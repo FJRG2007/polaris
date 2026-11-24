@@ -2516,6 +2516,10 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/account/downloads",
             icon: Download,
             keywords: [
+                "updates",
+                "check for updates",
+                "version",
+                "restart to update",
                 "app",
                 "apps",
                 "desktop",
@@ -2789,7 +2793,8 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         // The desktop app's own settings, one screen per category of
         // `APP_SETTING_CATEGORIES`: kept on the computer and offered only inside
         // the app, the way Discord lists its app settings beside the account's.
-        // The phone app lists General, Hosts and Updates (`APP_PHONE_CATEGORIES`).
+        // The phone app lists General and Hosts (`APP_PHONE_CATEGORIES`); the app's
+        // version and its updates are on Downloads.
         {
             label: "General", // i18n-ignore
             href: "/account/app/general",
@@ -2827,7 +2832,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Voice widget and games", // i18n-ignore
             href: "/account/app/voice",
             icon: AudioLines,
-            keywords: ["overlay", "voice widget", "call widget", "games", "in game", "show voice widget during calls", "only while a game is running", "avatar size", "show names", "show people", "opacity", "position"],
+            keywords: ["overlay", "voice widget", "call widget", "games", "in game", "show voice widget during calls", "only while a game is running", "avatar size", "show names", "show people", "opacity", "position", "quick actions", "clickable while locked", "clickable regions", "max users displayed", "reset default layout", "pin", "pin widget", "overlay lock key", "lock key", "overlay hotkey", "overlay in games", "per game overlay"],
             group: THIS_APP_GROUP,
             desktopOnly: true
         },
@@ -2847,15 +2852,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["hardware acceleration", "gpu", "graphics"],
             group: THIS_APP_GROUP,
             desktopOnly: true
-        },
-        {
-            label: "Updates", // i18n-ignore
-            href: "/account/app/updates",
-            icon: RefreshCw,
-            keywords: ["version", "check for updates", "restart", "desktop app"],
-            group: THIS_APP_GROUP,
-            desktopOnly: true,
-            phoneApp: true
         },
         // Hardware support the desktop app installs on this computer only.
         {

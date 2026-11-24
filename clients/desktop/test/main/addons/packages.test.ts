@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { entryFor, fakeFetch, fixturePackage, PACKAGE_URL, zip } from "./fixtures";
 import {
     installAddon,
@@ -14,6 +14,17 @@ import {
     type InstallOptions
 } from "@/main/addons/packages";
 
+// A folder Windows will not let go of: `rm` refuses any path holding `locked`.
+const lock = vi.hoisted(() => ({ name: null as string | null }));
+vi.mock("node:fs/promises", async (original) => {
+    const real = await original<typeof import("node:fs/promises")>();
+    return {
+        ...real,
+        rm: (path: string, options?: Parameters<typeof real.rm>[1]) =>
+            lock.name && String(path).includes(lock.name) ? Promise.reject(Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" })) : real.rm(path, options)
+    };
+});
+
 const dirs: string[] = [];
 async function tempDir(): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), "addons-packages-"));
@@ -21,6 +32,7 @@ async function tempDir(): Promise<string> {
     return dir;
 }
 afterEach(async () => {
+    lock.name = null;
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
 });
 
@@ -107,6 +119,32 @@ describe("updating, disabling and uninstalling", () => {
         // The replaced version stays on disk to roll back to (updates.test.ts).
         expect(await readdir(join(dir, "packages", "fixture-mixer"))).toEqual(["1.0.0", "1.1.0"]);
         expect((await readInstalled(dir)).addons["fixture-mixer"]?.enabled).toBe(false);
+    });
+
+    it("is installed even when the version it replaces cannot be removed, and sweeps it later", async () => {
+        const { dir } = await install(fixturePackage());
+        // Left behind by an app up to 0.1.96, which threw here and failed the install.
+        await mkdir(join(dir, "packages", "fixture-mixer", "0.9.0"), { recursive: true });
+        await writeFile(join(dir, "packages", "fixture-mixer", "0.9.0", "main.node"), "loaded");
+        lock.name = "0.9.0";
+        const update = (version: string) => {
+            const next = fixturePackage({ version });
+            return installAddon({
+                dir,
+                entry: entryFor(next, { version }),
+                platform: "linux-x64",
+                appVersion: "0.1.73",
+                accepted: ["usb", "polaris-actions"],
+                fetcher: fakeFetch({ [PACKAGE_URL]: next })
+            });
+        };
+        expect((await update("1.1.0")).ok).toBe(true);
+        expect((await readInstalled(dir)).addons["fixture-mixer"]?.version).toBe("1.1.0");
+        expect(await readdir(join(dir, "packages", "fixture-mixer"))).toEqual(["0.9.0", "1.0.0", "1.1.0"]);
+        lock.name = null;
+        expect((await update("1.2.0")).ok).toBe(true);
+        // One earlier version kept, never more.
+        expect(await readdir(join(dir, "packages", "fixture-mixer"))).toEqual(["1.1.0", "1.2.0"]);
     });
 
     it("leaves nothing behind once uninstalled", async () => {

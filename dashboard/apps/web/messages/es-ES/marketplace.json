@@ -57,7 +57,7 @@
             "label": "Mostrar",
             "all": "Todo",
             "apps": "Apps",
-            "addons": "Plugins"
+            "addons": "Complementos"
         }
     },
     "uninstall": {
@@ -93,7 +93,7 @@
         "lockedHint": "Instalar apps requiere permiso para gestionarlas. Pídeselo a un admin.",
         "preview": "Vista de {name}",
         "kindApp": "App",
-        "kindAddon": "Plugin"
+        "kindAddon": "Complemento"
     },
     "wizard": {
         "title": "Instalar {name}",

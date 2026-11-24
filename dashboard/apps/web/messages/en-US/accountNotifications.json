@@ -526,6 +526,14 @@
             "label": "Update installed on its own",
             "description": "A scheduled or automatic update ran, and how it went."
         },
+        "appsUpdate": {
+            "label": "An app has an update",
+            "description": "A newer release of an installed app is published, and what changed."
+        },
+        "appsUpdated": {
+            "label": "An app updated on its own",
+            "description": "An app took its newest release by itself, or went back when it failed."
+        },
         "instanceAnnouncement": {
             "label": "Announcement from your administrator",
             "description": "A message an administrator of this instance sent to you or a group you are in."

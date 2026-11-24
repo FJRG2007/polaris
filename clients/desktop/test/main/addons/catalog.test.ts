@@ -1,9 +1,9 @@
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
 import { verifySigned } from "@/main/addons/signature";
 import { afterEach, describe, expect, it } from "vitest";
-import { cachedCatalog, openCatalog, refreshCatalog } from "@/main/addons/catalog";
+import { cachedCatalog, openCatalog, refreshCatalog, writeWhole } from "@/main/addons/catalog";
 import { catalogOf, entryFor, fakeFetch, fixturePackage, sign, TEST_KEYS } from "./fixtures";
 
 const URL = "https://github.com/FJRG2007/polaris/releases/download/device-addons/catalog.json";
@@ -65,5 +65,19 @@ describe("catalog refresh", () => {
         const forged = await refreshCatalog(dir, fakeFetch({ [URL]: bytes, [`${URL}.sig`]: sign(bytesOf({ other: 1 })) }), null, URL, TEST_KEYS);
         expect(forged.kind).toBe("failed");
         expect(await cachedCatalog(dir, TEST_KEYS)).toBeNull();
+    });
+});
+
+describe("writeWhole", () => {
+    // Windows refuses a rename over a file any handle has open (EPERM): a store page
+    // reading installed.json the moment an install wrote it failed desktop 0.1.99's install.
+    it("replaces a file that is open elsewhere once it is let go", async () => {
+        const path = join(await tempDir(), "installed.json");
+        await writeFile(path, "{}");
+        const reader = await open(path, "r");
+        const released = new Promise<void>((resolve) => setTimeout(() => void reader.close().then(resolve), 50));
+        await writeWhole(path, '{"schema":1}');
+        await released;
+        expect(await readFile(path, "utf8")).toBe('{"schema":1}');
     });
 });

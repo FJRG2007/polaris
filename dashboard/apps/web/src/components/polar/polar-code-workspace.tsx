@@ -56,6 +56,8 @@ import {
 import * as shellTabs from "@/components/polar/shell-tabs";
 import { previewStartBlock } from "@/lib/agents/session-preview-command";
 
+export type WorkspacePane = Pane;
+
 type Pane = "files" | "artifacts" | "preview" | "browser" | "changes" | "pull" | "terminal";
 
 /** How often the file list is read again while the agent works. */
@@ -86,6 +88,7 @@ export function PolarCodeWorkspace({
     live,
     lastEdit = null,
     lastTool = null,
+    requested = null,
     onPick
 }: {
     open: boolean;
@@ -100,6 +103,9 @@ export function PolarCodeWorkspace({
     /** When the agent last finished any other tool: the checkout is looked at
      *  then, and a write a shell command made wakes the same two. */
     lastTool?: string | null;
+    /** A pane asked for from outside - the composer's "+" menu - which the
+     *  workspace shows as though the person had picked its tab. */
+    requested?: { readonly pane: Pane; readonly at: number } | null;
     /** Takes an element picked in the preview to the composer; without it
      *  the preview offers no picker. */
     onPick?: (element: PickedElement) => void;
@@ -116,6 +122,11 @@ export function PolarCodeWorkspace({
     useEffect(() => {
         if (!open) chosen.current = false;
     }, [open]);
+    useEffect(() => {
+        if (!requested) return;
+        chosen.current = true;
+        setPane(requested.pane);
+    }, [requested]);
     useEffect(() => {
         if (!open || !live || pane === "preview") return;
         const controller = new AbortController();

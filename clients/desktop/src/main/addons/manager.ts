@@ -174,8 +174,13 @@ export function createAddonManager(options: ManagerOptions) {
         return manifests.get(key) ?? null;
     }
 
-    /** Fetch, check and unpack one entry and start it; the caller holds `serial`. */
-    async function put(id: string, entry: AddonEntry, accepted: readonly AddonPermission[]): Promise<{ ok: true; } | { ok: false; reason: InstallFailure; }> {
+    /**
+     * Fetch, check and unpack one entry and start it; the caller holds `serial`.
+     * `started` is false when it went in but
+     * starting it threw: the install stands and is reported as done, the start
+     * apart, and the add-on's run state says the rest.
+     */
+    async function put(id: string, entry: AddonEntry, accepted: readonly AddonPermission[]): Promise<{ ok: true; started: boolean; } | { ok: false; reason: InstallFailure; }> {
         installing[id] = { received: 0, total: 0 };
         changed();
         try {
@@ -192,23 +197,31 @@ export function createAddonManager(options: ManagerOptions) {
                 }
             });
             if (!result.ok) return result;
-            supervisor.drop(id);
-            await reconcile();
-            return { ok: true as const };
+            try {
+                supervisor.drop(id);
+                await reconcile();
+                return { ok: true as const, started: true };
+            } catch (error) {
+                console.warn(`[addons] ${id} ${entry.version} is installed but did not start:`, error);
+                return { ok: true as const, started: false };
+            }
         } finally {
             delete installing[id];
             changed();
         }
     }
 
-    /** Say it once: the version is written down as announced before the notice goes out. */
+    /**
+     * Say it once: the version is written down as announced before the notice goes out.
+     * A failed write skips this notice (the next look says it) and never stops the updates after it.
+     */
     async function tell(id: string, version: string, news: UpdateNews): Promise<void> {
         const fresh = await updateInstalled(options.dir, (installed) => {
             const addon = installed.addons[id];
             if (!addon || announced(addon.notified, version)) return false;
             addon.notified = version;
             return true;
-        });
+        }).catch(() => false);
         if (fresh) options.notify?.(id, news);
     }
 
@@ -416,19 +429,21 @@ export function createAddonManager(options: ManagerOptions) {
             });
         },
 
-        install(id: string, accepted: readonly AddonPermission[]): Promise<{ ok: true; } | { ok: false; reason: InstallFailure | "unknown"; }> {
+        install(id: string, accepted: readonly AddonPermission[]): Promise<{ ok: true; started: boolean; } | { ok: false; reason: InstallFailure | "unknown"; }> {
             return serial(async () => {
                 await loadCatalog();
                 const entry = catalog?.addons.find((item) => item.id === id);
                 if (!entry) return { ok: false as const, reason: "unknown" as const };
                 const result = await put(id, entry, accepted);
-                // Put in by the person: nothing more to announce about this version.
+                // Put in by the person: nothing more to announce about this version. Only
+                // bookkeeping: failing to write it down must not report an install that
+                // went in as failed (0.1.99 did, when Windows refused the rename).
                 if (result.ok) {
                     await updateInstalled(options.dir, (installed) => {
                         const addon = installed.addons[id];
                         if (addon) addon.notified = entry.version;
                         return Boolean(addon);
-                    });
+                    }).catch((error: unknown) => console.warn(`[addons] ${id} ${entry.version} is installed; noting it as announced failed:`, error));
                 }
                 return result;
             });

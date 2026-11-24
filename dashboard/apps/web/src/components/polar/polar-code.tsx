@@ -156,9 +156,16 @@ import type {
     PolarCodeThread
 } from "@/lib/polar/code";
 import type { SessionView } from "@/lib/agents/session-service";
+import type { WorkspacePane } from "@/components/polar/polar-code-workspace";
+import type { PlusMenuView } from "@/components/polar/composer-plus-menu";
 import {
     BookmarkPlus,
     Code2,
+    FolderTree,
+    GitCompare,
+    Globe,
+    MousePointer2,
+    SquareTerminal,
     Keyboard,
     MessageSquare,
     PanelRight,
@@ -1562,6 +1569,8 @@ function CodeThread({
     const [thread, setThread] = useState<PolarCodeThread | null | undefined>(undefined);
     // The files, the changes and the terminal, beside the thread.
     const [workspace, setWorkspace] = useState(false);
+    // The pane the composer's "+" asked for, stamped so asking twice still moves it.
+    const [workspacePane, setWorkspacePane] = useState<{ pane: WorkspacePane; at: number } | null>(null);
     const [failed, setFailed] = useState(false);
     const [reply, setReply] = useState("");
     // The "/context" card, open until closed.
@@ -2197,6 +2206,31 @@ function CodeThread({
                 disabled={busy}
                 maxLength={PROMPT_MAX}
                 onSubmit={send}
+                views={
+                    thread?.canManage
+                        ? (
+                              [
+                                  ["files", FolderTree],
+                                  ["preview", Globe],
+                                  ...(thread.view.place === "local"
+                                      ? ([["browser", MousePointer2]] as const)
+                                      : []),
+                                  ["changes", GitCompare],
+                                  ["terminal", SquareTerminal]
+                              ] as const
+                          ).map(
+                              ([pane, Icon]): PlusMenuView => ({
+                                  id: pane,
+                                  label: t(`code.pane.${pane}`),
+                                  icon: <Icon />,
+                                  onSelect: () => {
+                                      setWorkspacePane({ pane, at: Date.now() });
+                                      setWorkspace(true);
+                                  }
+                              })
+                          )
+                        : undefined
+                }
                 picker={
                     liveSource || liveMode || liveEffort || liveAccount || liveSurface || liveSwitch ? (
                         <>
@@ -2429,6 +2463,7 @@ function CodeThread({
                     live={live}
                     lastEdit={thread.lastEdit ?? null}
                     lastTool={thread.lastTool ?? null}
+                    requested={workspacePane}
                     onPick={(element) => {
                         setPicks((list) => [...list, element].slice(-PICKS_MAX));
                         // What comes next is saying what to do with it.

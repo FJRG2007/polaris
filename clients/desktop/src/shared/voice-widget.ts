@@ -13,8 +13,10 @@ import * as z from "zod/mini";
 
 /** The most people the page may list; the widget draws fewer and counts the rest. */
 export const MAX_PEOPLE = 50;
-/** The most rows the widget draws before it says how many more there are. */
+/** The most rows the widget draws by default before it says how many more there are. */
 export const MAX_ROWS = 8;
+/** The highest "Max users displayed" choice; 0 is Off, which lists everybody. */
+export const MAX_USERS_LIMIT = 25;
 
 /**
  * The keys that lock and unlock the widget, tried in order, each with the name
@@ -24,7 +26,14 @@ export const MAX_ROWS = 8;
  * keyboard). The same with Ctrl (Cmd on a Mac) always, which nobody types,
  * and which also serves where Discord already holds the first.
  */
-export function lockKeys(platform: NodeJS.Platform, inGame: boolean): readonly (readonly [accelerator: string, label: string])[] {
+export function lockKeys(
+    platform: NodeJS.Platform,
+    inGame: boolean,
+    chosen: readonly [accelerator: string, label: string] | null = null
+): readonly (readonly [accelerator: string, label: string])[] {
+    // A key somebody chose is the only one: falling back to another would
+    // leave them pressing the one they chose while a different one works.
+    if (chosen) return [chosen];
     const withCtrl = ["CommandOrControl+Shift+`", platform === "darwin" ? "Cmd+Shift+`" : "Ctrl+Shift+`"] as const;
     return inGame ? [["Shift+`", "Shift+`"], withCtrl] : [withCtrl];
 }
@@ -68,8 +77,28 @@ export interface WidgetView {
     /** The key that locks it again, or null when no key could be held. */
     readonly lockKey: string | null;
     readonly look: WidgetLook;
+    /** The quick actions (mute, deafen, leave) are shown while locked and take
+     *  clicks there - the clickable regions of the overlay. Absent from an
+     *  older main process, which reads as false. */
+    readonly actions?: boolean;
+    /** The quick actions are on at all; false hides them even unlocked. Absent
+     *  from an older main process, which always had them. */
+    readonly buttons?: boolean;
+    /** Pinned: it stays on screen while locked. Unpinned, it shows only while
+     *  unlocked, as Discord's unpinned widgets do. Absent from an older main
+     *  process, which always kept it. */
+    readonly pinned?: boolean;
     /** Which edge the rows sit against: the bottom for a widget in a bottom corner. */
     readonly anchor: "top" | "bottom";
+    /** The layer the panel is drawn in: the display's work area and the
+     *  margin from its edges, in the layer's pixels, and where the panel was
+     *  left (null: its corner). Absent from an older main process, whose
+     *  window was the panel itself. */
+    readonly layer?: {
+        readonly area: Region;
+        readonly margin: number;
+        readonly place: { readonly x: number; readonly y: number; readonly width?: number; readonly height?: number; } | null;
+    };
     /** Each face fetched so far, by person id, as a data URL. Sent only when one
      *  arrived since the last view; a view without it keeps the ones it had. */
     readonly faces?: Readonly<Record<string, string>>;
@@ -98,10 +127,22 @@ export interface WidgetLook {
     readonly people: PeopleMode;
     readonly opacity: Opacity;
     readonly corner: Corner;
+    /** The most people drawn before "and N more"; 0 (Off) draws everybody. */
+    readonly maxUsers: number;
 }
 
-/** Discord's own defaults: large faces, every name, everybody, fully opaque. */
-export const DEFAULT_LOOK: WidgetLook = { avatars: "large", names: "always", people: "always", opacity: 100, corner: "top-left" };
+/** Discord's own defaults: large faces, every name, everybody, fully opaque, eight rows. */
+export const DEFAULT_LOOK: WidgetLook = {
+    avatars: "large",
+    names: "always",
+    people: "always",
+    opacity: 100,
+    corner: "top-left",
+    maxUsers: MAX_ROWS
+};
+
+/** A "Max users displayed" value: a whole number from Off (0) to the limit. */
+export const maxUsersSchema = z.int().check(z.minimum(0), z.maximum(MAX_USERS_LIMIT));
 
 const opacitySchema = z.union([z.literal(100), z.literal(80), z.literal(60), z.literal(40)]);
 
@@ -111,7 +152,8 @@ export const lookChangeSchema = z.union([
     z.strictObject({ key: z.literal("names"), value: z.enum(NAME_MODES) }),
     z.strictObject({ key: z.literal("people"), value: z.enum(PEOPLE_MODES) }),
     z.strictObject({ key: z.literal("opacity"), value: opacitySchema }),
-    z.strictObject({ key: z.literal("corner"), value: z.enum(CORNERS) })
+    z.strictObject({ key: z.literal("corner"), value: z.enum(CORNERS) }),
+    z.strictObject({ key: z.literal("maxUsers"), value: maxUsersSchema })
 ]);
 
 export type LookChange = z.infer<typeof lookChangeSchema>;
@@ -131,15 +173,79 @@ export function showsName(person: Pick<VoicePerson, "speaking">, look: Pick<Widg
     return look.names === "always" || (look.names === "speaking" && person.speaking);
 }
 
-/** Whether the widget is on screen: only in a call, only when switched on, and
- *  - when somebody asked for that - only while a game is running. */
+/** How many rows the widget draws at most: the chosen number, or everybody the page may list when Off. */
+export function rowCap(look: Partial<Pick<WidgetLook, "maxUsers">>): number {
+    if (look.maxUsers === undefined) return MAX_ROWS;
+    return look.maxUsers === 0 ? MAX_PEOPLE : look.maxUsers;
+}
+
+/** A rectangle of the widget's page, in its own pixels. */
+export interface Region {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+}
+
+/**
+ * Whether a point falls in one of the regions that take clicks while the
+ * widget is locked. Everywhere else a click goes through to the game; the
+ * page asks for clicks only while the pointer is over one of these.
+ */
+export function insideRegions(point: { readonly x: number; readonly y: number; }, regions: readonly Region[]): boolean {
+    return regions.some((region) =>
+        region.width > 0 &&
+        region.height > 0 &&
+        point.x >= region.x &&
+        point.y >= region.y &&
+        point.x < region.x + region.width &&
+        point.y < region.y + region.height
+    );
+}
+
+/** Whether the widget is on screen: only in a call, only when switched on,
+ *  - when somebody asked for that - only while a game is running, and never
+ *  over a game it was turned off for. */
 export function widgetVisible(input: {
     readonly inCall: boolean;
     readonly enabled: boolean;
     readonly onlyWithGame: boolean;
     readonly gameRunning: boolean;
+    /** The game running is one the overlay was turned off for. */
+    readonly gameOff?: boolean;
 }): boolean {
-    return input.inCall && input.enabled && (!input.onlyWithGame || input.gameRunning);
+    return input.inCall && input.enabled && (!input.onlyWithGame || input.gameRunning) && !input.gameOff;
+}
+
+/** A game the overlay was turned off for, by its program, with the name it was seen with. */
+export interface OverlayGame {
+    readonly key: string;
+    readonly name: string;
+}
+
+/** The most games the overlay can be turned off for. */
+export const MAX_OFF_GAMES = 200;
+
+/**
+ * The games the overlay is off for after turning it on or off for one:
+ * turned off, it joins the list (once); turned on, it leaves it.
+ */
+export function withOverlayGame(off: readonly OverlayGame[], game: OverlayGame, on: boolean): OverlayGame[] {
+    const rest = off.filter((entry) => entry.key !== game.key);
+    return on ? rest : [...rest, game].slice(-MAX_OFF_GAMES);
+}
+
+/**
+ * What the settings list for the per-game switch: the game running now
+ * first (on or off), then every game the overlay was turned off for.
+ */
+export function overlayGameRows(
+    off: readonly OverlayGame[],
+    running: OverlayGame | null
+): { key: string; name: string; on: boolean; running: boolean; }[] {
+    const rows = off.map((game) => ({ key: game.key, name: game.name, on: false, running: game.key === running?.key }));
+    if (running && !rows.some((row) => row.running)) rows.unshift({ key: running.key, name: running.name, on: true, running: true });
+    return rows.sort((a, b) => Number(b.running) - Number(a.running));
 }
 
 /** The window's width, in pixels at the default text size: room for a long
@@ -163,16 +269,23 @@ const MORE_HEIGHT = 22;
  * clear, and locked it lets clicks through. With no names it is as narrow as a
  * face; unlocked it is wide enough for its buttons.
  */
-export function widgetSize(people: number, unlocked: boolean, look: Pick<WidgetLook, "avatars" | "names"> = DEFAULT_LOOK): { width: number; height: number; } {
+export function widgetSize(
+    people: number,
+    unlocked: boolean,
+    look: Pick<WidgetLook, "avatars" | "names"> & Partial<Pick<WidgetLook, "maxUsers">> = DEFAULT_LOOK,
+    actions = false
+): { width: number; height: number; } {
     const metrics = ROW_METRICS[look.avatars];
-    const rows = Math.min(Math.max(people, 1), MAX_ROWS);
-    const height = PADDING + rows * metrics.row + (people > MAX_ROWS ? MORE_HEIGHT : 0) + (unlocked ? FOOTER_HEIGHT : 0);
-    const width = unlocked || look.names !== "never" ? WIDGET_WIDTH : PADDING + metrics.face + PADDING;
+    const cap = rowCap(look);
+    const rows = Math.min(Math.max(people, 1), cap);
+    const footer = unlocked || actions;
+    const height = PADDING + rows * metrics.row + (people > cap ? MORE_HEIGHT : 0) + (footer ? FOOTER_HEIGHT : 0);
+    const width = footer || look.names !== "never" ? WIDGET_WIDTH : PADDING + metrics.face + PADDING;
     return { width, height };
 }
 
 /** The window's height for this many people. */
-export function widgetHeight(people: number, unlocked: boolean, look: Pick<WidgetLook, "avatars" | "names"> = DEFAULT_LOOK): number {
+export function widgetHeight(people: number, unlocked: boolean, look: Pick<WidgetLook, "avatars" | "names"> & Partial<Pick<WidgetLook, "maxUsers">> = DEFAULT_LOOK): number {
     return widgetSize(people, unlocked, look).height;
 }
 

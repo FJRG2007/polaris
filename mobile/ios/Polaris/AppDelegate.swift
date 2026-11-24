@@ -43,7 +43,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     /// The Polaris open now, on `path` when one is given.
     func showStart(path: String? = nil) {
         if let host = ServerStore.active {
-            window?.rootViewController = WebViewController(host: host, path: path) { [weak self] in self?.showHosts() }
+            window?.rootViewController = WebViewController(
+                host: host, path: path,
+                changeServer: { [weak self] in self?.showHosts() },
+                reopen: { [weak self] in self?.showStart() }
+            )
         } else {
             showServer()
         }

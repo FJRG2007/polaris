@@ -19,6 +19,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 
 const { AppSettingsView } = await import("../../src/app/(app)/account/app/[category]/app-settings-view");
+const { ThisDeviceApp } = await import("../../src/components/this-app/this-device-app");
 
 const SNAPSHOT = {
     version: "0.1.15",
@@ -50,6 +51,18 @@ async function draw(category: core.AppSettingCategory) {
     render(
         <MessagesWrapper>
             <AppSettingsView category={category} />
+        </MessagesWrapper>
+    );
+    await act(async () => {
+        await Promise.resolve();
+    });
+}
+
+/** The phone's version and updates, as Downloads draws them. */
+async function drawDownloads() {
+    render(
+        <MessagesWrapper>
+            <ThisDeviceApp />
         </MessagesWrapper>
     );
     await act(async () => {
@@ -122,7 +135,7 @@ describe("the phone app's settings screen", () => {
         await draw("hosts");
         expect(screen.getByText("Home")).toBeTruthy();
         expect(screen.getByText("https://work.example.test")).toBeTruthy();
-        expect(screen.getByText("Open now")).toBeTruthy();
+        expect(screen.getByText("In use")).toBeTruthy();
         // A phone has no windows: the hint names the app's own screen.
         expect(screen.getByText(/on the app's own screen/)).toBeTruthy();
         expect(screen.queryByText(/window/)).toBeNull();
@@ -130,9 +143,9 @@ describe("the phone app's settings screen", () => {
         expect(app.changeServer).toHaveBeenCalled();
     });
 
-    it("checks for updates through the app's callback", async () => {
+    it("checks for updates through the app's callback, on Downloads", async () => {
         const app = phone();
-        await draw("updates");
+        await drawDownloads();
         expect(screen.getByText("Polaris 0.1.15")).toBeTruthy();
         await act(async () => screen.getByRole("button", { name: "Check for updates" }).click());
         expect(screen.getByText("Checking for updates...")).toBeTruthy();
@@ -144,7 +157,7 @@ describe("the phone app's settings screen", () => {
 
     it("says a store updates a copy installed from one", async () => {
         phone({ ...SNAPSHOT, updates: "store" });
-        await draw("updates");
+        await drawDownloads();
         expect(screen.queryByRole("button", { name: "Check for updates" })).toBeNull();
         expect(screen.getByText("This copy of Polaris updates through the system that installed it.")).toBeTruthy();
     });

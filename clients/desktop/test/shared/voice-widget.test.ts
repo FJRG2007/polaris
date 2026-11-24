@@ -10,9 +10,14 @@ import {
     DEFAULT_LOOK,
     faceColor,
     initials,
+    insideRegions,
     lockKeys,
     lookChangeSchema,
+    overlayGameRows,
+    withOverlayGame,
+    MAX_PEOPLE,
     MAX_ROWS,
+    rowCap,
     showsName,
     shownPeople,
     voiceActionSchema,
@@ -162,5 +167,101 @@ describe("the widget's size and corner", () => {
         ["bottom-right", { x: 1920 - 240 - 16, y: 40 + 1000 - 100 - 16 }]
     ] as const)("sits %s of the work area", (corner, point) => {
         expect(cornerPoint(area, { width: 240, height: 100 }, corner, 16)).toEqual(point);
+    });
+});
+
+describe("max users displayed", () => {
+    it("caps the rows at the chosen number, Off listing everybody", () => {
+        expect(rowCap(DEFAULT_LOOK)).toBe(MAX_ROWS);
+        expect(rowCap({ maxUsers: 5 })).toBe(5);
+        expect(rowCap({ maxUsers: 0 })).toBe(MAX_PEOPLE);
+        expect(rowCap({})).toBe(MAX_ROWS);
+    });
+
+    it("sizes the window for the capped rows and the line that counts the rest", () => {
+        const five = { ...DEFAULT_LOOK, maxUsers: 5 };
+        expect(widgetSize(5, false, five).height).toBe(widgetSize(5, false, DEFAULT_LOOK).height);
+        expect(widgetSize(12, false, five).height).toBeLessThan(widgetSize(12, false, DEFAULT_LOOK).height);
+        expect(widgetSize(12, false, five).height).toBeGreaterThan(widgetSize(5, false, five).height);
+        expect(widgetSize(20, false, { ...DEFAULT_LOOK, maxUsers: 0 }).height).toBeGreaterThan(widgetSize(20, false, DEFAULT_LOOK).height);
+    });
+
+    it("is one whole number from Off to 25 when it is changed", () => {
+        expect(lookChangeSchema.safeParse({ key: "maxUsers", value: 0 }).success).toBe(true);
+        expect(lookChangeSchema.safeParse({ key: "maxUsers", value: 25 }).success).toBe(true);
+        expect(lookChangeSchema.safeParse({ key: "maxUsers", value: 26 }).success).toBe(false);
+        expect(lookChangeSchema.safeParse({ key: "maxUsers", value: -1 }).success).toBe(false);
+        expect(lookChangeSchema.safeParse({ key: "maxUsers", value: 7.5 }).success).toBe(false);
+        expect(withLookChange(DEFAULT_LOOK, { key: "maxUsers", value: 12 }).maxUsers).toBe(12);
+    });
+});
+
+describe("clickable regions", () => {
+    const buttons = [
+        { x: 8, y: 100, width: 32, height: 32 },
+        { x: 44, y: 100, width: 32, height: 32 }
+    ];
+
+    it("take a point on a button and let every other one through", () => {
+        expect(insideRegions({ x: 10, y: 110 }, buttons)).toBe(true);
+        expect(insideRegions({ x: 75, y: 131 }, buttons)).toBe(true);
+        expect(insideRegions({ x: 42, y: 110 }, buttons)).toBe(false);
+        expect(insideRegions({ x: 10, y: 20 }, buttons)).toBe(false);
+        // The far edges belong to what is next to the box.
+        expect(insideRegions({ x: 40, y: 110 }, buttons)).toBe(false);
+        expect(insideRegions({ x: 10, y: 132 }, buttons)).toBe(false);
+    });
+
+    it("never take a click for a hidden (empty) button or with no regions", () => {
+        expect(insideRegions({ x: 0, y: 0 }, [{ x: 0, y: 0, width: 0, height: 0 }])).toBe(false);
+        expect(insideRegions({ x: 5, y: 5 }, [])).toBe(false);
+    });
+
+    it("keep the buttons' row while locked, so the window is sized for it", () => {
+        expect(widgetSize(3, false, DEFAULT_LOOK, true).height).toBe(widgetSize(3, true, DEFAULT_LOOK).height);
+        expect(widgetSize(3, false, { ...DEFAULT_LOOK, names: "never" }, true).width).toBe(widgetSize(3, true, DEFAULT_LOOK).width);
+    });
+});
+
+describe("the overlay's choosable lock key", () => {
+    it("is the only key held once chosen, in or out of a game", () => {
+        expect(lockKeys("win32", true, ["Alt+O", "Alt+O"])).toEqual([["Alt+O", "Alt+O"]]);
+        expect(lockKeys("win32", false, ["F10", "F10"])).toEqual([["F10", "F10"]]);
+    });
+
+    it("leaves the default keys when none was chosen", () => {
+        expect(lockKeys("win32", true, null)).toEqual(lockKeys("win32", true));
+    });
+});
+
+describe("the overlay per game", () => {
+    const cs = { key: "cs2.exe", name: "Counter-Strike 2" };
+    const dota = { key: "dota2.exe", name: "Dota 2" };
+
+    it("hides the widget over a game it was turned off for", () => {
+        const base = { inCall: true, enabled: true, onlyWithGame: false, gameRunning: true };
+        expect(widgetVisible({ ...base, gameOff: true })).toBe(false);
+        expect(widgetVisible({ ...base, gameOff: false })).toBe(true);
+        // From a caller that does not know about games.
+        expect(widgetVisible(base)).toBe(true);
+    });
+
+    it("adds a game once when turned off and drops it when turned on", () => {
+        const off = withOverlayGame([], cs, false);
+        expect(off).toEqual([cs]);
+        expect(withOverlayGame(off, cs, false)).toEqual([cs]);
+        expect(withOverlayGame([cs, dota], cs, true)).toEqual([dota]);
+    });
+
+    it("lists the game running first, then every game turned off", () => {
+        expect(overlayGameRows([], null)).toEqual([]);
+        expect(overlayGameRows([dota], cs)).toEqual([
+            { ...cs, on: true, running: true },
+            { ...dota, on: false, running: false }
+        ]);
+        expect(overlayGameRows([dota, cs], cs)).toEqual([
+            { ...cs, on: false, running: true },
+            { ...dota, on: false, running: false }
+        ]);
     });
 });

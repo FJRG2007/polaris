@@ -17,10 +17,23 @@ import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-sha
 import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
 import { setCallHotkeys } from "./call-hotkeys";
-import { followTextSize as followWidgetTextSize, followVoiceWidgetLook, setVoiceState, voiceWidgetAction } from "./voice-widget";
-import { launcherBinding, rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, rememberVoiceWidgetLook, textSize, voiceWidgetLook } from "./settings";
+import {
+    followTextSize as followWidgetTextSize,
+    followVoiceWidgetLook,
+    overlayGames,
+    overlayLockStatus,
+    recordOverlayLockKey,
+    setOverlayGame,
+    setOverlayLockBinding,
+    setVoiceState,
+    setVoiceWidgetClickable,
+    placeVoicePanel,
+    voiceWidgetAction
+} from "./voice-widget";
+import { launcherBinding, overlayLockBinding, rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, rememberVoiceWidgetLook, resetVoiceWidgetLayout, textSize, voiceWidgetLook } from "./settings";
 import { readTextSize } from "@/shared/text-size";
 import { lookChangeSchema, voiceActionSchema, voiceStateSchema, withLookChange } from "@/shared/voice-widget";
+import { placeReportSchema } from "@/shared/overlay-layout";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
 import { closeNotice, showNotice } from "./notices";
 import { appBadgeSchema, applyAppBadge } from "./app-badge";
@@ -48,7 +61,10 @@ import {
     type Outcome,
     type PickedFolder,
     type HostImport,
+    type HostsSnapshot,
+    type HostStatus,
     type Preferences,
+    type SettingsFeature,
     type PreferenceToggle,
     type SystemIdle
 } from "@/shared/bridge";
@@ -75,7 +91,7 @@ import {
 } from "electron";
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
 import { clearClipboardHistory, followClipboardKeep, launcherStatus, recordLauncherKey, setLauncherBinding } from "./launcher";
-import { appKeyPressSchema, readAppSettingChange, type AppSettingChange } from "@polaris/core/app-settings";
+import { APP_SETTING_FEATURES, appKeyPressSchema, appOverlayGameChangeSchema, readAppSettingChange, type AppSettingChange } from "@polaris/core/app-settings";
 import { bindingFromPress } from "@/shared/launcher-hotkey";
 
 export interface IpcHost extends PushHost {
@@ -98,12 +114,16 @@ export interface IpcHost extends PushHost {
     readonly connectSubmit: (raw: unknown, name?: string) => Promise<Outcome>;
     readonly connectCheck: (raw: unknown) => Promise<AddressCheck>;
     readonly switchServer: (origin: string) => Promise<Outcome>;
-    readonly nameServer: (origin: string, name: string) => Outcome;
     /** Give a listed host another address and name; a new address is checked first. */
     readonly editServer: (origin: string, address: string, name: string) => Promise<Outcome>;
     readonly removeServer: (origin: string) => Outcome;
+    /** Keep a host from Settings > This app > Hosts, checked first, without opening it. */
+    readonly addServer: (raw: unknown, name: string) => Promise<Outcome>;
+    /** Whether a listed host answers as a Polaris now. */
+    readonly hostStatus: (origin: string) => Promise<HostStatus>;
     /** Moving the list of hosts to and from another device. */
     readonly hosts: {
+        readonly link: () => string;
         readonly copy: () => { ok: boolean; count: number };
         readonly exportFile: (parent: BrowserWindow | null) => Promise<HostImport>;
         readonly importFile: (parent: BrowserWindow | null) => Promise<HostImport>;
@@ -111,8 +131,9 @@ export interface IpcHost extends PushHost {
     };
     /** Put the settings away, from the page itself. */
     readonly closeConnect: () => void;
-    /** The window that adds, names, removes and switches servers. */
-    readonly openServers: () => void;
+    /** Manage the hosts, asked by a Polaris page: its own Hosts when it draws them,
+     *  else the hosts window saying the host is older than this app. */
+    readonly manageHosts: (sender: WebContents) => void;
     /** The update waiting for a restart, and the restart into it. */
     readonly updates: Pick<UpdateReadyState, "current" | "install" | "offer">;
     /** Why this run began, for a page of this origin, with its call once. */
@@ -121,8 +142,9 @@ export interface IpcHost extends PushHost {
     readonly holdCall: (sender: number, origin: string, note: string | null) => void;
     /** Ask for a newer version now, from a press. */
     readonly checkUpdates: () => Promise<UpdateCheck>;
-    /** This page draws the app's settings: the tray and the menus open them there. */
-    readonly settingsAnnounced: (sender: WebContents) => void;
+    /** This page draws the app's settings: the tray and the menus open them there.
+     *  `hosts` when it manages the hosts too. */
+    readonly settingsAnnounced: (sender: WebContents, hosts: boolean) => void;
 }
 
 /** A server named by the list: an address in the one stored form. */
@@ -451,6 +473,16 @@ export function registerIpc(host: IpcHost): void {
         const action = voiceActionSchema.safeParse(raw);
         return from(event, "voice-widget") && action.success && voiceWidgetAction(action.data);
     });
+    // The widget's pointer over (true) or off (false) a region that takes clicks while locked.
+    ipcMain.handle(CHANNELS.widgetClickable, (event, raw: unknown): void => {
+        const on = z.boolean().safeParse(raw);
+        if (from(event, "voice-widget") && on.success) setVoiceWidgetClickable(on.data);
+    });
+    // A panel dragged or resized in the overlay layer.
+    ipcMain.handle(CHANNELS.widgetPlace, (event, raw: unknown): void => {
+        const place = placeReportSchema.safeParse(raw);
+        if (from(event, "voice-widget") && place.success) placeVoicePanel(place.data);
+    });
 
     ipcMain.handle(CHANNELS.gameCurrent, (event) => {
         if (!fromPolaris(event)) return { game: null, reporter: false };
@@ -606,7 +638,7 @@ export function registerIpc(host: IpcHost): void {
     });
 
     ipcMain.handle(CHANNELS.openServers, (event): void => {
-        if (fromPolaris(event)) host.openServers();
+        if (fromPolaris(event)) host.manageHosts(event.sender);
     });
 
     // The page cannot open an ms-settings: link itself: navigation sends only
@@ -735,22 +767,12 @@ export function registerIpc(host: IpcHost): void {
         const origin = listedSchema.safeParse(raw);
         return from(event, "connect") && origin.success ? host.switchServer(origin.data) : REFUSED;
     });
-    ipcMain.handle(CHANNELS.connectRename, (event, raw: unknown) => {
-        const input = z.object({ origin: listedSchema, name: z.string().max(200) }).safeParse(raw);
-        return from(event, "connect") && input.success ? host.nameServer(input.data.origin, input.data.name) : REFUSED;
-    });
-    ipcMain.handle(CHANNELS.connectEdit, (event, raw: unknown) => {
-        const input = z.object({ origin: listedSchema, address: z.string().max(2048), name: z.string().max(200) }).safeParse(raw);
-        return from(event, "connect") && input.success
-            ? host.editServer(input.data.origin, input.data.address, input.data.name)
-            : REFUSED;
-    });
-
     // The app's settings, for the host's own Settings page ("This app"). The
     // values are this computer's, so the page only reads and changes them
-    // through these calls, each validated here; the list of hosts is only read,
-    // since it decides which server this app trusts - it is changed from the
-    // app's own page alone (`manageHosts`).
+    // through these calls, each validated here. The list of hosts decides which
+    // server this app trusts, so every address the page hands over goes through
+    // the same schema and the same probe as one typed in the hosts window, and
+    // only the Polaris main frame on the host in use may ask.
     const changed = (): void => {
         for (const contents of webContents.getAllWebContents()) {
             const kind = kindOf(contents);
@@ -761,6 +783,7 @@ export function registerIpc(host: IpcHost): void {
         const status = await launcherStatus();
         const state = host.connectState();
         const look = voiceWidgetLook();
+        const overlayLock = overlayLockStatus();
         return {
             ...host.preferences(),
             voiceWidgetAvatars: look.avatars,
@@ -768,9 +791,15 @@ export function registerIpc(host: IpcHost): void {
             voiceWidgetPeople: look.people,
             voiceWidgetOpacity: String(look.opacity),
             voiceWidgetCorner: look.corner,
+            voiceWidgetMaxUsers: look.maxUsers,
             launcherBinding: launcherBinding(),
             launcherKey: status.key,
             launcherProblem: status.problem,
+            overlayLockBinding: overlayLockBinding(),
+            overlayLockKey: overlayLock.key,
+            overlayLockProblem: overlayLock.problem,
+            overlayGames: overlayGames(),
+            features: [...APP_SETTING_FEATURES],
             server: state.address,
             servers: state.servers.map((server) => ({ origin: server.origin, name: server.name }))
         };
@@ -806,6 +835,8 @@ export function registerIpc(host: IpcHost): void {
                 return changeLook({ key: "opacity", value: Number(change.value) });
             case "voiceWidgetCorner":
                 return changeLook({ key: "corner", value: change.value });
+            case "voiceWidgetMaxUsers":
+                return changeLook({ key: "maxUsers", value: change.value });
             default:
                 return host.setToggle(change.key, change.value);
         }
@@ -819,11 +850,38 @@ export function registerIpc(host: IpcHost): void {
     });
     ipcMain.handle(CHANNELS.appSettingsRecord, (event, raw: unknown) => {
         const recording = z.boolean().safeParse(raw);
-        if (fromPolaris(event) && recording.success) recordLauncherKey(recording.data);
+        if (!fromPolaris(event) || !recording.success) return;
+        recordLauncherKey(recording.data);
+        recordOverlayLockKey(recording.data);
+    });
+    // The overlay's lock key: a press becomes it, null puts the default keys back.
+    ipcMain.handle(CHANNELS.appSettingsOverlayShortcut, (event, raw: unknown) => {
+        if (!fromPolaris(event)) return null;
+        // Recording is over either way: the launcher takes its own key back.
+        recordLauncherKey(false);
+        let binding = "";
+        if (raw !== null) {
+            const press = appKeyPressSchema.safeParse(raw);
+            const chosen = press.success ? bindingFromPress(press.data, process.platform) : null;
+            if (!chosen) return null;
+            binding = chosen;
+        }
+        // The launcher's key went back to it when recording stopped; one key cannot be both.
+        if (binding && binding === launcherBinding()) return null;
+        if (!setOverlayLockBinding(binding)) return null;
+        changed();
+        return snapshot();
+    });
+    ipcMain.handle(CHANNELS.appSettingsOverlayGame, (event, raw: unknown) => {
+        const change = appOverlayGameChangeSchema.safeParse(raw);
+        if (!fromPolaris(event) || !change.success || !setOverlayGame(change.data.key, change.data.on)) return null;
+        changed();
+        return snapshot();
     });
     ipcMain.handle(CHANNELS.appSettingsShortcut, async (event, raw: unknown) => {
         const press = appKeyPressSchema.safeParse(raw);
         if (!fromPolaris(event) || !press.success) return null;
+        recordOverlayLockKey(false);
         const binding = bindingFromPress(press.data, process.platform);
         if (!binding) return null;
         await setLauncherBinding(binding);
@@ -835,10 +893,69 @@ export function registerIpc(host: IpcHost): void {
     });
     ipcMain.handle(CHANNELS.appSettingsRelaunch, (event) => (fromPolaris(event) ? host.relaunch() : REFUSED));
     ipcMain.handle(CHANNELS.appSettingsHosts, (event) => {
-        if (fromPolaris(event)) host.openServers();
+        if (fromPolaris(event)) host.manageHosts(event.sender);
     });
-    ipcMain.handle(CHANNELS.appSettingsAnnounce, (event) => {
-        if (fromPolaris(event)) host.settingsAnnounced(event.sender);
+    ipcMain.handle(CHANNELS.appSettingsResetOverlay, async (event) => {
+        if (!fromPolaris(event)) return null;
+        resetVoiceWidgetLayout();
+        followVoiceWidgetLook();
+        changed();
+        return snapshot();
+    });
+    ipcMain.handle(CHANNELS.appSettingsAnnounce, (event, raw: unknown) => {
+        // An older page sends nothing: it draws the settings and not the hosts.
+        const features = z.array(z.string().max(32)).max(16).catch([]).parse(raw);
+        if (fromPolaris(event)) host.settingsAnnounced(event.sender, features.includes("hosts" satisfies SettingsFeature));
+    });
+
+    // Settings > This app > Hosts. Each change says so to every Polaris page, so
+    // a second window on the screen draws the list anew.
+    const hostsChanged = <T extends { ok: boolean }>(outcome: T): T => {
+        if (outcome.ok) changed();
+        return outcome;
+    };
+    const HOSTS_REFUSED: HostImport = { ok: false, error: "Polaris could not do that. Try again." };
+    ipcMain.handle(CHANNELS.hostsList, (event): HostsSnapshot | null => {
+        if (!fromPolaris(event)) return null;
+        const state = host.connectState();
+        return { servers: state.servers, error: state.error };
+    });
+    ipcMain.handle(CHANNELS.hostsCheck, (event, raw: unknown) =>
+        fromPolaris(event) ? host.connectCheck(raw) : { ok: false, message: null }
+    );
+    ipcMain.handle(CHANNELS.hostsAdd, async (event, raw: unknown) => {
+        const input = z.object({ address: z.string().max(2048), name: z.string().max(200) }).safeParse(raw);
+        if (!fromPolaris(event) || !input.success) return REFUSED;
+        return hostsChanged(await host.addServer(input.data.address, input.data.name));
+    });
+    ipcMain.handle(CHANNELS.hostsSwitch, (event, raw: unknown) => {
+        const origin = listedSchema.safeParse(raw);
+        return fromPolaris(event) && origin.success ? host.switchServer(origin.data) : REFUSED;
+    });
+    ipcMain.handle(CHANNELS.hostsEdit, async (event, raw: unknown) => {
+        const input = z.object({ origin: listedSchema, address: z.string().max(2048), name: z.string().max(200) }).safeParse(raw);
+        if (!fromPolaris(event) || !input.success) return REFUSED;
+        return hostsChanged(await host.editServer(input.data.origin, input.data.address, input.data.name));
+    });
+    ipcMain.handle(CHANNELS.hostsRemove, (event, raw: unknown) => {
+        const origin = listedSchema.safeParse(raw);
+        return fromPolaris(event) && origin.success ? hostsChanged(host.removeServer(origin.data)) : REFUSED;
+    });
+    ipcMain.handle(CHANNELS.hostsStatus, (event, raw: unknown): Promise<HostStatus> | HostStatus => {
+        const origin = listedSchema.safeParse(raw);
+        return fromPolaris(event) && origin.success ? host.hostStatus(origin.data) : "unknown";
+    });
+    ipcMain.handle(CHANNELS.hostsLink, (event) => (fromPolaris(event) ? host.hosts.link() : ""));
+    ipcMain.handle(CHANNELS.hostsCopy, (event) => (fromPolaris(event) ? host.hosts.copy() : { ok: false, count: 0 }));
+    ipcMain.handle(CHANNELS.hostsExport, (event) =>
+        fromPolaris(event) ? host.hosts.exportFile(BrowserWindow.fromWebContents(event.sender)) : HOSTS_REFUSED
+    );
+    ipcMain.handle(CHANNELS.hostsOpen, async (event) =>
+        fromPolaris(event) ? hostsChanged(await host.hosts.importFile(BrowserWindow.fromWebContents(event.sender))) : HOSTS_REFUSED
+    );
+    ipcMain.handle(CHANNELS.hostsImport, (event, raw: unknown) => {
+        const text = z.string().max(65536).safeParse(raw);
+        return fromPolaris(event) && text.success ? hostsChanged(host.hosts.take(text.data)) : HOSTS_REFUSED;
     });
     // Only the host's update page, by its exact address.
     ipcMain.handle(CHANNELS.connectOpenOnHost, (event, raw: unknown) => {
@@ -847,25 +964,6 @@ export function registerIpc(host: IpcHost): void {
     });
     ipcMain.handle(CHANNELS.connectClose, (event) => {
         if (from(event, "connect")) host.closeConnect();
-    });
-    ipcMain.handle(CHANNELS.connectRemove, (event, raw: unknown) => {
-        const origin = listedSchema.safeParse(raw);
-        return from(event, "connect") && origin.success ? host.removeServer(origin.data) : REFUSED;
-    });
-    // Moving the list: only the settings window asks, and only text crosses in.
-    const HOSTS_REFUSED: HostImport = { ok: false, error: "Polaris could not do that. Try again." };
-    ipcMain.handle(CHANNELS.connectHostsCopy, (event) =>
-        from(event, "connect") ? host.hosts.copy() : { ok: false, count: 0 }
-    );
-    ipcMain.handle(CHANNELS.connectHostsExport, (event) =>
-        from(event, "connect") ? host.hosts.exportFile(BrowserWindow.fromWebContents(event.sender)) : HOSTS_REFUSED
-    );
-    ipcMain.handle(CHANNELS.connectHostsOpen, (event) =>
-        from(event, "connect") ? host.hosts.importFile(BrowserWindow.fromWebContents(event.sender)) : HOSTS_REFUSED
-    );
-    ipcMain.handle(CHANNELS.connectHostsImport, (event, raw: unknown) => {
-        const text = z.string().max(65536).safeParse(raw);
-        return from(event, "connect") && text.success ? host.hosts.take(text.data) : HOSTS_REFUSED;
     });
 
     ipcMain.handle(CHANNELS.keyState, (event) => (from(event, "api-key") ? keyFormState() : null));

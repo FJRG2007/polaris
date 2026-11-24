@@ -1,0 +1,1 @@
+Your Polaris servers are edited, removed, imported and exported in Settings > This app > Hosts; the app's own screen opens or adds one.

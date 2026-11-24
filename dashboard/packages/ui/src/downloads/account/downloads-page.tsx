@@ -10,6 +10,7 @@
 import { Badge } from "../../index";
 import type { ReactNode } from "react";
 import { CliSection } from "./cli-section";
+import { AntivirusHelpLink } from "./antivirus-help";
 import { SystemMark } from "./client-marks";
 import { useTranslations } from "../../i18n";
 import { ExtensionCard } from "./extension-card";
@@ -31,7 +32,8 @@ export function DownloadsPage({
     desktopFiles,
     mobileFiles,
     tv,
-    signedFirefox
+    signedFirefox,
+    thisDevice
 }: {
     repo: string;
     /** The address the CLI signs in to, or null for the one the page is on. */
@@ -54,6 +56,8 @@ export function DownloadsPage({
     tv?: ReactNode;
     /** Where the signed Firefox package is served, when the release has one. */
     signedFirefox?: Promise<string | null>;
+    /** The app this page runs in - its version and its updates - above the cards; nothing in a browser. */
+    thisDevice?: ReactNode;
 }) {
     const t = useTranslations("account");
     const tc = useTranslations("components");
@@ -66,6 +70,8 @@ export function DownloadsPage({
                 </h1>
                 <p className="text-sm text-muted-foreground">{t("downloads.page.intro")}</p>
             </div>
+
+            {thisDevice}
 
             <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
                 {/* First and wide: the app itself. Its files wait on GitHub behind
@@ -85,6 +91,7 @@ export function DownloadsPage({
                             <Badge variant="neutral">{t("downloads.desktop.recommended")}</Badge>
                         </p>
                         {desktopFiles}
+                        <AntivirusHelpLink />
                     </div>
                     {/* The other way to have it in a window of its own: the
                         browser's install offer, which needs no download. Drawn

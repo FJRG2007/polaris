@@ -56,6 +56,7 @@ describe("before the screen has been opened", () => {
             cases: 3,
             update: true,
             apis: 0,
+            apps: 0,
             total: 7
         });
     });
@@ -95,6 +96,7 @@ describe("an account that keeps its badges", () => {
             cases: 3,
             update: true,
             apis: 0,
+            apps: 0,
             total: 7
         });
     });
@@ -136,7 +138,7 @@ describe("marking entries seen from the app menu", () => {
             "2026-09-29T09:00:00.000Z",
             undefined
         ]);
-        expect(waiting).toEqual({ reports: 1, cases: 3, update: false, apis: 0, total: 4 });
+        expect(waiting).toEqual({ reports: 1, cases: 3, update: false, apis: 0, apps: 0, total: 4 });
     });
 
     it("takes the later of a visit and a mark", async () => {

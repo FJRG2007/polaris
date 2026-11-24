@@ -15,7 +15,7 @@ import { unzipSync } from "fflate";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { writeWhole, type Fetcher } from "./catalog";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import {
     ADDON_PERMISSIONS,
     addonFit,
@@ -210,9 +210,24 @@ export async function installAddon(options: InstallOptions): Promise<InstallResu
         ...(previous?.failed && previous.failed !== entry.version && compareAddonVersions(previous.failed, entry.version) > 0 ? { failed: previous.failed } : {})
     };
     await saveInstalled(dir, installed);
-    const older = previous?.previous?.version;
-    if (older && older !== entry.version && older !== replaced?.version) await rm(packageDir(dir, entry.id, older), { recursive: true, force: true });
+    await pruneVersions(dir, entry.id, [entry.version, replaced?.version]);
     return { ok: true, manifest: packaged };
+}
+
+/**
+ * Remove every version folder of one add-on but those kept. Never throws: by
+ * now the install is written down, and a folder Windows will not let go of
+ * (a native module still loaded by the process being replaced) is only a
+ * leftover, removed by a later install. An app up to 0.1.96 failed the whole
+ * install here and left such folders behind.
+ */
+async function pruneVersions(dir: string, id: string, keep: readonly (string | undefined)[]): Promise<void> {
+    const root = join(dir, "packages", id);
+    const versions = await readdir(root).catch(() => [] as string[]);
+    for (const version of versions) {
+        if (keep.includes(version) || version.startsWith(".")) continue;
+        await rm(join(root, version), { recursive: true, force: true }).catch(() => undefined);
+    }
 }
 
 /**
@@ -231,7 +246,7 @@ export async function rollbackAddon(dir: string, id: string): Promise<{ from: st
     delete back.previous;
     installed.addons[id] = back;
     await saveInstalled(dir, installed);
-    await rm(packageDir(dir, id, from), { recursive: true, force: true });
+    await rm(packageDir(dir, id, from), { recursive: true, force: true }).catch(() => undefined);
     return { from, to: previous.version };
 }
 

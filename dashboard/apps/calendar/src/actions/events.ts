@@ -49,6 +49,11 @@ export async function openTodoAction(objectId: unknown): Promise<Outcome<{ detai
 
 const saveInput = z.object({
     objectId: uuidSchema.nullable(),
+    /** A new event's UID chosen on the device, so sending it twice makes one. */
+    uid: z
+        .string()
+        .regex(/^[A-Za-z0-9-]{8,64}$/)
+        .nullish(),
     recurrenceKey,
     scope,
     version,
@@ -63,6 +68,7 @@ export async function saveEventAction(input: unknown): Promise<Outcome<{ objectI
     return outcome(async () =>
         objects.saveEvent(await requireCalendarUser(), {
             objectId: parsed.data.objectId,
+            uid: parsed.data.uid ?? null,
             recurrenceKey: parsed.data.recurrenceKey,
             scope: parsed.data.scope,
             version: parsed.data.version,

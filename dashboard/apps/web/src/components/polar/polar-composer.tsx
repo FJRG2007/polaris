@@ -14,20 +14,19 @@
  */
 
 import Link from "next/link";
-import { Paperclip, X } from "lucide-react";
+import { X } from "lucide-react";
 import { cn } from "@polaris/ui";
 import type { Payer } from "@/lib/polar/shared";
 import type { VoiceAvailability } from "@/lib/polar/voice-call";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { BorderBeam } from "@/components/polar/motion/border-beam";
-import { useRef, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
+import { useCallback, useRef, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
+import { ComposerPlusMenu, isAttachShortcut, type PlusMenuView } from "@/components/polar/composer-plus-menu";
 import { ImproveButton } from "@/components/polar/improve-button";
 import { AttachmentList, type AttachmentData } from "@/components/polar/elements/attachments";
 import { DictationButton, VoiceModeButton, type VoiceNotice } from "@/components/polar/polar-voice";
 import {
     PromptInput,
-    PromptInputAttach,
-    PromptInputButton,
     PromptInputFooter,
     PromptInputHeader,
     PromptInputSubmit,
@@ -88,6 +87,7 @@ export function PolarComposer({
     attach,
     attachId,
     voiceMode,
+    views,
     submit,
     streaming = false,
     hidden = false,
@@ -121,6 +121,8 @@ export function PolarComposer({
     /** The id the attach button sits under, for a command that presses it. */
     attachId?: string;
     voiceMode: ComposerVoiceMode;
+    /** The session's panes the "+" menu opens, for a Code session. */
+    views?: readonly PlusMenuView[];
     submit: {
         busy: boolean;
         disabled: boolean;
@@ -144,6 +146,10 @@ export function PolarComposer({
 }) {
     const t = useTranslations("polar");
     const own = useRef<HTMLTextAreaElement | null>(null);
+    const openFiles = useRef<(() => void) | null>(null);
+    const registerOpenFiles = useCallback((open: (() => void) | null) => {
+        openFiles.current = open;
+    }, []);
     // A transcription lands after the recording ends: it joins what is in the
     // box then, not what was there when the microphone was pressed.
     const latest = useRef(value);
@@ -161,6 +167,13 @@ export function PolarComposer({
         <BorderBeam active={streaming} className={cn(hidden && "hidden", className)}>
             <PromptInput
                 onSubmit={onSubmit}
+                onKeyDownCapture={(event) => {
+                    // Ctrl+U attaches, as in Claude; only while the focus is in
+                    // this composer, so a hidden one never answers it.
+                    if (!isAttachShortcut(event) || !openFiles.current) return;
+                    event.preventDefault();
+                    openFiles.current();
+                }}
                 className={cn(highlighted && "border-primary bg-primary/10")}
             >
                 <PromptInputHeader>{header}</PromptInputHeader>
@@ -205,28 +218,17 @@ export function PolarComposer({
                     squeezing each other to nothing. */}
                 <PromptInputFooter className="max-sm:items-end">
                     <PromptInputTools className="max-sm:flex-wrap">
-                        <span id={attachId} className="contents">
-                            {"files" in attach ? (
-                                <PromptInputAttach
-                                    label={t("files.add")}
-                                    accept={attach.accept}
-                                    disabled={attach.disabled}
-                                    onFiles={attach.onFiles}
-                                    onFailed={attach.onFailed}
-                                />
-                            ) : (
-                                // aria-disabled rather than disabled, so the
-                                // reason is still there on hover and focus.
-                                <PromptInputButton
-                                    label={attach.refusal}
-                                    aria-disabled
-                                    className="opacity-50"
-                                    onClick={(event) => event.preventDefault()}
-                                >
-                                    <Paperclip />
-                                </PromptInputButton>
-                            )}
-                        </span>
+                        <ComposerPlusMenu
+                            attach={attach}
+                            attachId={attachId}
+                            slashable={!value.trim()}
+                            onSlash={() => {
+                                onValueChange("/");
+                                own.current?.focus();
+                            }}
+                            views={views}
+                            registerOpenFiles={registerOpenFiles}
+                        />
                         <DictationButton
                             available={kit.voice.dictation}
                             disabled={disabled}

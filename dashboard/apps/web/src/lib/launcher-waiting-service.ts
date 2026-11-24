@@ -221,7 +221,8 @@ const ADMIN_HREF: Record<AdminItemId, string> = {
     reports: "/admin/safety",
     cases: "/admin/safety",
     update: "/admin/updates",
-    apis: "/admin/integrations"
+    apis: "/admin/integrations",
+    apps: "/admin/updates#app-updates"
 };
 
 async function adminGroup(userId: string): Promise<LauncherWaitingGroup | null> {
@@ -231,7 +232,8 @@ async function adminGroup(userId: string): Promise<LauncherWaitingGroup | null> 
         reports: waiting.reports,
         cases: waiting.cases,
         update: waiting.update ? 1 : 0,
-        apis: waiting.apis
+        apis: waiting.apis,
+        apps: waiting.apps
     };
     return {
         app: "admin",
@@ -301,5 +303,9 @@ export async function markLauncherRead(
         return;
     }
     if (id && !isAdminItem(id)) return;
-    await dismissAdminWaiting(userId, id ? [id as AdminItemId] : DISMISSABLE_ADMIN_ITEMS);
+    // An app's update is not dismissed: it goes when it is installed.
+    const entries = (id ? [id as AdminItemId] : DISMISSABLE_ADMIN_ITEMS).filter(
+        (one): one is Exclude<AdminItemId, "apps"> => one !== "apps"
+    );
+    if (entries.length > 0) await dismissAdminWaiting(userId, entries);
 }

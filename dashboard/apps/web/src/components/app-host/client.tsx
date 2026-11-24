@@ -53,6 +53,13 @@ import { mergeUnchanged } from "@/lib/structural-merge";
 import { refreshAppFavorites } from "@/components/use-app-favorites";
 import { useKeptSnapshot, useLiveRead } from "@/components/use-live-resource";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
+import {
+    attemptAppAction,
+    discardAppAction,
+    keepAppAction,
+    retryAppAction,
+    useKeptAppActions
+} from "@/lib/offline/app-action-writes";
 
 const FilePickerDialog = dynamic(
     () =>
@@ -283,6 +290,15 @@ export const clientHost = {
     mediaPlayer: { MediaPlayer },
     notificationSound: { soundGain },
     soundingClient: { anotherClientSounds, thisClientRings },
+    // Host API 1.2: an app's action kept on this device while Polaris cannot
+    // be reached, and made when it answers.
+    offline: {
+        attempt: attemptAppAction,
+        keep: keepAppAction,
+        useKept: useKeptAppActions,
+        retry: retryAppAction,
+        discard: discardAppAction
+    },
     pagedPicker: { PagedPicker },
     qrCode: { QRCodeSVG },
     appUrl: { useAppUrl },

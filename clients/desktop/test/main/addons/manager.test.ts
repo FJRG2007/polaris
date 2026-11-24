@@ -1,12 +1,27 @@
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAddonManager } from "@/main/addons/manager";
 import type { AddonChild } from "@/main/addons/supervisor";
 import type { UsbDevice } from "@polaris/core/device-addons";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { listLinuxUsb, readUsbId } from "@/main/addons/presence";
 import { catalogOf, entryFor, fakeFetch, fixturePackage, PACKAGE_URL, sign, TEST_KEYS } from "./fixtures";
+
+// installed.json refused after `refuse.after` renames over it, as Windows answers a rename over an open file.
+const refuse = vi.hoisted(() => ({ after: Number.POSITIVE_INFINITY, seen: 0 }));
+vi.mock("node:fs/promises", async (original) => {
+    const real = await original<typeof import("node:fs/promises")>();
+    return {
+        ...real,
+        rename: (from: string, to: string) => {
+            if (String(to).endsWith("installed.json") && ++refuse.seen > refuse.after) {
+                return Promise.reject(Object.assign(new Error("EPERM: operation not permitted, rename"), { code: "EPERM" }));
+            }
+            return real.rename(from, to);
+        }
+    };
+});
 
 const CATALOG = "https://github.com/FJRG2007/polaris/releases/download/device-addons/catalog.json";
 const DEVICE: UsbDevice = { vendorId: 0x06f8, productId: 0xe053 };
@@ -17,6 +32,8 @@ async function tempDir(): Promise<string> {
     return dir;
 }
 afterEach(async () => {
+    refuse.after = Number.POSITIVE_INFINITY;
+    refuse.seen = 0;
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
 });
 
@@ -27,6 +44,7 @@ async function setup() {
     const fetched: string[] = [];
     const fetcher = fakeFetch({ [CATALOG]: catalogBytes, [`${CATALOG}.sig`]: sign(catalogBytes), [PACKAGE_URL]: bytes }, fetched);
     let devices: UsbDevice[] | null = [];
+    let deviceListBroken = false;
     const forks: string[] = [];
     const offers: string[] = [];
     const manager = createAddonManager({
@@ -40,7 +58,10 @@ async function setup() {
             return { postMessage: () => undefined, kill: () => undefined, onMessage: () => undefined, onExit: () => undefined };
         },
         call: async () => null,
-        devices: () => devices,
+        devices: () => {
+            if (deviceListBroken) throw new Error("device list unavailable");
+            return devices;
+        },
         offer: (entry, name) => offers.push(`${entry.id}:${name}`)
     });
     return {
@@ -51,6 +72,9 @@ async function setup() {
         offers,
         plug: (next: UsbDevice[] | null) => {
             devices = next;
+        },
+        breakDeviceList: () => {
+            deviceListBroken = true;
         }
     };
 }
@@ -75,7 +99,7 @@ describe("add-on manager", () => {
         const { manager, forks, plug } = await setup();
         await manager.snapshot();
         await manager.refresh();
-        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true });
+        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true, started: true });
         expect(forks).toEqual([]);
         expect((await manager.snapshot()).installed[0]?.run).toEqual({ state: "sleeping" });
         plug([DEVICE]);
@@ -85,6 +109,23 @@ describe("add-on manager", () => {
         plug([]);
         await manager.devicesChanged([]);
         expect((await manager.snapshot()).installed[0]?.run).toEqual({ state: "sleeping" });
+    });
+
+    it("reports an install that went in as installed when starting it fails", async () => {
+        const { manager, dir, breakDeviceList } = await setup();
+        await manager.refresh();
+        breakDeviceList();
+        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true, started: false });
+        expect(JSON.parse(await readFile(join(dir, "installed.json"), "utf8")).addons["fixture-mixer"].version).toBe("1.0.0");
+    });
+
+    it("reports an install that went in as installed when writing it down afterwards keeps failing", async () => {
+        const { manager, dir } = await setup();
+        await manager.refresh();
+        refuse.seen = 0;
+        refuse.after = 1;
+        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true, started: true });
+        expect(JSON.parse(await readFile(join(dir, "installed.json"), "utf8")).addons["fixture-mixer"].version).toBe("1.0.0");
     });
 
     it("runs an installed add-on where devices cannot be listed, and stops it when disabled", async () => {

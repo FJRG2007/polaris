@@ -1294,11 +1294,21 @@ function NoteBranch({
                             <FolderPlus className="size-3.5" />
                             {t("tree.moveTo")}
                         </ContextMenuItem>
-                        <ContextMenuItem onSelect={() => onShareNote(note.id)}>
+                        {/* Made here and not on Polaris yet: a link or an export of it
+                            is Polaris's to make, so they wait for it, and say so. */}
+                        <ContextMenuItem
+                            disabled={(note as TreeNote).unsent}
+                            title={(note as TreeNote).unsent ? t("view.needsPolaris") : undefined}
+                            onSelect={() => onShareNote(note.id)}
+                        >
                             <Share2 className="size-3.5" />
                             {t("tree.shareLink")}
                         </ContextMenuItem>
-                        <ContextMenuItem onSelect={() => download("note", note.id)}>
+                        <ContextMenuItem
+                            disabled={(note as TreeNote).unsent}
+                            title={(note as TreeNote).unsent ? t("view.needsPolaris") : undefined}
+                            onSelect={() => download("note", note.id)}
+                        >
                             <Download className="size-3.5" />
                             {t("tree.export")}
                         </ContextMenuItem>

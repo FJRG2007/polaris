@@ -155,8 +155,9 @@ function useInstallFlow(bridge: AddonsBridge | null, snapshot: AddonsSnapshot | 
                     : { title: say(t, "install.title", { name: entry.name }), description, confirmLabel: say(t, "install.confirm") }
             );
             if (!ok) return;
-            const problem = await install(entry);
-            if (problem) toast.show({ title: say(t, `failure.${problem === "app-version" ? "appVersion" : problem}`) });
+            const outcome = await install(entry);
+            if (!outcome.installed) toast.show({ title: say(t, `failure.${outcome.problem === "app-version" ? "appVersion" : outcome.problem}`) });
+            else if (!outcome.started) toast.show({ title: say(t, "failure.notStarted") });
         })();
     };
     return [

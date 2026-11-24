@@ -24,6 +24,7 @@ import { renderAppSettings } from "@/lib/app-bundles/serve-page";
 import { findStoreApp } from "@/lib/apps/marketplace-store";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
+import { AppUpdatesCard } from "@/components/app-bundles/app-updates-card";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,7 @@ export default async function PolarisAppSettingsPage({
                     }
                     revision={Date.now()}
                 />
+                <AppUpdatesCard appId={app.id} />
             </div>
         </Messages>
     );

@@ -13,6 +13,7 @@
  */
 
 import { saveFile } from "@/components/transfers/move-file";
+import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -75,6 +76,17 @@ import {
 /** How long a note sits untouched before it is written. Long enough not to
  *  write on every keystroke, short enough that closing the tab is safe. */
 const SAVE_AFTER = 800;
+
+/** A note this device has and Polaris does not yet, saved as its Markdown file. */
+function saveHere(title: string, body: string): void {
+    const blob = new Blob([core.noteFile({ frontmatter: null, body })], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${core.fileNameFor(title || "note")}.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+}
 
 export function NotesView({
     shelves: served,
@@ -388,13 +400,15 @@ export function NotesView({
                                     {t("view.sharedWithYou")}
                                 </Badge>
                             ) : null}
-                            {!shared && !local && (
+                            {!shared && (
                                 <button
                                     type="button"
                                     aria-label={t("view.shareNote")}
-                                    title={t("view.share")}
+                                    // Not on Polaris yet: sharing it is Polaris's to do.
+                                    title={local ? t("view.needsPolaris") : t("view.share")}
+                                    disabled={Boolean(local)}
                                     onClick={() => setSharingPeople(note.id)}
-                                    className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                                 >
                                     <Share2 className="size-4" />
                                 </button>
@@ -410,22 +424,24 @@ export function NotesView({
                                     <LayoutTemplate className="size-4" />
                                 </button>
                             )}
-                            {!local && (
                             <button
                                 type="button"
                                 aria-label={t("view.exportNote")}
                                 title={t("view.export")}
                                 onClick={() =>
-                                    saveFile(
-                                        `/api/notes/export?scope=note&id=${note.id}`,
-                                        `${note.title || "note"}.md`
-                                    )
+                                    // A note Polaris does not have yet is written
+                                    // out from this device, as the one file it is.
+                                    local
+                                        ? saveHere(title || note.title, body)
+                                        : saveFile(
+                                              `/api/notes/export?scope=note&id=${note.id}`,
+                                              `${note.title || "note"}.md`
+                                          )
                                 }
                                 className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <Download className="size-4" />
                             </button>
-                            )}
                             {!shared && (
                                 <button
                                     type="button"

@@ -107,8 +107,12 @@ Spreadsheets, slides and drawings now show the text editor's saving line
 
 ## Not fixed here
 
-- Sharing, publishing, exporting or saving as a template a note the server
-  does not have yet still needs the host.
+- Sharing, publishing or saving as a template a note the server does not
+  have yet still needs the host. Share is shown disabled with that reason
+  (`view.needsPolaris`), in the note and in the tree's menu.
+- Exporting such a note from the note itself writes its Markdown file from the
+  device (`core.noteFile`); the tree's Export waits for Polaris, as it reads
+  the note from there.
 
 ## Making, moving and deleting notes offline
 
@@ -166,3 +170,57 @@ message carries the composer's key (`draftKey` on `mailDraftSchema`):
 answer writes over the same draft, and a draft that has since been queued or
 sent is left alone rather than put back to being a draft. A save the composer
 gets through itself, or a send, forgets any older kept copy.
+
+## Drive changes made offline
+
+A rename, a move, a new folder or a delete to the bin made in Drive while
+Polaris could not be reached used to fail with a banner. Now each is kept on the
+device (`drive/offline-changes.ts`, kind `drive.change`, one entry per change,
+in order) and made when Polaris answers (`replayDriveChangeAction`). A replay
+whose first attempt landed and only lost its answer is answered as done: the
+renamed or moved file is already where it was going, the binned one is gone,
+the folder already exists. Until then the folder is drawn as it will be, and
+the changes wait in a strip above it with a clock, or with Polaris's reason, Try
+again and Drop. A folder opened with Polaris unreachable shows the last listing
+this tab read, however old, with the unreachable banner. Uploads and deleting
+for good are not kept: one needs the file on the host, the other cannot be
+undone, so it is put back and says Polaris could not be reached.
+
+## Calendar changes made offline (2026-11-24)
+
+A new event, a save from the editor, a drag or resize, and a delete made in
+Calendar while Polaris could not be reached used to fail with a toast. Calendar
+is an app bundle, so this is built once for every bundle: each action stub the
+bundler writes carries which action it is (`polaris.app-action-ref`), and the
+dashboard offers apps `hostUi.offline` (host API 1.2), which tries the call and,
+when no server answers, keeps it as data in the shared queue (kind
+`app.action`, `lib/offline/app-action-writes.ts`) and sends it to
+`/api/app-bundles/action` from whichever page is open. An `{ ok: false, error }`
+answer marks it not sent with the app's words; a gateway or 5xx answer is tried
+again. A whole save replaces one still waiting for the same event; drags and
+deletes follow each other in order, and a later change to an event with one
+waiting is kept behind it rather than made out of order.
+
+The grid draws the waiting changes as they will be (`withKeptCalls`), and a
+strip above it shows each with a clock, or with the refusal, Try again and Drop
+- and for a save refused because the event changed meanwhile, Keep mine (sent
+again with no version). A new event carries a UID chosen on the device, so one
+sent again after a lost answer is the event already made, not a second. A drag
+sent again after a lost answer would move twice; that window is the request
+landing and only its answer being lost.
+
+The Drive kind is now registered on every page too (`components/offline-writes.tsx`):
+before, a Drive change flushed from another screen was marked not made.
+
+Not covered: opening an event offline (the editor reads it from Polaris), and a
+calendar bundle on a dashboard older than host API 1.2 fails as before.
+
+## A long outage marked waiting writes as not sent
+
+Every flush that found no server counted an attempt, and five marked the write
+as not sent - so a few edits during one outage (each one flushes) failed
+everything waiting while Polaris was simply down. An attempt that gets no
+answer now counts only when Polaris answers a probe (`counts` in
+`lib/offline/outbox.ts`, `polarisAnswers` in `write-queue.ts`): then it is this
+write that does not get through. Already known unreachable, no extra probe is
+made; the probe's own backoff asks, and its recovery flushes.

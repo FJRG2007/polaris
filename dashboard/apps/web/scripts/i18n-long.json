@@ -292,5 +292,9 @@
     "web/watch:labels.metric.service (es-ES)",
     "web/watch:overview.title (es-ES)",
     "web/watch:text.buildCache (es-ES)",
-    "web/watch:text.unknownMetric (es-ES)"
+    "web/watch:text.unknownMetric (es-ES)",
+    "web/account:addons.update.confirm (es-ES)",
+    "web/marketplace:card.kindAddon (es-ES)",
+    "web/marketplace:view.kinds.addons (es-ES)",
+    "web/appSettings:hosts.copy (es-ES)"
 ]

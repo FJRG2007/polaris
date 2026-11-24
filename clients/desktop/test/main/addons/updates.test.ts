@@ -196,7 +196,7 @@ async function setup() {
     const first = fixturePackage();
     publish(entryFor(first), first);
     await manager.refresh();
-    expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true });
+    expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true, started: true });
     return {
         dir,
         manager,
@@ -234,7 +234,7 @@ describe("updates in the manager", () => {
         await manager.refresh();
         // The refresh announced it as available; installing it is not announced again.
         expect(news.map((item) => item.kind)).toEqual(["available"]);
-        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true });
+        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true, started: true });
         await manager.checkUpdates();
         expect(news.map((item) => item.kind)).toEqual(["available"]);
     });
@@ -250,7 +250,7 @@ describe("updates in the manager", () => {
         expect(snapshot.installed[0]).toMatchObject({ update: "1.1.0", consent: ["network"] });
         // Accepting only the old ones is refused; accepting all of them puts it in.
         expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: false, reason: "permissions" });
-        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions", "network"])).toEqual({ ok: true });
+        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions", "network"])).toEqual({ ok: true, started: true });
         expect((await readInstalled(dir)).addons["fixture-mixer"]).toMatchObject({ version: "1.1.0", granted: ["usb", "polaris-actions", "network"] });
     });
 
@@ -278,7 +278,8 @@ describe("updates in the manager", () => {
         await manager.checkUpdates();
         expect(await installedVersion(dir)).toBe("1.0.0");
         child.speak({ type: "status", state: "connected" });
-        await settle();
+        // The update the free status sets off runs on its own: wait for it, not a fixed 20 ms.
+        for (let i = 0; i < 50 && (await installedVersion(dir)) !== "1.1.0"; i++) await settle();
         await manager.snapshot();
         expect(await installedVersion(dir)).toBe("1.1.0");
     });

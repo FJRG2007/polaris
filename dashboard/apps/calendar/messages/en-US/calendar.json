@@ -699,5 +699,17 @@
         "floating": "No time zone (floating)",
         "none": "No time zone matches.",
         "search": "Search time zones"
+    },
+    "offline": {
+        "title": "Waiting to be saved",
+        "create": "New: {title}",
+        "save": "Changed: {title}",
+        "move": "Moved: {title}",
+        "delete": "Deleted: {title}",
+        "waiting": "Waits for Polaris",
+        "notMade": "Not made",
+        "keepMine": "Keep mine",
+        "drop": "Drop",
+        "kept": "Saved on this device. Made when Polaris is back."
     }
 }

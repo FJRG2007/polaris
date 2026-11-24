@@ -1712,7 +1712,8 @@
         "desktop": {
             "app": "Escritorio",
             "recommended": "Recomendada",
-            "description": "Polaris en tu ordenador, para Windows, macOS y Linux. Despliega desde tu propia máquina y vigila tus servicios en su propia ventana."
+            "description": "Polaris en tu ordenador, para Windows, macOS y Linux. Despliega desde tu propia máquina y vigila tus servicios en su propia ventana.",
+            "antivirus": "¿Lo bloquea el antivirus?"
         },
         "cards": {
             "install": "Instalar",
@@ -2534,7 +2535,8 @@
             "appVersion": "Necesita una app más nueva. Actualiza la app primero.",
             "download": "Falló la descarga. Inténtalo de nuevo.",
             "integrity": "La descarga no coincidía con lo publicado y no se instaló nada.",
-            "other": "No se pudo instalar. Inténtalo de nuevo."
+            "other": "No se pudo instalar. Inténtalo de nuevo.",
+            "notStarted": "Instalado, pero no ha arrancado. Su estado dice por qué."
         },
         "detail": {
             "version": "Versión",
@@ -2570,7 +2572,7 @@
             "title": "¿Actualizar {name} a {version}?",
             "added": "Ahora también pide:",
             "noNew": "No pide nada nuevo.",
-            "confirm": "Instalar"
+            "confirm": "Actualizar"
         },
         "auto": {
             "all": "Actualizar complementos solos",

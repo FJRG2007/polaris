@@ -48,8 +48,23 @@ export const ANNOTATIONS = {
     version: "org.opencontainers.image.version",
     revision: "org.opencontainers.image.revision",
     hostApi: "vnd.polaris.app.host-api",
-    notes: "vnd.polaris.app.notes"
+    notes: "vnd.polaris.app.notes",
+    /** What the release asks to reach, comma-separated (`polaris.permissions`
+     *  in the app's package.json). A release that asks for more than an
+     *  administrator accepted is never applied by itself. */
+    permissions: "vnd.polaris.app.permissions"
 } as const;
+
+/** One thing a release asks to reach, as the bundler writes it. */
+const PERMISSION = /^[a-z][a-z0-9.:_-]{0,63}$/;
+const MAX_PERMISSIONS = 32;
+
+/** The permissions an annotation names: valid ones, each once, in order. */
+export function readPermissions(raw: string | undefined): string[] {
+    if (!raw) return [];
+    const names = raw.split(",").map((name) => name.trim()).filter((name) => PERMISSION.test(name));
+    return [...new Set(names)].slice(0, MAX_PERMISSIONS);
+}
 
 const APP_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const Digest = z.string().regex(/^sha256:[a-f0-9]{64}$/);
@@ -78,6 +93,8 @@ export interface AppRelease {
     readonly revision?: string;
     readonly notes?: string;
     readonly hostApi?: string;
+    /** What it asks to reach; empty when it asks for nothing. */
+    readonly permissions: readonly string[];
 }
 
 /** Where an update is, for the screen showing it. */
@@ -136,7 +153,8 @@ export function readRelease(bytes: Buffer, named?: string | null): AppRelease {
         version: short(notes[ANNOTATIONS.version], 64),
         revision: short(notes[ANNOTATIONS.revision], 64),
         notes: short(notes[ANNOTATIONS.notes], 300),
-        hostApi: short(notes[ANNOTATIONS.hostApi], 16)
+        hostApi: short(notes[ANNOTATIONS.hostApi], 16),
+        permissions: readPermissions(notes[ANNOTATIONS.permissions])
     };
 }
 
@@ -242,7 +260,8 @@ function pinOf(release: AppRelease, version?: string): BundlePin {
         source: "registry",
         ...(release.version || version ? { version: release.version || version } : {}),
         ...(release.revision ? { revision: release.revision } : {}),
-        ...(release.notes ? { notes: release.notes } : {})
+        ...(release.notes ? { notes: release.notes } : {}),
+        ...(release.permissions.length > 0 ? { permissions: [...release.permissions] } : {})
     };
 }
 

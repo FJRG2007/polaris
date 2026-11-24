@@ -15,7 +15,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 vi.mock("@/lib/app-bundles/actions", () => ({
     appUpdatesAction: vi.fn(),
-    changeAppBuildAction: vi.fn()
+    changeAppBuildAction: vi.fn(),
+    appAutoUpdateAction: async () => ({ auto: false }),
+    setAppAutoUpdateAction: async () => ({ rows: [], auto: false })
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 // The template form's login option reads the firewall's actions, which reach the server.

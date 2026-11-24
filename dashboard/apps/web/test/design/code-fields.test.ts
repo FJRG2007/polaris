@@ -39,6 +39,7 @@ const NOT_CODE: Record<string, { count: number; why: string }> = {
     "web/src/app/(app)/vault/item-dialog.tsx": { count: 2, why: "an SSH key pair" },
     "web/src/app/(app)/vault/sends/sends-view.tsx": { count: 1, why: "a secret text" },
     "web/src/components/rules/condition-builder.tsx": { count: 1, why: "a rule expression, a syntax with no grammar to paint" },
+    "web/src/components/this-app/hosts-manager.tsx": { count: 1, why: "a pasted host transfer code, an opaque string" },
     "web/src/app/tr/[token]/submit-text-form.tsx": { count: 1, why: "a visitor's free text in no known language" }
 };
 

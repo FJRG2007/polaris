@@ -146,17 +146,40 @@ export function installProblem(reason: string): InstallProblem {
     }
 }
 
-/** Install or update one add-on, accepting what it asks for; null when it went in. */
-export function useInstallAddon(bridge: AddonsBridge | null): (entry: AddonEntry) => Promise<InstallProblem | null> {
-    return useCallback(
-        async (entry: AddonEntry) => {
-            if (!bridge) return "other";
-            const answer = addonInstallResultSchema.safeParse(await bridge.install(entry.id, entry.permissions).catch(() => null));
-            if (!answer.success) return "other";
-            return answer.data.ok ? null : installProblem(answer.data.reason);
-        },
-        [bridge]
-    );
+/** How an install ended: in (and whether it started once in), or not and why. */
+export type InstallOutcome = { readonly installed: true; readonly started: boolean } | { readonly installed: false; readonly problem: InstallProblem };
+
+/** The version of one add-on the app holds right now, or null (not installed, or no answer). */
+async function heldVersion(bridge: AddonsBridge, id: string): Promise<{ readonly version: string; readonly enabled: boolean } | null> {
+    const snapshot = readAddonsSnapshot(await bridge.get().catch(() => null));
+    const found = snapshot?.installed.find((item) => item.id === id);
+    return found ? { version: found.version, enabled: found.enabled } : null;
+}
+
+/**
+ * Install or update one add-on, accepting what it asks for.
+ *
+ * The app's answer is not the last word: an app up to 0.1.96 put the files in,
+ * wrote them down as installed, and then threw while removing the version they
+ * replaced (Windows keeps a loaded native module open), so the page heard an
+ * error for an install that had happened. When the answer is missing or
+ * unreadable, what the app now holds decides. Such an app never started the new
+ * version either, so an add-on that is switched on is switched on again, which
+ * has it start from the new files.
+ */
+export async function installAddon(bridge: AddonsBridge, entry: AddonEntry): Promise<InstallOutcome> {
+    const before = await heldVersion(bridge, entry.id);
+    const answer = addonInstallResultSchema.safeParse(await bridge.install(entry.id, entry.permissions).catch(() => null));
+    if (answer.success) return answer.data.ok ? { installed: true, started: answer.data.started ?? true } : { installed: false, problem: installProblem(answer.data.reason) };
+    const after = await heldVersion(bridge, entry.id);
+    if (!after || after.version !== entry.version || before?.version === entry.version) return { installed: false, problem: "other" };
+    if (!after.enabled) return { installed: true, started: true };
+    const restarted = await bridge.setEnabled(entry.id, true).catch(() => false);
+    return { installed: true, started: restarted === true };
+}
+
+export function useInstallAddon(bridge: AddonsBridge | null): (entry: AddonEntry) => Promise<InstallOutcome> {
+    return useCallback(async (entry: AddonEntry) => (bridge ? installAddon(bridge, entry) : { installed: false as const, problem: "other" as const }), [bridge]);
 }
 
 const officialEntrySchema = z.object({ displayName: z.string().max(300), version: z.string().max(100) });

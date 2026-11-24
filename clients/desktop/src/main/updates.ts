@@ -101,7 +101,12 @@ export interface FirstCheck {
     readonly downloaded: () => Promise<UpdateCheck>;
 }
 
-export function watchForUpdates(found: (update: Update) => void): FirstCheck {
+/**
+ * `failed` hears of an update Squirrel downloaded on Windows and then could not
+ * apply - an antivirus holding its files is the usual cause - once per version,
+ * in place of `found`'s announcement for it.
+ */
+export function watchForUpdates(found: (update: Update) => void, failed?: (update: Update) => void): FirstCheck {
     let ready: () => void = () => undefined;
     let began: (version: string | null) => void = () => undefined;
     let ended: (installed: boolean) => void = () => undefined;
@@ -135,14 +140,17 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
     };
 
     // The page is the way left: say it once for the version that failed.
-    const fallBack = () => {
-        const failed = installing;
+    // `broke` is Squirrel's own error, as opposed to finding nothing to install.
+    const fallBack = (broke = false) => {
+        const version = installing;
         installing = null;
         ended(false);
-        if (failed) settleDownload({ kind: "available", version: failed });
-        if (failed && failed !== announced) {
-            announced = failed;
-            found({ version: failed, page: source.page(`desktop-v${failed}`) });
+        if (version) settleDownload({ kind: "available", version });
+        if (version && version !== announced) {
+            announced = version;
+            const update = { version, page: source.page(`desktop-v${version}`) };
+            if (broke && failed && process.platform === "win32") failed(update);
+            found(update);
         }
     };
     const installed = (version: string, install: () => void) => {
@@ -161,8 +169,8 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
     };
 
     const listenToSquirrel = () => {
-        autoUpdater.on("error", fallBack);
-        autoUpdater.on("update-not-available", fallBack);
+        autoUpdater.on("error", () => fallBack(true));
+        autoUpdater.on("update-not-available", () => fallBack());
         autoUpdater.on("update-downloaded", () => {
             const version = installing;
             if (version) installed(version, () => autoUpdater.quitAndInstall());
@@ -224,13 +232,13 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
             outcome = { done: new Promise((resolve) => (settle = resolve)), settle: (check) => settle(check) };
             began(release.version);
             if (mode.kind === "appimage") {
-                void viaAppImage(release, mode.path).catch(fallBack);
+                void viaAppImage(release, mode.path).catch(() => fallBack());
                 return { kind: "downloading", version: release.version };
             }
             try {
                 viaSquirrel(release);
             } catch {
-                fallBack();
+                fallBack(true);
                 return { kind: "available", version: release.version };
             }
             return { kind: "downloading", version: release.version };

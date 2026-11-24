@@ -514,12 +514,15 @@ export async function sendAction(input: unknown): Promise<{ id?: string; error?:
                 parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notSent")
         };
 
+    // A page that seals never sends text through here: it is one that does not.
     const result = await guard(() =>
-        messages.send(
-            me,
-            parsed.data,
-            [],
-            parsed.data.replyToId ? { messageId: parsed.data.replyToId, forwarded: false } : null
+        messages.refusalForPage(false, () =>
+            messages.send(
+                me,
+                parsed.data,
+                [],
+                parsed.data.replyToId ? { messageId: parsed.data.replyToId, forwarded: false } : null
+            )
         )
     );
     return result.error ? { error: result.error } : { id: result.value };
@@ -563,7 +566,10 @@ export async function replyFromNoticeAction(
                 )
             );
     }
-    const sent = await guard(() => messages.send(me, { channelId, body }, [], null));
+    // A page that seals answers a notice sealed (`sendSealedMessage`), never here.
+    const sent = await guard(() =>
+        messages.refusalForPage(false, () => messages.send(me, { channelId, body }, [], null))
+    );
     if (sent.error || !sent.value)
         return { error: sent.error ?? (await getTranslations("chat"))("errors.notSent") };
     return { id: sent.value };
@@ -592,7 +598,11 @@ export async function forwardAction(
     return result.error ? { error: result.error } : { id: result.value };
 }
 
-export async function editAction(input: unknown): Promise<{ error?: string }> {
+export async function editAction(
+    input: unknown,
+    /** Whether the page has sealed chat open; a build from before this sends nothing. */
+    pageSeals?: unknown
+): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatEditSchema.safeParse(input);
     if (!parsed.success)
@@ -601,7 +611,7 @@ export async function editAction(input: unknown): Promise<{ error?: string }> {
                 parsed.error.issues[0]?.message ??
                 (await getTranslations("chat"))("errors.notSaved")
         };
-    return guard(() => messages.edit(me, parsed.data));
+    return guard(() => messages.refusalForPage(pageSeals === true, () => messages.edit(me, parsed.data)));
 }
 
 export async function deleteMessageAction(messageId: string): Promise<{ error?: string }> {

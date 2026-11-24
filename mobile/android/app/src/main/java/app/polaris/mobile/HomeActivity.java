@@ -397,6 +397,18 @@ public final class HomeActivity extends Activity {
         media.call(id, op, args);
     }
 
+    /** A call from the page's Settings > This app > Hosts (`PageHosts`); only this window's own Polaris is answered. */
+    void hostsCall(String id, String op, JSONObject args) {
+        if (web == null || !ServerAddress.sameOrigin(origin, web.getUrl())) return;
+        PageHosts.call(this, op, args, json -> runOnUiThread(() -> hostsAnswer(id, json)));
+    }
+
+    private void hostsAnswer(String id, String json) {
+        if (web == null) return;
+        web.evaluateJavascript("window.__polarisMobileHosts && window.__polarisMobileHosts(" + JSONObject.quote(id) + ","
+                + JSONObject.quote(json) + ")", null);
+    }
+
     void mediaAnswer(String id, String json) {
         if (web == null) return;
         web.evaluateJavascript("window.__polarisMobileMedia && window.__polarisMobileMedia(" + JSONObject.quote(id) + ","

@@ -95,8 +95,26 @@ function readApp(dir) {
         slot: app.slot ? app.slot.split("#") : null,
         prepare: app.prepare ? resolve(dir, app.prepare) : null,
         assets: app.assets ?? {},
-        hostApi: hostApiOf(pkg.name, app.hostApi)
+        hostApi: hostApiOf(pkg.name, app.hostApi),
+        permissions: permissionsOf(pkg.name, app.permissions)
     };
+}
+
+/**
+ * What an app asks to reach, from `polaris.permissions`: written on its OCI
+ * manifest so a dashboard holds an update that asks for more than an
+ * administrator accepted. Refused when it is not a list of plain names.
+ */
+function permissionsOf(name, declared) {
+    if (declared === undefined) return [];
+    if (
+        !Array.isArray(declared) ||
+        declared.length > 32 ||
+        !declared.every((one) => typeof one === "string" && /^[a-z][a-z0-9.:_-]{0,63}$/.test(one))
+    ) {
+        throw new Error(`${name}: polaris.permissions must be a list of up to 32 plain names`);
+    }
+    return [...new Set(declared)].sort();
 }
 
 /** The host API this workspace's dashboard provides (`@polaris/app-host`). */
@@ -155,6 +173,27 @@ function sharedPlugin(side, used) {
     };
 }
 
+/**
+ * The browser half of one module of server actions: each a call the dashboard
+ * forwards, carrying which action it is under `polaris.app-action-ref`, so the
+ * dashboard can keep the call and make it later when Polaris cannot be reached
+ * (`hostUi.offline`). Exported for the tests.
+ */
+export function actionStubSource(appId, moduleId, names) {
+    const at = (name) =>
+        `${JSON.stringify(appId)}, ${JSON.stringify(moduleId)}, ${JSON.stringify(name)}`;
+    const ref = (name) =>
+        `{ app: ${JSON.stringify(appId)}, module: ${JSON.stringify(moduleId)}, name: ${JSON.stringify(name)} }`;
+    return [
+        `const call = globalThis[Symbol.for("polaris.app-action")];`,
+        `const ref = Symbol.for("polaris.app-action-ref");`,
+        ...names.map(
+            (name) =>
+                `export const ${name} = Object.assign((...args) => call(${at(name)}, args), { [ref]: ${ref(name)} });`
+        )
+    ].join("\n");
+}
+
 /** In the browser half, a server action is a call the dashboard forwards. */
 function actionStubPlugin(app, src, actions) {
     return {
@@ -164,14 +203,7 @@ function actionStubPlugin(app, src, actions) {
                 const id = actions.get(args.path);
                 if (!id) return undefined;
                 const names = actions.names.get(args.path);
-                const lines = [
-                    `const call = globalThis[Symbol.for("polaris.app-action")];`,
-                    ...names.map(
-                        (name) =>
-                            `export const ${name} = (...args) => call(${JSON.stringify(app.id)}, ${JSON.stringify(id)}, ${JSON.stringify(name)}, args);`
-                    )
-                ];
-                return { contents: lines.join("\n"), loader: "js" };
+                return { contents: actionStubSource(app.id, id, names), loader: "js" };
             });
         }
     };
@@ -383,7 +415,9 @@ export async function buildAppBundle(dir, out, build = "") {
     const archive = join(out, `${app.id}.zip`);
     writeFileSync(archive, bytes);
     const digest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
-    return { manifest, archive, digest, size: bytes.length };
+    // What it asks to reach rides on the OCI manifest, not in the zip, so a
+    // bundle's digest does not move with it.
+    return { manifest, archive, digest, size: bytes.length, permissions: app.permissions };
 }
 
 function walkAll(directory, found = []) {
@@ -451,7 +485,8 @@ export function ociManifest(id, digest, size, about = {}) {
             ["org.opencontainers.image.version", about.version],
             ["org.opencontainers.image.revision", about.revision],
             ["vnd.polaris.app.host-api", about.hostApi],
-            ["vnd.polaris.app.notes", about.notes]
+            ["vnd.polaris.app.notes", about.notes],
+            ["vnd.polaris.app.permissions", about.permissions]
         ].filter(([, value]) => typeof value === "string" && value.length > 0)
     );
     const bytes = JSON.stringify({
@@ -486,12 +521,13 @@ async function main() {
     const dashboard = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
     const index = { format: BUNDLE_FORMAT, build, apps: {} };
     for (const dir of dirs.length > 0 ? dirs : appPackages(dashboard)) {
-        const { manifest, digest, size } = await buildAppBundle(dir, resolve(out), build);
+        const { manifest, digest, size, permissions } = await buildAppBundle(dir, resolve(out), build);
         const oci = ociManifest(manifest.id, digest, size, {
             version: manifest.version,
             hostApi: manifest.hostApi,
             revision: process.env.POLARIS_BUILD_SHA || undefined,
-            notes: changeLine(dir)
+            notes: changeLine(dir),
+            permissions: permissions.length > 0 ? permissions.join(",") : undefined
         });
         writeFileSync(join(resolve(out), `${manifest.id}.oci.json`), oci.bytes);
         index.apps[manifest.id] = {

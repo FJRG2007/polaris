@@ -49,6 +49,7 @@ import { tickSessionSchedules } from "@/lib/agents/session-schedules";
 import { tickDeployAutomations } from "@/lib/deploy/automations";
 import { evaluateAlarms } from "@/lib/watch/alarm-evaluator";
 import { scanServiceUpdates } from "@/lib/deploy/update-scan";
+import { tickAppUpdates } from "@/lib/app-bundles/auto-update";
 import { expireTransfers } from "@/lib/drive-transfer-service";
 import { sweepDisposableTransfers } from "@/lib/disposable-transfer-service";
 import { runMailServerPass } from "@/lib/mail-server/scheduled";
@@ -695,6 +696,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: 30 * MINUTE,
         leaseMs: null,
         run: () => scanServiceUpdates()
+    },
+    {
+        key: "app-updates",
+        // Ticks every five minutes; a pass runs every six hours, sooner while
+        // the registry could not be reached (`tickAppUpdates` keeps that pace).
+        everyMs: 5 * MINUTE,
+        // Leased: a pass updates apps and announces releases, and two at once
+        // would race the same update and say the same thing twice.
+        leaseMs: 30 * MINUTE,
+        run: () => tickAppUpdates()
     },
     {
         key: "runtime-logs",

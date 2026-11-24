@@ -25,6 +25,7 @@ import type { UpdateReady } from "./update-ready";
 import type { UpdateCheck } from "./update-check";
 import type { CallHotkey, CallHotkeysInput, CallHotkeysResult } from "./call-hotkeys";
 import type { CallPageAction, VoiceAction, VoiceState, WidgetLook, WidgetView } from "./voice-widget";
+import type { PlaceReport } from "./overlay-layout";
 import type { SearchEngine } from "./launcher";
 import type { ClipboardKeep } from "./clipboard-store";
 
@@ -39,6 +40,22 @@ export type HostImport =
  *  that can be opened, and the line to show. Null when it was cancelled by a
  *  newer address. */
 export type AddressCheck = { readonly ok: boolean; readonly message: string | null; };
+
+/** How a listed host answered just now: a Polaris that opens, not one, or not asked
+ *  because this computer has no network. */
+export type HostStatus = "online" | "offline" | "unknown";
+
+/** What Settings > This app > Hosts reads: every host kept, and why the one in use
+ *  could not be opened, when it could not. */
+export interface HostsSnapshot {
+    readonly servers: readonly ServerRow[];
+    readonly error: string | null;
+}
+
+/** What a page that draws the settings can say it draws besides them. */
+export const SETTINGS_FEATURES = ["hosts"] as const;
+
+export type SettingsFeature = (typeof SETTINGS_FEATURES)[number];
 
 export interface NoticeInput {
     readonly title: string;
@@ -172,10 +189,49 @@ export interface PolarisDesktop {
         clearClipboard(): Promise<void>;
         /** Start the app again, for a setting that applies then. */
         relaunch(): Promise<void>;
-        /** Open the app's own page at its hosts, the only place they are changed. */
+        /** Open where the hosts are managed: this page's Hosts when it said it draws
+         *  them (`announce(["hosts"])`), else the app's hosts window, saying why. */
         manageHosts(): Promise<void>;
-        /** Say this page draws the settings, so the tray and menus open them here. */
-        announce(): Promise<void>;
+        /** Say this page draws the settings, so the tray and menus open them here,
+         *  and which of `SETTINGS_FEATURES` it draws as well. */
+        announce(features?: readonly SettingsFeature[]): Promise<void>;
+        /**
+         * The hosts this app keeps, managed from Settings > This app > Hosts. Every
+         * address is checked here against the same schema and probe as the hosts
+         * window, and every answer is the app's own.
+         */
+        hosts: {
+            list(): Promise<HostsSnapshot | null>;
+            /** Whether a typed address is a Polaris, asked while it is typed. */
+            check(address: string): Promise<AddressCheck>;
+            /** Keep a host, after checking it is a Polaris; the windows stay where they are. */
+            add(address: string, name: string): Promise<Outcome>;
+            /** Open a listed host in the windows; it becomes the one the app starts on. */
+            switchTo(origin: string): Promise<Outcome>;
+            /** Change a listed host's address and name together. */
+            edit(origin: string, address: string, name: string): Promise<Outcome>;
+            /** Take a host off the list; removing the one in use closes its windows. */
+            remove(origin: string): Promise<Outcome>;
+            status(origin: string): Promise<HostStatus>;
+            /** The list as a `polaris://hosts` link, for a QR another device scans. */
+            link(): Promise<string>;
+            /** Put the list on the clipboard as a code. */
+            copy(): Promise<{ readonly ok: boolean; readonly count: number; }>;
+            /** Write the list to a file somebody picks. */
+            exportFile(): Promise<HostImport>;
+            /** Take in a list from a file somebody picks. */
+            importFile(): Promise<HostImport>;
+            /** Take in a list from a pasted or scanned code. */
+            importText(text: string): Promise<HostImport>;
+        };
+        /** Put the voice widget back as it first came (look, corner, widgets);
+         *  answers the snapshot after it. Absent in apps that predate it. */
+        resetOverlay?(): Promise<unknown>;
+        /** Take the next key press as the overlay's lock key; null puts back
+         *  the default keys. Answers the snapshot. Absent in older apps. */
+        setOverlayShortcut?(press: unknown | null): Promise<unknown>;
+        /** Turn the overlay on or off for one game. Answers the snapshot. Absent in older apps. */
+        setOverlayGame?(key: string, on: boolean): Promise<unknown>;
         /** Hear that a value changed anywhere. Answers the way to stop. */
         onChange(listener: () => void): () => void;
         /** Hear the app asking to show a category. Answers the way to stop. */
@@ -423,6 +479,10 @@ export interface Preferences {
     readonly voiceWidget: boolean;
     /** That widget only while a game is running. */
     readonly voiceWidgetGameOnly: boolean;
+    /** Mute, deafen and leave on the widget. */
+    readonly overlayQuickActions: boolean;
+    /** Those buttons stay and take clicks while the widget is locked. */
+    readonly overlayClickable: boolean;
     /** How the widget looks. */
     readonly voiceWidgetLook: WidgetLook;
     /** The launcher opens with its key from anywhere. */
@@ -454,7 +514,18 @@ export interface LauncherStatus {
 }
 
 /** The switches the settings window keeps with one call. */
-export const PREFERENCE_TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard", "launcherGameMode"] as const;
+export const PREFERENCE_TOGGLES = [
+    "minimizeToTray",
+    "startMinimized",
+    "voiceWidget",
+    "voiceWidgetGameOnly",
+    "launcher",
+    "launcherClipboard",
+    "launcherGameMode",
+    "overlayQuickActions",
+    "overlayClickable",
+    "voiceWidgetPinned"
+] as const;
 
 export type PreferenceToggle = (typeof PREFERENCE_TOGGLES)[number];
 
@@ -479,22 +550,10 @@ export interface PolarisLocal {
         check(address: string): Promise<AddressCheck>;
         /** Open a server from the list. */
         switchTo(origin: string): Promise<Outcome>;
-        rename(origin: string, name: string): Promise<Outcome>;
-        /** Change a listed host's address and name together. */
-        edit(origin: string, address: string, name: string): Promise<Outcome>;
-        remove(origin: string): Promise<Outcome>;
         /** Put the hosts window away. */
         close(): Promise<void>;
         /** Heard each time the page, kept open between visits, is shown again. */
         onShown?(listener: () => void): () => void;
-        /** Put the list of hosts on the clipboard as a code. */
-        copyHosts(): Promise<{ readonly ok: boolean; readonly count: number; }>;
-        /** Write the list of hosts to a file somebody picks. */
-        exportHostsFile(): Promise<HostImport>;
-        /** Take in a list of hosts from a file somebody picks. */
-        importHostsFile(): Promise<HostImport>;
-        /** Take in a list of hosts from a pasted or scanned code. */
-        importHosts(text: string): Promise<HostImport>;
         /** Open the host's update page (`readHostPath`) in the Polaris window,
          *  or say that it could not. */
         openOnHost?(path: string): Promise<HostPageOutcome>;
@@ -521,6 +580,11 @@ export interface PolarisLocal {
     readonly voiceWidget: {
         onView(listener: (view: WidgetView | null) => void): () => void;
         act(action: VoiceAction): Promise<boolean>;
+        /** While locked, take clicks (true: the pointer is over a clickable
+         *  region) or let them through to the game (false). */
+        clickable(on: boolean): Promise<void>;
+        /** A panel was dragged or resized to here, in the layer's pixels. */
+        place(place: PlaceReport): Promise<void>;
     };
 }
 
@@ -752,6 +816,11 @@ export const CHANNELS = {
     callAction: "desktop:call-action",
     widgetView: "desktop:widget-view",
     widgetAction: "desktop:widget-action",
+    widgetClickable: "desktop:widget-clickable",
+    widgetPlace: "desktop:widget-place",
+    appSettingsResetOverlay: "desktop:app-settings-reset-overlay",
+    appSettingsOverlayShortcut: "desktop:app-settings-overlay-shortcut",
+    appSettingsOverlayGame: "desktop:app-settings-overlay-game",
     openServers: "desktop:open-servers",
     appSettingsGet: "desktop:app-settings-get",
     appSettingsSet: "desktop:app-settings-set",
@@ -761,6 +830,18 @@ export const CHANNELS = {
     appSettingsRelaunch: "desktop:app-settings-relaunch",
     appSettingsHosts: "desktop:app-settings-hosts",
     appSettingsAnnounce: "desktop:app-settings-announce",
+    hostsList: "desktop:hosts-list",
+    hostsCheck: "desktop:hosts-check",
+    hostsAdd: "desktop:hosts-add",
+    hostsSwitch: "desktop:hosts-switch",
+    hostsEdit: "desktop:hosts-edit",
+    hostsRemove: "desktop:hosts-remove",
+    hostsStatus: "desktop:hosts-status",
+    hostsLink: "desktop:hosts-link",
+    hostsCopy: "desktop:hosts-copy",
+    hostsExport: "desktop:hosts-export",
+    hostsOpen: "desktop:hosts-open",
+    hostsImport: "desktop:hosts-import",
     appSettingsChanged: "desktop:app-settings-changed",
     appSettingsOpen: "desktop:app-settings-open",
     addonsGet: "desktop:addons-get",
@@ -804,13 +885,6 @@ export const CHANNELS = {
     connectState: "local:connect-state",
     connectSubmit: "local:connect-submit",
     connectSwitch: "local:connect-switch",
-    connectRename: "local:connect-rename",
-    connectEdit: "local:connect-edit",
-    connectRemove: "local:connect-remove",
-    connectHostsCopy: "local:connect-hosts-copy",
-    connectHostsExport: "local:connect-hosts-export",
-    connectHostsOpen: "local:connect-hosts-open",
-    connectHostsImport: "local:connect-hosts-import",
     connectCheck: "local:connect-check",
     connectClose: "local:connect-close",
     connectShown: "local:connect-shown",

@@ -12,7 +12,7 @@
 
 import { useEffect } from "react";
 import type { LocalStore } from "@/lib/chat/offline/local-store";
-import { reachability, subscribeReachability } from "@/lib/reachability";
+import { probeNow, reachability, subscribeReachability } from "@/lib/reachability";
 import { drainQueue, type QueuedEntry, type QueueEvent, type QueueSendResult } from "./outbox";
 
 export interface WriteQueue<E extends QueuedEntry> {
@@ -27,6 +27,21 @@ export interface WriteQueue<E extends QueuedEntry> {
     flush(): void;
     /** Every sent or failed entry; null when the queue changed some other way. */
     subscribe(listener: (event: QueueEvent<E> | null) => void): () => void;
+}
+
+/**
+ * Whether Polaris answers right now, for an attempt that got no answer: one
+ * probe, shared with anything else asking. Already known not to answer, it is
+ * not asked again here - its own backoff asks, and the recovery flushes. When
+ * it cannot be asked the attempt counts, as it always did.
+ */
+async function polarisAnswers(): Promise<boolean> {
+    try {
+        if (!reachability().reachable) return false;
+        return await probeNow();
+    } catch {
+        return true;
+    }
 }
 
 export function createWriteQueue<E extends QueuedEntry>(options: {
@@ -60,7 +75,8 @@ export function createWriteQueue<E extends QueuedEntry>(options: {
             send: options.deliver,
             save: async (entry) => void (await store.write(kind, entry.key, entry)),
             drop: (key) => store.forget(kind, key),
-            notify
+            notify,
+            counts: polarisAnswers
         });
     };
 

@@ -58,6 +58,7 @@ import {
     FileText,
     GitBranchPlus,
     History,
+    Undo2,
     Ghost,
     Maximize2,
     MoreHorizontal,
@@ -128,6 +129,7 @@ import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useExitPresence } from "@/lib/use-exit-presence";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { UsageDialog } from "@/components/polar/polar-usage";
+import { useConfirm } from "@/components/confirm-dialog";
 import { ContextBar, ContextDialog, CompactionDivider } from "@/components/polar/polar-context";
 import {
     AnswerSpendLine,
@@ -915,6 +917,7 @@ export function PolarChat({
     const pageOnce = useRef(false);
     const [queue, setQueue] = useState<QueuedMessage[]>([]);
     const [editing, setEditing] = useState<string | null>(null);
+    const [confirmRewind, rewindDialog] = useConfirm();
     const [files, setFiles] = useState<AttachmentData[]>([]);
     const [fileError, setFileError] = useState<string | null>(null);
     const [dragging, setDragging] = useState(false);
@@ -1647,6 +1650,31 @@ export function PolarChat({
         textarea.current?.focus();
     };
 
+    /**
+     * Rewinds the conversation to one of the reader's messages, as Claude
+     * Code's "Restore conversation" does: everything from it on leaves the
+     * screen and its text goes back into the box to send again or change.
+     * Nothing is deleted - what is stored stays until the next message is
+     * sent, and then remains in the tree as the earlier version, the same as
+     * an edit's.
+     */
+    const rewindTo = async (message: UIMessage) => {
+        if (busy || waitingApproval) return;
+        const ok = await confirmRewind({
+            title: t("rewind.title"),
+            description: t("rewind.description"),
+            confirmLabel: t("rewind.confirm")
+        });
+        if (!ok) return;
+        const at = chat.messages.findIndex((entry) => entry.id === message.id);
+        if (at < 0) return;
+        setEditing(null);
+        setQuote(null);
+        chat.setMessages(chat.messages.slice(0, at));
+        setInput(textOf(message));
+        textarea.current?.focus();
+    };
+
     /** Copies the path up to a message into a new conversation and opens it. */
     const branchFrom = async (messageId: string) => {
         const from = live.current.threadId;
@@ -1869,7 +1897,7 @@ export function PolarChat({
         if (command === "file") {
             return document
                 .getElementById(fullPage ? "polar-attach-page" : "polar-attach")
-                ?.querySelector("button")
+                ?.querySelector<HTMLButtonElement>("[data-polar-attach]")
                 ?.click();
         }
         if (command === "tools" && choice && !busy) {
@@ -3187,6 +3215,7 @@ export function PolarChat({
                                                 }
                                             />
                                         )}
+                                        onRewind={() => void rewindTo(message)}
                                         onBranch={
                                             temporary
                                                 ? undefined
@@ -3260,6 +3289,7 @@ export function PolarChat({
                     onClose={() => setSharingFrom(null)}
                 />
             ) : null}
+            {rewindDialog}
             {commandDraft ? (
                 <polarCommands.CommandForm
                     draft={commandDraft}
@@ -3374,6 +3404,7 @@ function MessageView({
     payer,
     onShare,
     onBranch,
+    onRewind,
     renderFailure
 }: {
     message: UIMessage;
@@ -3406,6 +3437,8 @@ function MessageView({
     payer: string | null;
     onShare?: () => void;
     onBranch?: () => void;
+    /** Rewinds the conversation to this message, for the reader's own. */
+    onRewind?: () => void;
     /** Why this answer has nothing else to show, drawn the way the panel words it. */
     renderFailure: (failure: polarFailure.StoredFailure) => ReactNode;
 }) {
@@ -3785,6 +3818,11 @@ function MessageView({
                             {!busy && onResend ? (
                                 <MessageAction label={t("actions.resend")} onClick={onResend}>
                                     <RotateCw />
+                                </MessageAction>
+                            ) : null}
+                            {!busy && onRewind ? (
+                                <MessageAction label={t("rewind.action")} onClick={onRewind}>
+                                    <Undo2 />
                                 </MessageAction>
                             ) : null}
                             <MessageAction label={t("commands.saveAs")} onClick={onSaveCommand}>

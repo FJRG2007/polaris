@@ -2587,5 +2587,24 @@
             "plain1": "Happy New Year. What's first?",
             "named1": "Happy New Year, {name}"
         }
+    },
+    "plus": {
+        "open": "Add files, commands and more",
+        "files": "Add files or photos",
+        "filesKey": "Ctrl+U",
+        "folder": "Add folder",
+        "slash": "Slash commands",
+        "slashBusy": "Box not empty",
+        "plugins": "Plugins",
+        "attention": "{count, plural, one {# needs attention} other {# need attention}}",
+        "connectors": "Connectors",
+        "skills": "Skills",
+        "tools": "Your tools"
+    },
+    "rewind": {
+        "action": "Rewind here",
+        "title": "Rewind to this message?",
+        "description": "Messages after it leave the chat and its text goes back into the box. Nothing is deleted: once you send, the old replies stay as the earlier version.",
+        "confirm": "Rewind"
     }
 }

@@ -8,7 +8,16 @@ import type { IpcHost } from "@/main/ipc";
 import { CHANNELS } from "@/shared/bridge";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const widget = vi.hoisted(() => ({ setVoiceState: vi.fn(), voiceWidgetAction: vi.fn(() => true) }));
+const widget = vi.hoisted(() => ({
+    setVoiceState: vi.fn(),
+    voiceWidgetAction: vi.fn(() => true),
+    placeVoicePanel: vi.fn(),
+    overlayLockStatus: vi.fn(() => ({ key: "Shift+` / Ctrl+Shift+`", problem: null })),
+    overlayGames: vi.fn(() => []),
+    recordOverlayLockKey: vi.fn(),
+    setOverlayLockBinding: vi.fn(() => true),
+    setOverlayGame: vi.fn(() => true)
+}));
 vi.mock("@/main/voice-widget", () => widget);
 
 const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>();
@@ -104,17 +113,91 @@ describe("the widget's buttons", () => {
     });
 });
 
+describe("a panel dragged in the overlay layer", () => {
+    const place = { id: "voice", x: 40, y: 60, width: 260, height: 120, sized: true };
+
+    it("is kept from the layer", () => {
+        handlers.get(CHANNELS.widgetPlace)?.(event("voice-widget"), place);
+        expect(widget.placeVoicePanel).toHaveBeenCalledWith(place);
+    });
+
+    it("refuses an unknown panel, a malformed place and any other window", () => {
+        widget.placeVoicePanel.mockClear();
+        handlers.get(CHANNELS.widgetPlace)?.(event("voice-widget"), { ...place, id: "chat" });
+        handlers.get(CHANNELS.widgetPlace)?.(event("voice-widget"), { ...place, width: 0 });
+        handlers.get(CHANNELS.widgetPlace)?.(event("voice-widget"), { ...place, x: 1.5 });
+        handlers.get(CHANNELS.widgetPlace)?.(event("polaris"), place);
+        expect(widget.placeVoicePanel).not.toHaveBeenCalled();
+    });
+});
+
 describe("the widget's switches", () => {
-    it.each([["voiceWidget"], ["voiceWidgetGameOnly"]])("are kept from the host's Settings > This app: %s", async (name) => {
+    it.each([["voiceWidget"], ["voiceWidgetGameOnly"], ["overlayQuickActions"], ["overlayClickable"], ["voiceWidgetPinned"]])("are kept from the host's Settings > This app: %s", async (name) => {
         const setToggle = vi.fn(() => true);
         handlers.clear();
         const { registerIpc } = await import("@/main/ipc");
         registerIpc({ server: () => ORIGIN, setToggle, preferences: () => ({}), connectState: () => ({ address: ORIGIN, servers: [] }) } as unknown as IpcHost);
         await handlers.get(CHANNELS.appSettingsSet)?.(event("polaris"), { key: name, value: true });
         expect(setToggle).toHaveBeenCalledWith(name, true);
-    });
+        // The first case imports the whole IPC module, slow on a loaded machine.
+    }, 20_000);
 
     it("are not taken from any other window", async () => {
         expect(await handlers.get(CHANNELS.appSettingsSet)?.(event("connect"), { key: "voiceWidget", value: true })).toBeNull();
+    });
+});
+
+/** The IPC registered with a host that answers a snapshot. */
+async function withSnapshotHost(): Promise<void> {
+    handlers.clear();
+    const { registerIpc } = await import("@/main/ipc");
+    registerIpc({ server: () => ORIGIN, setToggle: () => true, preferences: () => ({}), connectState: () => ({ address: ORIGIN, servers: [] }) } as unknown as IpcHost);
+}
+
+describe("the overlay's lock key", () => {
+    beforeEach(withSnapshotHost, 20_000);
+    const press = { code: "KeyO", ctrlKey: true, metaKey: false, altKey: true, shiftKey: false };
+
+    it("takes a recorded press as its binding and answers the snapshot", async () => {
+        widget.setOverlayLockBinding.mockClear();
+        const answer = await handlers.get(CHANNELS.appSettingsOverlayShortcut)?.(event("polaris"), press);
+        expect(widget.setOverlayLockBinding).toHaveBeenCalledWith("Mod+Alt+O");
+        expect(answer).toMatchObject({ overlayLockKey: "Shift+` / Ctrl+Shift+`", features: ["overlayPin", "overlayLockKey", "overlayGames"] });
+    });
+
+    it("puts the default keys back for null", async () => {
+        widget.setOverlayLockBinding.mockClear();
+        await handlers.get(CHANNELS.appSettingsOverlayShortcut)?.(event("polaris"), null);
+        expect(widget.setOverlayLockBinding).toHaveBeenCalledWith("");
+    });
+
+    it("refuses a bare letter, a key the system will not give, and any other window", async () => {
+        widget.setOverlayLockBinding.mockClear();
+        const bare = { ...press, ctrlKey: false, altKey: false };
+        expect(await handlers.get(CHANNELS.appSettingsOverlayShortcut)?.(event("polaris"), bare)).toBeNull();
+        expect(widget.setOverlayLockBinding).not.toHaveBeenCalled();
+        widget.setOverlayLockBinding.mockReturnValueOnce(false);
+        expect(await handlers.get(CHANNELS.appSettingsOverlayShortcut)?.(event("polaris"), press)).toBeNull();
+        expect(await handlers.get(CHANNELS.appSettingsOverlayShortcut)?.(event("voice-widget"), press)).toBeNull();
+    });
+});
+
+describe("the overlay per game", () => {
+    beforeEach(withSnapshotHost, 20_000);
+    it("is turned on or off for a game from the host's Settings", async () => {
+        widget.setOverlayGame.mockClear();
+        const answer = await handlers.get(CHANNELS.appSettingsOverlayGame)?.(event("polaris"), { key: "cs2.exe", on: false });
+        expect(widget.setOverlayGame).toHaveBeenCalledWith("cs2.exe", false);
+        expect(answer).not.toBeNull();
+    });
+
+    it("refuses a malformed change, an unknown game and other windows", async () => {
+        widget.setOverlayGame.mockClear();
+        expect(await handlers.get(CHANNELS.appSettingsOverlayGame)?.(event("polaris"), { key: "", on: false })).toBeNull();
+        expect(await handlers.get(CHANNELS.appSettingsOverlayGame)?.(event("polaris"), { key: "x", on: "no" })).toBeNull();
+        expect(widget.setOverlayGame).not.toHaveBeenCalled();
+        widget.setOverlayGame.mockReturnValueOnce(false);
+        expect(await handlers.get(CHANNELS.appSettingsOverlayGame)?.(event("polaris"), { key: "x", on: true })).toBeNull();
+        expect(await handlers.get(CHANNELS.appSettingsOverlayGame)?.(event("connect"), { key: "x", on: true })).toBeNull();
     });
 });

@@ -19,7 +19,7 @@
  */
 
 import { addonShortcutsNow, addonsSnapshotNow, registerAddonViewScheme, startDeviceAddons, stopDeviceAddons } from "./addons/electron";
-import { HOST_UPDATE_ACCESS_PATH, readSettingsProbe, readUpdateAccess, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
+import { HOST_UPDATE_ACCESS_PATH, hostsRoute, readSettingsProbe, readUpdateAccess, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
 import { runner } from "./runner";
@@ -39,8 +39,8 @@ import { pushRunning } from "./push-local";
 import { watchForUpdates, type FirstCheck, type Update } from "./updates";
 import { updateBeforeOpening, type Opening } from "./update-first";
 import { UpdateReadyState } from "./update-ready";
-import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
-import { allowLocalPermission, allowPermission } from "./permissions";
+import { CHANNELS, type AddressCheck, type HostStatus, type Outcome } from "@/shared/bridge";
+import { allowPermission } from "./permissions";
 import * as hostTransfer from "./host-transfer";
 import { handledSquirrelEvent } from "./squirrel";
 import { restoreAppIcon } from "./app-icon";
@@ -49,7 +49,7 @@ import { installScreenShare } from "./screen-share";
 import { installTray } from "./tray";
 import { appItems, hideMenuBar, installMenu, type MenuActions, type MenuUpdate } from "./menu";
 import { serverAddressSchema } from "@/shared/server-address";
-import { describeServer, listServers, normalizeServerName, renameServer, replaceServer, sameInstanceWords, SERVER_NAME_MAX, withoutServer } from "@/shared/servers";
+import { describeServer, listServers, normalizeServerName, renameServer, replaceServer, sameInstanceWords, SERVER_NAME_MAX, withoutServer, withServer } from "@/shared/servers";
 import { setOpenAtLogin, startedAtLogin } from "./login-item";
 import { restoredPlace } from "@/shared/window-place";
 import * as settings from "./settings";
@@ -57,7 +57,7 @@ import { cancelRelaunch, holdCall, loadRelaunch, markRelaunch, relaunched } from
 import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpdateAttempted, updateAttempted } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, warmLocalSheet, type LocalSheet } from "./windows";
-import { app, autoUpdater, BrowserWindow, dialog, net, powerMonitor, screen, session } from "electron";
+import { app, autoUpdater, BrowserWindow, dialog, net, powerMonitor, screen, session, type WebContents } from "electron";
 import { describeNetError, describeOfflinePage, errorText, finishedLoad, isCertificateError, netErrorCode, RECONNECTS_WORDS } from "./reachability";
 import { createReconnector, RECONNECT_PROBE_MS } from "./reconnect";
 import { sameInstanceAs } from "./same-instance";
@@ -65,6 +65,7 @@ import { addressWords, failoverFor, instanceRecordFor } from "./polaris-api";
 import { AUTHORITY_INVALID, USE_CHROMIUM, pinScope, verifyDecision } from "./local-ca-pin";
 import { activeOrigin, backStep, failedLoadStep, samePlaceOn, titleWith } from "./window-failover";
 import { openExternal } from "./open-external";
+import { antivirusHelpUrl, antivirusNotice } from "./antivirus-help";
 import { installDeviceHeaders } from "./device-headers";
 import { startNativeHost } from "./native-host/service";
 import { DEFAULT_HOLD_MS, UNTRUSTED_WORDS } from "../../../../dashboard/packages/core/src/instance-fallback";
@@ -83,6 +84,8 @@ let sheet: LocalSheet | null = null;
 /** The page of the main window that said it draws the app's settings, by its
  *  contents' id; cleared as that page navigates away, fails or dies. */
 let settingsPage: number | null = null;
+/** The same page, when it said it manages the hosts as well (Settings > This app > Hosts). */
+let hostsPage: number | null = null;
 /** Why the hosts window is open, when Settings... opened it; read by that page. */
 let localSettings: LocalSettingsState = { reason: null };
 
@@ -97,7 +100,7 @@ let loadError: string | null = null;
  * their folder, from the launcher's listing of them (`installedGames`).
  */
 const games = new GameWatcher((game) => {
-    setVoiceWidgetGame(game !== null);
+    setVoiceWidgetGame(game && { key: game.key, name: game.name });
     if (main && !main.isDestroyed()) main.webContents.send(CHANNELS.gameActivity, game);
 }, undefined, () => installedGames());
 // Game mode: the launcher's key reaches the game while it is in front.
@@ -406,6 +409,7 @@ function openMain(url: string): void {
     const pageId = window.webContents.id;
     const forgetSettingsPage = () => {
         if (settingsPage === pageId) settingsPage = null;
+        if (hostsPage === pageId) hostsPage = null;
     };
     window.webContents.on("did-start-navigation", (details) => {
         if (details.isMainFrame && !details.isSameDocument) forgetSettingsPage();
@@ -561,6 +565,9 @@ async function canUpdateHost(window: BrowserWindow | null, origin: string): Prom
  * host that answers that it has no such screen the hosts window says so, with
  * the update when this person may run it.
  */
+/** The host's Downloads, where this app's version and updates are. */
+const DOWNLOADS_PATH = "/account/downloads";
+
 async function openSettings(place: SettingsPlace = "general"): Promise<void> {
     const page = main && !main.isDestroyed() ? main : null;
     const origin = current;
@@ -579,12 +586,7 @@ async function openSettings(place: SettingsPlace = "general"): Promise<void> {
         route = settingsRoute(place, { ...state, probe });
     }
     if (route.kind === "probe" || !origin) route = { kind: "local", reason: null };
-    if (route.kind === "local") {
-        const reason = route.reason;
-        const canUpdate = reason === "outdated" && origin ? await canUpdateHost(page, origin) : false;
-        openConnect({ reason, canUpdate });
-        return;
-    }
+    if (route.kind === "local") return openHostsWindow(route.reason, page, origin);
     closeConnect();
     // No window - closed rather than kept in the tray: a new one opens there. A
     // crashed page is never "page", and loading an address gives it a new renderer.
@@ -597,6 +599,31 @@ async function openSettings(place: SettingsPlace = "general"): Promise<void> {
     page.focus();
     if (route.kind === "page") page.webContents.send(CHANNELS.appSettingsOpen, place);
     else void page.loadURL(`${origin}${route.path}`);
+}
+
+/** The hosts window, and why it opened in place of the host's screen: with the
+ *  update offered for a host older than it, when this person may run it. */
+async function openHostsWindow(reason: LocalSettingsState["reason"], page: BrowserWindow | null, origin: string | null): Promise<void> {
+    const canUpdate = reason === "outdated" && origin ? await canUpdateHost(page, origin) : false;
+    openConnect({ reason, canUpdate });
+}
+
+/**
+ * Hosts > Manage, the account menu's hosts, anything a Polaris page asks for
+ * to manage the hosts: that page's own Settings > This app > Hosts when it said
+ * it draws them (`hostsRoute`), and the hosts window, saying the host is older
+ * than this app, for a page that did not.
+ */
+function manageHosts(sender: WebContents): void {
+    const page = main && !main.isDestroyed() && main.webContents.id === sender.id ? main : null;
+    if (hostsRoute({ pageLoaded: Boolean(page), pageHosts: page !== null && hostsPage === sender.id }) === "page" && page) {
+        if (page.isMinimized()) page.restore();
+        page.show();
+        page.focus();
+        sender.send(CHANNELS.appSettingsOpen, "hosts" satisfies SettingsPlace);
+        return;
+    }
+    void openHostsWindow("outdated", page, current);
 }
 
 /**
@@ -771,6 +798,33 @@ async function connectSubmit(raw: unknown, typedName = ""): Promise<Outcome> {
     return { ok: true };
 }
 
+/**
+ * A host added from Settings > This app > Hosts: the same checks as one typed in
+ * the hosts window, then kept on the list. The windows stay where they are, on
+ * the page that asked; Switch opens it.
+ */
+async function addServer(raw: unknown, typedName = ""): Promise<Outcome> {
+    const parsed = serverAddressSchema.safeParse(typeof raw === "string" ? raw : "");
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "That is not an address." };
+    const name = normalizeServerName(typedName);
+    if (name && name.length > SERVER_NAME_MAX) return { ok: false, error: `Use at most ${SERVER_NAME_MAX} characters.` };
+    const origin = parsed.data;
+    const taken = servers().find((server) => server.origin === origin);
+    if (taken) return { ok: false, error: `Already on your list as ${describeServer(taken)}.` };
+    const problem = await probe(origin);
+    if (problem) return { ok: false, error: problem };
+    setSavedServers(renameServer(withServer(savedServers(), origin), origin, name));
+    refreshMenu();
+    return { ok: true };
+}
+
+/** Whether a listed host answers as a Polaris now; not asked with no network at all. */
+async function hostStatus(origin: string): Promise<HostStatus> {
+    if (!net.isOnline()) return "unknown";
+    const verdict = await serverCheck.check(origin).catch(() => null);
+    return verdict?.kind === "polaris" ? "online" : "offline";
+}
+
 /** Put the windows on a server already kept as the one in use. */
 function openServer(origin: string): void {
     if (origin !== current) leaveServer();
@@ -860,15 +914,14 @@ function nameServer(origin: string, typed: string): Outcome {
  *  leaves the list open to pick another; its sign-in is not touched. */
 function removeServer(origin: string): Outcome {
     if (origin === current) {
-        // The sheet goes with the Polaris window, so the list comes back in a
-        // window of its own to pick another.
-        const listOpen = Boolean(sheet);
+        // Every window of that host goes, the page that asked included, so the
+        // list comes back in a window of its own to pick another.
         setServerAddress(null);
         current = null;
         void runner().use(null);
         dropAlternate();
         leaveServer();
-        if (listOpen) openConnect();
+        openConnect();
     }
     setSavedServers(withoutServer(savedServers(), origin));
     refreshMenu();
@@ -926,6 +979,7 @@ function start(): void {
         // nothing below needs to have run for its menu to work.
         const menu: MenuActions = {
             changeServer: () => void openSettings(),
+            manageHosts: () => void openSettings("hosts"),
             switchServer: (origin) => void switchOrSayWhy(origin),
             back: goBack,
             reload: () => BrowserWindow.getFocusedWindow()?.webContents.reload(),
@@ -983,15 +1037,11 @@ function start(): void {
             }
             callback(verdict);
         });
-        session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
-            const mediaTypes = "mediaTypes" in details ? details.mediaTypes : undefined;
-            if (allowLocalPermission(permission, kindOf(contents), mediaTypes)) return callback(true);
+        session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) => {
             callback(allowPermission(permission, details.requestingUrl, server()));
         });
         session.defaultSession.setPermissionCheckHandler(
-            (contents, permission, requestingOrigin) =>
-                (contents !== null && allowLocalPermission(permission, kindOf(contents), undefined)) ||
-                allowPermission(permission, requestingOrigin, server())
+            (_contents, permission, requestingOrigin) => allowPermission(permission, requestingOrigin, server())
         );
 
         // Which computer this is, to the active server only, so its sessions
@@ -1023,6 +1073,9 @@ function start(): void {
                     startMinimized: settings.toggle("startMinimized"),
                     voiceWidget: settings.toggle("voiceWidget"),
                     voiceWidgetGameOnly: settings.toggle("voiceWidgetGameOnly"),
+                    overlayQuickActions: settings.toggle("overlayQuickActions"),
+                    overlayClickable: settings.toggle("overlayClickable"),
+                    voiceWidgetPinned: settings.toggle("voiceWidgetPinned"),
                     voiceWidgetLook: settings.voiceWidgetLook(),
                     launcher: settings.toggle("launcher"),
                     launcherClipboard: settings.toggle("launcherClipboard"),
@@ -1059,20 +1112,23 @@ function start(): void {
             connectSubmit,
             connectCheck,
             switchServer,
-            nameServer,
             editServer,
             removeServer,
+            addServer,
+            hostStatus,
             hosts: {
+                link: () => hostTransfer.hostsLink(hostStore),
                 copy: () => hostTransfer.copyHosts(hostStore),
                 exportFile: (parent) => hostTransfer.saveHostsFile(hostStore, parent),
                 importFile: (parent) => hostTransfer.importHostsFile(hostStore, parent),
                 take: (text) => hostTransfer.importHosts(hostStore, text)
             },
             closeConnect,
-            openServers: openConnect,
-            settingsAnnounced: (sender) => {
+            manageHosts,
+            settingsAnnounced: (sender, hosts) => {
                 if (!main || main.isDestroyed() || sender.id !== main.webContents.id) return;
                 settingsPage = sender.id;
+                hostsPage = hosts ? sender.id : null;
                 if (current) settingsHosts.add(current);
             },
             updates,
@@ -1086,13 +1142,22 @@ function start(): void {
         installScreenShare(server);
         games.start();
 
+        /**
+         * Where an update is fetched: Downloads on the host, which shows this
+         * app's version, the download's progress and its restart; the release
+         * page only when there is no host page to open it on.
+         */
+        const openDownloads = (update: Update) =>
+            current && !loadError ? showPolaris(DOWNLOADS_PATH) : openExternal(update.page);
         const announce = (update: Update) => {
-            const open = () => openExternal(update.page);
+            const open = () => openDownloads(update);
             // The window in front draws the restart button itself: no notice
             // on top of it. A page that does not (an older Polaris, the address
             // form) gets the notice, as do the other windows' pages through the
             // button they draw.
             if (!updates.needsNotice(update, frontPage())) return;
+            // Told already, by the notice that it did not install.
+            if (!update.restart && update.version === didNotInstall) return;
             showNotice(
                 update.restart
                     ? {
@@ -1116,10 +1181,22 @@ function start(): void {
         };
         /** The update the app was about to restart into, unannounced until it opens. */
         let heldBack: Update | null = null;
+        /** The version Squirrel failed to apply, announced with the antivirus guide. */
+        let didNotInstall: string | null = null;
+        const notInstalled = (update: Update) => {
+            didNotInstall = update.version;
+            showNotice(
+                antivirusNotice(
+                    "update",
+                    { guide: () => openExternal(antivirusHelpUrl(app.getLocale())), page: () => openExternal(update.page) },
+                    update.version
+                )
+            );
+        };
         const first = (updateWatch = watchForUpdates((update) => {
             menuUpdate = {
                 version: update.version,
-                open: () => openExternal(update.page),
+                open: () => openDownloads(update),
                 ...(update.restart ? { restart: update.restart } : {})
             };
             refreshMenu();
@@ -1130,7 +1207,7 @@ function start(): void {
                 return;
             }
             announce(update);
-        }));
+        }, notInstalled));
 
         void updateBeforeOpening(first, {
             attempted: updateAttempted,

@@ -4,8 +4,8 @@ import android.net.Uri;
 import android.webkit.JavascriptInterface;
 
 /**
- * What the page can ask of the app, as `window.polarisMobile`: which app and version it is running in, the way to the
- * list of Polaris servers, where the last picked file came from, opening a photo sent to be seen once, and handing a
+ * What the page can ask of the app, as `window.polarisMobile`: which app and version it is running in, the list of
+ * Polaris servers, where the last picked file came from, opening a photo sent to be seen once, and handing a
  * link to the phone's browser or mail app. Nothing here
  * hands the page anything it could not already see: a view-once file is fetched and shown by the app, never given to
  * the page, and the VPN's private key stays in the app.
@@ -87,6 +87,23 @@ final class PageBridge {
     public void appSettingsAction(String action) {
         if (action == null || action.length() > 32) return;
         activity.runOnUiThread(() -> HostsActivity.act(activity, action));
+    }
+
+    /**
+     * The servers this phone keeps, managed from the page's Settings > This app > Hosts: `op` is list, check, add,
+     * switch, edit, remove, status, link, copy, export or import, `args` its JSON. Its presence is how the app says the
+     * page manages them; the answer, shaped as the desktop app's, comes back to `window.__polarisMobileHosts(id, json)`.
+     */
+    @JavascriptInterface
+    public void hostsCall(String id, String op, String args) {
+        if (!validId(id) || op == null || op.length() > 16 || args == null || args.length() > 80 * 1024) return;
+        org.json.JSONObject parsed;
+        try {
+            parsed = new org.json.JSONObject(args);
+        } catch (org.json.JSONException unreadable) {
+            return;
+        }
+        activity.runOnUiThread(() -> activity.hostsCall(id, op, parsed));
     }
 
     /** Check for a newer build now; the answer comes back to `window.__polarisMobileUpdate(id, json)`. */

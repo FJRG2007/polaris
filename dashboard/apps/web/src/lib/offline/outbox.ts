@@ -24,7 +24,8 @@ export interface QueuedEntry {
 
 /**
  * - `sent` / `refused`: the server answered.
- * - `unreachable`: no server; counted as an attempt.
+ * - `unreachable`: no server; counted as an attempt only while Polaris itself
+ *   answers (`counts`), so an outage of any length uses none of them up.
  * - `held`: this page cannot send it at all (a sealed message on a page where
  *   sealed chat is not open) - not an attempt, nothing is wrong with it, and it
  *   goes when a page that can send it flushes.
@@ -35,7 +36,8 @@ export type QueueEvent<E extends QueuedEntry> =
     | { readonly entry: E; readonly sent: string }
     | { readonly entry: E; readonly failed: string };
 
-/** Attempts that found no server before an entry is shown as not sent. */
+/** Attempts that found no server, while Polaris answered, before an entry is
+ *  shown as not sent. */
 export const OUTBOX_MAX_ATTEMPTS = 5;
 
 export async function drainQueue<E extends QueuedEntry>(
@@ -45,6 +47,14 @@ export async function drainQueue<E extends QueuedEntry>(
         save(entry: E): Promise<void>;
         drop(key: string): Promise<void>;
         notify(event: QueueEvent<E>): void;
+        /**
+         * Whether an attempt that found no server counts toward the limit. Only
+         * when Polaris answers some other way: then this entry itself is what
+         * does not get through. While Polaris is down nothing counts, or a few
+         * flushes during one outage would mark everything waiting as not sent.
+         * Counted when absent.
+         */
+        counts?(entry: E): Promise<boolean>;
     }
 ): Promise<void> {
     const queue = entries
@@ -64,6 +74,9 @@ export async function drainQueue<E extends QueuedEntry>(
             io.notify({ entry, failed: result.refused });
             continue;
         }
+        // Polaris is not there at all: this entry and what follows wait, as
+        // they were.
+        if (io.counts && !(await io.counts(entry))) return;
         const attempts = entry.attempts + 1;
         if (attempts >= OUTBOX_MAX_ATTEMPTS) {
             await io.save({ ...entry, attempts, state: "failed" });

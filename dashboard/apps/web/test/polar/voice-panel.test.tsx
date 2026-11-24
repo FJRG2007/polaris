@@ -133,7 +133,7 @@ describe("voice in the composer", () => {
         expect(box.disabled).toBe(false);
         fireEvent.change(box, { target: { value: "Typed during the call" } });
         expect(box.value).toBe("Typed during the call");
-        const attach = screen.getByRole("button", { name: "Attach files" }) as HTMLButtonElement;
+        const attach = screen.getByRole("button", { name: "Add files, commands and more" }) as HTMLButtonElement;
         expect(attach.disabled).toBe(false);
         expect(screen.getByRole("button", { name: "Send (Enter)" })).toBeTruthy();
         // Only a second microphone rests while the call has one, and says why.

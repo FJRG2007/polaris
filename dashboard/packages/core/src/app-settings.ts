@@ -23,8 +23,7 @@ export const APP_SETTING_CATEGORIES = [
     "clipboard",
     "voice",
     "hosts",
-    "advanced",
-    "updates"
+    "advanced"
 ] as const;
 
 export type AppSettingCategory = (typeof APP_SETTING_CATEGORIES)[number];
@@ -42,6 +41,10 @@ export const APP_WIDGET_PEOPLE = ["always", "speaking"] as const;
 /** Percentages, kept as text so every choice crosses the bridge the same way. */
 export const APP_WIDGET_OPACITIES = ["100", "80", "60", "40"] as const;
 export const APP_WIDGET_CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
+/** "Max users displayed": a whole number up to this, where 0 is Off (everybody). */
+export const APP_WIDGET_MAX_USERS = 25;
+/** The marks under that slider, as Discord draws them. */
+export const APP_WIDGET_MAX_USERS_MARKS = [0, 5, 10, 15, 20, 25] as const;
 
 interface SettingBase<K extends string> {
     readonly key: K;
@@ -50,12 +53,32 @@ interface SettingBase<K extends string> {
     readonly dependsOn?: string;
     /** Takes effect once the app starts again. */
     readonly restart?: boolean;
+    /** Shown only by an app that lists this in its snapshot's `features`: an
+     *  older app would refuse the change, or treat it as another setting's. */
+    readonly feature?: AppSettingFeature;
 }
+
+/**
+ * What an app newer than the first settings page can do, each named in its
+ * snapshot so a page drawn by a newer Polaris never offers an older app a
+ * setting it does not have.
+ */
+export const APP_SETTING_FEATURES = ["overlayPin", "overlayLockKey", "overlayGames"] as const;
+
+export type AppSettingFeature = (typeof APP_SETTING_FEATURES)[number];
 
 export type AppSettingEntry =
     | (SettingBase<string> & { readonly kind: "toggle"; readonly default: boolean })
     | (SettingBase<string> & { readonly kind: "choice"; readonly options: readonly string[]; readonly default: string })
-    | (SettingBase<string> & { readonly kind: "shortcut"; readonly default: string });
+    | (SettingBase<string> & { readonly kind: "shortcut"; readonly default: string })
+    | (SettingBase<string> & {
+          readonly kind: "range";
+          readonly min: number;
+          readonly max: number;
+          readonly step: number;
+          readonly marks: readonly number[];
+          readonly default: number;
+      });
 
 /** Every setting, in the order each category lists them. */
 export const APP_SETTINGS = [
@@ -77,6 +100,24 @@ export const APP_SETTINGS = [
     },
     { key: "voiceWidget", kind: "toggle", category: "voice", default: true },
     { key: "voiceWidgetGameOnly", kind: "toggle", category: "voice", default: false, dependsOn: "voiceWidget" },
+    { key: "overlayQuickActions", kind: "toggle", category: "voice", default: true, dependsOn: "voiceWidget" },
+    { key: "overlayClickable", kind: "toggle", category: "voice", default: false, dependsOn: "overlayQuickActions" },
+    {
+        key: "voiceWidgetPinned",
+        kind: "toggle",
+        category: "voice",
+        default: true,
+        dependsOn: "voiceWidget",
+        feature: "overlayPin"
+    },
+    {
+        key: "overlayLockBinding",
+        kind: "shortcut",
+        category: "voice",
+        default: "",
+        dependsOn: "voiceWidget",
+        feature: "overlayLockKey"
+    },
     {
         key: "voiceWidgetAvatars",
         kind: "choice",
@@ -99,6 +140,17 @@ export const APP_SETTINGS = [
         category: "voice",
         default: "always",
         options: APP_WIDGET_PEOPLE,
+        dependsOn: "voiceWidget"
+    },
+    {
+        key: "voiceWidgetMaxUsers",
+        kind: "range",
+        category: "voice",
+        default: 8,
+        min: 0,
+        max: APP_WIDGET_MAX_USERS,
+        step: 1,
+        marks: APP_WIDGET_MAX_USERS_MARKS,
         dependsOn: "voiceWidget"
     },
     {
@@ -132,6 +184,9 @@ export const APP_SETTING_TOGGLES = [
     "launcherClipboard",
     "voiceWidget",
     "voiceWidgetGameOnly",
+    "overlayQuickActions",
+    "overlayClickable",
+    "voiceWidgetPinned",
     "hardwareAcceleration"
 ] as const;
 
@@ -150,6 +205,29 @@ const savedHostSchema = z.object({
     origin: z.string().max(2048),
     name: z.string().max(200).nullable().catch(null)
 });
+
+/** A game the overlay can be turned off for, by the program that runs it. */
+const overlayGameSchema = z.object({
+    key: z.string().min(1).max(260),
+    name: z.string().max(120),
+    on: z.boolean(),
+    /** Running now. */
+    running: z.boolean().catch(false)
+});
+
+export type AppOverlayGame = z.infer<typeof overlayGameSchema>;
+
+/** Turning the overlay on or off for one game, as a screen asks for it. */
+export const appOverlayGameChangeSchema = z
+    .object({ key: z.string().min(1).max(260), on: z.boolean() })
+    .strict();
+
+export type AppOverlayGameChange = z.infer<typeof appOverlayGameChangeSchema>;
+
+/** Whether a setting is offered with this app: one that needs a feature only when the app has it. */
+export function appSettingOffered(entry: AppSettingEntry, features: readonly AppSettingFeature[]): boolean {
+    return !entry.feature || features.includes(entry.feature);
+}
 
 /**
  * What the app answers when asked for its settings: every value, plus the
@@ -174,6 +252,23 @@ const snapshotSchema = z.object({
     voiceWidgetPeople: z.enum(APP_WIDGET_PEOPLE).catch("always"),
     voiceWidgetOpacity: z.enum(APP_WIDGET_OPACITIES).catch("100"),
     voiceWidgetCorner: z.enum(APP_WIDGET_CORNERS).catch("top-left"),
+    voiceWidgetMaxUsers: z.number().int().min(0).max(APP_WIDGET_MAX_USERS).catch(8),
+    overlayQuickActions: z.boolean().catch(true),
+    overlayClickable: z.boolean().catch(false),
+    voiceWidgetPinned: z.boolean().catch(true),
+    /** The overlay's lock key as chosen, in the dashboard's spelling; empty for the default keys. */
+    overlayLockBinding: z.string().max(40).catch(""),
+    /** The overlay's lock key as a person reads it, and what stops it when it is not held. */
+    overlayLockKey: z.string().max(60).nullable().catch(null),
+    overlayLockProblem: z.string().max(500).nullable().catch(null),
+    /** The game running now and each one the overlay was turned off for, with whether it shows there. */
+    overlayGames: z.array(overlayGameSchema).max(200).catch([]),
+    /** What this app can do beyond the first settings page (`APP_SETTING_FEATURES`); unknown names are dropped. */
+    features: z
+        .array(z.string().max(32))
+        .max(32)
+        .catch([])
+        .transform((names) => APP_SETTING_FEATURES.filter((feature) => names.includes(feature))),
     hardwareAcceleration: z.boolean().catch(true),
     /** The kept choice differs from the one this run started with. */
     restartPending: z.boolean().catch(false),
@@ -206,7 +301,10 @@ export const appSettingChangeSchema = z.union([
     z.object({ key: z.literal("voiceWidgetNames"), value: z.enum(APP_WIDGET_NAMES) }).strict(),
     z.object({ key: z.literal("voiceWidgetPeople"), value: z.enum(APP_WIDGET_PEOPLE) }).strict(),
     z.object({ key: z.literal("voiceWidgetOpacity"), value: z.enum(APP_WIDGET_OPACITIES) }).strict(),
-    z.object({ key: z.literal("voiceWidgetCorner"), value: z.enum(APP_WIDGET_CORNERS) }).strict()
+    z.object({ key: z.literal("voiceWidgetCorner"), value: z.enum(APP_WIDGET_CORNERS) }).strict(),
+    z
+        .object({ key: z.literal("voiceWidgetMaxUsers"), value: z.number().int().min(0).max(APP_WIDGET_MAX_USERS) })
+        .strict()
 ]);
 
 export type AppSettingChange = z.infer<typeof appSettingChangeSchema>;
@@ -242,12 +340,12 @@ export function appSettingsTarget(state: {
 }
 
 /**
- * The categories the phone app lists, of the same group: its servers, its
- * version, and the rest of what it keeps on the phone (notifications,
- * language, Vault autofill) under General. The other categories are the
- * desktop app's alone.
+ * The categories the phone app lists, of the same group: its servers, and the
+ * rest of what it keeps on the phone (notifications, language, Vault autofill)
+ * under General. The other categories are the desktop app's alone; the app's
+ * version and its updates are on Downloads.
  */
-export const APP_PHONE_CATEGORIES = ["general", "hosts", "updates"] as const satisfies readonly AppSettingCategory[];
+export const APP_PHONE_CATEGORIES = ["general", "hosts"] as const satisfies readonly AppSettingCategory[];
 
 export type AppPhoneCategory = (typeof APP_PHONE_CATEGORIES)[number];
 

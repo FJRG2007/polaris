@@ -2587,5 +2587,24 @@
             "plain1": "Feliz año nuevo. ¿Qué va primero?",
             "named1": "Feliz año nuevo, {name}"
         }
+    },
+    "plus": {
+        "open": "Añadir archivos, comandos y más",
+        "files": "Añadir archivos o fotos",
+        "filesKey": "Ctrl+U",
+        "folder": "Subir carpeta",
+        "slash": "Comandos con /",
+        "slashBusy": "Cuadro con texto",
+        "plugins": "Plugins",
+        "attention": "{count, plural, one {# pide atención} other {# piden atención}}",
+        "connectors": "Conectores",
+        "skills": "Skills",
+        "tools": "Herramientas"
+    },
+    "rewind": {
+        "action": "Volver aquí",
+        "title": "¿Volver a este mensaje?",
+        "description": "Lo posterior sale del chat y su texto vuelve al cuadro. No se borra nada: al enviar, las respuestas anteriores quedan como versión previa.",
+        "confirm": "Volver"
     }
 }

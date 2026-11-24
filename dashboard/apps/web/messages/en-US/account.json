@@ -1712,7 +1712,8 @@
         "desktop": {
             "app": "Desktop app",
             "recommended": "Recommended",
-            "description": "Polaris on your computer, for Windows, macOS and Linux. Deploy from your own machine and keep an eye on your services in their own window."
+            "description": "Polaris on your computer, for Windows, macOS and Linux. Deploy from your own machine and keep an eye on your services in their own window.",
+            "antivirus": "Antivirus blocking it?"
         },
         "cards": {
             "install": "Install",
@@ -2534,7 +2535,8 @@
             "appVersion": "It needs a newer desktop app. Update the app first.",
             "download": "The download failed. Try again.",
             "integrity": "The download did not match what was published, so nothing was installed.",
-            "other": "It could not be installed. Try again."
+            "other": "It could not be installed. Try again.",
+            "notStarted": "Installed, but it has not started. Its status says why."
         },
         "detail": {
             "version": "Version",

@@ -25,17 +25,22 @@ export interface AdminQueue {
     readonly cases: number;
     readonly update: boolean;
     readonly apis: number;
+    /** Installed apps whose newest release waits on an administrator; absent
+     *  where the caller predates them. */
+    readonly apps?: number;
 }
 
 /** The notification each part of that queue is announced with. */
 export const UPDATE_EVENT = "system.update";
 export const SAFETY_EVENT = "admin.safety.case";
+export const APP_UPDATE_EVENT = "apps.update";
 
 /** Management's own screens that carry a part of its count. */
 const ADMIN_SCREEN_COUNT: Readonly<Record<string, (queue: AdminQueue) => number>> = {
     "/admin/updates": (queue) => (queue.update ? 1 : 0),
     "/admin/safety": (queue) => queue.reports + queue.cases,
-    "/admin/integrations": (queue) => queue.apis
+    "/admin/integrations": (queue) => queue.apis,
+    "/admin/apps": (queue) => queue.apps ?? 0
 };
 
 /** The Management app's id, as the app catalogue has it. */
@@ -81,6 +86,7 @@ export function tabWaiting(input: {
     const apps = Object.values(input.apps).reduce((sum, count) => sum + count, 0);
     const overlap =
         Math.min(input.admin.update ? 1 : 0, unreadOf(UPDATE_EVENT)) +
-        Math.min(input.admin.reports + input.admin.cases, unreadOf(SAFETY_EVENT));
+        Math.min(input.admin.reports + input.admin.cases, unreadOf(SAFETY_EVENT)) +
+        Math.min(input.admin.apps ?? 0, unreadOf(APP_UPDATE_EVENT));
     return bellUnread + apps - overlap;
 }

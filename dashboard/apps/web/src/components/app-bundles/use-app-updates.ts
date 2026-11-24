@@ -15,8 +15,10 @@ import { z } from "zod";
 import type { UpdateRefusal } from "@/lib/app-bundles/releases";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+    appAutoUpdateAction,
     appUpdatesAction,
     changeAppBuildAction,
+    setAppAutoUpdateAction,
     type AppUpdateRow
 } from "@/lib/app-bundles/actions";
 
@@ -68,6 +70,13 @@ export interface AppUpdates {
     /** Update every app that has a build this Polaris runs, one after another -
      *  only those in `only` when it is given. */
     readonly updateAll: (only?: ReadonlySet<string>) => Promise<void>;
+    /** Whether apps update by themselves, for all of them; null until read. */
+    readonly autoAll: boolean | null;
+    /** Turn automatic updates on or off for every app (`id` null) or one. Shown
+     *  at once and put back when the server refuses. */
+    readonly setAuto: (id: string | null, auto: boolean) => Promise<void>;
+    /** The switch failed to save. */
+    readonly autoFailed: boolean;
 }
 
 export function useAppUpdates({ enabled = true }: { enabled?: boolean } = {}): AppUpdates {
@@ -77,6 +86,8 @@ export function useAppUpdates({ enabled = true }: { enabled?: boolean } = {}): A
     const [refusals, setRefusals] = useState<Record<string, UpdateRefusal>>({});
     const poll = useRef<ReturnType<typeof setInterval> | null>(null);
     const latest = useRef<AppUpdateRow[] | null>(null);
+    const [autoAll, setAutoAll] = useState<boolean | null>(null);
+    const [autoFailed, setAutoFailed] = useState(false);
     useEffect(() => {
         latest.current = rows;
     }, [rows]);
@@ -107,7 +118,12 @@ export function useAppUpdates({ enabled = true }: { enabled?: boolean } = {}): A
     }, []);
 
     useEffect(() => {
-        if (enabled) void load(true);
+        if (enabled) {
+            void load(true);
+            appAutoUpdateAction()
+                .then((policy) => setAutoAll(policy.auto))
+                .catch(() => undefined);
+        }
         return () => {
             if (poll.current) clearInterval(poll.current);
         };
@@ -149,5 +165,32 @@ export function useAppUpdates({ enabled = true }: { enabled?: boolean } = {}): A
         [change]
     );
 
-    return { rows, failed, busy, refusals, load, change, updateAll };
+    const setAuto = useCallback(
+        async (id: string | null, auto: boolean) => {
+            const before = { rows: latest.current, all: autoAll };
+            setAutoFailed(false);
+            if (id === null) setAutoAll(auto);
+            else
+                setRows(
+                    (all) =>
+                        all?.map((row) =>
+                            row.id === id ? { ...row, auto, autoOwn: true } : row
+                        ) ?? all
+                );
+            try {
+                const result = await setAppAutoUpdateAction(id, auto);
+                if ("error" in result) throw new Error(result.error);
+                setRows(result.rows);
+                latest.current = result.rows;
+                setAutoAll(result.auto);
+            } catch {
+                setRows(before.rows);
+                setAutoAll(before.all);
+                setAutoFailed(true);
+            }
+        },
+        [autoAll]
+    );
+
+    return { rows, failed, busy, refusals, load, change, updateAll, autoAll, setAuto, autoFailed };
 }

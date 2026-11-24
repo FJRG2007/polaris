@@ -6,8 +6,23 @@
  *
  * Locked, clicks go through it to whatever is underneath. The lock key (Shift
  * and the key under Esc, as in Discord) unlocks it: it then takes clicks,
- * shows mute, deafen and leave, and can be dragged; where it is left is kept.
- * Until it is dragged it sits in the corner chosen in the settings.
+ * shows mute, deafen and leave, and can be dragged and made wider; where it
+ * is left is kept. Until it is dragged it sits in the corner chosen in the
+ * settings.
+ *
+ * The widget is a panel of the overlay layer (`overlay-layout`): one
+ * see-through window over the work area of the display the panel is on (not
+ * the taskbar: a window over the whole screen is taken by Windows for a
+ * full-screen app, which turns on Do not disturb), so a panel is
+ * dragged and resized in the page rather than by moving a window, and later
+ * widgets join it as panels of their own.
+ *
+ * With clickable regions on, the quick actions (mute, deafen, leave) stay on
+ * it while locked and take clicks there: the window lets every click through
+ * and forwards the pointer's moves, and its page says when the pointer is over
+ * a button (`setVoiceWidgetClickable`) - only then does it take the click.
+ * That is Electron's documented click-through pattern, and what Discord calls
+ * the overlay's clickable regions.
  *
  * The page in the call says what to draw (`setVoiceState`), and a press on the
  * widget goes back to that page as its call keys do (`voiceWidgetAction`).
@@ -23,14 +38,17 @@ import { serverPath } from "./navigation";
 import { CHANNELS } from "@/shared/bridge";
 import { textScale } from "@/shared/text-size";
 import { holdGlobalKey } from "./call-hotkeys";
+import { displayAccelerator, launcherAccelerator } from "@/shared/launcher-hotkey";
 import { openVoiceWidgetWindow } from "./windows";
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
-import { nativeImage, screen, type BrowserWindow, type WebContents } from "electron";
+import { clampInside, clampWidth, displayFor, type PanelPlace, type PlaceReport } from "@/shared/overlay-layout";
+import { nativeImage, screen, type BrowserWindow, type Display, type WebContents } from "electron";
 import {
-    cornerPoint,
     lockKeys,
-    widgetSize,
+    overlayGameRows,
     widgetVisible,
+    withOverlayGame,
+    type OverlayGame,
     type CallPageAction,
     type VoiceAction,
     type VoiceState,
@@ -49,12 +67,15 @@ const FACE_MIN_PX = 16;
 
 let state: NonNullable<VoiceState> | null = null;
 let holder: WebContents | null = null;
-let gameRunning = false;
+/** The game running now, as the game watcher last saw it. */
+let game: OverlayGame | null = null;
 let unlocked = false;
 let widget: { readonly window: BrowserWindow; ready: boolean; } | null = null;
 let releaseLockKey: (() => void) | null = null;
 /** The name of the lock key held, or null when every one was taken. */
 let lockLabel: string | null = null;
+/** The pointer is over a clickable region while locked, so clicks land on the widget. */
+let takingClicks = false;
 /** The look chosen in the settings, read when the widget opens and when it changes. */
 let look: WidgetLook | null = null;
 /** Each face asked for in this call, by address: a data URL, or null for none. */
@@ -103,13 +124,97 @@ function forgetFaces(): void {
     facesChanged = true;
 }
 
-/** Whether a game is running now, as the game watcher last saw it. */
-export function setVoiceWidgetGame(running: boolean): void {
-    if (running === gameRunning) return;
-    gameRunning = running;
+/** The game running now, or null, as the game watcher last saw it. */
+export function setVoiceWidgetGame(next: OverlayGame | null): void {
+    if (next?.key === game?.key && next?.name === game?.name) return;
+    const changedRunning = (next === null) !== (game === null);
+    game = next;
     // The key Shift+` is only taken while a game runs; see `lockKeys`.
-    if (widget && !widget.window.isDestroyed()) holdLockKey();
+    if (changedRunning && widget && !widget.window.isDestroyed()) holdLockKey();
     refreshVoiceWidget();
+}
+
+/** The game running is one the overlay was turned off for. */
+function gameOff(): boolean {
+    return game !== null && settings.overlayOffGames().some((entry) => entry.key === game?.key);
+}
+
+/** The rows of the settings' per-game switch: the game running and every one turned off. */
+export function overlayGames(): ReturnType<typeof overlayGameRows> {
+    return overlayGameRows(settings.overlayOffGames(), game);
+}
+
+/** Turn the overlay on or off for one game: the one running, or one on the list. */
+export function setOverlayGame(key: string, on: boolean): boolean {
+    const known = game?.key === key ? game : settings.overlayOffGames().find((entry) => entry.key === key);
+    if (!known) return false;
+    settings.rememberOverlayOffGames(withOverlayGame(settings.overlayOffGames(), known, on));
+    refreshVoiceWidget();
+    return true;
+}
+
+/** The key somebody chose, as an accelerator and its name, or null for the default keys. */
+function chosenLockKey(): readonly [string, string] | null {
+    const binding = settings.overlayLockBinding();
+    const accelerator = binding ? launcherAccelerator(binding) : null;
+    return accelerator ? [accelerator, displayAccelerator(accelerator, process.platform)] : null;
+}
+
+/** The lock key as the settings show it, and "taken" when the widget is open
+ *  and could not hold it (another program has it). */
+export function overlayLockStatus(): { key: string; problem: "taken" | null; } {
+    const chosen = chosenLockKey();
+    const key = chosen ? chosen[1] : lockKeys(process.platform, true).map(([, label]) => label).join(" / ");
+    const open = widget !== null && !widget.window.isDestroyed();
+    return { key, problem: open && !recordingLock && lockLabel === null ? "taken" : null };
+}
+
+/**
+ * Keep a new lock key ("" for the default keys). A key the system will not
+ * give is not kept: the one before stays, and the answer is false.
+ */
+export function setOverlayLockBinding(binding: string): boolean {
+    if (binding) {
+        const accelerator = launcherAccelerator(binding);
+        if (!accelerator) return false;
+        // Nothing holds the lock key while no widget is open, so ask the
+        // system for it once and let it go again.
+        const open = widget !== null && !widget.window.isDestroyed();
+        if (open) releaseLockKey?.();
+        releaseLockKey = null;
+        lockLabel = null;
+        const trial = holdGlobalKey(accelerator, () => undefined);
+        trial?.();
+        if (!trial) {
+            if (open) holdLockKey();
+            return false;
+        }
+    }
+    settings.rememberOverlayLockBinding(binding);
+    recordingLock = false;
+    if (widget && !widget.window.isDestroyed()) holdLockKey();
+    return true;
+}
+
+/** Recording a new key in the settings: the lock key lets go meanwhile, so
+ *  the press reaches the page, and is taken back after. */
+let recordingLock = false;
+let recordingLockTimer: NodeJS.Timeout | null = null;
+/** The longest a recording keeps the key let go, as the launcher's does. */
+const RECORDING_MS = 30_000;
+
+export function recordOverlayLockKey(recording: boolean): void {
+    if (recordingLockTimer) clearTimeout(recordingLockTimer);
+    recordingLockTimer = null;
+    // Settings closed mid-recording never say they stopped: take it back anyway.
+    if (recording) recordingLockTimer = setTimeout(() => recordOverlayLockKey(false), RECORDING_MS);
+    recordingLock = recording;
+    if (!widget || widget.window.isDestroyed()) return;
+    if (recording) {
+        releaseLockKey?.();
+        releaseLockKey = null;
+        lockLabel = null;
+    } else if (!releaseLockKey) holdLockKey();
 }
 
 /** The call as the page in it last described it, or null outside one. */
@@ -137,7 +242,8 @@ export function refreshVoiceWidget(): void {
         inCall: state !== null,
         enabled: settings.toggle("voiceWidget"),
         onlyWithGame: settings.toggle("voiceWidgetGameOnly"),
-        gameRunning
+        gameRunning: game !== null,
+        gameOff: gameOff()
     });
     if (!visible || !state) {
         closeVoiceWidget();
@@ -148,7 +254,32 @@ export function refreshVoiceWidget(): void {
     draw();
 }
 
+/** The quick actions are on the widget at all. */
+function quickActions(): boolean {
+    return settings.toggle("overlayQuickActions");
+}
+
+/** The quick actions stay, and take clicks, while the widget is locked. */
+function lockedActions(): boolean {
+    return quickActions() && settings.toggle("overlayClickable");
+}
+
+/**
+ * The widget's page says the pointer is over (true) or off (false) one of its
+ * clickable regions. Only while locked, and only with clickable regions on:
+ * unlocked it takes every click anyway.
+ */
+export function setVoiceWidgetClickable(on: boolean): void {
+    if (!widget || widget.window.isDestroyed() || unlocked) return;
+    const take = on && lockedActions();
+    if (take === takingClicks) return;
+    takingClicks = take;
+    if (take) widget.window.setIgnoreMouseEvents(false);
+    else widget.window.setIgnoreMouseEvents(true, { forward: true });
+}
+
 export function closeVoiceWidget(): void {
+    takingClicks = false;
     releaseLockKey?.();
     releaseLockKey = null;
     lockLabel = null;
@@ -162,7 +293,7 @@ export function closeVoiceWidget(): void {
  *  corner moves it there (the settings forgot where it was dragged). */
 export function followVoiceWidgetLook(): void {
     look = settings.voiceWidgetLook();
-    draw(true);
+    draw();
 }
 
 function currentLook(): WidgetLook {
@@ -170,35 +301,21 @@ function currentLook(): WidgetLook {
     return look;
 }
 
-/** The kept place when it is still on a screen, else null for the chosen corner. */
-function keptPlace(height: number): { x: number; y: number; } | null {
-    const kept = settings.voiceWidgetPlace();
-    if (!kept) return null;
-    const onScreen = screen.getAllDisplays().some(({ workArea }) =>
-        kept.x + MARGIN >= workArea.x &&
-        kept.y + MARGIN >= workArea.y &&
-        kept.x + MARGIN <= workArea.x + workArea.width &&
-        kept.y + Math.min(height, MARGIN) <= workArea.y + workArea.height
-    );
-    return onScreen ? kept : null;
-}
-
-function cornerOfScreen(size: { width: number; height: number; }): { x: number; y: number; } {
-    return cornerPoint(screen.getPrimaryDisplay().workArea, size, currentLook().corner, MARGIN);
-}
-
-/** The widget's size, grown with the account's text size: its page is drawn in rem. */
-function size(people: number, open: boolean): { width: number; height: number; } {
-    const scale = textScale(settings.textSize());
-    const base = widgetSize(people, open, currentLook());
-    return { width: Math.round(base.width * scale), height: Math.round(base.height * scale) };
+/**
+ * The display the layer covers and where the voice panel sits on it: the
+ * display it was left on, or - when that one is gone, or it was never moved -
+ * the main display, with no place so the panel takes its chosen corner.
+ */
+function layerPlan(): { display: Display; place: PanelPlace | null; } {
+    const kept = settings.voicePanelPlace();
+    const on = kept && displayFor({ x: kept.x + MARGIN, y: kept.y + MARGIN }, screen.getAllDisplays());
+    return on ? { display: on, place: kept } : { display: screen.getPrimaryDisplay(), place: null };
 }
 
 function open(): NonNullable<typeof widget> {
     look = settings.voiceWidgetLook();
     facesChanged = true;
-    const bounds = size(state?.participants.length ?? 0, false);
-    const window = openVoiceWidgetWindow({ ...(keptPlace(bounds.height) ?? cornerOfScreen(bounds)), ...bounds });
+    const window = openVoiceWidgetWindow(layerPlan().display.workArea);
     const opened = { window, ready: false };
     window.webContents.once("did-finish-load", () => {
         opened.ready = true;
@@ -206,16 +323,40 @@ function open(): NonNullable<typeof widget> {
         draw();
         window.showInactive();
     });
-    // Only a drag moves it while unlocked; a move of its own (a new size in
-    // its corner) is not somebody choosing a place.
-    window.on("moved", () => {
-        if (unlocked) remember();
-    });
+    // A display added, removed or resized: the layer covers its display again.
+    const follow = () => draw();
+    screen.on("display-metrics-changed", follow);
+    screen.on("display-removed", follow);
     window.once("closed", () => {
+        screen.removeListener("display-metrics-changed", follow);
+        screen.removeListener("display-removed", follow);
         if (widget === opened) widget = null;
     });
     holdLockKey();
     return opened;
+}
+
+/**
+ * The layer's page says where a panel was dragged or resized to, in its own
+ * pixels. Only while unlocked - nobody arranges a locked overlay - and kept
+ * inside the display, at a width the panel allows.
+ */
+export function placeVoicePanel(report: PlaceReport): void {
+    if (!widget || widget.window.isDestroyed() || !unlocked) return;
+    const origin = widget.window.getBounds();
+    // Only moved, a panel that never had a width of its own keeps taking its
+    // own, so it still grows with the text size.
+    const chosen = report.sized || settings.voicePanelPlace()?.width !== undefined;
+    const width = chosen ? clampWidth(report.id, report.width, textScale(settings.textSize())) : report.width;
+    const inside = clampInside({ ...report, width }, { x: 0, y: 0, width: origin.width, height: origin.height });
+    settings.rememberPanelPlace({
+        id: report.id,
+        x: origin.x + inside.x,
+        y: origin.y + inside.y,
+        ...(chosen ? { width } : {}),
+        height: report.height
+    });
+    draw();
 }
 
 /** Hold the first lock key the system gives, letting go of the one held before. */
@@ -223,7 +364,8 @@ function holdLockKey(): void {
     releaseLockKey?.();
     releaseLockKey = null;
     lockLabel = null;
-    for (const [accelerator, label] of lockKeys(process.platform, gameRunning)) {
+    if (recordingLock) return;
+    for (const [accelerator, label] of lockKeys(process.platform, game !== null, chosenLockKey())) {
         releaseLockKey = holdGlobalKey(accelerator, toggleLock);
         if (!releaseLockKey) continue;
         lockLabel = label;
@@ -231,28 +373,15 @@ function holdLockKey(): void {
     }
 }
 
-let movedWhileUnlocked = false;
-
-function remember(): void {
-    if (!widget || widget.window.isDestroyed()) return;
-    const { x, y } = widget.window.getBounds();
-    settings.rememberVoiceWidgetPlace({ x, y });
-    movedWhileUnlocked = true;
-}
-
 function toggleLock(): void {
     if (!widget || widget.window.isDestroyed()) return;
     unlocked = !unlocked;
+    takingClicks = false;
     const { window } = widget;
     // Unlocked it takes clicks and can be dragged; locked, clicks go through.
     window.setFocusable(unlocked);
-    if (unlocked) {
-        movedWhileUnlocked = false;
-        window.setIgnoreMouseEvents(false);
-    } else {
-        window.setIgnoreMouseEvents(true, { forward: true });
-        if (movedWhileUnlocked) remember();
-    }
+    if (unlocked) window.setIgnoreMouseEvents(false);
+    else window.setIgnoreMouseEvents(true, { forward: true });
     draw();
 }
 
@@ -330,23 +459,18 @@ function facesView(): Readonly<Record<string, string>> | undefined {
     return view;
 }
 
-/** Draw the widget; `replace` puts it back in its corner even at the same size
- *  (a new corner chosen), unless it was dragged somewhere. */
-function draw(replace = false): void {
+/** Draw the widget: the layer over its display, and the voice panel in it. */
+function draw(): void {
     if (!widget || widget.window.isDestroyed() || !state) return;
     const { window } = widget;
+    // Clickable regions switched off while the pointer sat on one.
+    if (takingClicks && !lockedActions()) setVoiceWidgetClickable(false);
     const shape = currentLook();
-    const bounds = window.getBounds();
-    const { width, height } = size(state.participants.length, unlocked);
     const bottom = shape.corner.startsWith("bottom");
-    if (replace || bounds.height !== height || bounds.width !== width) {
-        // Where nobody dragged it, it stays in its corner as it grows; dragged,
-        // it grows away from the edge its rows sit against.
-        const place = settings.voiceWidgetPlace()
-            ? { x: bounds.x, y: bottom ? bounds.y + bounds.height - height : bounds.y }
-            : cornerOfScreen({ width, height });
-        window.setBounds({ ...place, width, height });
-    }
+    const { display, place } = layerPlan();
+    const bounds = window.getBounds();
+    const cover = display.workArea;
+    if (bounds.x !== cover.x || bounds.y !== cover.y || bounds.width !== cover.width || bounds.height !== cover.height) window.setBounds(cover);
     if (!widget.ready) return;
     const faceUpdate = facesView();
     const view: WidgetView = {
@@ -354,7 +478,15 @@ function draw(replace = false): void {
         unlocked,
         lockKey: lockLabel,
         look: shape,
+        actions: lockedActions(),
+        buttons: quickActions(),
+        pinned: settings.toggle("voiceWidgetPinned"),
         anchor: bottom ? "bottom" : "top",
+        layer: {
+            area: { x: 0, y: 0, width: cover.width, height: cover.height },
+            margin: MARGIN,
+            place: place && { x: place.x - cover.x, y: place.y - cover.y, width: place.width, height: place.height }
+        },
         ...(faceUpdate ? { faces: faceUpdate } : {})
     };
     window.webContents.send(CHANNELS.widgetView, view);

@@ -43,16 +43,49 @@ describe("settings entry points", () => {
 
     it("the menu action is wired to openSettings, and nothing else opens the settings in place of it", () => {
         expect(INDEX).toMatch(/changeServer: \(\) => void openSettings\(\)/);
-        // The hosts window is told a reason by the decision alone.
+        // The hosts window is told a reason in one place, reached from the two decisions.
         const withReason = [...INDEX.matchAll(/openConnect\(\{[^}]*reason/g)];
         expect(withReason).toHaveLength(1);
-        expect(body("openSettings")).toMatch(/openConnect\(\{[^}]*reason/);
+        expect(body("openHostsWindow")).toMatch(/openConnect\(\{[^}]*reason/);
+        expect(body("openSettings")).toMatch(/openHostsWindow\(route\.reason/);
+        expect(body("manageHosts")).toMatch(/openHostsWindow\("outdated"/);
     });
 
     it("a closed window opens the host's screen in a new one rather than the hosts window", () => {
         const decision = body("openSettings");
         expect(decision).toMatch(/if \(!page\) \{\s*showPolaris\(route\.path\);/);
         expect(decision).not.toMatch(/reason: "offline"/);
+    });
+
+    it("the menu's Manage hosts... opens Settings > This app > Hosts through the same decision", () => {
+        const manageHosts = vi.fn();
+        const actions = new Proxy({ manageHosts } as unknown as MenuActions, {
+            get: (target, key) => (key in target ? target[key as keyof MenuActions] : vi.fn())
+        });
+        const two = [
+            { origin: "https://a.example", name: null, host: "a.example", active: true },
+            { origin: "https://b.example", name: "B", host: "b.example", active: false }
+        ];
+        const found = appItems(actions, undefined, two)
+            .flatMap((item) => (Array.isArray(item.submenu) ? item.submenu : []))
+            .filter((item) => item.label === "Manage hosts...");
+        expect(found).toHaveLength(1);
+        expect(found[0]?.click).toBe(manageHosts);
+        expect(INDEX).toMatch(/manageHosts: \(\) => void openSettings\("hosts"\)/);
+    });
+
+    it("a page's manage hosts opens its own Hosts when it draws them, never the hosts window first", () => {
+        const decision = body("manageHosts");
+        expect(decision).toMatch(/hostsRoute\(/);
+        expect(decision).toMatch(/sender\.send\(CHANNELS\.appSettingsOpen, "hosts"/);
+        expect(INDEX).not.toMatch(/openServers: openConnect/);
+    });
+
+    it("the hosts window only adds and opens a host: editing, removing and moving the list are Settings", () => {
+        const page = readFileSync(join(__dirname, "..", "..", "src", "renderer", "connect.html"), "utf8");
+        const script = readFileSync(join(__dirname, "..", "..", "src", "renderer", "connect.ts"), "utf8");
+        expect(page).not.toMatch(/<dialog|hosts-send|hosts-receive|confirm-remove/);
+        expect(script).not.toMatch(/\.(edit|remove|rename|copyHosts|exportHostsFile|importHostsFile|importHosts)\(/);
     });
 
     it("the hosts window draws no settings of its own: they are the host's Settings > This app", () => {

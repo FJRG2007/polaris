@@ -19,7 +19,8 @@ import { DEFAULT_TEXT_SIZE, readTextSize, type TextSize } from "@/shared/text-si
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { readRelaunchMark, type RelaunchMark } from "@/shared/relaunch";
 import { DEFAULT_LAUNCHER_BINDING } from "@/shared/launcher-hotkey";
-import { AVATAR_SIZES, CORNERS, DEFAULT_LOOK, NAME_MODES, OPACITIES, PEOPLE_MODES, type Opacity, type WidgetLook } from "@/shared/voice-widget";
+import { layoutSchema, voicePlace, withPlace, type PanelPlace } from "@/shared/overlay-layout";
+import { AVATAR_SIZES, CORNERS, DEFAULT_LOOK, MAX_OFF_GAMES, MAX_USERS_LIMIT, NAME_MODES, OPACITIES, PEOPLE_MODES, type Opacity, type OverlayGame, type WidgetLook } from "@/shared/voice-widget";
 import { DEFAULT_SEARCH_ENGINE, SEARCH_ENGINE_IDS, launcherEngineOf, type SearchEngine } from "@/shared/launcher";
 import { CLIPBOARD_KEEP_IDS, DEFAULT_CLIPBOARD_KEEP, clipboardOn, type ClipboardKeep } from "@/shared/clipboard-store";
 
@@ -78,6 +79,9 @@ const settingsSchema = z.object({
     launcherGameMode: z.boolean().catch(true),
     // Where the widget was dragged to, or null for its corner.
     voiceWidgetPlace: z.object({ x: z.number().int(), y: z.number().int() }).nullable().catch(null),
+    // Where each of the overlay layer's panels was left (`overlay-layout`),
+    // read entry by entry in `overlayLayout()`.
+    overlayLayout: z.array(z.unknown()).max(64).catch([]),
     // How the widget looks, as Discord's overlay voice widget offers: each
     // choice on its own, so a file without one, or with one this build does
     // not know, takes the default for that choice alone.
@@ -86,6 +90,30 @@ const settingsSchema = z.object({
     voiceWidgetPeople: z.enum(PEOPLE_MODES).catch(DEFAULT_LOOK.people),
     voiceWidgetOpacity: z.enum(OPACITY_CHOICES).catch(String(DEFAULT_LOOK.opacity) as OpacityChoice),
     voiceWidgetCorner: z.enum(CORNERS).catch(DEFAULT_LOOK.corner),
+    // The most people the widget lists before "and N more"; 0 (Off) lists everybody.
+    voiceWidgetMaxUsers: z.number().int().min(0).max(MAX_USERS_LIMIT).catch(DEFAULT_LOOK.maxUsers),
+    // On unless somebody turned it off: mute, deafen and leave on the widget.
+    overlayQuickActions: z.boolean().catch(true),
+    // Off unless somebody turned it on: those buttons stay on the widget while
+    // it is locked and take clicks there, while the rest lets clicks through.
+    overlayClickable: z.boolean().catch(false),
+    // On unless somebody turned it off: the widget stays on screen while it is
+    // locked. Off, it shows only while unlocked, as Discord's unpinned widgets.
+    voiceWidgetPinned: z.boolean().catch(true),
+    // The overlay's lock key in the dashboard's spelling; empty (and any file
+    // from before it) keeps Shift+` in a game and Ctrl+Shift+` always.
+    overlayLockBinding: z.string().max(40).catch(""),
+    // The games the overlay was turned off for, by their program; any entry
+    // that does not read is dropped alone.
+    overlayOffGames: z
+        .array(z.unknown())
+        .catch([])
+        .transform((entries) =>
+            entries
+                .map((entry) => z.object({ key: z.string().min(1).max(260), name: z.string().max(120) }).safeParse(entry))
+                .flatMap((parsed) => (parsed.success ? [parsed.data] : []))
+                .slice(-MAX_OFF_GAMES)
+        ),
     // The account's text size last seen in the Polaris window, or null before one was.
     textSize: z.unknown().transform(readTextSize).catch(null),
     // On unless somebody turned it off: the launcher opens with its key from anywhere.
@@ -124,11 +152,18 @@ const EMPTY: Settings = {
     voiceWidgetGameOnly: false,
     launcherGameMode: true,
     voiceWidgetPlace: null,
+    overlayLayout: [],
     voiceWidgetAvatars: DEFAULT_LOOK.avatars,
     voiceWidgetNames: DEFAULT_LOOK.names,
     voiceWidgetPeople: DEFAULT_LOOK.people,
     voiceWidgetOpacity: String(DEFAULT_LOOK.opacity) as OpacityChoice,
     voiceWidgetCorner: DEFAULT_LOOK.corner,
+    voiceWidgetMaxUsers: DEFAULT_LOOK.maxUsers,
+    overlayQuickActions: true,
+    overlayClickable: false,
+    voiceWidgetPinned: true,
+    overlayLockBinding: "",
+    overlayOffGames: [],
     textSize: null,
     launcher: true,
     launcherBinding: DEFAULT_LAUNCHER_BINDING,
@@ -267,7 +302,7 @@ export function rememberHardwareAcceleration(on: boolean): void {
 }
 
 /** The switches kept as they are and read when they matter. */
-export const TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard", "launcherGameMode"] as const;
+export const TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard", "launcherGameMode", "overlayQuickActions", "overlayClickable", "voiceWidgetPinned"] as const;
 
 export type Toggle = (typeof TOGGLES)[number];
 
@@ -297,6 +332,30 @@ export function rememberVoiceWidgetPlace(place: { x: number; y: number }): void 
     save({ ...load(), voiceWidgetPlace: place });
 }
 
+/** Where each overlay panel was left; an entry this build cannot read is skipped. */
+export function overlayLayout(): PanelPlace[] {
+    return load().overlayLayout.flatMap((entry) => {
+        const place = layoutSchema.safeParse([entry]);
+        return place.success ? place.data : [];
+    });
+}
+
+/** The voice panel's place: the layout's, or where the widget was dragged before there was one. */
+export function voicePanelPlace(): PanelPlace | null {
+    return voicePlace(overlayLayout(), voiceWidgetPlace());
+}
+
+/** Keep where a panel was left. The voice panel's corner is also kept where an
+ *  older app reads it, so going back to one leaves the widget where it was. */
+export function rememberPanelPlace(place: PanelPlace): void {
+    const { id, ...rest } = place;
+    save({
+        ...load(),
+        overlayLayout: withPlace(overlayLayout(), id, rest),
+        ...(id === "voice" ? { voiceWidgetPlace: { x: place.x, y: place.y } } : {})
+    });
+}
+
 /** How the voice widget looks. */
 export function voiceWidgetLook(): WidgetLook {
     const settings = load();
@@ -305,8 +364,46 @@ export function voiceWidgetLook(): WidgetLook {
         names: settings.voiceWidgetNames,
         people: settings.voiceWidgetPeople,
         opacity: Number(settings.voiceWidgetOpacity) as Opacity,
-        corner: settings.voiceWidgetCorner
+        corner: settings.voiceWidgetCorner,
+        maxUsers: settings.voiceWidgetMaxUsers
     };
+}
+
+/** Put the widget back as it first came: Discord's look, its corner, and every widget on. */
+export function resetVoiceWidgetLayout(): void {
+    save({
+        ...load(),
+        voiceWidgetPlace: null,
+        overlayLayout: [],
+        voiceWidgetAvatars: DEFAULT_LOOK.avatars,
+        voiceWidgetNames: DEFAULT_LOOK.names,
+        voiceWidgetPeople: DEFAULT_LOOK.people,
+        voiceWidgetOpacity: String(DEFAULT_LOOK.opacity) as OpacityChoice,
+        voiceWidgetCorner: DEFAULT_LOOK.corner,
+        voiceWidgetMaxUsers: DEFAULT_LOOK.maxUsers,
+        voiceWidget: true,
+        overlayQuickActions: true,
+        overlayClickable: false,
+        voiceWidgetPinned: true
+    });
+}
+
+/** The overlay's lock key in the dashboard's spelling, or "" for the default keys. */
+export function overlayLockBinding(): string {
+    return load().overlayLockBinding;
+}
+
+export function rememberOverlayLockBinding(binding: string): void {
+    save({ ...load(), overlayLockBinding: binding });
+}
+
+/** The games the overlay was turned off for. */
+export function overlayOffGames(): readonly OverlayGame[] {
+    return load().overlayOffGames;
+}
+
+export function rememberOverlayOffGames(games: readonly OverlayGame[]): void {
+    save({ ...load(), overlayOffGames: [...games] });
 }
 
 /** Keep a new look. A new corner forgets where the widget was dragged, so it goes there. */
@@ -320,7 +417,8 @@ export function rememberVoiceWidgetLook(look: WidgetLook): void {
         voiceWidgetPeople: look.people,
         voiceWidgetOpacity: String(look.opacity) as OpacityChoice,
         voiceWidgetCorner: look.corner,
-        ...(moved ? { voiceWidgetPlace: null } : {})
+        voiceWidgetMaxUsers: look.maxUsers,
+        ...(moved ? { voiceWidgetPlace: null, overlayLayout: withPlace(overlayLayout(), "voice", null) } : {})
     });
 }
 

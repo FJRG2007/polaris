@@ -123,3 +123,15 @@ export type HostPageOutcome = "opened" | "offline";
 export function readHostPath(raw: unknown): string | null {
     return raw === HOST_UPDATE_PATH ? raw : null;
 }
+
+/**
+ * Where a Polaris page's "manage hosts" goes (Hosts > Manage, the account
+ * menu): the page's own Settings > This app > Hosts when it said it draws them,
+ * and otherwise the hosts window, which says the host is older than this app.
+ * The hosts window itself only adds a host and opens one: it is what is shown
+ * where no Polaris page can be - the first run, or every host out of reach
+ * with nothing kept.
+ */
+export function hostsRoute(state: { readonly pageLoaded: boolean; readonly pageHosts: boolean; }): "page" | "local" {
+    return state.pageLoaded && state.pageHosts ? "page" : "local";
+}

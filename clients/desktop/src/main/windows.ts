@@ -302,7 +302,8 @@ export function openOverlayWindow(bounds: { readonly x: number; readonly y: numb
 }
 
 /**
- * The voice widget's window: small, see-through, over everything - a game
+ * The overlay layer's window (it holds the voice widget): see-through, over a
+ * display's work area, over everything - a game
  * running windowed or borderless included - and never in the taskbar. It takes
  * no focus, so a press on it does not take the keyboard from the game, and
  * clicks go through it until it is unlocked (`voice-widget`). Kept out of

@@ -2051,6 +2051,13 @@
         "nextMonth": "Next month"
     },
     "appUpdates": {
+        "autoAll": "Update apps automatically",
+        "autoFailed": "That setting could not be saved. Try again.",
+        "autoOne": "Updates automatically (set for this app)",
+        "autoFollows": "Updates automatically (same as every app)",
+        "autoFor": "Update {name} automatically",
+        "heldPermissions": "This update asks for access {name} did not have ({permissions}), so it waits for you. Update now to accept it.",
+        "heldFailed": "This release failed here before, so it is not installed automatically. Update now to try it again.",
         "title": "Apps",
         "body": "Each app updates on its own, without restarting Polaris.",
         "check": "Check for app updates",

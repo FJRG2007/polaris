@@ -34,7 +34,6 @@
  */
 
 import { prisma, Prisma } from "@polaris/db";
-import { chatE2eeEnabled } from "./flag";
 import { publishChatChange } from "@/lib/chat/live";
 import { expiryForChannel } from "@/lib/chat/vanish";
 import { unhideOnMessage } from "@/lib/chat/chat-lock";
@@ -214,11 +213,7 @@ export async function editSealed(userId: string, input: SealedEdit): Promise<Dat
     return editedAt;
 }
 
-/** Whether a conversation is sealed: sealed chat is on and its MLS group exists. */
-export async function conversationSealed(channelId: string): Promise<boolean> {
-    if (!chatE2eeEnabled()) return false;
-    return (await prisma.mlsGroup.count({ where: { channelId }, take: 1 })) > 0;
-}
+export { conversationSealed } from "./sealed-conversation";
 
 /** One stored sealed message, as a reader opens it. */
 /** Polar's or a webhook's name on its message, as on its plain ones. */

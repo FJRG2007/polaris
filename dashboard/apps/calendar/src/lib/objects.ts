@@ -224,8 +224,18 @@ export function eventFromInput(
     return base ? { ...base, ...fields } : engine.newEvent(fields);
 }
 
+async function madeWithUid(calendarId: string, uid: string): Promise<string | null> {
+    const row = await prisma.calendarObject.findUnique({
+        where: { calendarId_uid: { calendarId, uid } },
+        select: { id: true }
+    });
+    return row?.id ?? null;
+}
+
 export interface SaveEventInput {
     readonly objectId: string | null;
+    /** For a new event: the UID this device gave it, so a repeat is the same one. */
+    readonly uid?: string | null;
     readonly recurrenceKey: string | null;
     readonly scope: engine.EditScope;
     readonly version: string | null;
@@ -244,8 +254,22 @@ export async function saveEvent(
     const context: WriteContext = { actor: user, floatingZone: input.floatingZone };
     const target = await requireWritableCalendar(user.id, input.event.calendarId);
     if (!input.objectId) {
-        const item = engine.eventItem(eventFromInput(input.event, null, organizerFor(user)));
-        return { objectId: await writeItem(target.id, null, item, context) };
+        // A new event named by this device (made while Polaris could not be
+        // reached, and sent when it answered): sent again after a lost answer,
+        // it is the one already made, not a second.
+        if (input.uid) {
+            const made = await madeWithUid(target.id, input.uid);
+            if (made) return { objectId: made };
+        }
+        const event = eventFromInput(input.event, null, organizerFor(user));
+        const item = engine.eventItem(input.uid ? { ...event, uid: input.uid } : event);
+        try {
+            return { objectId: await writeItem(target.id, null, item, context) };
+        } catch (caught) {
+            const made = input.uid ? await madeWithUid(target.id, input.uid) : null;
+            if (made) return { objectId: made };
+            throw caught;
+        }
     }
 
     const { row } = await writableObject(user, input.objectId, input.version ?? undefined);

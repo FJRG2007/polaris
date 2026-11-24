@@ -138,6 +138,8 @@ function isComponent(value: unknown): value is React.ElementType {
     return value !== null && typeof value === "object" && "$$typeof" in value;
 }
 
+const GATEWAY_STATUSES = new Set([502, 503, 504]);
+
 interface ActionAnswer {
     value?: unknown;
     revalidated?: boolean;
@@ -157,6 +159,10 @@ async function callAction(
         body: JSON.stringify({ app, module, name, args: toWire(args) })
     });
     const answer = (await response.json().catch(() => null)) as ActionAnswer | null;
+    // A gateway answered for Polaris (it is down or restarting): said the way
+    // Next says it of its own actions, so it reads as Polaris not answering.
+    if (!answer && GATEWAY_STATUSES.has(response.status))
+        throw new Error("An unexpected response was received from the server.");
     if (!response.ok || !answer)
         throw new Error(answer?.error ?? "The server could not do that. Try again.");
     if (answer.redirect) {

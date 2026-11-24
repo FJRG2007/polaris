@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { APP_SETTING_CATEGORIES } from "@polaris/core/app-settings";
-import { HOST_UPDATE_ACCESS_PATH, HOST_UPDATE_PATH, readHostPath, readSettingsProbe, readUpdateAccess, settingsPath, settingsRoute, type SettingsPlace, type SettingsRouteState } from "@/shared/settings-route";
+import { HOST_UPDATE_ACCESS_PATH, HOST_UPDATE_PATH, hostsRoute, readHostPath, readSettingsProbe, readUpdateAccess, settingsPath, settingsRoute, type SettingsPlace, type SettingsRouteState } from "@/shared/settings-route";
 
 const HOST = "https://polaris.example.com";
 const loaded: SettingsRouteState = { origin: HOST, pageLoaded: true, pageAnnounced: false, probe: null };
@@ -111,5 +111,19 @@ describe("readUpdateAccess", () => {
     it.each([307, 302, 303, 401, 403, 404, 500, null])("offers no update for %s", (status) => {
         // 307 is the host sending a non-administrator home, or anybody to the sign-in.
         expect(readUpdateAccess(status)).toBe(false);
+    });
+});
+
+describe("hostsRoute", () => {
+    it("opens the page's own Hosts only when it loaded and said it draws them", () => {
+        expect(hostsRoute({ pageLoaded: true, pageHosts: true })).toBe("page");
+    });
+
+    it.each([
+        [{ pageLoaded: true, pageHosts: false }],
+        [{ pageLoaded: false, pageHosts: true }],
+        [{ pageLoaded: false, pageHosts: false }]
+    ])("gives the hosts window otherwise: %o", (state) => {
+        expect(hostsRoute(state)).toBe("local");
     });
 });

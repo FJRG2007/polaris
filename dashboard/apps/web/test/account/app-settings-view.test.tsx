@@ -18,13 +18,30 @@ import { APP_SETTING_CATEGORIES } from "@polaris/core/app-settings";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
+// A store of this test's own: the runtime's may be missing or shared between files.
+const kept = new Map<string, string>();
+Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: {
+        getItem: (key: string) => kept.get(key) ?? null,
+        setItem: (key: string, value: string) => void kept.set(key, String(value)),
+        removeItem: (key: string) => void kept.delete(key),
+        clear: () => kept.clear()
+    }
+});
+const route = vi.hoisted(() => ({ pathname: "/account/app/general" }));
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ push: () => {}, refresh: () => {} }),
+    usePathname: () => route.pathname
+}));
 const network = vi.hoisted(() => ({ online: true, recovered: 0 }));
 vi.mock("@enigmax/primitives/react/network", () => ({ useNetworkState: () => network }));
 
 const { AppSettingsView, forgetAppSettingsSnapshot } = await import(
     "../../src/app/(app)/account/app/[category]/app-settings-view"
 );
+const { default: CategoryLoading } = await import("../../src/app/(app)/account/app/[category]/loading");
+const { ThisDeviceApp, forgetDesktopUpdateState } = await import("../../src/components/this-app/this-device-app");
 
 const SNAPSHOT = {
     openAtLogin: true,
@@ -88,7 +105,11 @@ async function draw(category: (typeof APP_SETTING_CATEGORIES)[number]) {
     });
 }
 
-beforeEach(() => forgetAppSettingsSnapshot());
+beforeEach(() => {
+    forgetAppSettingsSnapshot();
+    forgetDesktopUpdateState();
+    window.localStorage.clear();
+});
 afterEach(() => {
     cleanup();
     network.online = true;
@@ -120,6 +141,63 @@ describe("the app's settings screen", () => {
         expect(screen.getByRole("switch", { name: "Minimize to tray" }).getAttribute("aria-checked")).toBe("true");
     });
 
+    it("offers the overlay's pin, lock key and per-game switch only to an app that has them", async () => {
+        install(fakeBridge());
+        await draw("voice");
+        expect(screen.queryByRole("switch", { name: "Pin" })).toBeNull();
+        expect(screen.queryByText("Overlay lock key")).toBeNull();
+        expect(screen.queryByText("Overlay in games")).toBeNull();
+        cleanup();
+        forgetAppSettingsSnapshot();
+        const newer = {
+            ...SNAPSHOT,
+            voiceWidgetPinned: true,
+            overlayLockKey: "Shift+` / Ctrl+Shift+`",
+            overlayGames: [{ key: "cs2.exe", name: "Counter-Strike 2", on: true, running: true }],
+            features: ["overlayPin", "overlayLockKey", "overlayGames"]
+        };
+        install(
+            fakeBridge({
+                get: vi.fn(async () => newer),
+                setOverlayShortcut: vi.fn(async () => newer),
+                setOverlayGame: vi.fn(async () => newer)
+            })
+        );
+        await draw("voice");
+        expect(screen.getByRole("switch", { name: "Pin" }).getAttribute("aria-checked")).toBe("true");
+        expect(screen.getByText("Shift+` / Ctrl+Shift+`")).toBeTruthy();
+        expect(screen.getByRole("switch", { name: "Counter-Strike 2" }).getAttribute("aria-checked")).toBe("true");
+    });
+
+    it("names the chosen lock key in the voice widget's hint, and the default keys without one", async () => {
+        const chosen = { ...SNAPSHOT, overlayLockBinding: "Mod+Alt+O", overlayLockKey: "Ctrl+Alt+O", features: ["overlayLockKey"] };
+        install(fakeBridge({ get: vi.fn(async () => chosen), setOverlayShortcut: vi.fn(async () => chosen) }));
+        await draw("voice");
+        expect(screen.getByText("Who is in the call and who is talking. Ctrl+Alt+O unlocks it.")).toBeTruthy();
+        cleanup();
+        forgetAppSettingsSnapshot();
+        install(fakeBridge());
+        await draw("voice");
+        expect(screen.getByText(appSettingsMessages.items.voiceWidget.hint)).toBeTruthy();
+    });
+
+    it("turns the overlay off for a game at once and back when the app refuses it", async () => {
+        let refuse: (value: unknown) => void = () => undefined;
+        const setOverlayGame = vi.fn(() => new Promise((resolve) => (refuse = resolve)));
+        const newer = {
+            ...SNAPSHOT,
+            overlayGames: [{ key: "cs2.exe", name: "Counter-Strike 2", on: true, running: true }],
+            features: ["overlayGames"]
+        };
+        install(fakeBridge({ get: vi.fn(async () => newer), setOverlayGame }));
+        await draw("voice");
+        await act(async () => screen.getByRole("switch", { name: "Counter-Strike 2" }).click());
+        expect(setOverlayGame).toHaveBeenCalledWith("cs2.exe", false);
+        expect(screen.getByRole("switch", { name: "Counter-Strike 2" }).getAttribute("aria-checked")).toBe("false");
+        await act(async () => refuse(null));
+        expect(screen.getByRole("switch", { name: "Counter-Strike 2" }).getAttribute("aria-checked")).toBe("true");
+    });
+
     it("names the launcher by the key it holds", async () => {
         install(fakeBridge({ get: vi.fn(async () => ({ ...SNAPSHOT, launcherKey: "Ctrl+K" })) }));
         await draw("search");
@@ -131,7 +209,7 @@ describe("the app's settings screen", () => {
         install(bridge);
         await draw("hosts");
         expect(screen.getByText("Home")).toBeTruthy();
-        expect(screen.getByText("Open now")).toBeTruthy();
+        expect(screen.getByText("In use")).toBeTruthy();
         await act(async () => screen.getByRole("button", { name: "Manage hosts" }).click());
         expect(bridge.appSettings.manageHosts).toHaveBeenCalled();
     });
@@ -142,18 +220,100 @@ describe("the app's settings screen", () => {
         expect(screen.getByRole("button", { name: "Restart now" })).toBeTruthy();
     });
 
-    it("keeps the update check for a connection when the page was opened offline", async () => {
+    it("draws every row before the app answers, with a placeholder only on each control", async () => {
+        install(fakeBridge({ get: vi.fn(() => new Promise(() => undefined)) }));
+        await draw("search");
+        expect(screen.getByText(appSettingsMessages.items.launcherEngine.label)).toBeTruthy();
+        expect(screen.getByText(appSettingsMessages.items.launcherEngine.hint)).toBeTruthy();
+        expect(screen.getByText(appSettingsMessages.items.launcher.plain)).toBeTruthy();
+        expect(document.querySelectorAll("[data-placeholder]").length).toBe(2);
+        expect(screen.queryByRole("switch")).toBeNull();
+    });
+
+    it("draws the values kept on this device at once, and swaps only what the app answers differently", async () => {
+        window.localStorage.setItem("polaris.this-app.general", JSON.stringify({ ...SNAPSHOT, openAtLogin: true }));
+        let answer: (value: unknown) => void = () => undefined;
+        install(fakeBridge({ get: vi.fn(() => new Promise((resolve) => (answer = resolve))) }));
+        await draw("general");
+        expect(screen.getByRole("switch", { name: "Open with the computer" }).getAttribute("aria-checked")).toBe("true");
+        expect(screen.getByRole("switch", { name: "Start in the tray" })).toBeTruthy();
+        expect(document.querySelector("[data-placeholder]")).toBeNull();
+        await act(async () => answer({ ...SNAPSHOT, openAtLogin: false }));
+        expect(screen.getByRole("switch", { name: "Open with the computer" }).getAttribute("aria-checked")).toBe("false");
+        expect(JSON.parse(window.localStorage.getItem("polaris.this-app.general")!).openAtLogin).toBe(false);
+    });
+
+    it("draws the category in its loading state, before the host answers for the route", async () => {
+        window.localStorage.setItem("polaris.this-app.window", JSON.stringify({ ...SNAPSHOT, minimizeToTray: false }));
+        install(fakeBridge({ get: vi.fn(() => new Promise(() => undefined)) }));
+        route.pathname = "/account/app/window";
+        render(
+            <MessagesWrapper>
+                <CategoryLoading />
+            </MessagesWrapper>
+        );
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(screen.getByRole("heading", { name: appSettingsMessages.categories.window.title })).toBeTruthy();
+        expect(screen.getByRole("switch", { name: "Minimize to tray" }).getAttribute("aria-checked")).toBe("false");
+    });
+
+    it("puts a kept value back when the app refuses the change", async () => {
+        window.localStorage.setItem("polaris.this-app.window", JSON.stringify(SNAPSHOT));
+        install(fakeBridge({ get: vi.fn(() => new Promise(() => undefined)), set: vi.fn(async () => null) }));
+        await draw("window");
+        await act(async () => screen.getByRole("switch", { name: "Minimize to tray" }).click());
+        expect(screen.getByRole("switch", { name: "Minimize to tray" }).getAttribute("aria-checked")).toBe("true");
+        expect(JSON.parse(window.localStorage.getItem("polaris.this-app.window")!).minimizeToTray).toBe(true);
+    });
+
+    it("keeps the update check on Downloads for a connection when the page was opened offline", async () => {
         const checkForUpdates = vi.fn(async () => ({ kind: "current" }));
-        install({ ...fakeBridge(), checkForUpdates });
+        install({ ...fakeBridge(), version: "0.1.92", checkForUpdates });
         network.online = false;
-        await draw("updates");
+        render(
+            <MessagesWrapper>
+                <ThisDeviceApp />
+            </MessagesWrapper>
+        );
+        expect(screen.getByText("Polaris 0.1.92")).toBeTruthy();
         const check = screen.getByRole("button", { name: "Check for updates" });
         expect(check.getAttribute("aria-disabled")).toBe("true");
-        expect(screen.getByText(appSettingsMessages.updates.offline)).toBeTruthy();
+        expect(screen.getAllByText(appSettingsMessages.updates.offline).length).toBeGreaterThan(0);
         await act(async () => check.click());
         expect(checkForUpdates).not.toHaveBeenCalled();
     });
 
+    it("offers the restart into a downloaded update on Downloads, offline too", async () => {
+        const installUpdate = vi.fn(async () => undefined);
+        install({
+            ...fakeBridge(),
+            version: "0.1.92",
+            installUpdate,
+            updateReady: vi.fn(async () => ({ version: "0.1.93" }))
+        });
+        network.online = false;
+        render(
+            <MessagesWrapper>
+                <ThisDeviceApp />
+            </MessagesWrapper>
+        );
+        await act(async () => {
+            await Promise.resolve();
+        });
+        await act(async () => screen.getByRole("button", { name: "Restart now" }).click());
+        expect(installUpdate).toHaveBeenCalled();
+    });
+
+    it("draws nothing for the app on Downloads in a browser", () => {
+        const { container } = render(
+            <MessagesWrapper>
+                <ThisDeviceApp />
+            </MessagesWrapper>
+        );
+        expect(container.textContent).toBe("");
+    });
     it("says where these settings are changed when the page is not in the app", async () => {
         await draw("general");
         expect(screen.getByText("Open this in the desktop app")).toBeTruthy();

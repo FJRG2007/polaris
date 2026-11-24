@@ -26,8 +26,16 @@ const {
     updateAttempted,
     rememberVoiceWidgetLook,
     rememberVoiceWidgetPlace,
+    resetVoiceWidgetLayout,
     voiceWidgetLook,
-    voiceWidgetPlace
+    voiceWidgetPlace,
+    overlayLockBinding,
+    overlayOffGames,
+    rememberOverlayLockBinding,
+    rememberOverlayOffGames,
+    overlayLayout,
+    rememberPanelPlace,
+    voicePanelPlace
 } = await import("@/main/settings");
 
 beforeEach(() => {
@@ -152,7 +160,7 @@ describe("the restart the app made itself", () => {
 });
 
 describe("the voice widget's look", () => {
-    const defaults = { avatars: "large", names: "always", people: "always", opacity: 100, corner: "top-left" };
+    const defaults = { avatars: "large", names: "always", people: "always", opacity: 100, corner: "top-left", maxUsers: 8 } as const;
 
     it("is Discord's defaults for a file from before it existed", () => {
         writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidget: true }));
@@ -166,10 +174,104 @@ describe("the voice widget's look", () => {
 
     it("is kept, and a new corner forgets where it was dragged", () => {
         rememberVoiceWidgetPlace({ x: 300, y: 200 });
-        rememberVoiceWidgetLook({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "top-left" });
-        expect(voiceWidgetLook()).toEqual({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "top-left" });
+        rememberVoiceWidgetLook({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "top-left", maxUsers: 8 });
+        expect(voiceWidgetLook()).toEqual({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "top-left", maxUsers: 8 });
         expect(voiceWidgetPlace()).toEqual({ x: 300, y: 200 });
-        rememberVoiceWidgetLook({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "bottom-right" });
+        rememberVoiceWidgetLook({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "bottom-right", maxUsers: 8 });
         expect(voiceWidgetPlace()).toBeNull();
+    });
+
+    it("keeps how many people it lists, and reads a stored value out of range as the default", () => {
+        rememberVoiceWidgetLook({ ...defaults, maxUsers: 0 });
+        expect(voiceWidgetLook().maxUsers).toBe(0);
+        rememberVoiceWidgetLook({ ...defaults, maxUsers: 25 });
+        expect(voiceWidgetLook().maxUsers).toBe(25);
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidgetMaxUsers: 99 }));
+        expect(voiceWidgetLook().maxUsers).toBe(8);
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidgetMaxUsers: 2.5 }));
+        expect(voiceWidgetLook().maxUsers).toBe(8);
+    });
+
+    it("goes back to its first layout: look, corner, place and every widget", () => {
+        rememberVoiceWidgetLook({ avatars: "small", names: "never", people: "speaking", opacity: 40, corner: "bottom-right", maxUsers: 3 });
+        rememberVoiceWidgetPlace({ x: 10, y: 20 });
+        rememberToggle("overlayQuickActions", false);
+        rememberToggle("overlayClickable", true);
+        rememberToggle("voiceWidgetGameOnly", true);
+        rememberToggle("voiceWidgetPinned", false);
+        rememberOverlayLockBinding("Mod+Alt+O");
+        resetVoiceWidgetLayout();
+        expect(toggle("voiceWidgetPinned")).toBe(true);
+        // A key and the games are not the layout either.
+        expect(overlayLockBinding()).toBe("Mod+Alt+O");
+        expect(voiceWidgetLook()).toEqual(defaults);
+        expect(voiceWidgetPlace()).toBeNull();
+        expect(toggle("overlayQuickActions")).toBe(true);
+        expect(toggle("overlayClickable")).toBe(false);
+        // Not part of the layout: when it shows is somebody's own choice.
+        expect(toggle("voiceWidgetGameOnly")).toBe(true);
+    });
+});
+
+describe("the overlay layer's panels", () => {
+    it("put a widget dragged before the layer where it was left", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidgetPlace: { x: 300, y: 200 } }));
+        expect(overlayLayout()).toEqual([]);
+        expect(voicePanelPlace()).toEqual({ id: "voice", x: 300, y: 200 });
+    });
+
+    it("keep each place, also where an older app reads the widget's", () => {
+        rememberPanelPlace({ id: "voice", x: 40, y: 50, width: 300, height: 120 });
+        expect(voicePanelPlace()).toEqual({ id: "voice", x: 40, y: 50, width: 300, height: 120 });
+        expect(voiceWidgetPlace()).toEqual({ x: 40, y: 50 });
+    });
+
+    it("skip an entry this build cannot read and keep the rest", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ overlayLayout: [{ id: "voice", x: "a" }, { id: "chat", x: 1, y: 2 }, 7] }));
+        expect(overlayLayout()).toEqual([{ id: "chat", x: 1, y: 2 }]);
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ overlayLayout: "broken" }));
+        expect(overlayLayout()).toEqual([]);
+    });
+
+    it("go back to their corners on a reset, and the voice panel on a new corner", () => {
+        rememberPanelPlace({ id: "voice", x: 40, y: 50 });
+        rememberPanelPlace({ id: "chat", x: 1, y: 2 });
+        rememberVoiceWidgetLook({ avatars: "large", names: "always", people: "always", opacity: 100, corner: "bottom-right", maxUsers: 8 });
+        expect(voicePanelPlace()).toBeNull();
+        expect(overlayLayout()).toEqual([{ id: "chat", x: 1, y: 2 }]);
+        resetVoiceWidgetLayout();
+        expect(overlayLayout()).toEqual([]);
+    });
+});
+
+describe("the overlay's widgets", () => {
+    it("have the quick actions on and clickable regions off on a file from before them", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidget: true }));
+        expect(toggle("overlayQuickActions")).toBe(true);
+        expect(toggle("overlayClickable")).toBe(false);
+    });
+});
+
+describe("the overlay's own choices", () => {
+    it("keep what an install from before them had: pinned, the default keys, every game", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidget: true, overlayClickable: true }));
+        expect(toggle("voiceWidgetPinned")).toBe(true);
+        expect(overlayLockBinding()).toBe("");
+        expect(overlayOffGames()).toEqual([]);
+    });
+
+    it("drop a game entry that does not read, and keep the rest", () => {
+        writeFileSync(
+            join(folder.path, "settings.json"),
+            JSON.stringify({ overlayOffGames: [{ key: "cs2.exe", name: "Counter-Strike 2" }, { key: "" }, 7, { name: "x" }] })
+        );
+        expect(overlayOffGames()).toEqual([{ key: "cs2.exe", name: "Counter-Strike 2" }]);
+    });
+
+    it("are kept", () => {
+        rememberOverlayOffGames([{ key: "dota2.exe", name: "Dota 2" }]);
+        rememberOverlayLockBinding("F10");
+        expect(overlayOffGames()).toEqual([{ key: "dota2.exe", name: "Dota 2" }]);
+        expect(overlayLockBinding()).toBe("F10");
     });
 });

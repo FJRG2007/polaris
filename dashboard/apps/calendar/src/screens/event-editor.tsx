@@ -16,6 +16,7 @@
 import * as engine from "../engine";
 import { unwrap } from "./cached-read";
 import * as model from "./editor-model";
+import * as offline from "./offline-calls";
 import { ZonePicker } from "./zone-picker";
 import { LocationLine, WebLink } from "./contact-links";
 import { ZoneComparison } from "./clock/zone-compare";
@@ -204,21 +205,44 @@ export function EventEditor({
         }
         setBusy(true);
         try {
-            await unwrap(
-                () =>
-                    eventActions.saveEventAction({
-                        objectId: detail?.objectId ?? null,
-                        recurrenceKey: detail?.recurrenceKey ?? null,
-                        scope,
-                        version: detail?.version ?? null,
-                        zone,
-                        event: model.inputOf(form)
-                    }),
+            const objectId = detail?.objectId ?? null;
+            const uid = objectId ? null : offline.newEventUid();
+            const target = objectId ?? `new:${uid}`;
+            const answer = await offline.sendOrKeep(
+                eventActions.saveEventAction,
+                {
+                    objectId,
+                    uid,
+                    recurrenceKey: detail?.recurrenceKey ?? null,
+                    scope,
+                    version: detail?.version ?? null,
+                    zone,
+                    event: model.inputOf(form)
+                },
+                {
+                    target,
+                    // A whole event: a later save of it replaces one still waiting.
+                    replace: true,
+                    meta: {
+                        op: "save",
+                        objectId,
+                        summary: form.summary,
+                        occurrence:
+                            scope === "all" && !repeating
+                                ? offline.keptOccurrence(target, form, zone)
+                                : null
+                    }
+                },
                 t("screen.failed")
             );
             toast.show({
                 key: "calendar-saved",
-                title: isNew ? t("editor.created") : t("editor.saved")
+                title:
+                    answer === offline.KEPT
+                        ? t("offline.kept")
+                        : isNew
+                          ? t("editor.created")
+                          : t("editor.saved")
             });
             onChanged();
             onClose();
@@ -258,17 +282,26 @@ export function EventEditor({
         }
         setBusy(true);
         try {
-            await unwrap(
-                () =>
-                    eventActions.deleteEventAction({
+            const answer = await offline.sendOrKeep(
+                eventActions.deleteEventAction,
+                { objectId: detail.objectId, recurrenceKey: detail.recurrenceKey, scope, zone },
+                {
+                    target: detail.objectId,
+                    meta: {
+                        op: "delete",
                         objectId: detail.objectId,
-                        recurrenceKey: detail.recurrenceKey,
+                        recurrenceKey: detail.recurrenceKey ?? "",
                         scope,
-                        zone
-                    }),
+                        start: detail.recurrenceKey ?? "",
+                        summary: detail.event.summary
+                    }
+                },
                 t("screen.failed")
             );
-            toast.show({ key: "calendar-deleted", title: t("editor.deleted") });
+            toast.show({
+                key: "calendar-deleted",
+                title: answer === offline.KEPT ? t("offline.kept") : t("editor.deleted")
+            });
             onChanged();
             onClose();
         } catch (caught) {

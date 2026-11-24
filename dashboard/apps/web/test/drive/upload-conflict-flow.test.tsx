@@ -42,6 +42,8 @@ vi.mock("@/components/use-live-resource", () => ({
 vi.mock("@/components/transfers/move-file", () => ({
     sendFile: (...args: unknown[]) => sendFile(...args)
 }));
+// The offline replay is a server action; the explorer only imports it.
+vi.mock("../../src/app/(app)/drive/offline-actions", () => ({ replayDriveChangeAction: async () => ({}) }));
 vi.mock("../../src/app/(app)/drive/actions", () => ({
     driveJobsAction: async () => [],
     startDriveJobAction: async () => ({}),
