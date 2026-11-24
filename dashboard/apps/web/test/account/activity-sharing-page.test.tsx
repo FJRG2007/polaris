@@ -37,7 +37,7 @@ vi.mock("@/app/(app)/account/privacy/actions", () => ({
         return {};
     }
 }));
-vi.mock("@/components/desktop-app", () => ({ useDesktopBridge: () => null, useDesktopAppSettings: () => false }));
+vi.mock("@/components/desktop-app", () => ({ useDesktopBridge: () => null, useDesktopAppSettings: () => false, usePhoneAppSettings: () => false }));
 vi.mock("@/components/presence-store", () => ({
     usePresenceRefresh: () => () => undefined,
     usePresence: () => ({ activity: playing })
