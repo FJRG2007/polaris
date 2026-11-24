@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { launchDetached, launchFor, parseRegQuery, registeredLaunch, splitArguments } from "../../src/main/default-browser";
+import { browserEnvironment, launchDetached, launchFor, parseRegQuery, registeredLaunch, splitArguments } from "../../src/main/default-browser";
 
 const URL_IN = "https://click.example.com/ls/click?upn=a1B2%2Fx&b=2";
 
@@ -153,6 +153,16 @@ describe("launchDetached", () => {
 
     it("resolves when the process keeps running: it became the browser", async () => {
         await expect(launchDetached(node, ["-e", "setTimeout(() => {}, 3000)"], 300)).resolves.toBeUndefined();
+    });
+
+    // The started browser is a Chromium program: Electron's and Chromium's own
+    // variables (a crash handler's pipe, run-as-Node) are not handed to it.
+    it("starts the browser without Electron's or Chromium's variables", async () => {
+        const env = { ...process.env, CHROME_CRASHPAD_PIPE_NAME: String.raw`\\.\pipe\crashpad_1`, ELECTRON_RUN_AS_NODE: "1", NODE_OPTIONS: "--inspect" };
+        const probe = ["-e", "process.exit(process.env.CHROME_CRASHPAD_PIPE_NAME || process.env.NODE_OPTIONS ? 1 : 24)"];
+        await expect(launchDetached(process.execPath, probe, 5_000, env)).resolves.toBeUndefined();
+        expect(Object.keys(browserEnvironment(env)).filter((name) => /^(ELECTRON_|CHROME_|NODE_OPTIONS$)/i.test(name))).toEqual([]);
+        expect(browserEnvironment(env).PATH ?? browserEnvironment(env).Path).toBe(process.env.PATH ?? process.env.Path);
     });
 
     it("rejects for a program that is not there", async () => {

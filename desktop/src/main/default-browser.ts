@@ -14,6 +14,7 @@
  * command.
  */
 
+import { win32 } from "node:path";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 
@@ -211,6 +212,63 @@ export function exitMeaning(code: number | null): string {
 export const SETTLE_MS = 8_000;
 
 /**
+ * Variables Electron and Chromium read to change how a Chromium program starts:
+ * `CHROME_CRASHPAD_PIPE_NAME` makes a Chromium process report to another
+ * program's crash handler (`components/crash/core/app/crashpad_win.cc`),
+ * `ELECTRON_RUN_AS_NODE` and `NODE_OPTIONS` change what a Node-based program
+ * does. None of them is Polaris's to hand to a browser.
+ */
+const CHROMIUM_VARIABLES = /^(?:ELECTRON_|CHROME_|NODE_OPTIONS$)/i;
+
+/** The environment a started browser is given: Polaris's own, without the
+ *  variables only Electron or Chromium read. */
+export function browserEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    return Object.fromEntries(Object.entries(env).filter(([name]) => !CHROMIUM_VARIABLES.test(name)));
+}
+
+/**
+ * Hand `url` to the Windows shell that draws the desktop, so the shell starts
+ * the browser - the way a link clicked anywhere else in Windows is opened.
+ *
+ * A second `explorer.exe` does not open the address itself: it passes its
+ * command line to the Explorer already running and exits. The browser is then
+ * started by that Explorer, outside Polaris's process tree, with nothing of
+ * Polaris's (its job, its token, its environment) inherited - the same reason
+ * `explorer.exe <program>` is the known way to start a program unelevated
+ * from an elevated one (Raymond Chen, "How can I launch an unelevated process
+ * from my elevated process", The Old New Thing, 2013-11-18). Explorer's exit
+ * code is 1 whether or not it handed the address on, so it says nothing:
+ * resolving means Windows started Explorer with the address, not that a page
+ * opened. Rejects with `ShellUnavailable` for an address Explorer would read as
+ * more than one argument: it splits its command line at commas.
+ */
+export function handToShell(url: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
+    return new Promise((resolve, reject) => {
+        // `new URL().href` encodes a quote, so the address cannot close its own
+        // quotes; a comma is left as it is, and Explorer would split there.
+        if (/[",\s]/.test(url)) {
+            reject(new ShellUnavailable("Explorer would split this address at its comma"));
+            return;
+        }
+        const explorer = win32.join(env.SystemRoot ?? env.SYSTEMROOT ?? String.raw`C:\Windows`, "explorer.exe");
+        if (!existsSync(explorer)) {
+            reject(new ShellUnavailable(`${explorer} is not there`));
+            return;
+        }
+        const child = spawn(explorer, [`"${url}"`], { detached: true, stdio: "ignore", windowsVerbatimArguments: true, env: browserEnvironment(env) });
+        child.once("error", (error) => reject(error));
+        child.once("spawn", () => {
+            child.unref();
+            resolve();
+        });
+    });
+}
+
+/** `handToShell` cannot be used for this address or on this machine; not a
+ *  refusal of the link. */
+export class ShellUnavailable extends Error {}
+
+/**
  * Start the browser detached and wait for what it does with the link.
  *
  * Starting the process is not opening the link. With the browser already
@@ -221,13 +279,13 @@ export const SETTLE_MS = 8_000;
  * hand-over code, or is still running after `SETTLE_MS` (it became the
  * browser); rejects with the exit code otherwise.
  */
-export function launchDetached(file: string, args: readonly string[], settleMs: number = SETTLE_MS): Promise<void> {
+export function launchDetached(file: string, args: readonly string[], settleMs: number = SETTLE_MS, env: NodeJS.ProcessEnv = process.env): Promise<void> {
     return new Promise((resolve, reject) => {
         if (!existsSync(file)) {
             reject(new Error(`${file} is not there`));
             return;
         }
-        const child = spawn(file, [...args], { detached: true, stdio: "ignore", windowsHide: false });
+        const child = spawn(file, [...args], { detached: true, stdio: "ignore", windowsHide: false, env: browserEnvironment(env) });
         let settled = false;
         const finish = (error: Error | null) => {
             if (settled) return;

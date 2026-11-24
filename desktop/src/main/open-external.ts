@@ -8,24 +8,29 @@
  * first that works wins:
  *
  * - Windows: the default browser's registered command, started directly
- *   (`default-browser.ts`), then `shell.openExternal`. The direct start comes
- *   first because it is the one route whose outcome can be read: the started
- *   browser's exit code says whether the running copy took the link
- *   (BUG-0020). `shell.openExternal` resolves whether or not a browser showed
- *   anything, so when it only runs because the browser refused the link, the
- *   person is still shown the address.
+ *   (`default-browser.ts`); then the desktop's own Explorer, which starts the
+ *   browser outside Polaris's process tree (`handToShell`); then
+ *   `shell.openExternal`. The direct start comes first because it is the one
+ *   route whose outcome can be read: the started browser's exit code says
+ *   whether the running copy took the link. When it did not - a browser
+ *   started by Polaris that turns the link down while one is already open
+ *   (BUG-0020) - Explorer starts it instead, as it does for a link clicked
+ *   anywhere else in Windows.
  * - macOS and Linux: `shell.openExternal`, then `open` / `xdg-open`, whose exit
  *   code says whether the link was handed on.
  *
- * When every route fails, or the only one left cannot say it worked, the person
- * is told and offered the address, and the last link handed out can always be
- * copied from the tray. Every attempt is written to `links.log`.
+ * Only when every route refused the link is the person told, inside the
+ * window and without stopping them: the address and Copy link. A route that
+ * accepted the link and has no refusal to read is taken at its word - the
+ * system's own alert box is never shown for a link. The last link handed out
+ * can always be copied from the tray. Every attempt is written to `links.log`.
  */
 
-import { BrowserWindow, app, clipboard, dialog, shell } from "electron";
+import { BrowserWindow, app, shell } from "electron";
 import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { isSafeExternalUrl } from "./navigation";
+import { CHANNELS } from "@/shared/bridge";
 import { rememberLink } from "./tray";
 import * as browser from "./default-browser";
 
@@ -53,7 +58,8 @@ export interface OpenExternalDeps {
  * - `opened`      - a route that can tell took the link, or the only route
  *                   there was accepted it.
  * - `unconfirmed` - an earlier route refused the link, and the one that
- *                   accepted it cannot say whether anything opened.
+ *                   accepted it cannot say whether anything opened. Not said
+ *                   on screen: the route raised no refusal to show.
  * - `failed`      - not a link that may leave the app, or every route failed.
  */
 export type OpenOutcome = "opened" | "unconfirmed" | "failed";
@@ -96,7 +102,7 @@ export async function openOutsideOutcome(raw: string, deps: OpenExternalDeps): P
             deps.log(`Opened ${logTarget(url)} through ${route.name}${route.confirms ? "" : " (not confirmed)"}`, null);
             return route.confirms || !refused ? "opened" : "unconfirmed";
         } catch (error) {
-            if (!(error instanceof RouteUnavailable)) refused = true;
+            if (!(error instanceof RouteUnavailable) && !(error instanceof browser.ShellUnavailable)) refused = true;
             deps.log(`Opening ${logTarget(url)} through ${route.name} failed`, error);
         }
     }
@@ -111,7 +117,8 @@ export async function openOutsideOutcome(raw: string, deps: OpenExternalDeps): P
 export const outsideSystem = {
     open: (url: string): Promise<void> => shell.openExternal(url),
     readRegistry: browser.readRegistry,
-    launch: browser.launchDetached,
+    launch: (file: string, args: readonly string[]): Promise<void> => browser.launchDetached(file, args),
+    shell: (url: string): Promise<void> => browser.handToShell(url),
     opener: browser.runOpener
 };
 
@@ -128,7 +135,8 @@ export function routesFor(platform: NodeJS.Platform, system: typeof outsideSyste
             },
             confirms: true
         };
-        return [direct, handOver];
+        const desktop: OutsideRoute = { name: "the Windows shell (Explorer)", run: (url) => system.shell(url), confirms: false };
+        return [direct, desktop, handOver];
     }
     const opener = platform === "darwin" ? "open" : "xdg-open";
     return [handOver, { name: opener, run: (url) => system.opener(opener, url), confirms: true }];
@@ -158,31 +166,31 @@ function writeLog(message: string, error: unknown): void {
     }
 }
 
-/**
- * Said on screen when no route opened the link, so a click is never answered
- * with nothing: the address, and a way to take it to the browser by hand.
- */
-async function sayFailed(url: string, outcome: Exclude<OpenOutcome, "opened">): Promise<void> {
-    const program = url.startsWith("mailto:") ? "Your mail app" : "Your browser";
-    const title = outcome === "failed" ? "Couldn't open the link" : "The link may not have opened";
-    const said = outcome === "failed"
-        ? `${program} didn't open it. Copy it and paste it there instead.`
-        : `${program} didn't take it from Polaris, so Windows was asked instead. If nothing opened, copy it and paste it there.`;
-    const options = {
-        type: "warning" as const,
-        title,
-        message: title,
-        detail: `${said}
+/** What the in-window notice is told when no route opened a link
+ *  (`preload/link-notice.ts`). */
+export interface LinkNotice {
+    readonly url: string;
+    readonly title: string;
+    readonly body: string;
+}
 
-${url}`,
-        buttons: ["Copy link", "Close"],
-        defaultId: 0,
-        cancelId: 1,
-        noLink: true
-    };
-    const parent = BrowserWindow.getFocusedWindow();
-    const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
-    if (response === 0) clipboard.writeText(url);
+/** The words for a link no route opened. */
+export function linkNotice(url: string): LinkNotice {
+    const program = url.startsWith("mailto:") ? "Your mail app" : "Your browser";
+    return { url, title: "Couldn't open the link", body: `${program} didn't open it. Copy it and paste it there.` };
+}
+
+/**
+ * Said inside the window when no route opened the link, so a click is never
+ * answered with nothing - and never with a system alert box that stops the
+ * person until it is dismissed. Sent to the focused window, else the first
+ * shown one; the tray's "Copy last link opened" covers a click with no window
+ * left to tell.
+ */
+function sayFailed(url: string): void {
+    const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows().find((each) => !each.isDestroyed() && each.isVisible());
+    if (!window || window.isDestroyed()) return;
+    window.webContents.send(CHANNELS.linkNotice, linkNotice(url));
 }
 
 const deps: OpenExternalDeps = {
@@ -191,11 +199,11 @@ const deps: OpenExternalDeps = {
 };
 
 /** Open a link outside the app, for callers that do not wait on the outcome.
- *  When every route fails, the person is told and offered the address. */
+ *  When every route refused it, the person is told and offered the address. */
 export function openExternal(url: string): void {
     const address = outsideAddress(url);
     if (address) rememberLink(address);
     void openOutsideOutcome(url, deps).then((outcome) => {
-        if (outcome !== "opened" && address) void sayFailed(address, outcome).catch(() => undefined);
+        if (outcome === "failed" && address) sayFailed(address);
     });
 }

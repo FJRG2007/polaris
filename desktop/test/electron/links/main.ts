@@ -1,13 +1,15 @@
 /**
  * BUG-0020 in a real Electron, headless: every way a link is clicked in the
  * desktop app reaches the routes that hand it to the system, and a link no route
- * could open says so with Copy link.
+ * could open says so inside the window with Copy link - never with a system
+ * alert box.
  *
  * The desktop's own window (`openPolarisWindow`: the window-open handler and the
  * navigation guard), preload and right-click menu are used as they ship, and
  * the page draws the dashboard's real mail frame (`frame-document.ts`) and
  * `openLink`. Only the last step is swapped: the registry reader, the process
- * launcher, `shell.openExternal`, the dialog and the clipboard are recorders,
+ * launcher, the Explorer hand-over, `shell.openExternal`, the dialog and the
+ * clipboard are recorders,
  * so no browser is ever started, no window is shown, and nothing is written to
  * the clipboard of the machine it runs on.
  *
@@ -37,6 +39,10 @@ outsideSystem.readRegistry = async (key) =>
 outsideSystem.launch = async (file, args) => {
     if (failing) return refuse();
     reached.push(`launch ${file} ${args.join(" ")}`);
+};
+outsideSystem.shell = async (url) => {
+    if (failing) return refuse();
+    reached.push(`shell ${url}`);
 };
 outsideSystem.open = async (url) => {
     if (failing) return refuse();
@@ -104,6 +110,11 @@ app.whenReady().then(() =>
             openExternal(raw);
             return true;
         });
+        ipcMain.handle(CHANNELS.editWriteClipboard, (_event, raw: unknown) => {
+            if (typeof raw !== "string") return false;
+            clipboard.writeText(raw);
+            return true;
+        });
         const window = openPolarisWindow(`${origin}/mail`, () => origin, { hidden: true, width: 900, height: 500 });
         const contents = window.webContents;
         await new Promise((resolve) => contents.once("did-finish-load", () => resolve(undefined)));
@@ -134,12 +145,18 @@ app.whenReady().then(() =>
         }
         expect("the page stays on Polaris", contents.getURL() === `${origin}/mail`, contents.getURL());
 
-        // Every route failing: the person is told, and Copy link copies it.
+        // Every route failing: the person is told inside the window, and Copy
+        // link copies it. The system's alert box is never shown.
         failing = true;
+        window.focus();
         openExternal("https://example.net/failed?x=1");
-        await until(() => dialogs.length > 0 && copied.length > 0, 5_000);
-        expect("a link no route opened shows the dialog", dialogs.length === 1 && dialogs[0]!.includes("Copy link") && dialogs[0]!.includes("https://example.net/failed?x=1"), dialogs.join(" / ") || "no dialog");
+        const card = "document.querySelector('polaris-link-notice')?.shadowRoot";
+        const shown = await until(async () => Boolean(await contents.executeJavaScript(`Boolean(${card}?.textContent.includes("https://example.net/failed?x=1"))`)), 5_000);
+        expect("a link no route opened is said in the window", shown, shown ? "card shown" : "no card");
+        await contents.executeJavaScript(`${card}?.querySelector("button")?.click()`);
+        await until(() => copied.length > 0, 5_000);
         expect("Copy link copies the address", copied.includes("https://example.net/failed?x=1"), copied.join(", ") || "nothing copied");
+        expect("no system alert box", dialogs.length === 0, dialogs.join(" / ") || "none");
 
         console.log(failures === 0 ? "HARNESS OK" : `HARNESS FAILED ${failures}`);
         server.close();

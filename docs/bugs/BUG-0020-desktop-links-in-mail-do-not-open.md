@@ -233,6 +233,91 @@ and that code names the reason.
   the whole address, which can carry tokens) and, for a failure, the exit
   code.
 
+## The alert after every click (2026-11-24, desktop 0.1.106)
+
+On 0.1.104 the owner saw a Windows alert box, "The link may not have opened",
+after clicking a link. `links.log` on that machine (Polaris and Brave not
+elevated, Brave the https default):
+
+```
+21:44:14.875Z Opening https://github.com through the default browser's registered command failed: ...brave.exe exited with code 1: the browser exited without taking the link
+21:44:14.932Z Opened https://github.com through the system's URL handler (not confirmed)
+```
+
+### Cause
+
+Two separate things.
+
+- **The alert was ours.** 0.1.93 answered every refused hand-over that
+  `shell.openExternal` then accepted with `dialog.showMessageBox`, the native
+  alert box, because `shell.openExternal` cannot say whether a page opened.
+  In other words, the alert came up every time the direct start was refused,
+  even when Windows had accepted the link.
+- **Why Brave refused it.** The `brave.exe` that Polaris starts is only a
+  messenger, because Brave is already running, and it exits with code 1
+  without delivering the link. In Chromium's startup code (read for this entry:
+  `chrome/app/chrome_exe_main_win.cc`, `chrome/app/chrome_main_delegate.cc`,
+  `chrome/browser/process_singleton_win.cc`,
+  `chrome/browser/win/chrome_process_finder.cc`,
+  `chrome/common/chrome_result_codes.h`,
+  `content/public/common/result_codes.h`), a messenger that delivered exits
+  with 0 (`AttemptFastNotify`) or 24 (`NORMAL_EXIT_PROCESS_NOTIFIED`). One
+  that could not reach the running window exits with 21 (`PROFILE_IN_USE`,
+  which is also returned for `LOCK_ERROR`). The only literal exit 1 is
+  `HasDeprecatedArguments`, a command line containing `chromehtml:`, and that
+  is not this link. Otherwise 1 is `content::RESULT_CODE_KILLED`, the code a
+  process is terminated with. So the messenger did not fail at any point
+  where Chromium decides. It was stopped or refused by something it runs
+  under. The environment, arguments, integrity level and working directory
+  were already ruled out (see above), and every route Polaris had started the
+  browser as Polaris's own child: the direct start, and `shell.openExternal`,
+  which is `ShellExecuteW` inside the Polaris process. A cold start works,
+  and so does a link clicked anywhere else in Windows. That leaves what the
+  messenger inherits from its parent, starting with its job object (libuv
+  starts a `detached` child without `CREATE_BREAKAWAY_FROM_JOB`, so it stays
+  in every job Polaris is in). **Not proven:** which inherited property
+  Brave's messenger stops on. Reading the jobs needs elevation, and running a
+  browser is off limits on that machine.
+
+### Fix
+
+- **Windows routes (`open-external.ts`).** The order is: the registered
+  command (its exit code can be read), then **the desktop's Explorer**
+  (`handToShell` in `default-browser.ts`), then `shell.openExternal`.
+  `explorer.exe "<url>"` passes the address to the Explorer that is already
+  running and exits, so the browser is started by the shell, outside Polaris's
+  process tree, the way a link clicked anywhere else in Windows is opened.
+  This is the same reason `explorer.exe <program>` is the known way to start a
+  program unelevated from an elevated one (Raymond Chen, *How can I launch an
+  unelevated process from my elevated process and vice versa?*, The Old New
+  Thing, 2013-11-18). The launcher already starts Store apps the same way
+  (`explorer.exe shell:AppsFolder\...`). The address goes as one quoted
+  argument with `windowsVerbatimArguments`. `new URL().href` encodes quotes
+  and spaces, and an address with a comma, which Explorer splits on, skips
+  this route and goes to `shell.openExternal`.
+- **No native alert for a link, ever.** `dialog` is gone from
+  `open-external.ts`. A route that accepted the link with no refusal to read
+  shows nothing. Only when every route refused does the window show a small
+  card in the corner (`preload/link-notice.ts`): the address, Copy link
+  (through the existing clipboard channel) and Close. It does not block, it
+  goes away after 15 s, it stays while hovered or focused, and it lives in a
+  shadow root.
+- **A browser started by Polaris gets a clean environment**
+  (`browserEnvironment`). `ELECTRON_*`, `CHROME_*` (for example
+  `CHROME_CRASHPAD_PIPE_NAME`, which points a Chromium process at another
+  program's crash handler, `components/crash/core/app/crashpad_win.cc`) and
+  `NODE_OPTIONS` are dropped, both for the direct start and for Explorer.
+  This variable set was already absent on the owner's machine, so this is
+  defence, not the fix.
+- `links.log` keeps one line per attempt, by scheme and host only. A click
+  that the direct start refuses now reads "...failed: ...code 1" followed by
+  "Opened ... through the Windows shell (Explorer) (not confirmed)".
+
+Status stays **open** until the owner confirms on 0.1.106 that a link opens in
+Brave with Brave already running and no alert. If the log then shows Explorer
+taking the link but no tab, the shell's own start is being refused too, and the
+machine's jobs are the next thing to read, elevated.
+
 ## Regression test
 
 - `desktop/test/main/open-external.test.ts`: a several-thousand-character
@@ -262,9 +347,23 @@ and that code names the reason.
   this test's own Node exiting with a browser's codes. 24 and 0 resolve; 21
   and 1 reject with the code (this test fails on the 0.1.60-0.1.92 launcher,
   which resolved on spawn); a process still running resolves.
-- `desktop/test/main/open-external.test.ts`: a refused hand-over is
-  `unconfirmed` (dialog shown) after the system route; a Store browser and a
-  delivered hand-over are `opened`; the log names the host, never the token.
+- `desktop/test/main/open-external.test.ts`: a refused hand-over goes to
+  Explorer and is `unconfirmed` with nothing shown; an address Explorer can't
+  take goes to `shell.openExternal`; only every route refusing is `failed`; a
+  Store browser and a delivered hand-over are `opened`; the log names the
+  host, never the token; `open-external.ts` has no `dialog`.
+- `desktop/test/main/hand-to-shell.test.ts` (`spawn` recorded, nothing
+  started): Explorer from `%SystemRoot%`, the address as one quoted verbatim
+  argument, detached, without `ELECTRON_*`/`CHROME_*`; comma, quote and space
+  addresses and a missing Explorer fall through.
+- `desktop/test/main/default-browser.test.ts` > `launchDetached`: a real child
+  process exits 24 only when `CHROME_CRASHPAD_PIPE_NAME` and `NODE_OPTIONS`
+  did not reach it. This fails when the scrub is removed.
+- `desktop/test/main/link-notice.test.ts`: the card takes only the words the
+  main process sends.
+- Not exercised: Explorer actually starting Brave, and the in-window card
+  drawn in a real window. `test/electron/links` checks both, but it was not
+  run, because Electron is not launched on the owner's machine.
 - Not exercised: a real browser starting from the direct launch (never run
   here, so no browser opens on this machine).
 
