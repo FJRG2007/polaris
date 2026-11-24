@@ -12310,6 +12310,23 @@ model GameArt {
 
 // Which store game a program is, as the first desktop app that knew said, so a
 // game reported by an older app without a store id still gets its picture.
+// Which store game a game is, found by its name for a game reported with no
+// store id this server asks (Fortnite from Epic, Valorant, Minecraft...): one
+// lookup per name per server, a miss kept too so it is not asked on every report.
+model GameArtName {
+    // The name as `normalizeGameName` writes it: `fall guys`.
+    name      String   @id
+    // The store id found (`steam:1097150`, `msstore:BT5P2X999VH2`), or null when
+    // no source had exactly this title, or more than one game did.
+    ref       String?
+    // The source that settled it (`steam`, `msstore`, `wikidata`): the one that
+    // found it, or found more than one game by the title. Null when none had it.
+    source    String?
+    checkedAt DateTime
+
+    @@index([checkedAt])
+}
+
 model GameArtKey {
     // The program, as `gameKeyOf` writes it.
     key       String   @id

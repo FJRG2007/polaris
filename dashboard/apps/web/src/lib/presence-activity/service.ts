@@ -30,8 +30,9 @@ import { sessionHref } from "@/lib/chat/activity-card";
 import { MAX_PLAYERS, PASS_TTL_MS } from "@/lib/chat/call-activity";
 import { isGameAway } from "@/lib/chat/game-away";
 import { activitySettingsFor, activitySettingsOf, rememberSeenGame } from "./settings";
-import { artRefOfReport, warmGameArt } from "./game-art";
+import { artRefOfReport, warmPicture } from "./game-art";
 import { artRoute } from "./game-art-sources";
+import { nameRefOf } from "./game-art-lookup";
 
 /** The sources that are stored here rather than looked up. */
 export type StoredSource = Extract<core.ActivitySource, "spotify" | "game">;
@@ -202,8 +203,9 @@ export async function reportGame(
     );
     // The picture is the store's, fetched by this server: the report names the
     // game's store id at most, never an image.
-    const art = await artRefOfReport(game.key, game.store).catch(() => null);
-    if (art) warmGameArt(art);
+    // A game with no store id this server asks is looked up by its name.
+    const art = (await artRefOfReport(game.key, game.store).catch(() => null)) ?? nameRefOf(game.name);
+    if (art) warmPicture(art);
     await Promise.all([
         putActivity(
             userId,

@@ -9,9 +9,10 @@
  */
 
 import { prisma } from "@polaris/db";
-import * as core from "@polaris/core";
+import { rateLimit } from "@/lib/rate-limit-service";
 import { fetchImage, follow, readCapped } from "@/lib/safe-fetch";
 import { MAX_ART_BYTES, MAX_METADATA_BYTES, artRefFor, artUrlFrom, metadataUrl, resolvable } from "./game-art-sources";
+import { lookupByName, nameOfRef } from "./game-art-lookup";
 
 /** The side of the square every picture is redrawn at. */
 export const ART_SIDE = 128;
@@ -44,19 +45,27 @@ export async function redraw(bytes: Uint8Array): Promise<Uint8Array | null> {
     }
 }
 
+/** A store's JSON answer through the guarded fetch, or undefined when it gave none. */
+async function storeJson(address: string): Promise<unknown | undefined> {
+    const response = await follow(new URL(address), "application/json, application/sparql-results+json", undefined, 10_000);
+    if (!response?.ok) {
+        await response?.body?.cancel().catch(() => undefined);
+        return undefined;
+    }
+    const raw = await readCapped(response, MAX_METADATA_BYTES);
+    if (!raw) return undefined;
+    try {
+        return JSON.parse(new TextDecoder().decode(raw)) as unknown;
+    } catch {
+        return undefined;
+    }
+}
+
 async function fromStore(ref: string): Promise<Uint8Array | null> {
     const address = metadataUrl(ref);
     if (!address) return null;
-    const response = await follow(new URL(address), "application/json", undefined, 10_000);
-    if (!response?.ok) return null;
-    const raw = await readCapped(response, MAX_METADATA_BYTES);
-    if (!raw) return null;
-    let body: unknown;
-    try {
-        body = JSON.parse(new TextDecoder().decode(raw));
-    } catch {
-        return null;
-    }
+    const body = await storeJson(address);
+    if (body === undefined) return null;
     const art = artUrlFrom(ref, body);
     if (!art) return null;
     const image = await fetchImage(art, MAX_ART_BYTES);
@@ -77,7 +86,7 @@ async function fetchAndKeep(ref: string): Promise<Uint8Array | null> {
  * or the kept answer is old. Null when the store has none, or is not one asked.
  */
 export async function gameArt(ref: string, now: Date = new Date()): Promise<Uint8Array | null> {
-    if (!core.GAME_STORE_REF.test(ref) || !resolvable(ref)) return null;
+    if (!resolvable(ref)) return null;
     const kept = await prisma.gameArt.findUnique({ where: { ref }, select: { image: true, fetchedAt: true } });
     const age = kept ? now.getTime() - kept.fetchedAt.getTime() : Infinity;
     if (kept?.image && age < ART_FRESH_MS) return new Uint8Array(kept.image);
@@ -109,7 +118,81 @@ export async function artRefOfReport(key: string, reported: string | undefined):
     return artRefFor(key, reported, learned?.ref);
 }
 
-/** Start fetching a picture before the first reader asks, so their card is not the one that waits. */
-export function warmGameArt(ref: string): void {
-    void gameArt(ref).catch(() => undefined);
+/** A name found is asked again after this, in case the store renamed or delisted it. */
+const NAME_FRESH_MS = 90 * 24 * 60 * 60_000;
+
+/** A name no source had is asked again after this; one asked longer ago is forgotten. */
+const NAME_MISSING_RETRY_MS = 7 * 24 * 60 * 60_000;
+const NAME_MISSING_KEEP_MS = 30 * 24 * 60 * 60_000;
+
+/**
+ * Lookups this server makes in a window, every reader and game together. Each
+ * is up to three requests; Wikidata allows a client a minute of query time a
+ * minute and Steam's store search is unmetered but not unlimited, so a burst of
+ * new names waits for the next window instead of being remembered as missing.
+ */
+const LOOKUP_LIMIT = 20;
+const LOOKUP_WINDOW_MS = 60_000;
+
+/** The lookups in flight, so readers of the same new game share one. */
+const namesInFlight = new Map<string, Promise<string | null>>();
+
+let lastSweep = 0;
+
+/** Forget names nobody has had a store id for in a long time, at most once an hour. */
+function sweepMissingNames(now: Date): void {
+    if (now.getTime() - lastSweep < 60 * 60_000) return;
+    lastSweep = now.getTime();
+    void prisma.gameArtName
+        .deleteMany({ where: { ref: null, checkedAt: { lt: new Date(now.getTime() - NAME_MISSING_KEEP_MS) } } })
+        .catch(() => undefined);
+}
+
+async function lookUpAndKeep(name: string, now: Date): Promise<string | null> {
+    const allowed = await rateLimit("game-art-lookup", LOOKUP_LIMIT, LOOKUP_WINDOW_MS);
+    if (!allowed.ok) return null;
+    const found = await lookupByName(name, (url) => storeJson(url)).catch(() => undefined);
+    // A source that did not answer is not a source that had nothing: nothing is kept.
+    if (!found) return null;
+    const row = { ref: found.ref, source: found.source, checkedAt: now };
+    await prisma.gameArtName
+        .upsert({ where: { name }, create: { name, ...row }, update: row })
+        .catch(() => undefined);
+    if (!found.ref) sweepMissingNames(now);
+    return found.ref;
+}
+
+/**
+ * The store id of the game this normalized name is, found once per server by
+ * the keyless chain (`game-art-lookup.ts`) and kept - a miss too, so a game no
+ * store sells is not looked up on every report. Null when none is known.
+ */
+export async function refForName(name: string, now: Date = new Date()): Promise<string | null> {
+    const kept = await prisma.gameArtName
+        .findUnique({ where: { name }, select: { ref: true, checkedAt: true } })
+        .catch(() => null);
+    const age = kept ? now.getTime() - kept.checkedAt.getTime() : Infinity;
+    if (kept?.ref && age < NAME_FRESH_MS) return kept.ref;
+    if (kept && !kept.ref && age < NAME_MISSING_RETRY_MS) return null;
+    const running = namesInFlight.get(name);
+    if (running) return running;
+    const next = lookUpAndKeep(name, now).finally(() => namesInFlight.delete(name));
+    namesInFlight.set(name, next);
+    const fresh = await next;
+    // A lookup that could not run keeps the id found last time.
+    return fresh ?? kept?.ref ?? null;
+}
+
+/** The picture for what a card names: a store id, or a game's `name:` to look up first. */
+export async function pictureFor(ref: string): Promise<Uint8Array | null> {
+    const name = nameOfRef(ref);
+    if (name === null) return gameArt(ref);
+    const found = await refForName(name);
+    return found ? gameArt(found) : null;
+}
+
+/** Start fetching a picture - and for a game known only by name, its lookup -
+ *  before the first reader asks, so their card is not the one that waits. */
+export function warmPicture(ref: string): void {
+    void pictureFor(ref).catch(() => undefined);
 }

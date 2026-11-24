@@ -16,11 +16,17 @@
  *   day, and the pictures are shown only to identify the game being played.
  * - **GOG** - `api.gog.com/products/<id>`, public and unauthenticated, whose
  *   `images.icon` is the 128px square GOG Galaxy draws.
- * - **Epic, Ubisoft, packaged apps** - not asked. Epic's catalog has no public,
- *   documented endpoint (its store's GraphQL is undocumented and needs a session),
- *   Ubisoft publishes none, and a packaged app's AUMID is not a Microsoft Store
- *   product id. Their games draw the neutral game glyph unless the program is one
- *   `CURATED_ART` knows by its Steam id.
+ * - **Microsoft Store** - `displaycatalog.mp.microsoft.com/v7.0/products`, the
+ *   catalog Windows' own Store client reads, answered without a key; its square
+ *   box art is the picture. A desktop app never reports this id (an AUMID is not
+ *   a product id): it is found by the game's name (`game-art-lookup.ts`), which
+ *   is how Fortnite, Valorant and League of Legends get theirs.
+ * - **Epic, Ubisoft, packaged apps** - not asked by their own id. Epic's catalog
+ *   has no public, documented endpoint (its store's GraphQL is undocumented and
+ *   needs a session), Ubisoft publishes none, and a packaged app's AUMID is not a
+ *   Microsoft Store product id. Their games are looked up by name instead.
+ *
+ * Research and sources: docs/game-art-sources.md.
  */
 
 import * as core from "@polaris/core";
@@ -78,20 +84,30 @@ export function artRefFor(
     learned: string | null | undefined
 ): string | null {
     for (const ref of [CURATED_ART[key], reported, learned]) {
-        if (ref && core.GAME_STORE_REF.test(ref) && resolvable(ref)) return ref;
+        if (ref && resolvable(ref)) return ref;
     }
     return null;
 }
 
+/** A Microsoft Store product id, which only this server ever writes (found by name). */
+const MSSTORE_REF = /^msstore:[0-9A-Z]{12}$/;
+
+/** Whether this is a store id a picture is kept under: one a computer may
+ *  report (`core.GAME_STORE_REF`), or a Microsoft Store product this server found. */
+export function isArtRef(ref: string): boolean {
+    return core.GAME_STORE_REF.test(ref) || MSSTORE_REF.test(ref);
+}
+
 /** Whether a store is one this server asks for pictures. */
 export function resolvable(ref: string): boolean {
+    if (!isArtRef(ref)) return false;
     const store = core.gameStoreOf(ref);
-    return store === "steam" || store === "gog";
+    return store === "steam" || store === "gog" || store === "msstore";
 }
 
 /** The address of the store's metadata for this game, or null for a store not asked. */
 export function metadataUrl(ref: string): string | null {
-    if (!core.GAME_STORE_REF.test(ref)) return null;
+    if (!resolvable(ref)) return null;
     const id = ref.slice(ref.indexOf(":") + 1);
     if (core.gameStoreOf(ref) === "steam") {
         const input = {
@@ -102,11 +118,12 @@ export function metadataUrl(ref: string): string | null {
         return `https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=${encodeURIComponent(JSON.stringify(input))}`;
     }
     if (core.gameStoreOf(ref) === "gog") return `https://api.gog.com/products/${id}`;
+    if (core.gameStoreOf(ref) === "msstore") return `https://displaycatalog.mp.microsoft.com/v7.0/products?bigIds=${id}&market=US&languages=en-US`;
     return null;
 }
 
 /** Only these hosts are fetched a picture from, whatever a store's answer names. */
-const ART_HOSTS = [/^shared\.(?:akamai|cloudflare)\.steamstatic\.com$/, /^cdn\.(?:akamai|cloudflare)\.steamstatic\.com$/, /^images-\d\.gog-statics\.com$/];
+const ART_HOSTS = [/^shared\.(?:akamai|cloudflare)\.steamstatic\.com$/, /^cdn\.(?:akamai|cloudflare)\.steamstatic\.com$/, /^images-\d\.gog-statics\.com$/, /^store-images\.s-microsoft\.com$/];
 
 function artAddress(raw: string): string | null {
     let url: URL;
@@ -141,6 +158,28 @@ export function artUrlFrom(ref: string, body: unknown): string | null {
     if (core.gameStoreOf(ref) === "gog") {
         const icon = (body as { images?: { icon?: unknown } }).images?.icon;
         return typeof icon === "string" ? artAddress(icon) : null;
+    }
+    if (core.gameStoreOf(ref) === "msstore") {
+        const product = (body as { Products?: { LocalizedProperties?: { Images?: unknown[] }[] }[] }).Products?.[0];
+        const images = (product?.LocalizedProperties?.[0]?.Images ?? []).filter(
+            (image): image is { ImagePurpose: string; Width: number; Uri: string } =>
+                !!image && typeof image === "object" && typeof (image as { Uri?: unknown }).Uri === "string"
+        );
+        // Square first: the box art, then the largest logo tile, then the poster.
+        for (const purpose of ["BoxArt", "Logo", "Poster"]) {
+            const best = images
+                .filter((image) => image.ImagePurpose === purpose && (purpose !== "Logo" || image.Width >= 150))
+                .sort((a, b) => (b.Width ?? 0) - (a.Width ?? 0))[0];
+            const address = best ? artAddress(best.Uri) : null;
+            if (!address) continue;
+            // The catalog's image host scales on request: the 2160px box art
+            // would be a megabyte to redraw at 128px.
+            const scaled = new URL(address);
+            scaled.searchParams.set("w", "256");
+            scaled.searchParams.set("h", "256");
+            return scaled.href;
+        }
+        return null;
     }
     return null;
 }

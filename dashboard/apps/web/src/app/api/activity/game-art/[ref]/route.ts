@@ -3,13 +3,14 @@
  *
  * Served from here rather than linked from the store, so the store never sees
  * who is looking at whom. Signed-in readers only, and only for a store id this
- * server asks: anything else is a 404, which a card draws as the game glyph.
+ * server asks or a game's `name:` to look up: anything else is a 404, which a
+ * card draws as the game glyph.
  */
 
-import * as core from "@polaris/core";
 import { backgroundUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { gameArt } from "@/lib/presence-activity/game-art";
+import { pictureFor } from "@/lib/presence-activity/game-art";
+import { nameOfRef } from "@/lib/presence-activity/game-art-lookup";
 import { resolvable } from "@/lib/presence-activity/game-art-sources";
 
 export const runtime = "nodejs";
@@ -33,11 +34,11 @@ function decoded(raw: string): string {
 export async function GET(_request: Request, context: { params: Promise<{ ref: string }> }): Promise<Response> {
     const user = await backgroundUser();
     if (!user) return new Response(null, { status: 401 });
-    const ref = core.gameStoreRefSchema.safeParse(decoded((await context.params).ref));
-    if (!ref.success || !resolvable(ref.data)) return new Response(null, NONE);
+    const ref = decoded((await context.params).ref);
+    if (!resolvable(ref) && nameOfRef(ref) === null) return new Response(null, NONE);
     const throttle = await rateLimit(`game-art:${user.id}`, ART_LIMIT, ART_WINDOW_MS);
     if (!throttle.ok) return new Response(null, { status: 429, headers: { "Retry-After": String(Math.ceil(throttle.retryAfterMs / 1000)) } });
-    const image = await gameArt(ref.data).catch(() => null);
+    const image = await pictureFor(ref).catch(() => null);
     if (!image) return new Response(null, NONE);
     return new Response(Buffer.from(image), {
         headers: {

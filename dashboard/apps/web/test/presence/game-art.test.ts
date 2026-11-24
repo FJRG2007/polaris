@@ -4,8 +4,8 @@
  * What is pinned:
  * - a computer names a game's store id at most; a report with anything else
  *   still shows the game, without the id;
- * - only Steam and GOG are asked, at their own public addresses, and a picture
- *   is only ever taken from their own image hosts;
+ * - only Steam, GOG and the Microsoft Store are asked, at their own public
+ *   addresses, and a picture is only ever taken from their own image hosts;
  * - the curated id wins over a reported one, and a reported one is learned for
  *   older desktop apps that send none;
  * - a picture is redrawn as a 128px WebP, fetched once and shared by readers
@@ -125,6 +125,30 @@ describe("where a picture is looked for", () => {
         expect(sources.artUrlFrom("gog:1", { images: { icon: "//images-4.gog-statics.com/abc.png" } })).toBe(
             "https://images-4.gog-statics.com/abc.png"
         );
+    });
+
+    it("asks the Microsoft Store for a product this server found, and takes its box art scaled down", () => {
+        expect(sources.metadataUrl("msstore:BT5P2X999VH2")).toBe(
+            "https://displaycatalog.mp.microsoft.com/v7.0/products?bigIds=BT5P2X999VH2&market=US&languages=en-US"
+        );
+        const images = [
+            { ImagePurpose: "Logo", Width: 50, Uri: "//store-images.s-microsoft.com/image/apps.1.logo50" },
+            { ImagePurpose: "Logo", Width: 300, Uri: "//store-images.s-microsoft.com/image/apps.2.logo300" },
+            { ImagePurpose: "BoxArt", Width: 2160, Uri: "//store-images.s-microsoft.com/image/apps.3.boxart" }
+        ];
+        const answer = (list: unknown[]) => ({ Products: [{ LocalizedProperties: [{ Images: list }] }] });
+        expect(sources.artUrlFrom("msstore:BT5P2X999VH2", answer(images))).toBe(
+            "https://store-images.s-microsoft.com/image/apps.3.boxart?w=256&h=256"
+        );
+        expect(sources.artUrlFrom("msstore:BT5P2X999VH2", answer(images.slice(0, 2)))).toBe(
+            "https://store-images.s-microsoft.com/image/apps.2.logo300?w=256&h=256"
+        );
+        expect(sources.artUrlFrom("msstore:BT5P2X999VH2", answer([{ ImagePurpose: "BoxArt", Width: 9, Uri: "https://evil.example/x" }]))).toBeNull();
+        expect(sources.artUrlFrom("msstore:BT5P2X999VH2", answer([images[0]]))).toBeNull();
+        // Only this server writes a Microsoft Store id; a computer cannot report one.
+        expect(sources.resolvable("msstore:BT5P2X999VH2")).toBe(true);
+        expect(sources.resolvable("msstore:bt5p2x999vh2")).toBe(false);
+        expect(core.gameReportSchema.parse({ game: { key: "a.exe", name: "A", startedAt: "2026-11-24T00:00:00.000Z", store: "msstore:BT5P2X999VH2" } }).game?.store).toBeUndefined();
     });
 
     it("never takes a picture from anywhere but the store's own image hosts", () => {

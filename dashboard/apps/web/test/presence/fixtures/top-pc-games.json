@@ -1,0 +1,3525 @@
+{
+ "recorded": "2026-11-24",
+ "games": [
+  {
+   "name": "Counter-Strike 2",
+   "expected": "steam:730",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 730,
+       "name": "Counter-Strike 2",
+       "type": "app"
+      },
+      {
+       "id": 2678630,
+       "name": "Counter-Strike 2 Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 666220,
+       "name": "CS2D",
+       "type": "app"
+      },
+      {
+       "id": 4831080,
+       "name": "Stickman Counter Zombie Strike 2: Multiplayer",
+       "type": "app"
+      },
+      {
+       "id": 647631,
+       "name": "Pure Farming 2018 - Gomselmash Palesse CS-200",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Dota 2",
+   "expected": "steam:570",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 570,
+       "name": "Dota 2",
+       "type": "app"
+      },
+      {
+       "id": 411180,
+       "name": "Dota 2 Player Profiles",
+       "type": "app"
+      },
+      {
+       "id": 652720,
+       "name": "The Dota 2 Remixes EP",
+       "type": "app"
+      },
+      {
+       "id": 1241930,
+       "name": "The Dota 2 Official Soundtrack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "PUBG: BATTLEGROUNDS",
+   "expected": "steam:578080",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 578080,
+       "name": "PUBG: BATTLEGROUNDS",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Apex Legends",
+   "expected": "steam:1172470",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1172470,
+       "name": "Apex Legends™",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Rust",
+   "expected": "steam:252490",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 252490,
+       "name": "Rust",
+       "type": "app"
+      },
+      {
+       "id": 3891560,
+       "name": "Rust - Warhammer 40,000 Pack",
+       "type": "app"
+      },
+      {
+       "id": 1353060,
+       "name": "Rust - Sunburn Pack",
+       "type": "app"
+      },
+      {
+       "id": 1670430,
+       "name": "Rust - Voice Props Pack",
+       "type": "app"
+      },
+      {
+       "id": 1701720,
+       "name": "Rust Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 1174370,
+       "name": "Rust - Instruments Pack",
+       "type": "app"
+      },
+      {
+       "id": 3664440,
+       "name": "Red Rust Pioneers",
+       "type": "app"
+      },
+      {
+       "id": 1358490,
+       "name": "Ash & Rust",
+       "type": "app"
+      },
+      {
+       "id": 4266520,
+       "name": "RustForge Sign Painter",
+       "type": "app"
+      },
+      {
+       "id": 2587360,
+       "name": "Neon Marble Rust",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Grand Theft Auto V",
+   "expected": "steam:271590",
+   "source": "wikidata",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 3240220,
+       "name": "Grand Theft Auto V Enhanced",
+       "type": "app"
+      },
+      {
+       "id": 1546990,
+       "name": "Grand Theft Auto: Vice City – The Definitive Edition",
+       "type": "app"
+      }
+     ]
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "9NKC1Z4Z92VN",
+         "Title": "Grand Theft Auto Online (Xbox Series X|S)",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NP019G7NZXT",
+         "Title": "Grand Theft Auto VI",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9PN8DW2WTFF8",
+         "Title": "Grand Theft Auto VI: Ultimate Edition",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9P8RQH67TTT1",
+         "Title": "Grand Theft Auto V (Xbox One & Xbox Series X|S)",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NXFX68ZNKK0",
+         "Title": "Grand Theft Auto V Enhanced (PC)",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NXMBTB02ZSF",
+         "Title": "Grand Theft Auto V (Xbox Series X|S)",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "BPJ686W6S0NH",
+         "Title": "Grand Theft Auto V (Xbox One)",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NQ0MVSLV0G7",
+         "Title": "Grand Theft Auto V and Great White Shark Card Bundle",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9P6ZXP2ZRQCV",
+         "Title": "Grand Theft Auto V Enhanced (PC) and Great White Shark Card Bundle",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9PN4LLBR8RCH",
+         "Title": "Grand Theft Auto VI: Ultimate Edition Upgrade",
+         "Type": "Durable"
+        }
+       ]
+      }
+     ]
+    },
+    "wikidata": {
+     "results": {
+      "bindings": [
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q17452"
+        },
+        "label": {
+         "value": "Grand Theft Auto V"
+        },
+        "steam": {
+         "value": "271590"
+        },
+        "ms": {
+         "value": "9nxmbtb02zsf"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q17452"
+        },
+        "label": {
+         "value": "Grand Theft Auto V"
+        },
+        "steam": {
+         "value": "271590"
+        },
+        "ms": {
+         "value": "bpj686w6s0nh"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q17452"
+        },
+        "label": {
+         "value": "Grand Theft Auto V"
+        },
+        "steam": {
+         "value": "271590"
+        },
+        "ms": {
+         "value": "c496clvxmjp8"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q94671"
+        },
+        "label": {
+         "value": "Grand Theft Auto: Vice City"
+        },
+        "steam": {
+         "value": "12110"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q23648408"
+        },
+        "label": {
+         "value": "Grand Theft Auto VI"
+        },
+        "ms": {
+         "value": "9nl3wwnzlzzn"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "Baldur's Gate 3",
+   "expected": "steam:1086940",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1086940,
+       "name": "Baldur's Gate 3",
+       "type": "app"
+      },
+      {
+       "id": 2378500,
+       "name": "Baldur's Gate 3 - Digital Deluxe Edition DLC",
+       "type": "app"
+      },
+      {
+       "id": 2956320,
+       "name": "Baldur's Gate 3 Toolkit Data",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Cyberpunk 2077",
+   "expected": "steam:1091500",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1091500,
+       "name": "Cyberpunk 2077",
+       "type": "app"
+      },
+      {
+       "id": 2138330,
+       "name": "Cyberpunk 2077: Phantom Liberty",
+       "type": "app"
+      },
+      {
+       "id": 2060310,
+       "name": "Cyberpunk 2077 REDmod",
+       "type": "app"
+      },
+      {
+       "id": 1495710,
+       "name": "Cyberpunk 2077 Bonus Content",
+       "type": "app"
+      },
+      {
+       "id": 3217460,
+       "name": "Immerse Gamepack Cyberpunk 2077 Demo",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "ELDEN RING",
+   "expected": "steam:1245620",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1245620,
+       "name": "ELDEN RING",
+       "type": "app"
+      },
+      {
+       "id": 2622380,
+       "name": "ELDEN RING NIGHTREIGN",
+       "type": "app"
+      },
+      {
+       "id": 2778580,
+       "name": "ELDEN RING Shadow of the Erdtree",
+       "type": "app"
+      },
+      {
+       "id": 3655690,
+       "name": "ELDEN RING Tarnished Pack",
+       "type": "app"
+      },
+      {
+       "id": 3531720,
+       "name": "ELDEN RING NIGHTREIGN The Forsaken Hollows",
+       "type": "app"
+      },
+      {
+       "id": 2778590,
+       "name": "ELDEN RING Shadow of the Erdtree Premium Bundle",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "HELLDIVERS™ 2",
+   "expected": "steam:553850",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 553850,
+       "name": "HELLDIVERS™ 2",
+       "type": "app"
+      },
+      {
+       "id": 2765950,
+       "name": "HELLDIVERS™ 2 - TR-117 Alpha Commander Armor Set",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Palworld",
+   "expected": "steam:1623730",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1623730,
+       "name": "Palworld",
+       "type": "app"
+      },
+      {
+       "id": 4031890,
+       "name": "Palworld: Palfarm",
+       "type": "app"
+      },
+      {
+       "id": 2771110,
+       "name": "Palworld - Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 3620480,
+       "name": "Pal♡world! ~More Than Just Pals~",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Lethal Company",
+   "expected": "steam:1966720",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1966720,
+       "name": "Lethal Company",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Among Us",
+   "expected": "steam:945360",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 945360,
+       "name": "Among Us",
+       "type": "app"
+      },
+      {
+       "id": 3884860,
+       "name": "The Wolf Among Us Remastered",
+       "type": "app"
+      },
+      {
+       "id": 3168600,
+       "name": "Among Us 3D",
+       "type": "app"
+      },
+      {
+       "id": 1849900,
+       "name": "Among Us 3D: VR",
+       "type": "app"
+      },
+      {
+       "id": 2160150,
+       "name": "AmongUs Challenger",
+       "type": "app"
+      },
+      {
+       "id": 1884870,
+       "name": "The Wolf Among Us 2",
+       "type": "app"
+      },
+      {
+       "id": 250320,
+       "name": "The Wolf Among Us",
+       "type": "app"
+      },
+      {
+       "id": 242700,
+       "name": "Injustice: Gods Among Us Ultimate Edition",
+       "type": "app"
+      },
+      {
+       "id": 2240160,
+       "name": "AmongUS Challenger - Prime",
+       "type": "app"
+      },
+      {
+       "id": 1114520,
+       "name": "Hero Among Us",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Rocket League®",
+   "expected": "msstore:C125W9BG2K0V",
+   "source": "msstore",
+   "answers": {
+    "steam": {
+     "items": []
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "C125W9BG2K0V",
+         "Title": "Rocket League®",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9P89VTXN7S3S",
+         "Title": "Rocket League® - Credits x1100",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "BQJPD3L5LR5G",
+         "Title": "Rocket League® - Xbox Customization Pack",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9MXDLQWFC5B9",
+         "Title": "Rocket League® - Credits x3000",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NRNMF9LPJX0",
+         "Title": "Rocket League® - Credits x500",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9PB8V3MP80S7",
+         "Title": "Rocket League® - Credits x6500",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9P3PDV3MWNHT",
+         "Title": "Rocket League® - Season 21 Rookie Pack",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9MWNZ8FKVBBX",
+         "Title": "Rocket League® - Season 22 Rocketeer Pack",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9P2BSZC8SRRJ",
+         "Title": "Rocket League® - Season 23 Veteran Pack",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9P3G18WJCJ0M",
+         "Title": "Rocket League® - Season 24 Rocketeer Pack",
+         "Type": "Durable"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Fall Guys",
+   "expected": "msstore:9PMXH5249DG5",
+   "source": "msstore",
+   "answers": {
+    "steam": {
+     "items": []
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "9PMXH5249DG5",
+         "Title": "Fall Guys",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9MTXT4LC1WXV",
+         "Title": "Fall Guys - 800 Show-Bucks",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9P6W5XVJLZHF",
+         "Title": "Fall Guys - 2400 Show-Bucks",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NRCPD1352WX",
+         "Title": "Fall Guys - Bean Machine Pack",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9MZJ18GJK0HC",
+         "Title": "Fall Guys - Magma Bean",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9PF02ZBF333P",
+         "Title": "Fall Guys - Desktop Destroyers Pack",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9MWK6RFQGV71",
+         "Title": "Fall Guys - Pail Pigeon Pack",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NQ9P0DQTS0N",
+         "Title": "Fall Guys - 4500 Show-Bucks",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9P94CLRZVD0T",
+         "Title": "Fall Guys - Steampunk Sprocket",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9P7SF7DQ02PF",
+         "Title": "Fall Guys - 12500 Show-Bucks",
+         "Type": "Consumable"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Fortnite",
+   "expected": "msstore:BT5P2X999VH2",
+   "source": "msstore",
+   "answers": {
+    "steam": {
+     "items": []
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "BT5P2X999VH2",
+         "Title": "Fortnite",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9P6LNN3KZ75R",
+         "Title": "Fortnite Battle Royale",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9PC5KKHSMCT5",
+         "Title": "Fortnite OG",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NSSDJRBX2HD",
+         "Title": "Fortnite Save the World",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9MZL842T57QN",
+         "Title": "Fortnite Festival",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9N16XHX3MB1R",
+         "Title": "Fortnite - 800 V-Bucks",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NKV4GWZZ2SS",
+         "Title": "Fortnite - 2,400 V-Bucks",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NLXT9WNM79M",
+         "Title": "Fortnite - 4,500 V-Bucks",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NT5L55WHW80",
+         "Title": "Fortnite - 12,500 V-Bucks",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NCJB85WM01G",
+         "Title": "Fortnite - Mainframe Break Pack",
+         "Type": "Durable"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "VALORANT",
+   "expected": "msstore:9N1NLJK9SKRN",
+   "source": "msstore",
+   "answers": {
+    "steam": {
+     "items": []
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "9N1NLJK9SKRN",
+         "Title": "VALORANT",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NKCCHCFTHV2",
+         "Title": "VALORANT PC",
+         "Type": "Game"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "League of Legends",
+   "expected": "msstore:9PB301R051CQ",
+   "source": "msstore",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1276800,
+       "name": "CONVERGENCE: A League of Legends Story™",
+       "type": "app"
+      },
+      {
+       "id": 1276790,
+       "name": "Ruined King: A League of Legends Story™",
+       "type": "app"
+      },
+      {
+       "id": 1457080,
+       "name": "The Mageseeker: A League of Legends Story™",
+       "type": "app"
+      },
+      {
+       "id": 1759380,
+       "name": "Bandle Tale: A League of Legends Story",
+       "type": "app"
+      },
+      {
+       "id": 1333200,
+       "name": "Song of Nunu: A League of Legends Story",
+       "type": "app"
+      },
+      {
+       "id": 1651960,
+       "name": "Hextech Mayhem: A League of Legends Story™",
+       "type": "app"
+      },
+      {
+       "id": 1815931,
+       "name": "Ruined King: A League of Legends Story™ - Ruined Skin Variants",
+       "type": "app"
+      },
+      {
+       "id": 2252144,
+       "name": "The Mageseeker: A League of Legends Story™ - Unchained Skins Pack",
+       "type": "app"
+      },
+      {
+       "id": 1815930,
+       "name": "Ruined King: A League of Legends Story™ - Manamune Sword for Yasuo",
+       "type": "app"
+      },
+      {
+       "id": 2634450,
+       "name": "Bandle Tale: A League of Legends Story - Bigger-On-The-Inside Pack",
+       "type": "app"
+      }
+     ]
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "9PB301R051CQ",
+         "Title": "League of Legends",
+         "Type": "Game"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Minecraft",
+   "expected": "msstore:9MVXMVT8ZKWC",
+   "source": "wikidata",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1912410,
+       "name": "Minecraft Dungeons II",
+       "type": "app"
+      },
+      {
+       "id": 1672970,
+       "name": "Minecraft Dungeons",
+       "type": "app"
+      },
+      {
+       "id": 5167410,
+       "name": "Minecraft Dungeons II Deluxe Upgrade",
+       "type": "app"
+      },
+      {
+       "id": 1928870,
+       "name": "Minecraft Legends",
+       "type": "app"
+      },
+      {
+       "id": 1672985,
+       "name": "Minecraft Dungeons Echoing Void",
+       "type": "app"
+      },
+      {
+       "id": 1672981,
+       "name": "Minecraft Dungeons Creeping Winter",
+       "type": "app"
+      },
+      {
+       "id": 3565190,
+       "name": "Sonic Racing: CrossWorlds - Minecraft Pack",
+       "type": "app"
+      },
+      {
+       "id": 1672980,
+       "name": "Minecraft Dungeons Jungle Awakens",
+       "type": "app"
+      },
+      {
+       "id": 1672986,
+       "name": "Minecraft Dungeons Hero DLC",
+       "type": "app"
+      },
+      {
+       "id": 1776550,
+       "name": "Minecraft Dungeons: Cloudy Climb Adventure Pass",
+       "type": "app"
+      }
+     ]
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "9NBDKVVG6909",
+         "Title": "Minecraft Legends Deluxe Edition",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NF0D13RPX5L",
+         "Title": "Minecraft Legends",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9MV69L4JSD31",
+         "Title": "Minecraft Legends Deluxe Edition",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NM395CH685J",
+         "Title": "Minecraft Legends for Windows + Launcher",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9N98Z825TNFW",
+         "Title": "Minecraft Legends - Windows",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NB6BVL3MTG4",
+         "Title": "Minecraft Dungeons for Windows + Launcher",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NZ12RV7B7R3",
+         "Title": "Minecraft Dungeons Ultimate Edition for Windows",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9N5KX36SQJ9Q",
+         "Title": "Minecraft Dungeons Ultimate DLC Bundle - Windows 10",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NXP44L49SHJ",
+         "Title": "Minecraft: Java & Bedrock Edition for PC",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9P8MK4NC0LJB",
+         "Title": "Minecraft Dungeons for Windows",
+         "Type": "Game"
+        }
+       ]
+      }
+     ]
+    },
+    "wikidata": {
+     "results": {
+      "bindings": [
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q6016926"
+        },
+        "label": {
+         "value": "Minecraft for Windows"
+        },
+        "ms": {
+         "value": "9nblggh2jhxj"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q6016926"
+        },
+        "label": {
+         "value": "Minecraft for Windows"
+        },
+        "ms": {
+         "value": "9nblggh537bl"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q63927755"
+        },
+        "label": {
+         "value": "Minecraft Earth"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q49740"
+        },
+        "label": {
+         "value": "Minecraft"
+        },
+        "ms": {
+         "value": "9nxp44l49shj"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q49740"
+        },
+        "label": {
+         "value": "Minecraft"
+        },
+        "ms": {
+         "value": "9mvxmvt8zkwc"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q6016926"
+        },
+        "label": {
+         "value": "Minecraft: Bedrock Edition"
+        },
+        "ms": {
+         "value": "9nblggh2jhxj"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q6016926"
+        },
+        "label": {
+         "value": "Minecraft: Bedrock Edition"
+        },
+        "ms": {
+         "value": "9nblggh537bl"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q56884780"
+        },
+        "label": {
+         "value": "Minecraft Dungeons"
+        },
+        "ms": {
+         "value": "9n8nj74fztg9"
+        },
+        "steam": {
+         "value": "1672970"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q56884780"
+        },
+        "label": {
+         "value": "Minecraft Dungeons"
+        },
+        "ms": {
+         "value": "9p8mk4nc0ljb"
+        },
+        "steam": {
+         "value": "1672970"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "Genshin Impact",
+   "expected": "msstore:9N7TFFRRZCC9",
+   "source": "msstore",
+   "answers": {
+    "steam": {
+     "items": []
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "9N7TFFRRZCC9",
+         "Title": "Genshin Impact",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NXJN7JXV445",
+         "Title": "Genshin Impact - Blessing of the Welkin Moon",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NKVFQGS91PT",
+         "Title": "Genshin Impact - 1,980 Genesis Crystals",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9PKT7K5LZBLG",
+         "Title": "Genshin Impact - 300 Genesis Crystals",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9N58GRSNJJJB",
+         "Title": "Genshin Impact - 6,480 Genesis Crystals",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9PP75K93DLPD",
+         "Title": "Genshin Impact - 60 Genesis Crystals",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9PH5M5R3GWRB",
+         "Title": "Genshin Impact - 980 Genesis Crystals",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9MZ5N6PNTKX1",
+         "Title": "Genshin Impact - 3,280 Genesis Crystals",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NPD7878MNJM",
+         "Title": "Genshin Impact: 300 Chronal Nexus",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9MVTPHGXBM1M",
+         "Title": "Genshin Impact: 60 Chronal Nexus",
+         "Type": "Consumable"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Roblox",
+   "expected": "msstore:9NBLGGGZM6WM",
+   "source": "wikidata",
+   "answers": {
+    "steam": {
+     "items": []
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "BQ1TN1T79V9K",
+         "Title": "Roblox - Xbox",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "C3S80L2NKZCZ",
+         "Title": "22,500 Robux for Xbox",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "BQ7R0F1X2Q4Z",
+         "Title": "10,000 Robux for Xbox",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "BXM8VVZFTM5Z",
+         "Title": "4,500 Robux for Xbox",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "C2CNGM1LX628",
+         "Title": "1,700 Robux for Xbox",
+         "Type": "Consumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9PMF91N3LZ3M",
+         "Title": "Roblox - Windows",
+         "Type": "Game"
+        }
+       ]
+      }
+     ]
+    },
+    "wikidata": {
+     "results": {
+      "bindings": [
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q692989"
+        },
+        "label": {
+         "value": "Roblox"
+        },
+        "ms": {
+         "value": "bq1tn1t79v9k"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q692989"
+        },
+        "label": {
+         "value": "Roblox"
+        },
+        "ms": {
+         "value": "9nblgggzm6wm"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "Overwatch® 2",
+   "expected": null,
+   "source": null,
+   "glyph": "Blizzard renamed it Overwatch; no store sells a game titled Overwatch 2 now. overwatch.exe is drawn from the curated Steam id.",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 5026420,
+       "name": "Overwatch® - Ultimate Battle Pass Bundle 2026: Season 5",
+       "type": "app"
+      },
+      {
+       "id": 5026430,
+       "name": "Overwatch® Starter Pack 2026: Season 5",
+       "type": "app"
+      }
+     ]
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "C1C4DZJPBC2V",
+         "Title": "Overwatch®",
+         "Type": "Game"
+        }
+       ]
+      }
+     ]
+    },
+    "wikidata": {
+     "results": {
+      "bindings": []
+     }
+    }
+   }
+  },
+  {
+   "name": "Call of Duty®",
+   "expected": "steam:1938090",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1938090,
+       "name": "Call of Duty®",
+       "type": "app"
+      },
+      {
+       "id": 4435490,
+       "name": "Call of Duty®: Modern Warfare® 4",
+       "type": "app"
+      },
+      {
+       "id": 311210,
+       "name": "Call of Duty®: Black Ops III",
+       "type": "app"
+      },
+      {
+       "id": 1962663,
+       "name": "Call of Duty®: Warzone™",
+       "type": "app"
+      },
+      {
+       "id": 202970,
+       "name": "Call of Duty®: Black Ops II",
+       "type": "app"
+      },
+      {
+       "id": 42700,
+       "name": "Call of Duty®: Black Ops",
+       "type": "app"
+      },
+      {
+       "id": 476600,
+       "name": "Call of Duty®: WWII",
+       "type": "app"
+      },
+      {
+       "id": 292730,
+       "name": "Call of Duty®: Infinite Warfare",
+       "type": "app"
+      },
+      {
+       "id": 1985810,
+       "name": "Call of Duty®: Black Ops Cold War",
+       "type": "app"
+      },
+      {
+       "id": 4384550,
+       "name": "Call of Duty®: Black Ops 6",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "EA SPORTS FC™ 25",
+   "expected": "steam:2669320",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 2669320,
+       "name": "EA SPORTS FC™ 25",
+       "type": "app"
+      },
+      {
+       "id": 3170610,
+       "name": "EA SPORTS FC™ 25 - FC Points",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "The Sims™ 4",
+   "expected": "steam:1222670",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1222670,
+       "name": "The Sims™ 4",
+       "type": "app"
+      },
+      {
+       "id": 1235733,
+       "name": "The Sims™ 4 Seasons",
+       "type": "app"
+      },
+      {
+       "id": 1235721,
+       "name": "The Sims™ 4 Cats & Dogs",
+       "type": "app"
+      },
+      {
+       "id": 1235734,
+       "name": "The Sims™ 4 Get To Work",
+       "type": "app"
+      },
+      {
+       "id": 1235731,
+       "name": "The Sims™ 4 City Living",
+       "type": "app"
+      },
+      {
+       "id": 2815310,
+       "name": "The Sims™ 4 Businesses & Hobbies Expansion Pack",
+       "type": "app"
+      },
+      {
+       "id": 3548690,
+       "name": "The Sims™ 4 Royalty & Legacy Expansion Pack",
+       "type": "app"
+      },
+      {
+       "id": 1235743,
+       "name": "The Sims™ 4 Vampires",
+       "type": "app"
+      },
+      {
+       "id": 3199780,
+       "name": "The Sims™ 4 Enchanted by Nature Expansion Pack",
+       "type": "app"
+      },
+      {
+       "id": 1458150,
+       "name": "The Sims™ 4 Cottage Living Expansion Pack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Tom Clancy's Rainbow Six® Siege",
+   "expected": "steam:359550",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 359550,
+       "name": "Tom Clancy's Rainbow Six Siege",
+       "type": "app"
+      },
+      {
+       "id": 1182510,
+       "name": "Tom Clancy's Rainbow Six® Siege - Y1 Operators",
+       "type": "app"
+      },
+      {
+       "id": 1173890,
+       "name": "Tom Clancy's Rainbow Six® Siege - Y3 + Y2 Operators",
+       "type": "app"
+      },
+      {
+       "id": 377560,
+       "name": "Tom Clancy's Rainbow Six® Siege - Ultra HD Texture Pack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Destiny 2",
+   "expected": "steam:1085660",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1085660,
+       "name": "Destiny 2",
+       "type": "app"
+      },
+      {
+       "id": 3186540,
+       "name": "Destiny 2: Renegades",
+       "type": "app"
+      },
+      {
+       "id": 3186490,
+       "name": "Destiny 2: The Edge of Fate",
+       "type": "app"
+      },
+      {
+       "id": 2336880,
+       "name": "Destiny 2: The Final Shape",
+       "type": "app"
+      },
+      {
+       "id": 1656330,
+       "name": "Destiny 2: The Witch Queen",
+       "type": "app"
+      },
+      {
+       "id": 1945340,
+       "name": "Destiny 2: Lightfall",
+       "type": "app"
+      },
+      {
+       "id": 1656370,
+       "name": "Destiny 2: Bungie 30th Anniversary Pack",
+       "type": "app"
+      },
+      {
+       "id": 1090150,
+       "name": "Destiny 2: Forsaken Pack",
+       "type": "app"
+      },
+      {
+       "id": 1314563,
+       "name": "Destiny 2: Beyond Light Pack",
+       "type": "app"
+      },
+      {
+       "id": 3952720,
+       "name": "Destiny 2: Triumphant Rewards Silver Bundle",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Warframe",
+   "expected": "steam:230410",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 230410,
+       "name": "Warframe",
+       "type": "app"
+      },
+      {
+       "id": 4447640,
+       "name": "Warframe: The Shadowgrapher Bundle",
+       "type": "app"
+      },
+      {
+       "id": 4735390,
+       "name": "Warframe: Constellations Complete Collection",
+       "type": "app"
+      },
+      {
+       "id": 4735410,
+       "name": "Warframe: Mesa Heirloom Collection",
+       "type": "app"
+      },
+      {
+       "id": 4157990,
+       "name": "Warframe: The Old Peace Complete Collection",
+       "type": "app"
+      },
+      {
+       "id": 4447650,
+       "name": "Warframe: Eat and Run Collection",
+       "type": "app"
+      },
+      {
+       "id": 2803600,
+       "name": "Warframe: Starter Weapon Pack",
+       "type": "app"
+      },
+      {
+       "id": 5127010,
+       "name": "Warframe: Glaxion Battlekit",
+       "type": "app"
+      },
+      {
+       "id": 5131900,
+       "name": "Warframe: Citrine Prime Access - Weapons Pack",
+       "type": "app"
+      },
+      {
+       "id": 4157970,
+       "name": "Warframe: The Old Peace Uriel Bundle",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Team Fortress 2",
+   "expected": "steam:440",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 440,
+       "name": "Team Fortress 2",
+       "type": "app"
+      },
+      {
+       "id": 3545060,
+       "name": "Team Fortress 2 Classified",
+       "type": "app"
+      },
+      {
+       "id": 2635440,
+       "name": "Team Fortress 2 Legacy",
+       "type": "app"
+      },
+      {
+       "id": 1055600,
+       "name": "Team Fortress 2: VR Mod",
+       "type": "app"
+      },
+      {
+       "id": 4212660,
+       "name": "Team Fortress 2: Rebalanced",
+       "type": "app"
+      },
+      {
+       "id": 3826520,
+       "name": "Team Fortress 2: Gold Rush",
+       "type": "app"
+      },
+      {
+       "id": 3037360,
+       "name": "Funko Fusion - Team Fortress 2 Pack",
+       "type": "app"
+      },
+      {
+       "id": 334330,
+       "name": "FaceRig Team Fortress 2 Avatars DLC",
+       "type": "app"
+      },
+      {
+       "id": 1531604,
+       "name": "Evil Genius 2: Team Fortress 2 - Pyro Pack",
+       "type": "app"
+      },
+      {
+       "id": 629330,
+       "name": "Fight Songs: The Music Of Team Fortress 2",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Path of Exile 2",
+   "expected": "steam:2694490",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 2694490,
+       "name": "Path of Exile 2",
+       "type": "app"
+      },
+      {
+       "id": 4619840,
+       "name": "Path of Exile 2 - Divinity Supporter Pack",
+       "type": "app"
+      },
+      {
+       "id": 4619890,
+       "name": "Path of Exile 2 - Eternal Bloodreaver Supporter Pack",
+       "type": "app"
+      },
+      {
+       "id": 4619860,
+       "name": "Path of Exile 2 - Arbiter of Divinity Supporter Pack",
+       "type": "app"
+      },
+      {
+       "id": 5518000,
+       "name": "Path of Exile 2 - Early Access Supporter Pack",
+       "type": "app"
+      },
+      {
+       "id": 4619870,
+       "name": "Path of Exile 2 - Bloodreaver Supporter Pack",
+       "type": "app"
+      },
+      {
+       "id": 5443610,
+       "name": "Path of Exile 2 - Archon of Ash Supporter Pack",
+       "type": "app"
+      },
+      {
+       "id": 4619880,
+       "name": "Path of Exile 2 - Elite Bloodreaver Supporter Pack",
+       "type": "app"
+      },
+      {
+       "id": 5443620,
+       "name": "Path of Exile 2 - Archon of Rebirth Supporter Pack",
+       "type": "app"
+      },
+      {
+       "id": 4619850,
+       "name": "Path of Exile 2 - Knight of Divinity Supporter Pack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Marvel Rivals",
+   "expected": "steam:2767030",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 2767030,
+       "name": "Marvel Rivals",
+       "type": "app"
+      },
+      {
+       "id": 4406010,
+       "name": "Marvel Rivals - High-Resolution Pack",
+       "type": "app"
+      },
+      {
+       "id": 5554080,
+       "name": "Marvel Rivals – Enabling In-Game Performance (Experimental)",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Dead by Daylight",
+   "expected": "steam:381210",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 381210,
+       "name": "Dead by Daylight",
+       "type": "app"
+      },
+      {
+       "id": 5510420,
+       "name": "Dead by Daylight: Terrifier",
+       "type": "app"
+      },
+      {
+       "id": 2656010,
+       "name": "Dead by Daylight - Chucky Chapter",
+       "type": "app"
+      },
+      {
+       "id": 4791830,
+       "name": "Dead by Daylight: Jason",
+       "type": "app"
+      },
+      {
+       "id": 1324970,
+       "name": "Dead By Daylight - Silent Hill Chapter",
+       "type": "app"
+      },
+      {
+       "id": 5060920,
+       "name": "Dead by Daylight: Chorus of Sin",
+       "type": "app"
+      },
+      {
+       "id": 1089270,
+       "name": "Dead by Daylight - Ghost Face®",
+       "type": "app"
+      },
+      {
+       "id": 1634040,
+       "name": "Dead by Daylight - Resident Evil Chapter",
+       "type": "app"
+      },
+      {
+       "id": 3103150,
+       "name": "Dead by Daylight - Castlevania Chapter",
+       "type": "app"
+      },
+      {
+       "id": 700280,
+       "name": "Dead by Daylight - Leatherface™",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Sea of Thieves",
+   "expected": "steam:1172620",
+   "source": "wikidata",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1172620,
+       "name": "Sea of Thieves: 2026 Edition",
+       "type": "app"
+      },
+      {
+       "id": 4373370,
+       "name": "Sea of Thieves: 2026 Premium Bundle",
+       "type": "app"
+      },
+      {
+       "id": 4373360,
+       "name": "Sea of Thieves: 2026 Deluxe Bundle",
+       "type": "app"
+      },
+      {
+       "id": 3937210,
+       "name": "Immerse Gamepack Sea of Thieves",
+       "type": "app"
+      },
+      {
+       "id": 2838630,
+       "name": "Sea of Thieves: Athena's Fortune Audiobook",
+       "type": "app"
+      },
+      {
+       "id": 4373290,
+       "name": "Sea of Thieves Original Soundtrack – 2026 Edition",
+       "type": "app"
+      },
+      {
+       "id": 2838640,
+       "name": "The Rough Guide to Sea of Thieves eBook",
+       "type": "app"
+      }
+     ]
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "9P2N57MC619K",
+         "Title": "Sea of Thieves: 2026 Edition",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9MWPCCN8BPGX",
+         "Title": "4250 Ancient Coins - Glittering Tribute of the Ancients",
+         "Type": "UnmanagedConsumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9N306KV44DM3",
+         "Title": "2550 Ancient Coins - Royal Treasury of the Ancients",
+         "Type": "UnmanagedConsumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9PCW2GCGQ75C",
+         "Title": "1000 Ancient Coins - Hidden Trove of the Ancients",
+         "Type": "UnmanagedConsumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NV7GXRHHGB8",
+         "Title": "550 Ancient Coins - Lost Chest of the Ancients",
+         "Type": "UnmanagedConsumable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9N1WWHGKBX3P",
+         "Title": "Sea of Thieves: 2026 Deluxe Edition",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NKD5GJTS6FH",
+         "Title": "Sea of Thieves: 2026 Premium Edition",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9MWNNM41MB6D",
+         "Title": "Sea of Thieves: X Edition",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NS8C5ZNSR7F",
+         "Title": "Sea of Thieves: A Pirate's Life Mega Bundle",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "C21HP72QSM7L",
+         "Title": "Sea of Thieves Insider",
+         "Type": "Game"
+        }
+       ]
+      }
+     ]
+    },
+    "wikidata": {
+     "results": {
+      "bindings": [
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q20113718"
+        },
+        "label": {
+         "value": "Sea of Thieves"
+        },
+        "steam": {
+         "value": "1172620"
+        },
+        "ms": {
+         "value": "9p2n57mc619k"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "Terraria",
+   "expected": "steam:105600",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 105600,
+       "name": "Terraria",
+       "type": "app"
+      },
+      {
+       "id": 409210,
+       "name": "Terraria: Official Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 1323320,
+       "name": "Terraria: Otherworld Official Soundtrack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Stardew Valley",
+   "expected": "steam:413150",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 413150,
+       "name": "Stardew Valley",
+       "type": "app"
+      },
+      {
+       "id": 440820,
+       "name": "Stardew Valley Soundtrack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Valheim",
+   "expected": "steam:892970",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 892970,
+       "name": "Valheim",
+       "type": "app"
+      },
+      {
+       "id": 1620250,
+       "name": "Valheim Soundtrack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Factorio",
+   "expected": "steam:427520",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 427520,
+       "name": "Factorio",
+       "type": "app"
+      },
+      {
+       "id": 645390,
+       "name": "Factorio: Space Age",
+       "type": "app"
+      },
+      {
+       "id": 436090,
+       "name": "Factorio - Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 452280,
+       "name": "Factorio Demo",
+       "type": "app"
+      },
+      {
+       "id": 3311770,
+       "name": "Factorio: Space Age - Soundtrack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Hollow Knight",
+   "expected": "steam:367520",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 367520,
+       "name": "Hollow Knight",
+       "type": "app"
+      },
+      {
+       "id": 1030300,
+       "name": "Hollow Knight: Silksong",
+       "type": "app"
+      },
+      {
+       "id": 598190,
+       "name": "Hollow Knight - Official Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 916000,
+       "name": "Hollow Knight - Gods & Nightmares",
+       "type": "app"
+      },
+      {
+       "id": 3928720,
+       "name": "Hollow Knight: Silksong - Official Soundtrack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Celeste",
+   "expected": "steam:504230",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 504230,
+       "name": "Celeste",
+       "type": "app"
+      },
+      {
+       "id": 1092840,
+       "name": "Celeste Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 411401,
+       "name": "Celeste - Sora Extra Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 3779560,
+       "name": "Celeste Blue Wizard Luna",
+       "type": "app"
+      },
+      {
+       "id": 4140930,
+       "name": "Trombone Champ: Celeste Song Pack",
+       "type": "app"
+      },
+      {
+       "id": 4218420,
+       "name": "Trombone Champ: Unflattened - Celeste Song Pack",
+       "type": "app"
+      },
+      {
+       "id": 4632820,
+       "name": "Rift of the NecroDancer: Celeste Music Pack",
+       "type": "app"
+      },
+      {
+       "id": 3429040,
+       "name": "Celeste & Luna: Hentai Puzzle 18+",
+       "type": "app"
+      },
+      {
+       "id": 1745210,
+       "name": "Timewell: Trail of Celestes",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "The Witcher 3: Wild Hunt",
+   "expected": "steam:292030",
+   "source": "wikidata",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 292030,
+       "name": "The Witcher 3: Wild Hunt — Remastered",
+       "type": "app"
+      },
+      {
+       "id": 5006530,
+       "name": "The Witcher 3: Wild Hunt — Songs of the Past",
+       "type": "app"
+      },
+      {
+       "id": 1229320,
+       "name": "The Witcher 3: Wild Hunt — Remastered Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 1233340,
+       "name": "The Witcher 3: Wild Hunt - Blood and Wine Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 1233280,
+       "name": "The Witcher 3: Wild Hunt - Hearts of Stone Soundtrack",
+       "type": "app"
+      }
+     ]
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "C261457LCNMJ",
+         "Title": "The Witcher 3: Wild Hunt — Remastered",
+         "Type": "Game"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "C1FJDP6X42GD",
+         "Title": "The Witcher 3: Wild Hunt – Blood and Wine",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "BRHTR6ZW2QT2",
+         "Title": "The Witcher 3: Wild Hunt – Hearts of Stone",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "C19TVRBR89QG",
+         "Title": "The Witcher 3: Wild Hunt - Game of The Year Edition Language Pack (PL)",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "BXSQDL9B0WRG",
+         "Title": "The Witcher 3: Wild Hunt - Game of The Year Edition Language Pack (FR)",
+         "Type": "Durable"
+        }
+       ]
+      },
+      {
+       "Products": [
+        {
+         "ProductId": "9NHTWNZCD043",
+         "Title": "The Witcher 3: Wild Hunt — Songs of the Past",
+         "Type": "Durable"
+        }
+       ]
+      }
+     ]
+    },
+    "wikidata": {
+     "results": {
+      "bindings": [
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "TW3"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "Wild Hunt"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "The Witcher 3"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "The Witcher III"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "The Witcher III: Wild Hunt"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "Witcher 3"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "TW3"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt_expansion_pass"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "Wild Hunt"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt_expansion_pass"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "The Witcher 3"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt_expansion_pass"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "The Witcher III"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt_expansion_pass"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "The Witcher III: Wild Hunt"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt_expansion_pass"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "Witcher 3"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt_expansion_pass"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "The Witcher 3: Wild Hunt"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q4267401"
+        },
+        "label": {
+         "value": "The Witcher 3: Wild Hunt"
+        },
+        "steam": {
+         "value": "292030"
+        },
+        "gog": {
+         "value": "game/the_witcher_3_wild_hunt_expansion_pass"
+        },
+        "ms": {
+         "value": "br765873cqjd"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "Red Dead Redemption 2",
+   "expected": "steam:1174180",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1174180,
+       "name": "Red Dead Redemption 2",
+       "type": "app"
+      },
+      {
+       "id": 4147110,
+       "name": "Deadrock Redemption 2",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Hogwarts Legacy",
+   "expected": "steam:990080",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 990080,
+       "name": "Hogwarts Legacy",
+       "type": "app"
+      },
+      {
+       "id": 1880832,
+       "name": "Hogwarts Legacy: Dark Arts Pack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Monster Hunter Wilds",
+   "expected": "steam:2246340",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 2246340,
+       "name": "Monster Hunter Wilds",
+       "type": "app"
+      },
+      {
+       "id": 4829700,
+       "name": "Monster Hunter Wilds: Ascendance",
+       "type": "app"
+      },
+      {
+       "id": 3289860,
+       "name": "Monster Hunter Wilds - Hairstyle: Gemma",
+       "type": "app"
+      },
+      {
+       "id": 3289830,
+       "name": "Monster Hunter Wilds - Gesture Set Vol. 4",
+       "type": "app"
+      },
+      {
+       "id": 3289910,
+       "name": "Monster Hunter Wilds - Seikret Decoration: Phoenix Caparison",
+       "type": "app"
+      },
+      {
+       "id": 3360540,
+       "name": "Monster Hunter Wilds - Gemma Outfit: Summer Coveralls",
+       "type": "app"
+      },
+      {
+       "id": 3697020,
+       "name": "Monster Hunter Wilds - Seikret Decoration: Whitewing Caparison",
+       "type": "app"
+      },
+      {
+       "id": 3696610,
+       "name": "Monster Hunter Wilds - Hunter Layered Armor Set: Cosmoloid",
+       "type": "app"
+      },
+      {
+       "id": 3696350,
+       "name": "Monster Hunter Wilds - BGM Set Vol. 2",
+       "type": "app"
+      },
+      {
+       "id": 3289700,
+       "name": "Monster Hunter Wilds - Gesture Set Vol. 3",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Black Myth: Wukong",
+   "expected": "steam:2358720",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 2358720,
+       "name": "Black Myth: Wukong",
+       "type": "app"
+      },
+      {
+       "id": 3132990,
+       "name": "Black Myth: Wukong Benchmark Tool",
+       "type": "app"
+      },
+      {
+       "id": 3288260,
+       "name": "Black Myth: Wukong Soundtrack Selection",
+       "type": "app"
+      },
+      {
+       "id": 2672610,
+       "name": "Black Myth: Wukong Deluxe Edition Upgrade",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "War Thunder",
+   "expected": "steam:236390",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 236390,
+       "name": "War Thunder",
+       "type": "app"
+      },
+      {
+       "id": 4184660,
+       "name": "War Thunder - Su-30MKK Pack",
+       "type": "app"
+      },
+      {
+       "id": 4434690,
+       "name": "War Thunder - ZTZ96B Pack",
+       "type": "app"
+      },
+      {
+       "id": 1947130,
+       "name": "War Thunder - A-10A Thunderbolt (Early) Pack",
+       "type": "app"
+      },
+      {
+       "id": 4184650,
+       "name": "War Thunder - BMPT-72 “Terminator-2” Pack",
+       "type": "app"
+      },
+      {
+       "id": 3386550,
+       "name": "War Thunder - Two Fronts Pack",
+       "type": "app"
+      },
+      {
+       "id": 4078910,
+       "name": "War Thunder - Senrai Maidens: Maria Pack",
+       "type": "app"
+      },
+      {
+       "id": 3752060,
+       "name": "War Thunder - In May 45 Pack",
+       "type": "app"
+      },
+      {
+       "id": 3752040,
+       "name": "War Thunder - Hell on Wheels Pack",
+       "type": "app"
+      },
+      {
+       "id": 4078870,
+       "name": "War Thunder - Su-30MK2 AMV Pack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "World of Tanks",
+   "expected": "steam:1407200",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1407200,
+       "name": "World of Tanks",
+       "type": "app"
+      },
+      {
+       "id": 444200,
+       "name": "World of Tanks Blitz",
+       "type": "app"
+      },
+      {
+       "id": 2100280,
+       "name": "World of Tanks: HEAT",
+       "type": "app"
+      },
+      {
+       "id": 1638640,
+       "name": "World of Tanks — Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 1737352,
+       "name": "World of Tanks — Premium Month Pack",
+       "type": "app"
+      },
+      {
+       "id": 4129890,
+       "name": "World of Tanks — 90 Days of Premium Pack",
+       "type": "app"
+      },
+      {
+       "id": 4873680,
+       "name": "World of Tanks: HEAT - Launch Soundtrack ",
+       "type": "app"
+      },
+      {
+       "id": 2994410,
+       "name": "World of Tanks Blitz - Resupply Pack",
+       "type": "app"
+      },
+      {
+       "id": 2446220,
+       "name": "World of Tanks Blitz - Welcome Bundle",
+       "type": "app"
+      },
+      {
+       "id": 2994390,
+       "name": "World of Tanks Blitz - Keiler Pack",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "World of Warcraft",
+   "expected": null,
+   "source": null,
+   "glyph": "Sold only through Battle.net, which publishes no catalog; Wikidata's item carries no store id.",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 5038780,
+       "name": "Fantasy Grounds - Dungeons & Dragons World of Warcraft",
+       "type": "app"
+      }
+     ]
+    },
+    "msstore": {
+     "Results": []
+    },
+    "wikidata": {
+     "results": {
+      "bindings": [
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q65056983"
+        },
+        "label": {
+         "value": "World of Warcraft Classic"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q131007"
+        },
+        "label": {
+         "value": "Vanilla WoW"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q131007"
+        },
+        "label": {
+         "value": "World of Warcraft Vanilla"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q131007"
+        },
+        "label": {
+         "value": "WoW Vanilla"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q131007"
+        },
+        "label": {
+         "value": "WoW 2004-2020"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q65056983"
+        },
+        "label": {
+         "value": "WoW Vanilla"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q65056983"
+        },
+        "label": {
+         "value": "WoW Classic"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "Hearthstone",
+   "expected": null,
+   "source": null,
+   "glyph": "Sold only through Battle.net, which publishes no catalog; Wikidata's item carries no store id.",
+   "answers": {
+    "steam": {
+     "items": []
+    },
+    "msstore": {
+     "Results": []
+    },
+    "wikidata": {
+     "results": {
+      "bindings": [
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q8262784"
+        },
+        "label": {
+         "value": "Hearthstone: Heroes of Warcraft"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q8262784"
+        },
+        "label": {
+         "value": "Hearthstone®"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q8262784"
+        },
+        "label": {
+         "value": "Heroes of Warcraft"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q8262784"
+        },
+        "label": {
+         "value": "Hearthstone"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q140419863"
+        },
+        "label": {
+         "value": "Hearthstone: Murder at Castle Nathria"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "Diablo IV",
+   "expected": "steam:2344520",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 2344520,
+       "name": "Diablo® IV",
+       "type": "app"
+      },
+      {
+       "id": 3958690,
+       "name": "Diablo® IV: Lord of Hatred™",
+       "type": "app"
+      },
+      {
+       "id": 2626040,
+       "name": "Diablo® IV - Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 3043530,
+       "name": "Diablo® IV: Vessel of Hatred™",
+       "type": "app"
+      },
+      {
+       "id": 4023020,
+       "name": "Funko Fusion - Fantastik Plastik Pack 4 - T-Bone and El Diablo",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Honkai: Star Rail",
+   "expected": null,
+   "source": null,
+   "glyph": "Sold through HoYoPlay and Epic only; Wikidata's item carries no Steam, GOG or Microsoft Store id.",
+   "answers": {
+    "steam": {
+     "items": []
+    },
+    "msstore": {
+     "Results": []
+    },
+    "wikidata": {
+     "results": {
+      "bindings": [
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q108896777"
+        },
+        "label": {
+         "value": "Honkai: Star Rail"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q108896777"
+        },
+        "label": {
+         "value": "Honkai Star Rail"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q108896777"
+        },
+        "label": {
+         "value": "Honkai: SR"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q108896777"
+        },
+        "label": {
+         "value": "HSR"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q108896777"
+        },
+        "label": {
+         "value": "Star Rail"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "Zenless Zone Zero",
+   "expected": "steam:4162040",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 4162040,
+       "name": "Zenless Zone Zero",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Escape from Tarkov",
+   "expected": "steam:3932890",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 3932890,
+       "name": "Escape from Tarkov",
+       "type": "app"
+      },
+      {
+       "id": 4090980,
+       "name": "Escape from Tarkov - The Unheard Steam Edition Expansion Pack",
+       "type": "app"
+      },
+      {
+       "id": 4091290,
+       "name": "Escape from Tarkov: PVE Zone",
+       "type": "app"
+      },
+      {
+       "id": 4898900,
+       "name": "Escape from Tarkov: TarCoin Special Offer",
+       "type": "app"
+      },
+      {
+       "id": 4090950,
+       "name": "Escape from Tarkov - Left Behind Expansion Pack",
+       "type": "app"
+      },
+      {
+       "id": 4090970,
+       "name": "Escape from Tarkov - Prepare for Escape Expansion Pack",
+       "type": "app"
+      },
+      {
+       "id": 4490930,
+       "name": "Escape from Tarkov: TarCoin Ingame Currency",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "osu!",
+   "expected": null,
+   "source": null,
+   "glyph": "Distributed from its own site; Wikidata's item carries no store id.",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 608180,
+       "name": "McOsu - Donation - 5",
+       "type": "app"
+      },
+      {
+       "id": 608160,
+       "name": "McOsu - Donation - 1",
+       "type": "app"
+      },
+      {
+       "id": 607260,
+       "name": "McOsu",
+       "type": "app"
+      },
+      {
+       "id": 608170,
+       "name": "McOsu - Donation - 3",
+       "type": "app"
+      }
+     ]
+    },
+    "msstore": {
+     "Results": [
+      {
+       "Products": [
+        {
+         "ProductId": "9WZDNCRFHXVJ",
+         "Title": "osu! WP",
+         "Type": "Game"
+        }
+       ]
+      }
+     ]
+    },
+    "wikidata": {
+     "results": {
+      "bindings": [
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q307441"
+        },
+        "label": {
+         "value": "osu"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q307441"
+        },
+        "label": {
+         "value": "osu lazer"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q307441"
+        },
+        "label": {
+         "value": "osu!lazer"
+        }
+       },
+       {
+        "item": {
+         "value": "http://www.wikidata.org/entity/Q307441"
+        },
+        "label": {
+         "value": "osu!"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "Battlefield™ 2042",
+   "expected": "steam:1517290",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 1517290,
+       "name": "Battlefield™ 2042",
+       "type": "app"
+      },
+      {
+       "id": 3269070,
+       "name": "Battlefield™ 2042 - BFC",
+       "type": "app"
+      },
+      {
+       "id": 2363740,
+       "name": "Battlefield™ 2042 Elite Upgrade",
+       "type": "app"
+      },
+      {
+       "id": 1932460,
+       "name": "Battlefield 2042 (Official Soundtrack)",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "THE FINALS",
+   "expected": "steam:2073850",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 2073850,
+       "name": "THE FINALS",
+       "type": "app"
+      },
+      {
+       "id": 4062430,
+       "name": "THE FINALS - The Apothecarion Set",
+       "type": "app"
+      },
+      {
+       "id": 909710,
+       "name": "Pythagoria: The Finals",
+       "type": "app"
+      },
+      {
+       "id": 3668920,
+       "name": "THE FINALS - Eyecaster Pack",
+       "type": "app"
+      },
+      {
+       "id": 3519910,
+       "name": "THE FINALS - Wavereaver Set",
+       "type": "app"
+      },
+      {
+       "id": 3411130,
+       "name": "THE FINALS - IVADA Cataclysm Set",
+       "type": "app"
+      },
+      {
+       "id": 4124770,
+       "name": "THE FINALS - New Contestant Pack",
+       "type": "app"
+      },
+      {
+       "id": 3211950,
+       "name": "THE FINALS - Örf Tactical Pack",
+       "type": "app"
+      },
+      {
+       "id": 2897810,
+       "name": "THE FINALS - Bank Rabbit Set",
+       "type": "app"
+      },
+      {
+       "id": 3080260,
+       "name": "THE FINALS - Metro Drifter Set",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Satisfactory",
+   "expected": "steam:526870",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 526870,
+       "name": "Satisfactory",
+       "type": "app"
+      },
+      {
+       "id": 5276140,
+       "name": "Satisfactory - Core Values Expansion",
+       "type": "app"
+      },
+      {
+       "id": 2873550,
+       "name": "Satisfactory Soundtrack",
+       "type": "app"
+      },
+      {
+       "id": 3187030,
+       "name": "Satisfactory Modeler",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Euro Truck Simulator 2",
+   "expected": "steam:227300",
+   "source": "steam",
+   "answers": {
+    "steam": {
+     "items": [
+      {
+       "id": 227300,
+       "name": "Euro Truck Simulator 2",
+       "type": "app"
+      },
+      {
+       "id": 3809270,
+       "name": "Euro Truck Simulator 2 - Coaches",
+       "type": "app"
+      },
+      {
+       "id": 3796990,
+       "name": "Euro Truck Simulator 2 - Iceland",
+       "type": "app"
+      },
+      {
+       "id": 4400930,
+       "name": "Euro Truck Simulator 2 - Soul of Anatolia",
+       "type": "app"
+      },
+      {
+       "id": 3851260,
+       "name": "Euro Truck Simulator 2 - Isle of Ireland",
+       "type": "app"
+      },
+      {
+       "id": 2780810,
+       "name": "Euro Truck Simulator 2 - Nordic Horizons",
+       "type": "app"
+      },
+      {
+       "id": 2604420,
+       "name": "Euro Truck Simulator 2 - Greece",
+       "type": "app"
+      },
+      {
+       "id": 304212,
+       "name": "Euro Truck Simulator 2 - Scandinavia",
+       "type": "app"
+      },
+      {
+       "id": 1209460,
+       "name": "Euro Truck Simulator 2 - Iberia",
+       "type": "app"
+      },
+      {
+       "id": 2004210,
+       "name": "Euro Truck Simulator 2 - West Balkans",
+       "type": "app"
+      }
+     ]
+    }
+   }
+  }
+ ]
+}
