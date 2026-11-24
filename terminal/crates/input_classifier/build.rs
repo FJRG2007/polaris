@@ -41,13 +41,23 @@ fn main() {
     }
     let partial = target.with_extension("onnx.part");
     let status = Command::new("curl")
-        .args(["--fail", "--location", "--silent", "--show-error", "--retry", "3", "--output"])
+        .args([
+            "--fail",
+            "--location",
+            "--silent",
+            "--show-error",
+            "--retry",
+            "3",
+            "--output",
+        ])
         .arg(&partial)
         .arg(MODEL_URL)
         .status();
     match status {
         Ok(status) if status.success() => {}
-        Ok(status) => panic!("downloading {MODEL_URL} failed ({status}); set POLARIS_TERMINAL_ASSETS_DIR to a directory holding {MODEL_FILE} to build offline"),
+        Ok(status) => panic!(
+            "downloading {MODEL_URL} failed ({status}); set POLARIS_TERMINAL_ASSETS_DIR to a directory holding {MODEL_FILE} to build offline"
+        ),
         Err(err) => panic!("could not run curl to download {MODEL_URL}: {err}"),
     }
     if !matches(&partial) {
