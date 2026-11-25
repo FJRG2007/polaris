@@ -259,10 +259,12 @@ export class HostdClient {
             | "updates-off"
             | "reboot-schedule"
             | "reboot-cancel"
+            | "packages-fix"
     ): Promise<{ exitCode: number; output: string } | "busy" | "timeout" | null> {
         const response = await this.call("POST", "/v1/host/security", JSON.stringify({ action }));
         if (response.status === 404) return null;
-        if (response.status === 400 && action.startsWith("reboot-")) return null;
+        if (response.status === 400 && (action.startsWith("reboot-") || action === "packages-fix"))
+            return null;
         if (response.status === 409) return "busy";
         if (response.status === 504) return "timeout";
         if (response.status !== 200) {
@@ -420,6 +422,25 @@ export class HostdClient {
         }
         const parsed = JSON.parse(response.body) as { size?: unknown };
         return { size: typeof parsed.size === "number" ? parsed.size : 0 };
+    }
+
+    /**
+     * Copy the host's package database into an export volume. Null from a
+     * daemon that predates it, which refuses the action as a bad request.
+     */
+    public async hostPackagesExport(volume: string): Promise<"copied" | "busy" | "timeout" | null> {
+        const response = await this.call(
+            "POST",
+            "/v1/host/security/image",
+            JSON.stringify({ action: "packages", volume })
+        );
+        if (response.status === 404 || response.status === 400) return null;
+        if (response.status === 409) return "busy";
+        if (response.status === 504) return "timeout";
+        if (response.status !== 200) {
+            throw new Error(`hostd package copy failed (${response.status}): ${response.body}`);
+        }
+        return "copied";
     }
 
     /** The export volumes on this host. Null from a daemon that predates it. */

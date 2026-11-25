@@ -90,6 +90,7 @@ describe("subjectKind", () => {
             "image"
         );
         expect(subjects.subjectKind({ kind: "deps", input: { applicationId: "a" } })).toBe("deps");
+        expect(subjects.subjectKind({ kind: "packages", input: {} })).toBe("host");
     });
 });
 

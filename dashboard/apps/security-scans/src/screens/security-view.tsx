@@ -66,7 +66,7 @@ const TABS: readonly { id: Tab; icon: typeof Bug }[] = [
 const KINDS_OF: Record<Tab, readonly string[]> = {
     malware: ["malware"],
     files: ["files"],
-    host: ["audit"],
+    host: ["audit", "packages"],
     images: ["image", "deps"]
 };
 const SEVERITY_TONE: Record<string, string> = {
@@ -647,13 +647,21 @@ function HostPanel({
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
                     <p className="text-sm text-muted-foreground">{t("host.hint")}</p>
-                    <div>
+                    <div className="flex flex-wrap gap-2">
                         <Button
                             onClick={() =>
                                 void submit(() => actions.auditAction({ targetId }), t("queued"))
                             }
                         >
                             {t("host.run")}
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() =>
+                                void submit(() => actions.packagesAction({ targetId }), t("queued"))
+                            }
+                        >
+                            {t("packages.run")}
                         </Button>
                     </div>
                 </div>
@@ -788,6 +796,10 @@ function summaryLine(t: SecurityTranslator, scan: Scan): string {
         return `${t("host.score")}: ${String(s.score)} / 100, ${t("host.warnings", { count: Number(s.warnings ?? 0) })}`;
     }
     const counts = verdictLine(t, subjects.verdictOf(scan.summary));
+    if (scan.kind === "packages") {
+        const fix = typeof s.fix === "string" ? s.fix : null;
+        return fix ? `${counts} ${t(`packages.fix.${fix}` as never)}` : counts;
+    }
     const files = (scan.summary as { files?: unknown }).files;
     if (scan.kind === "deps" && Array.isArray(files) && files.length > 0) {
         return `${counts} ${t("deps.files", {
@@ -837,6 +849,8 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                                 >
                                     {scan.kind === "audit"
                                         ? t("thisServer")
+                                        : scan.kind === "packages"
+                                          ? t("packages.label")
                                         : scan.kind === "deps"
                                           ? t("deps.label", { app: scan.label })
                                           : scan.label}
@@ -856,6 +870,24 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                                         {t("images.download")}
                                     </a>
                                 ) : null}
+                                {scan.kind === "packages" &&
+                                scan.state === "done" &&
+                                Number((scan.summary as { serious?: number }).serious ?? 0) > 0 &&
+                                (scan.summary as { fix?: string | null }).fix !== "done" ? (
+                                    <Button
+                                        size="xs"
+                                        variant="outline"
+                                        title={t("packages.applyHint")}
+                                        onClick={() =>
+                                            void submit(
+                                                () => actions.fixPackagesAction({ scanId: scan.id }),
+                                                t("packages.applied")
+                                            )
+                                        }
+                                    >
+                                        {t("packages.apply")}
+                                    </Button>
+                                ) : null}
                                 {scan.state === "done" ? (
                                     <Button
                                         size="xs"
@@ -867,7 +899,10 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                                 ) : null}
                             </div>
                             <p className="text-muted-foreground">{summaryLine(t, scan)}</p>
-                            {open === scan.id && (scan.kind === "image" || scan.kind === "deps") ? (
+                            {open === scan.id &&
+                            (scan.kind === "image" ||
+                                scan.kind === "deps" ||
+                                scan.kind === "packages") ? (
                                 <div className="mt-2">
                                     <FindingsTable
                                         t={t}

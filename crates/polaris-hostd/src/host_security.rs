@@ -41,6 +41,8 @@ pub const REBOOT_SCHEDULE_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo 
 
 pub const REBOOT_CANCEL_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; shutdown -c 'Polaris: the restart was cancelled' >/dev/null 2>&1; echo POLARIS_REBOOT=cancelled"#;
 
+pub const PACKAGES_FIX_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; nice -n 10 apt-get update -qq >/dev/null 2>&1; if ! command -v unattended-upgrade >/dev/null 2>&1; then echo POLARIS_FIX=unavailable; elif nice -n 10 unattended-upgrade >/dev/null 2>&1; then echo POLARIS_FIX=done; else echo POLARIS_FIX=failed; fi; [ -f /var/run/reboot-required ] && echo POLARIS_REBOOT=required; elif command -v dnf >/dev/null 2>&1; then if nice -n 10 dnf upgrade --security -y -q >/dev/null 2>&1; then echo POLARIS_FIX=done; else echo POLARIS_FIX=failed; fi; command -v needs-restarting >/dev/null 2>&1 && { needs-restarting -r >/dev/null 2>&1 || echo POLARIS_REBOOT=required; }; else echo POLARIS_FIX=unsupported; fi; true"#;
+
 #[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum HostAction {
@@ -50,6 +52,7 @@ pub enum HostAction {
     UpdatesOff,
     RebootSchedule,
     RebootCancel,
+    PackagesFix,
 }
 
 #[derive(Deserialize, Debug)]
@@ -87,6 +90,7 @@ pub fn argv(action: HostAction) -> Vec<String> {
                 HostAction::UpdatesOn => UPDATES_ON_SCRIPT,
                 HostAction::RebootSchedule => REBOOT_SCHEDULE_SCRIPT,
                 HostAction::RebootCancel => REBOOT_CANCEL_SCRIPT,
+                HostAction::PackagesFix => PACKAGES_FIX_SCRIPT,
                 _ => UPDATES_OFF_SCRIPT,
             };
             args.extend([
@@ -218,6 +222,9 @@ pub const EXPORT_HEADROOM: u64 = 1024 * 1024 * 1024;
 #[serde(rename_all = "kebab-case")]
 pub enum ExportAction {
     Export,
+    /// Copy the host's package database into the volume, for a scan of the
+    /// host's own packages.
+    Packages,
     Remove,
     List,
 }
@@ -325,8 +332,64 @@ pub fn export_image(image: &str, volume: &str) -> Result<u64, ExportError> {
         Some(_) if ok => return Err(ExportError::NoRoom),
         _ => return Err(ExportError::Failed),
     }
+    let save: Vec<String> = ["save", image].iter().map(|s| s.to_string()).collect();
+    pipe_into_volume(&save, volume, WRITE_TAIL, deadline).map(|()| size)
+}
+
+/// Where a package manager keeps what is installed, relative to the host's
+/// root, and the release file that names the distribution. Whatever exists is
+/// copied; the scanner reads them as a directory, as it would an image's.
+pub const PACKAGES_SCRIPT: &str = r#"cd /host || exit 21; set --; for p in etc/os-release usr/lib/os-release var/lib/dpkg/status var/lib/rpm usr/lib/sysimage/rpm lib/apk/db/installed; do [ -e "$p" ] && set -- "$@" "$p"; done; [ "$#" -gt 0 ] || exit 22; exec tar -cf - "$@""#;
+
+/// Reads the host's root read-only, with no network, and prints a tar.
+pub fn packages_argv() -> Vec<String> {
+    [
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "--cpu-shares",
+        "64",
+        "--memory",
+        "256m",
+        "-v",
+        "/:/host:ro",
+        TOOLS_IMAGE,
+        "/bin/sh",
+        "-c",
+        PACKAGES_SCRIPT,
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect()
+}
+
+pub const UNPACK_TAIL: &[&str] = &[
+    "/bin/sh",
+    "-c",
+    "mkdir -p /in/root && tar -C /in/root -xf -",
+];
+
+/// Copy the host's package database into `volume` under `/in/root`. A few MB;
+/// shares the host action lock like an image export.
+pub fn export_packages(volume: &str) -> Result<(), ExportError> {
+    let Ok(_guard) = RUNNING.try_lock() else {
+        return Err(ExportError::Busy);
+    };
+    let deadline = Instant::now() + ACTION_DEADLINE;
+    pipe_into_volume(&packages_argv(), volume, UNPACK_TAIL, deadline)
+}
+
+/// Run `docker <source>` and stream what it prints into a throwaway container
+/// that has only `volume` mounted and runs `tail`.
+fn pipe_into_volume(
+    source: &[String],
+    volume: &str,
+    tail: &[&str],
+    deadline: Instant,
+) -> Result<(), ExportError> {
     let mut save = Command::new("docker")
-        .args(["save", image])
+        .args(source)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -334,7 +397,7 @@ pub fn export_image(image: &str, volume: &str) -> Result<u64, ExportError> {
         .map_err(|_| ExportError::Failed)?;
     let stdout = save.stdout.take().ok_or(ExportError::Failed)?;
     let mut write = match Command::new("docker")
-        .args(volume_run_argv(volume, true, WRITE_TAIL))
+        .args(volume_run_argv(volume, true, tail))
         .stdin(Stdio::from(stdout))
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -348,7 +411,7 @@ pub fn export_image(image: &str, volume: &str) -> Result<u64, ExportError> {
         }
     };
     match wait_all(&mut [&mut save, &mut write], deadline) {
-        Ok(Some(statuses)) if statuses.iter().all(ExitStatus::success) => Ok(size),
+        Ok(Some(statuses)) if statuses.iter().all(ExitStatus::success) => Ok(()),
         Ok(None) => Err(ExportError::TimedOut),
         _ => Err(ExportError::Failed),
     }
@@ -466,6 +529,20 @@ mod tests {
     }
 
     #[test]
+    fn package_listing_reads_the_host_read_only_with_no_network() {
+        let args = packages_argv();
+        assert!(args.contains(&"/:/host:ro".to_string()));
+        assert!(args.contains(&"none".to_string()));
+        assert!(!args.contains(&"--privileged".to_string()));
+        assert_eq!(args.last().map(String::as_str), Some(PACKAGES_SCRIPT));
+        let ok: ImageExportRequest = serde_json::from_str(
+            r#"{"action":"packages","volume":"polaris-secscan-image-0123abcd"}"#,
+        )
+        .unwrap();
+        assert_eq!(ok.action, ExportAction::Packages);
+    }
+
+    #[test]
     fn export_requests_are_closed() {
         let ok: ImageExportRequest = serde_json::from_str(
             r#"{"action":"export","volume":"polaris-secscan-image-0123abcd","image":"x:1"}"#,
@@ -504,6 +581,7 @@ mod tests {
             (HostAction::UpdatesOff, UPDATES_OFF_SCRIPT),
             (HostAction::RebootSchedule, REBOOT_SCHEDULE_SCRIPT),
             (HostAction::RebootCancel, REBOOT_CANCEL_SCRIPT),
+            (HostAction::PackagesFix, PACKAGES_FIX_SCRIPT),
         ] {
             let args = argv(action);
             assert!(args.contains(&"--privileged".to_string()));
@@ -522,6 +600,8 @@ mod tests {
             UPDATES_OFF_SCRIPT,
             REBOOT_SCHEDULE_SCRIPT,
             REBOOT_CANCEL_SCRIPT,
+            PACKAGES_FIX_SCRIPT,
+            PACKAGES_SCRIPT,
         ] {
             assert!(!script.bytes().any(|b| b < 0x20 || b == 0x7f));
         }

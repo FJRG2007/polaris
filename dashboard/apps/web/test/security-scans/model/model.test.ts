@@ -414,11 +414,49 @@ describe("one-off specs", () => {
             new URL("../../../../../../crates/polaris-hostd/src/host_security.rs", import.meta.url),
             "utf8"
         );
-        for (const script of [specs.AUDIT_SCRIPT, ...Object.values(specs.UPDATES_SCRIPTS)]) {
+        for (const script of [
+            specs.AUDIT_SCRIPT,
+            specs.PACKAGES_SCRIPT,
+            ...Object.values(specs.UPDATES_SCRIPTS)
+        ]) {
             expect(rust).toContain(`r#"${script}"#`);
         }
         expect(rust).toContain(`"${specs.TOOLS_IMAGE}"`);
         expect(rust).toContain(`"${specs.HOST_CONTAINER}"`);
+    });
+});
+
+describe("host packages", () => {
+    const VOLUME = "polaris-secscan-image-0123abcd";
+
+    it("copies the package database read-only, with no network, into the volume", () => {
+        const argv = specs.packagesArgv(VOLUME);
+        expect(argv.list).toContain("/:/host:ro");
+        expect(argv.list).not.toContain("--privileged");
+        const network = argv.list.indexOf("--network");
+        expect(argv.list[network + 1]).toBe("none");
+        expect(argv.list.at(-1)).toBe(specs.PACKAGES_SCRIPT);
+        expect(argv.write).toContain(`${VOLUME}:/in`);
+        expect(argv.write).not.toContain("/:/host:ro");
+        expect(() => specs.packagesArgv("other")).toThrow();
+    });
+
+    it("reads the copied root as a directory with the image scanner", () => {
+        const spec = specs.hostVulnSpec(VOLUME);
+        const service = spec.services[0]!;
+        expect(service.image).toBe(specs.VULN_IMAGE);
+        expect(service.command?.[0]).toBe("dir:/in/root");
+        expect(() => specs.hostVulnSpec("x")).toThrow();
+    });
+
+    it("applies security updates with the tool the automatic ones use", () => {
+        const fix = specs.UPDATES_SCRIPTS["packages-fix"];
+        expect(fix).toContain("unattended-upgrade");
+        expect(fix).toContain("dnf upgrade --security -y");
+        expect(specs.hostArgv("packages-fix")).toContain("--privileged");
+        expect(parse.parseFixLog("POLARIS_DISTRO id=debian\nPOLARIS_FIX=done")).toBe("done");
+        expect(parse.parseFixLog("POLARIS_FIX=unavailable")).toBe("unavailable");
+        expect(parse.parseFixLog("nothing")).toBeNull();
     });
 });
 

@@ -286,6 +286,17 @@ function count(text: string, name: string): number | null {
     return match ? Number(match[1]) : null;
 }
 
+export type FixState = "done" | "failed" | "unavailable" | "unsupported";
+
+/** What applying the security updates now said; null when it said nothing. */
+export function parseFixLog(text: string): FixState | null {
+    return (
+        (/POLARIS_FIX=(done|failed|unavailable|unsupported)/.exec(text)?.[1] as
+            | FixState
+            | undefined) ?? null
+    );
+}
+
 export function parseUpdatesLog(text: string): UpdatesReport {
     const state = /POLARIS_UPDATES=(on|off|unsupported)/.exec(text)?.[1] as
         UpdatesState | undefined;

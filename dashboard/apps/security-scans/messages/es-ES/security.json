@@ -160,7 +160,9 @@
         "noRoom": "No hay espacio libre suficiente en el servidor para comprobar esta imagen. Libera espacio e inténtalo de nuevo.",
         "scannerFailed": "El analizador de vulnerabilidades se detuvo con un error. Inténtalo de nuevo.",
         "reportUnreadable": "No se pudo leer el informe del analizador. Actualiza Polaris desde Ajustes y vuelve a analizar.",
-        "sidecarRefused": "No se pudo apagar. Prueba desde su propia página."
+        "sidecarRefused": "No se pudo apagar. Prueba desde su propia página.",
+        "fixFailed": "No se pudieron aplicar las actualizaciones. Prueba más tarde.",
+        "fixUnsupported": "La distribución no tiene herramienta de actualizaciones."
     },
     "alerts": {
         "title": "{count, plural, one {Una vulnerabilidad grave nueva en {app}} other {# vulnerabilidades graves nuevas en {app}}}",
@@ -192,7 +194,8 @@
         "kind": {
             "appImage": "Imagen app",
             "image": "Imagen",
-            "deps": "Dependencias"
+            "deps": "Dependencias",
+            "host": "Paquetes del servidor"
         },
         "openApp": "Abrir app",
         "rescan": "Reanalizar",
@@ -221,7 +224,8 @@
         "updatePolaris": "Actualiza Polaris desde Ajustes y vuelve a analizar.",
         "updateImage": "Usa una versión más nueva de esta imagen y vuelve a analizar.",
         "updateDeps": "Actualiza estas dependencias en el repositorio y vuelve a desplegar.",
-        "wait": "Aún no hay solución. Vuelve a analizar más tarde por si ya ha salido."
+        "wait": "Aún no hay solución. Vuelve a analizar más tarde por si ya ha salido.",
+        "updateHost": "Aplica las actualizaciones de seguridad y vuelve a revisar."
     },
     "updates": {
         "armed": {
@@ -231,6 +235,20 @@
         "restart": {
             "title": "{server} necesita reiniciarse",
             "body": "Hay actualizaciones de seguridad instaladas que necesitan un reinicio. Prográmalo para las 04:30 desde Escaneos de seguridad."
+        }
+    },
+    "packages": {
+        "run": "Revisar paquetes",
+        "label": "Paquetes instalados",
+        "apply": "Aplicar seguridad",
+        "applyHint": "Instala ahora las actualizaciones de seguridad de la distribución. Los paquetes retenidos no cambian.",
+        "applied": "Actualizaciones aplicadas. Revisando de nuevo.",
+        "fix": {
+            "done": "Actualizaciones aplicadas; revisando de nuevo.",
+            "failed": "No se pudieron aplicar las actualizaciones.",
+            "unavailable": "Falta la herramienta; activa las automáticas.",
+            "unsupported": "Esta distribución no tiene herramienta de actualizaciones.",
+            "off": "Las automáticas están desactivadas: no se instaló nada."
         }
     }
 }

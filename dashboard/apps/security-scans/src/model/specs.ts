@@ -381,7 +381,8 @@ export type HostAction =
     | "updates-on"
     | "updates-off"
     | "reboot-schedule"
-    | "reboot-cancel";
+    | "reboot-cancel"
+    | "packages-fix";
 
 /** The hardening audit, run against the host's root mounted read-only. */
 export const AUDIT_SCRIPT =
@@ -398,8 +399,94 @@ export const UPDATES_SCRIPTS: Readonly<Record<Exclude<HostAction, "audit">, stri
     // Only when the host says a restart is pending; systemd announces it to every
     // session on the machine and can still be cancelled until it happens.
     "reboot-schedule": `${DISTRO}; if [ -f /var/run/reboot-required ] || { command -v needs-restarting >/dev/null 2>&1 && ! needs-restarting -r >/dev/null 2>&1; }; then shutdown -r 04:30 'Polaris: restarting at 04:30 to finish security updates' >/dev/null 2>&1 && echo POLARIS_REBOOT=scheduled; else echo POLARIS_REBOOT=none; fi; [ -f /run/systemd/shutdown/scheduled ] && echo "POLARIS_REBOOT_AT=$(sed -n 's/^USEC=//p' /run/systemd/shutdown/scheduled)"; true`,
-    "reboot-cancel": `${DISTRO}; shutdown -c 'Polaris: the restart was cancelled' >/dev/null 2>&1; echo POLARIS_REBOOT=cancelled`
+    "reboot-cancel": `${DISTRO}; shutdown -c 'Polaris: the restart was cancelled' >/dev/null 2>&1; echo POLARIS_REBOOT=cancelled`,
+
+    // The pending security updates, now: the same tool the automatic updates
+    // run, so a held package stays where it is.
+    "packages-fix": `${DISTRO}; if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; nice -n 10 apt-get update -qq >/dev/null 2>&1; if ! command -v unattended-upgrade >/dev/null 2>&1; then echo POLARIS_FIX=unavailable; elif nice -n 10 unattended-upgrade >/dev/null 2>&1; then echo POLARIS_FIX=done; else echo POLARIS_FIX=failed; fi; [ -f /var/run/reboot-required ] && echo POLARIS_REBOOT=required; elif command -v dnf >/dev/null 2>&1; then if nice -n 10 dnf upgrade --security -y -q >/dev/null 2>&1; then echo POLARIS_FIX=done; else echo POLARIS_FIX=failed; fi; command -v needs-restarting >/dev/null 2>&1 && { needs-restarting -r >/dev/null 2>&1 || echo POLARIS_REBOOT=required; }; else echo POLARIS_FIX=unsupported; fi; true`
 };
+
+/**
+ * Where a package manager keeps what is installed, and the release file that
+ * names the distribution, copied out of the host's root (read-only, no
+ * network) as a tar. The matcher reads them as a directory, as an image's.
+ */
+export const PACKAGES_SCRIPT =
+    'cd /host || exit 21; set --; for p in etc/os-release usr/lib/os-release var/lib/dpkg/status var/lib/rpm usr/lib/sysimage/rpm lib/apk/db/installed; do [ -e "$p" ] && set -- "$@" "$p"; done; [ "$#" -gt 0 ] || exit 22; exec tar -cf - "$@"';
+
+/** The host's package database into an export volume, over SSH: `list | write`. */
+export function packagesArgv(volume: string) {
+    if (!isExportVolume(volume)) throw new Error("Not an export volume");
+    return {
+        list: [
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            "none",
+            "--cpu-shares",
+            "64",
+            "--memory",
+            "256m",
+            "-v",
+            "/:/host:ro",
+            TOOLS_IMAGE,
+            "/bin/sh",
+            "-c",
+            PACKAGES_SCRIPT
+        ],
+        write: [
+            "docker",
+            "run",
+            "--rm",
+            "-i",
+            "--network",
+            "none",
+            "-v",
+            `${volume}:/in`,
+            TOOLS_IMAGE,
+            "/bin/sh",
+            "-c",
+            "mkdir -p /in/root && tar -C /in/root -xf -"
+        ],
+        // A pipe's status is its last command's: an empty copy is the failure.
+        check: [
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            "none",
+            "-v",
+            `${volume}:/in`,
+            TOOLS_IMAGE,
+            "/bin/sh",
+            "-c",
+            'test -n "$(ls -A /in/root 2>/dev/null)"'
+        ]
+    };
+}
+
+/** Vulnerabilities of the host's own packages, read from the copied database. */
+export function hostVulnSpec(volume: string): ComposeSpec {
+    if (!isExportVolume(volume)) throw new Error("Not an export volume");
+    return spec(
+        PROJECTS.images,
+        service("polaris-secscan-match", VULN_IMAGE, {
+            command: ["dir:/in/root", "-o", "json", "-q"],
+            env: {
+                GRYPE_DB_CACHE_DIR: "/cache/vulnerabilities",
+                GRYPE_CHECK_FOR_APP_UPDATE: "false"
+            },
+            volumes: [
+                { source: "cache", target: "/cache", kind: "volume" },
+                { source: volume, target: "/in", kind: "volume" }
+            ],
+            memoryMb: 2048
+        }),
+        ["cache"],
+        [volume]
+    );
+}
 
 /** The container a host action runs in. One name, so two can never overlap. */
 export const HOST_CONTAINER = "polaris-secscan-host";

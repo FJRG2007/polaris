@@ -13,6 +13,7 @@ import {
     hasRoom,
     hostArgv,
     LIST_EXPORTS_ARGV,
+    packagesArgv,
     parseDfFree,
     type HostAction
 } from "../model/specs";
@@ -209,6 +210,26 @@ export async function exportImage(
 }
 
 /** The export volumes on a server; null when it cannot be asked. */
+/**
+ * Copy the host's package database into `volume` under `/in/root`, read-only
+ * and with no network. Locally the daemon does it; over SSH the same two
+ * containers run with a pipe between them.
+ */
+export async function exportPackages(target: ScanTarget, volume: string): Promise<void> {
+    if (target.kind === "local" || !target.hostId) {
+        const result = await (await localDaemon()).hostPackagesExport(volume);
+        if (result === null) throw new ScanFailure("daemonOutdated");
+        if (result !== "copied") throw new ScanFailure(result);
+        return;
+    }
+    const argv = packagesArgv(volume);
+    await withSsh(target, async (client) => {
+        const copy = await sshRun(client, `${quoteArgv(argv.list)} | ${quoteArgv(argv.write)}`);
+        const check = await sshRun(client, quoteArgv(argv.check));
+        if (copy.code !== 0 || check.code !== 0) throw new ScanFailure("scanError");
+    });
+}
+
 export async function listExports(target: ScanTarget): Promise<string[] | null> {
     if (target.kind === "local" || !target.hostId) {
         const client = new HostdClient();

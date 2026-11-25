@@ -1638,6 +1638,20 @@ fn host_security_image<R: Read>(req: &Request, body: &mut R) -> Response {
                 Response::text(502, "Bad Gateway", "could not remove the export volume")
             }
         }
+        host_security::ExportAction::Packages => {
+            match host_security::export_packages(&request.volume) {
+                Ok(()) => Response::json(200, "OK", &serde_json::json!({ "copied": true })),
+                Err(host_security::ExportError::Busy) => {
+                    Response::text(409, "Conflict", "another host scan is still running")
+                }
+                Err(host_security::ExportError::TimedOut) => Response::text(
+                    504,
+                    "Gateway Timeout",
+                    "the package copy took too long and was stopped",
+                ),
+                Err(_) => Response::text(502, "Bad Gateway", "could not copy the package database"),
+            }
+        }
         host_security::ExportAction::Export => {
             let image = match request.image.as_deref() {
                 Some(image) if host_security::valid_export_image(image) => image,
