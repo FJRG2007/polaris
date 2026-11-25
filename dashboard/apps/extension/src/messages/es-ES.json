@@ -585,6 +585,9 @@
         "title": "Esta página de Polaris fue modificada",
         "body": "Parte del código que cargó no es el que Polaris compiló para la versión de este servidor. Sus campos de contraseña están bloqueados. No inicies sesión aquí: avisa a quien administra el servidor y cierra sesión en tus otros dispositivos.",
         "files": "Archivos que difieren:",
-        "dismiss": "Cerrar"
+        "dismiss": "Cerrar",
+        "outdated": "Esta página es de otra versión de Polaris distinta de la que ejecuta ahora el servidor. Recárgala cuando hayas guardado lo que estés escribiendo.",
+        "reload": "Recargar",
+        "later": "Ahora no"
     }
 }

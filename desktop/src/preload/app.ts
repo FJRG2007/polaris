@@ -270,4 +270,4 @@ ipcRenderer.on(CHANNELS.linkNotice, (_event, raw: unknown) => {
     const words = readLinkNotice(raw);
     if (words) showLinkNotice(words, async (text) => (await ipcRenderer.invoke(CHANNELS.editWriteClipboard, text)) === true);
 });
-checkPageCode((files) => ipcRenderer.invoke(CHANNELS.integrityCheck, files));
+checkPageCode((files, build) => ipcRenderer.invoke(CHANNELS.integrityCheck, files, build));

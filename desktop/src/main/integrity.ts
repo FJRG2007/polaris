@@ -20,7 +20,7 @@ import {
     servedPath,
     sriDigest,
     type IntegrityChecker,
-    type IntegrityVerdict
+    type PageVerdict
 } from "@polaris/core/integrity";
 
 const checkers = new WeakMap<Session, IntegrityChecker>();
@@ -40,7 +40,12 @@ function checkerFor(session: Session): IntegrityChecker {
  * it sent is not a list of files. A file the page could not hash (plain http has
  * no WebCrypto) is fetched and hashed here; one that cannot be is left out.
  */
-export async function checkPageFiles(contents: WebContents, origin: string, raw: unknown): Promise<IntegrityVerdict | null> {
+export async function checkPageFiles(
+    contents: WebContents,
+    origin: string,
+    raw: unknown,
+    build?: unknown
+): Promise<PageVerdict | null> {
     const files = readFiles(raw);
     if (!files) return null;
     const session = contents.session;
@@ -60,7 +65,8 @@ export async function checkPageFiles(contents: WebContents, origin: string, raw:
     );
     const verdict = await checkerFor(session).check(
         origin,
-        hashed.filter((file) => file.digest !== "")
+        hashed.filter((file) => file.digest !== ""),
+        build
     );
     if (verdict.kind === "changed") changed.add(contents);
     return verdict;

@@ -4959,7 +4959,8 @@ async function answerIntegrity(raw: unknown, senderUrl: string | undefined): Pro
     );
     const verdict = await checkPage(
         origin,
-        hashed.filter((file) => file.digest !== "")
+        hashed.filter((file) => file.digest !== ""),
+        (raw as { build?: unknown }).build
     );
     return {
         ok: true,
@@ -4969,6 +4970,11 @@ async function answerIntegrity(raw: unknown, senderUrl: string | undefined): Pro
             body: await say("integrity.body"),
             files: await say("integrity.files"),
             dismiss: await say("integrity.dismiss")
+        },
+        outdated: {
+            body: await say("integrity.outdated"),
+            reload: await say("integrity.reload"),
+            later: await say("integrity.later")
         }
     };
 }
