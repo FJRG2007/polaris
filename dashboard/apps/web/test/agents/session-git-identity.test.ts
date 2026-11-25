@@ -13,6 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({ findUnique: vi.fn() }));
 const links = vi.hoisted(() => ({ list: vi.fn(), credentials: vi.fn(), read: vi.fn() }));
+const domain = vi.hoisted(() => ({ base: vi.fn() }));
+vi.mock("@/lib/domain-service", () => ({ appBaseUrl: domain.base }));
 vi.mock("@polaris/db", () => ({ prisma: { user: { findUnique: db.findUnique } } }));
 vi.mock("@/lib/connections/store", () => ({ listConnections: links.list }));
 vi.mock("@/lib/github-access", () => ({ githubCredentialsForUser: links.credentials }));
@@ -32,6 +34,7 @@ beforeEach(() => {
     links.list.mockReset();
     links.credentials.mockReset();
     links.read.mockReset();
+    domain.base.mockReset();
 });
 
 const posix = (path: string) => path.replace(/\\/g, "/");
@@ -63,12 +66,16 @@ describe("the identity a GitHub account commits as", () => {
         expect(identity.identityFromGithub({ id: 1, login: "octo", name: "A\nB <x>" })?.name).toBe("A B x");
     });
 
-    it("uses the Polaris account when there is no GitHub one", () => {
-        expect(identity.identityFromUser({ name: "Ada", email: "ADA@example.test" })).toEqual({
+    it("uses the Polaris account's name and a no-reply address when there is no GitHub one", () => {
+        expect(identity.identityFromUser({ id: "cmUser01", name: "Ada" }, "polaris.example.test")).toEqual({
             name: "Ada",
-            email: "ada@example.test"
+            email: "cmuser01@users.noreply.polaris.example.test"
         });
-        expect(identity.identityFromUser({ name: "Ada", email: "not an address" })).toBeNull();
+        // No public hostname, or one that is not a hostname: the reserved name, never a guess.
+        expect(identity.identityFromUser({ id: "u1", name: "Ada" }, null)?.email).toBe("u1@users.noreply.polaris.invalid");
+        expect(identity.polarisNoreplyEmail("u1", "not a host")).toBe("u1@users.noreply.polaris.invalid");
+        expect(identity.identityFromUser({ id: "u1", name: "" }, null)?.name).toBe("u1");
+        expect(identity.identityFromUser({ id: "bad id@x", name: "Ada" }, null)).toBeNull();
     });
 });
 
@@ -99,9 +106,34 @@ describe("resolving the identity for a session", () => {
     it("falls back to the Polaris account without a GitHub link, and names nobody without an owner", async () => {
         links.list.mockResolvedValue([link("m", "typed", "", "manual")]);
         links.credentials.mockResolvedValue([]);
-        db.findUnique.mockResolvedValue({ name: "Ada", email: "ada@example.test" });
-        expect(await gitIdentityFor("u1", "")).toEqual({ name: "Ada", email: "ada@example.test" });
+        db.findUnique.mockResolvedValue({ id: "u1", name: "Ada" });
+        domain.base.mockResolvedValue("https://polaris.example.test");
+        const found = await gitIdentityFor("u1", "");
+        expect(found).toEqual({ name: "Ada", email: "u1@users.noreply.polaris.example.test" });
+        // The real address is never asked for, so it cannot reach a commit.
+        expect(db.findUnique).toHaveBeenCalledWith({ where: { id: "u1" }, select: { id: true, name: true } });
         expect(await gitIdentityFor(null, "a/b")).toBeNull();
+    });
+
+    it("uses the reserved name on an instance with no public hostname", async () => {
+        links.list.mockResolvedValue([]);
+        links.credentials.mockResolvedValue([]);
+        db.findUnique.mockResolvedValue({ id: "u1", name: "Ada" });
+        domain.base.mockResolvedValue("http://polaris.local");
+        expect((await gitIdentityFor("u1", ""))?.email).toBe("u1@users.noreply.polaris.invalid");
+        domain.base.mockRejectedValue(new Error("no settings"));
+        expect((await gitIdentityFor("u1", ""))?.email).toBe("u1@users.noreply.polaris.invalid");
+    });
+
+    it("switches to the GitHub address once GitHub is linked", async () => {
+        db.findUnique.mockResolvedValue({ id: "u1", name: "Ada" });
+        domain.base.mockResolvedValue("https://polaris.example.test");
+        links.list.mockResolvedValue([]);
+        links.credentials.mockResolvedValue([]);
+        expect((await gitIdentityFor("u1", "ada/site"))?.email).toBe("u1@users.noreply.polaris.example.test");
+        links.list.mockResolvedValue([link("c1", "ada", "7")]);
+        links.read.mockResolvedValue(null);
+        expect((await gitIdentityFor("u1", "ada/site"))?.email).toBe("7+ada@users.noreply.github.com");
     });
 });
 

@@ -6,7 +6,7 @@
  * ask - and then told the person about it either way. The boot sets the
  * identity of the person the session works for, the way their own computer
  * already has it: their GitHub account where they linked one, their Polaris
- * account otherwise.
+ * account otherwise (with a no-reply address, never their own).
  *
  * Pure: the values are resolved in `session-git-identity-source.ts` and reach
  * the boot as environment variables (`POLARIS_GIT_NAME`, `POLARIS_GIT_EMAIL`,
@@ -76,10 +76,34 @@ export function identityFromGithub(account: {
     };
 }
 
-/** The identity of a Polaris account with no GitHub linked. */
-export function identityFromUser(user: { readonly name: string; readonly email: string } | null): GitIdentity | null {
+/** Where an instance with no public hostname sends its no-reply addresses: a
+ *  reserved name that can never resolve (RFC 2606), rather than a guessed one. */
+export const NOREPLY_FALLBACK_HOST = "polaris.invalid";
+
+const USER_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const HOST = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
+/**
+ * The address a Polaris account commits as when it has no GitHub linked: tied
+ * to the account, on this instance's own public hostname, and never the
+ * person's real address - a commit pushed to a public repository publishes its
+ * author address for good. `host` is the instance's public hostname, or null
+ * when it has none.
+ */
+export function polarisNoreplyEmail(userId: string, host: string | null): string | null {
+    if (!USER_ID.test(userId)) return null;
+    const domain = host && HOST.test(host.toLowerCase()) ? host.toLowerCase() : NOREPLY_FALLBACK_HOST;
+    return `${userId.toLowerCase()}@users.noreply.${domain}`;
+}
+
+/** The identity of a Polaris account with no GitHub linked: its name, and its
+ *  no-reply address (`polarisNoreplyEmail`), never its own. */
+export function identityFromUser(
+    user: { readonly id: string; readonly name: string } | null,
+    host: string | null
+): GitIdentity | null {
     if (!user) return null;
-    const email = cleanEmail(user.email);
+    const email = polarisNoreplyEmail(user.id, host);
     if (!email) return null;
     return { name: cleanName(user.name) || (email.split("@")[0] ?? email), email };
 }
