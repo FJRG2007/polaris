@@ -1746,6 +1746,7 @@
         "refresh": "Recargar lista",
         "notSignedIn": "Sin conectar",
         "voiceNeedsSession": "Empieza la tarea y luego háblale",
+        "voiceNeedsRestart": "Envía un mensaje para reanudarla y luego háblale",
         "noModel": "Añade una clave de IA para elegir modelo.",
         "addKey": "Añadir",
         "searchBranches": "Buscar ramas",

@@ -173,6 +173,8 @@
         "noInstallationSession": "Polaris has no GitHub App installation for {owner}, so it cannot check the repository out. Connect it again under Agents settings.",
         "queueFull": "You already have {count} sessions waiting to start, which is as many as one account may queue. Cancel one, or wait for one to start.",
         "queueCancelled": "Cancelled before it started.",
+        "resumeSummary": "The agent could not reopen this conversation, so it was given a summary of it.",
+        "handoffFileFailed": "Polaris could not write the earlier conversation into this session. The agent was given a summary of it.",
         "accountFull": "You already have {count} sessions running, which is the most one account may have at once. Stop one and this will start.",
         "unknownAgent": "Polaris no longer knows an agent called {cli}.",
         "noTerminal": "its agent never opened a terminal to type into",

@@ -937,7 +937,8 @@ export function SignInRefusedNotice({ account }: { account: string | null }) {
  *  talk to, so a task that has not started says so on the button. */
 function useCodeComposerParts(
     busy: boolean,
-    call: { readonly disabled: boolean; readonly onOpen: () => void } | null = null
+    call: { readonly disabled: boolean; readonly onOpen: () => void } | null = null,
+    refusal: string | null = null
 ) {
     const t = useTranslations("polar");
     const [notice, setNotice] = useState<VoiceNotice | null>(null);
@@ -956,7 +957,7 @@ function useCodeComposerParts(
             onRemove: uploads.remove,
             onRetry: uploads.retry
         },
-        voiceMode: call ?? { refusal: t("code.voiceNeedsSession") }
+        voiceMode: call ?? { refusal: refusal ?? t("code.voiceNeedsSession") }
     };
 }
 
@@ -1602,7 +1603,10 @@ function CodeThread({
         busy,
         thread?.canManage && thread.session.live
             ? { disabled: busy || call !== null, onOpen: () => onCall({ greeting: null, watching: [] }) }
-            : null
+            : null,
+        // A stopped session takes a typed message, which starts it again; a
+        // call needs it up first.
+        thread && !thread.session.live ? t("code.voiceNeedsRestart") : null
     );
     const signal = useUnmountSignal();
     // The handed-over commands follow the CLI the session runs.
@@ -2098,7 +2102,11 @@ function CodeThread({
         });
     };
 
-    const dock = !thread ? null : !live ? (
+    // A stopped session keeps its reply box, like any chat: what is sent there
+    // starts it again on its own conversation (`reopenSessionAs`). Only work
+    // still held in its kept container cannot start again yet.
+    const reopenable = Boolean(thread?.canManage && canPrompt && thread.view.work?.state !== "kept");
+    const dock = !thread ? null : !live && !reopenable ? (
         <div className="flex min-w-0 flex-col gap-2">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                 <Notice>{t("code.ended")}</Notice>

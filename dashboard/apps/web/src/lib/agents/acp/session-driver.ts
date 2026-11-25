@@ -36,6 +36,13 @@ export interface DriverDeps {
     version(sessionId: string, binary: string): Promise<string | null>;
     /** Start (or restart) the agent with this launch line. */
     start(sessionId: string, argv: readonly string[]): Promise<void>;
+    /**
+     * The agent would not reopen the session's stored conversation (its
+     * transcript is not in this home): what to put in front of the next
+     * prompt so the new conversation still knows the old one, or null. Shown
+     * on the thread as one notice line, never as the prompt it builds.
+     */
+    resumeRefused?(sessionId: string): Promise<string | null>;
     pipe(sessionId: string): Promise<PipeIo>;
     storeRows(sessionId: string, rows: readonly HistoryRow[]): Promise<unknown>;
     recordEvents(
@@ -144,6 +151,8 @@ export class AcpSessionDriver {
     private connection: Connection | null = null;
     private opening: Promise<Connection> | null = null;
     private turn: Promise<void> | null = null;
+    /** The summary the next prompt carries after a refused `session/load`. */
+    private carried: string | null = null;
     /** Stored rows, in order, so a turn's closing rows land after its last update. */
     private stored: Promise<unknown> = Promise.resolve();
     private closedByUs = false;
@@ -166,7 +175,9 @@ export class AcpSessionDriver {
         if (this.turn) throw new AcpRefusal("The agent is still on the last message. Stop it or wait for it to finish.");
         const connection = await this.connect();
         await this.deps.recordEvents(this.sessionId, [{ kind: "prompt", detail: "", subject: "" }]);
-        const run = connection.client.prompt(connection.acpSessionId, text);
+        const carried = this.carried;
+        this.carried = null;
+        const run = connection.client.prompt(connection.acpSessionId, carried ? `${carried}\n\n${text}` : text);
         this.turn = run.then(
             (response) => this.endTurn(connection, response.stopReason, null),
             (error: unknown) => this.endTurn(connection, undefined, error)
@@ -279,6 +290,7 @@ export class AcpSessionDriver {
                     modes = loaded.modes?.availableModes ?? [];
                 } catch (error) {
                     this.deps.log(`${this.sessionId}: the agent would not reopen its conversation, starting a new one`, error);
+                    this.carried = (await this.deps.resumeRefused?.(this.sessionId).catch(() => null)) ?? null;
                 }
             }
             if (!acpSessionId) {

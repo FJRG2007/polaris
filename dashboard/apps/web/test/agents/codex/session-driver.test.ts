@@ -21,6 +21,7 @@ function harness(options: {
     mode?: core.SessionPermissionMode | null;
     answer?: PermissionStatus;
     help?: string | null;
+    resumeRefused?: CodexDriverDeps["resumeRefused"];
 } = {}) {
     const pipe = new StdioPipe();
     pipes.push(pipe);
@@ -37,6 +38,7 @@ function harness(options: {
             mode: options.mode === undefined ? "full" : options.mode
         }),
         help: async () => (options.help === undefined ? NEW_HELP : options.help),
+        resumeRefused: options.resumeRefused,
         start: async (_id, argv) => {
             started.push(argv);
         },
@@ -214,6 +216,48 @@ describe("CodexSessionDriver against a fake app-server on stdio", () => {
             "turn/start"
         ]);
         expect(vendorIds).toEqual(["thr_123"]);
+        driver.close();
+    });
+
+    it("puts the old conversation's summary in front of the first prompt after a refused resume, once", async () => {
+        const asked: string[] = [];
+        const { driver, pipe } = harness({
+            vendorSessionId: "thr_gone",
+            resumeRefused: async (id) => {
+                asked.push(id);
+                return "<polaris-handoff>earlier: fixed the login form</polaris-handoff>";
+            }
+        });
+        await driver.prompt("and now the tests");
+        await until(() => !driver.busy);
+        await driver.prompt("thanks");
+        await until(() => !driver.busy);
+        const texts = pipe
+            .received()
+            .filter((frame) => frame.method === "turn/start")
+            .map((frame) => (frame.params as { input: { text: string }[] }).input[0]!.text);
+        expect(asked).toEqual(["session-1"]);
+        expect(texts).toEqual([
+            "<polaris-handoff>earlier: fixed the login form</polaris-handoff>\n\nand now the tests",
+            "thanks"
+        ]);
+        driver.close();
+    });
+
+    it("carries no summary when the stored thread reopens", async () => {
+        const asked: string[] = [];
+        const { driver, pipe } = harness({
+            vendorSessionId: "thr_123",
+            resumeRefused: async (id) => {
+                asked.push(id);
+                return "summary";
+            }
+        });
+        await driver.prompt("hello");
+        await until(() => !driver.busy);
+        const start = pipe.received().find((frame) => frame.method === "turn/start");
+        expect((start!.params as { input: { text: string }[] }).input[0]!.text).toBe("hello");
+        expect(asked).toEqual([]);
         driver.close();
     });
 

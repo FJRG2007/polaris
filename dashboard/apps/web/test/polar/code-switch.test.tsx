@@ -636,9 +636,12 @@ describe("the voice call on a Code session", () => {
         access = "manage";
         serve({ ...ROW, state: "stopped", stateLabel: "Stopped", live: false }, true);
         await openSession();
-        expect(await screen.findByText(/This session has ended/)).toBeTruthy();
-        // An ended session takes no more messages, spoken or typed.
-        expect(screen.queryByRole("button", { name: "Voice mode" })).toBeNull();
+        // A stopped session keeps its reply box: a typed message starts it
+        // again. A call needs it up first, so the button refuses and says why.
+        const voice = await screen.findByRole("button", { name: "Send a message to restart it, then talk to it" });
+        expect(voice.getAttribute("aria-disabled")).toBe("true");
+        expect(screen.queryByText(/This session has ended/)).toBeNull();
+        fireEvent.click(voice);
         expect(screen.queryByRole("button", { name: "End call" })).toBeNull();
     });
 

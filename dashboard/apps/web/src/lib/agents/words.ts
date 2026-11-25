@@ -69,6 +69,9 @@ export function agentWord(
  */
 const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "Cancelled before it started.": "text.queueCancelled",
+    "The agent could not reopen this conversation, so it was given a summary of it.": "text.resumeSummary",
+    "Polaris could not write the earlier conversation into this session. The agent was given a summary of it.":
+        "text.handoffFileFailed",
     "The agent is still on the last message. Stop it or wait for it to finish.": "text.acpBusy",
     "This agent has no such mode in Chat.": "text.acpNoMode",
     "The agent exited as soon as it started.": "text.acpExited",

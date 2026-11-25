@@ -19,7 +19,23 @@ import { noteChatConversation, runInSession, sessionAcpPipe, startAcpAgent } fro
 import { AcpSessionDriver, type DriverDeps } from "./session-driver";
 import { awaitPermission, openPermissionRequest } from "../session-permissions";
 import { CodexSessionDriver, type CodexDriverDeps } from "../codex/session-driver";
-import { recordSessionConversation, recordSessionEvents } from "../session-service";
+import { handoffFor } from "../session-handoff-service";
+import { RESUME_REFUSED_NOTICE } from "../session-handoff";
+import { addSessionMessage, recordSessionConversation, recordSessionEvents, sessionViewById } from "../session-service";
+
+/**
+ * The session's own conversation as a summary, for an agent that would not
+ * reopen it, with one notice line on the thread. The summary itself is never a
+ * row: it travels in front of the next prompt, and `withoutHandoff` strips it
+ * from any transcript row that echoes it back.
+ */
+async function summaryForRefusedResume(sessionId: string): Promise<string | null> {
+    const session = await sessionViewById(sessionId);
+    if (!session) return null;
+    const { note } = await handoffFor(session, { kind: "restore", targetCli: session.cli, withFile: false });
+    await addSessionMessage(sessionId, "system", RESUME_REFUSED_NOTICE);
+    return note;
+}
 
 const deps: DriverDeps = {
     async session(sessionId) {
@@ -40,6 +56,7 @@ const deps: DriverDeps = {
         return result.code === 0 ? result.output : null;
     },
     start: startAcpAgent,
+    resumeRefused: summaryForRefusedResume,
     pipe: sessionAcpPipe,
     storeRows: storeHistoryRows,
     recordEvents: (sessionId, events) => recordSessionEvents(sessionId, events),
@@ -78,6 +95,7 @@ const codexDeps: CodexDriverDeps = {
         return result.code === 0 ? result.output : null;
     },
     start: startAcpAgent,
+    resumeRefused: summaryForRefusedResume,
     pipe: sessionAcpPipe,
     storeRows: storeHistoryRows,
     recordEvents: deps.recordEvents,

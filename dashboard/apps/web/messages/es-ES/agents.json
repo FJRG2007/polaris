@@ -173,6 +173,8 @@
         "noInstallationSession": "Polaris no tiene ninguna instalación de la GitHub App para {owner}, así que no puede descargar el repositorio. Vuelve a conectarla en los ajustes de Agentes.",
         "queueFull": "Ya tienes {count} sesiones esperando para iniciarse, que es lo máximo que una cuenta puede poner en cola. Cancela una o espera a que alguna se inicie.",
         "queueCancelled": "Cancelada antes de iniciarse.",
+        "resumeSummary": "El agente no pudo reabrir esta conversación, así que recibió un resumen de ella.",
+        "handoffFileFailed": "Polaris no pudo escribir la conversación anterior en esta sesión. El agente recibió un resumen de ella.",
         "accountFull": "Ya tienes {count} sesiones en marcha, que es el máximo que puede tener una cuenta a la vez. Detén una y esta se iniciará.",
         "unknownAgent": "Polaris ya no conoce ningún agente llamado {cli}.",
         "noTerminal": "su agente nunca abrió un terminal donde escribir",

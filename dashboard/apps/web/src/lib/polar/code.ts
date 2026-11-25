@@ -12,6 +12,7 @@
  * not have to carry the whole Agents catalog onto every page.
  */
 
+import * as codeMessages from "@/lib/polar/code-messages";
 import * as search from "@/lib/agents/session-search";
 import * as steps from "@/lib/polar/code-steps";
 import * as core from "@polaris/core";
@@ -85,6 +86,7 @@ import { storedTodos, type SessionTodo } from "@/lib/agents/session-asks";
 import { lastTurnRefused, refusedAccountName } from "@/lib/agents/signin-refusal";
 import {
     forkSessionAction,
+    reopenSessionAs,
     interruptSessionAction,
     listSessionsAction,
     promptSessionAction,
@@ -356,7 +358,7 @@ export async function polarCodeThread(
             ? await pendingPermission(sessionId)
             : null;
     const permission = asked && (await getSession(sessionId, user.id)) ? asked : null;
-    const messages: PolarCodeEntry[] = detail.messages.map((message) => ({
+    const messages: PolarCodeEntry[] = codeMessages.shownMessages(detail.messages).map((message) => ({
         id: message.id,
         at: message.at,
         type: "message",
@@ -1078,7 +1080,15 @@ export async function polarCodeContinue(
     const parsed = continueSchema.safeParse(input);
     if (!parsed.success) return { error: (await getTranslations("polar"))("code.continueFailed") };
     const { sessionId, target } = parsed.data;
-    const answer = await forkSessionAction(sessionId, target ? placeOf(target) : undefined, { carry: "restore" });
+    // Where it ran: the same session again, its conversation reopened.
+    if (!target) {
+        const session = await getSession(sessionId, user.id);
+        if (!session) return { error: (await getTranslations("agents"))("sessions.errors.gone") };
+        if (!core.isSessionOver(session.state)) return { id: session.id };
+        const reopened = await reopenSessionAs(session, user.id, null);
+        return reopened.error ? { error: reopened.error } : { id: session.id };
+    }
+    const answer = await forkSessionAction(sessionId, placeOf(target), { carry: "restore" });
     return answer.id ? { id: answer.id } : { error: answer.error };
 }
 

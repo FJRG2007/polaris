@@ -44,7 +44,7 @@ function recorded(cli: string): Frame[] {
 
 /** The agent's side of its recorded conversation, answering the ids the
  *  driver actually used. */
-function agentFor(cli: string, options: { failPrompt?: boolean; holdPrompt?: boolean } = {}) {
+function agentFor(cli: string, options: { failPrompt?: boolean; holdPrompt?: boolean; refuseLoad?: boolean } = {}) {
     const frames = recorded(cli);
     const sessionId = (frames[1]!.result as { sessionId: string }).sessionId;
     let promptId: unknown = null;
@@ -56,6 +56,8 @@ function agentFor(cli: string, options: { failPrompt?: boolean; holdPrompt?: boo
             case "session/new":
                 return answer(frames[1]!.result);
             case "session/load":
+                if (options.refuseLoad)
+                    return pipe.emit({ jsonrpc: "2.0", id: frame.id, error: { code: -32603, message: "Session not found" } });
                 // A replay of the old conversation, then the answer.
                 pipe.emit(frames[2]!);
                 return answer({ modes: (frames[1]!.result as Frame).modes ?? null });
@@ -82,7 +84,12 @@ function agentFor(cli: string, options: { failPrompt?: boolean; holdPrompt?: boo
     };
 }
 
-function harness(cli: string, pipe: FakePipe, vendorSessionId: string | null = null) {
+function harness(
+    cli: string,
+    pipe: FakePipe,
+    vendorSessionId: string | null = null,
+    resumeRefused?: DriverDeps["resumeRefused"]
+) {
     const rows: HistoryRow[] = [];
     const events: string[] = [];
     const vendorIds: string[] = [];
@@ -96,6 +103,7 @@ function harness(cli: string, pipe: FakePipe, vendorSessionId: string | null = n
         start: async (_id, argv) => {
             starts.push(argv);
         },
+        resumeRefused,
         pipe: async () => pipe,
         storeRows: async (_id, stored) => {
             rows.push(...stored);
@@ -252,6 +260,39 @@ describe("AcpSessionDriver", () => {
             "Looking at the tests.",
             "All green."
         ]);
+        driver.close();
+    });
+
+    it("starts a new conversation that carries the old one's summary when session/load is refused", async () => {
+        const asked: string[] = [];
+        const pipe = new FakePipe(agentFor("claude", { refuseLoad: true }));
+        const { driver } = harness("claude", pipe, "sess-gone", async (id) => {
+            asked.push(id);
+            return "<polaris-handoff>earlier work</polaris-handoff>";
+        });
+        await driver.prompt("Again");
+        await driver.settled();
+        const methods = pipe.received.map((frame) => frame.method);
+        expect(methods).toContain("session/load");
+        expect(methods).toContain("session/new");
+        expect(asked).toEqual(["session-1"]);
+        const prompt = pipe.received.find((frame) => frame.method === "session/prompt");
+        expect(JSON.stringify(prompt?.params)).toContain(
+            JSON.stringify("<polaris-handoff>earlier work</polaris-handoff>\n\nAgain").slice(1, -1)
+        );
+        driver.close();
+    });
+
+    it("asks for no summary when session/load reopens the conversation", async () => {
+        const asked: string[] = [];
+        const pipe = new FakePipe(agentFor("claude"));
+        const { driver } = harness("claude", pipe, "sess-claude-01", async (id) => {
+            asked.push(id);
+            return "summary";
+        });
+        await driver.prompt("Again");
+        await driver.settled();
+        expect(asked).toEqual([]);
         driver.close();
     });
 

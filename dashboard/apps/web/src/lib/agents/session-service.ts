@@ -579,6 +579,36 @@ export async function reissueSessionToken(
 }
 
 /**
+ * Put a session that ended back in line to start again: the same record,
+ * thread, branch and conversation id, queued until the caller (or the queue)
+ * starts it. False when it had not ended - another tab reopened it first - so
+ * a double send never starts two machines.
+ */
+export async function reopenSessionRecord(sessionId: string): Promise<boolean> {
+    const updated = await prisma.agentSession.updateMany({
+        where: { id: sessionId, state: { in: ["stopped", "failed"] } },
+        data: {
+            state: "queued",
+            error: null,
+            detail: "",
+            finishedAt: null,
+            containerId: null,
+            // This run's own clock. `startedAt` is when it was asked to start,
+            // which is its place in the queue (`queueKey`) and what the silence
+            // sweep counts from until the new machine reports; the old machine's
+            // last report, probe and hook sequence (in that machine's clock)
+            // would otherwise fail it as silent or drop its first hooks as stale.
+            startedAt: new Date(),
+            lastEventAt: null,
+            lastEventSeq: null,
+            lastAliveAt: null,
+            lastProbedAt: null
+        }
+    });
+    return updated.count > 0;
+}
+
+/**
  * The session a reporting token belongs to, or null.
  *
  * A token stops working the moment its session is over, which is what stops a

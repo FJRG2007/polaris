@@ -41,8 +41,13 @@ async function storedMessages(sessionId: string, take: number) {
 /** The note and the conversation file for the session that takes over from `source`. */
 export async function handoffFor(
     source: HandoffSource,
-    { kind, targetCli, at = new Date() }: { kind: "switch" | "restore"; targetCli: string; at?: Date }
-): Promise<{ note: string; file: { path: string; text: string } }> {
+    {
+        kind,
+        targetCli,
+        at = new Date(),
+        withFile = true
+    }: { kind: "switch" | "restore"; targetCli: string; at?: Date; withFile?: boolean }
+): Promise<{ note: string; bare: string; file: { path: string; text: string } }> {
     const rows = await storedMessages(source.id, handoff.HANDOFF_MESSAGES_MOST);
     const messages = rows.map((row) => ({
         role: row.role,
@@ -53,7 +58,7 @@ export async function handoffFor(
     }));
     const turns = handoff.handoffTurns(messages);
     const sourceAgent = agentLabel(source.cli);
-    const note = handoff.buildHandoffNote({
+    const input = {
         kind,
         sourceAgent,
         targetAgent: agentLabel(targetCli),
@@ -63,10 +68,16 @@ export async function handoffFor(
         at,
         originalTask: turns.find((turn) => turn.userRequest)?.userRequest ?? "",
         turns,
-        fullHistoryPath: handoff.HANDOFF_FILE
-    });
+        // Only where the file is written: a note naming one that is not there
+        // sends the agent looking for it.
+        fullHistoryPath: withFile ? handoff.HANDOFF_FILE : ""
+    };
+    const note = handoff.buildHandoffNote(input);
+    // The same note without the file, for when the file did not reach the session.
+    const bare = withFile ? handoff.buildHandoffNote({ ...input, fullHistoryPath: "" }) : note;
     return {
         note,
+        bare,
         file: { path: handoff.HANDOFF_FILE, text: handoff.conversationFile({ title: source.title, sourceAgent }, messages) }
     };
 }
