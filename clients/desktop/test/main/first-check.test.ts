@@ -7,18 +7,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const electron = vi.hoisted(() => ({
     fetch: vi.fn(),
-    listeners: new Map<string, () => void>(),
+    listeners: new Map<string, (...args: unknown[]) => void>(),
     setFeedURL: vi.fn(),
     checkForUpdates: vi.fn(),
     quitAndInstall: vi.fn()
 }));
 
 vi.mock("electron", () => ({
-    app: { isPackaged: true, getVersion: () => "0.1.1", on: () => undefined },
+    app: { isPackaged: true, getVersion: () => "0.1.1", getPath: () => "C:/temp", on: () => undefined },
     powerMonitor: { on: () => undefined },
     net: { fetch: electron.fetch },
     autoUpdater: {
-        on: (name: string, listener: () => void) => electron.listeners.set(name, listener),
+        on: (name: string, listener: (...args: unknown[]) => void) => electron.listeners.set(name, listener),
         setFeedURL: electron.setFeedURL,
         checkForUpdates: electron.checkForUpdates,
         quitAndInstall: electron.quitAndInstall
@@ -26,6 +26,8 @@ vi.mock("electron", () => ({
 }));
 vi.mock("node:fs", async (actual) => ({ ...(await actual<object>()), existsSync: () => true }));
 vi.mock("../../src/main/mac-signature", () => ({ developerSigned: async () => true }));
+const setup = vi.hoisted(() => ({ downloadSetup: vi.fn() }));
+vi.mock("../../src/main/setup-install", async (actual) => ({ ...(await actual<object>()), downloadSetup: setup.downloadSetup }));
 
 const { watchForUpdates } = await import("../../src/main/updates");
 
@@ -110,27 +112,45 @@ describe("the first check of a start", () => {
         expect(await ended).toEqual({ kind: "available", version: "0.1.3" });
     });
 
-    it("hands an update Squirrel could not apply to the antivirus notice, once", async () => {
+    it("makes the release's installer the restart when Squirrel could not apply it", async () => {
+        setup.downloadSetup.mockResolvedValue("C:/temp/polaris-setup-x/Polaris-Setup.exe");
         answers([release("desktop-v0.1.3")]);
         const found = vi.fn();
         const failed = vi.fn();
         const first = watchForUpdates(found, failed);
         await first.installing;
-        electron.listeners.get("error")?.();
-        expect(failed).toHaveBeenCalledTimes(1);
+        electron.listeners.get("error")?.(new Error("locked"));
+        await vi.waitFor(() => expect(found).toHaveBeenCalledTimes(1));
+        expect(found.mock.calls[0]?.[0]).toMatchObject({ version: "0.1.3", restart: expect.any(Function) });
+        expect(failed).not.toHaveBeenCalled();
+    });
+
+    it("hands it to the antivirus notice, once, with the reason, when the installer fails too", async () => {
+        setup.downloadSetup.mockRejectedValue(new Error("SHA256SUMS does not list Polaris-Setup.exe"));
+        answers([release("desktop-v0.1.3")]);
+        const found = vi.fn();
+        const failed = vi.fn();
+        const first = watchForUpdates(found, failed);
+        await first.installing;
+        electron.listeners.get("error")?.(new Error("locked"));
+        await vi.waitFor(() => expect(failed).toHaveBeenCalledTimes(1));
         expect(failed.mock.calls[0]?.[0]).toMatchObject({ version: "0.1.3" });
-        expect(found.mock.calls[0]?.[0]).toMatchObject({ version: "0.1.3" });
-        electron.listeners.get("error")?.();
+        expect(failed.mock.calls[0]?.[1]?.reason).toMatch(/locked.*does not list/);
+        expect(found).not.toHaveBeenCalled();
+        electron.listeners.get("error")?.(new Error("locked"));
+        await Promise.resolve();
         expect(failed).toHaveBeenCalledTimes(1);
     });
 
-    it("leaves the antivirus out when there was simply nothing to install", async () => {
+    it("treats Squirrel finding nothing, after a newer release was listed, as a failure on Windows", async () => {
+        setup.downloadSetup.mockRejectedValue(new Error("offline"));
         answers([release("desktop-v0.1.3")]);
         const failed = vi.fn();
         const first = watchForUpdates(vi.fn(), failed);
         await first.installing;
         electron.listeners.get("update-not-available")?.();
-        expect(failed).not.toHaveBeenCalled();
+        await vi.waitFor(() => expect(failed).toHaveBeenCalledTimes(1));
+        expect(failed.mock.calls[0]?.[1]?.reason).toMatch(/nothing to install/);
     });
 
     it("leaves the antivirus out off Windows", async () => {

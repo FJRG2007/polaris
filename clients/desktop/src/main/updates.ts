@@ -29,6 +29,8 @@
  */
 
 import { existsSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { downloadSetup, retryDelay } from "./setup-install";
 import { markRelaunch } from "./relaunch";
 import { replaceAppImage } from "./appimage";
 import { repository } from "../../package.json";
@@ -50,6 +52,11 @@ export const AWAY_MS = 10 * 60_000;
 const AFTER_FIRST_RUN_MS = 30_000;
 /** A checksums file is a line per installer; anything this large is not one. */
 const CHECKSUMS_MAX_BYTES = 64 * 1024;
+
+/** Why neither Squirrel nor the release's installer could update this copy. */
+export interface UpdateFailure {
+    readonly reason: string;
+}
 
 export interface Update {
     readonly version: string;
@@ -102,11 +109,17 @@ export interface FirstCheck {
 }
 
 /**
- * `failed` hears of an update Squirrel downloaded on Windows and then could not
- * apply - an antivirus holding its files is the usual cause - once per version,
- * in place of `found`'s announcement for it.
+ * When Squirrel cannot check for, download or apply an update on Windows, the
+ * release's installer is downloaded, checked against its checksums and made
+ * the update's restart: it runs silently over this install at the same moment
+ * an installed update would restart, so nobody is asked to download anything.
+ * `failed` hears only when that did not work either - an antivirus holding the
+ * files is the usual cause - with the reason, in place of `found`'s
+ * announcement. Squirrel is tried again later (`retryDelay`), so no copy is
+ * left on a version by one bad try
+ * (docs/bugs/BUG-0042-desktop-windows-update-not-applied.md).
  */
-export function watchForUpdates(found: (update: Update) => void, failed?: (update: Update) => void): FirstCheck {
+export function watchForUpdates(found: (update: Update) => void, failed?: (update: Update, failure: UpdateFailure) => void): FirstCheck {
     let ready: () => void = () => undefined;
     let began: (version: string | null) => void = () => undefined;
     let ended: (installed: boolean) => void = () => undefined;
@@ -132,6 +145,11 @@ export function watchForUpdates(found: (update: Update) => void, failed?: (updat
     let how: Promise<Installer> | null = null;
     /** The version installed and waiting for a restart. */
     let waiting: string | null = null;
+    /** The release Squirrel was handed, for the installer to fall back on. */
+    let handed: Release | null = null;
+    /** Squirrel's failures in a row, and when it is tried again after them. */
+    let failures = 0;
+    let retryAt = 0;
     /** What the download in flight comes to, for a press waiting on it. */
     let outcome: { readonly done: Promise<UpdateCheck>; readonly settle: (check: UpdateCheck) => void; } | null = null;
     const settleDownload = (check: UpdateCheck) => {
@@ -141,17 +159,56 @@ export function watchForUpdates(found: (update: Update) => void, failed?: (updat
 
     // The page is the way left: say it once for the version that failed.
     // `broke` is Squirrel's own error, as opposed to finding nothing to install.
-    const fallBack = (broke = false) => {
+    const fallBack = (broke = false, reason = "") => {
         const version = installing;
+        const release = handed;
         installing = null;
+        handed = null;
         ended(false);
         if (version) settleDownload({ kind: "available", version });
-        if (version && version !== announced) {
-            announced = version;
-            const update = { version, page: source.page(`desktop-v${version}`) };
-            if (broke && failed && process.platform === "win32") failed(update);
-            found(update);
+        if (!version || version === announced) return;
+        announced = version;
+        const update = { version, page: source.page(`desktop-v${version}`) };
+        if (broke && release && process.platform === "win32") {
+            failures += 1;
+            retryAt = Date.now() + retryDelay(failures);
+            console.error(`Polaris ${version} did not install through Squirrel (try ${failures}): ${reason || "no reason given"}`);
+            void viaSetup(release).then(
+                (setup) => installed(version, setup),
+                (caught: unknown) => {
+                    const why = `${reason || "Squirrel stopped without saying why."} The installer did not either: ${caught instanceof Error ? caught.message : String(caught)}`;
+                    console.error(`Polaris ${version}: ${why}`);
+                    if (failed) failed(update, { reason: why });
+                    else found(update);
+                }
+            );
+            return;
         }
+        found(update);
+    };
+
+    /**
+     * The release's installer, downloaded and checked; resolves with what runs
+     * it. `--silent` is Squirrel.Windows' Setup.exe flag for an install with no
+     * window; it then starts the new version itself.
+     */
+    const viaSetup = async (release: Release): Promise<() => void> => {
+        const path = await downloadSetup({
+            folder: source.download(release.tag),
+            assets: release.assets,
+            temp: app.getPath("temp"),
+            fetchText: (url) => fetchText(url, CHECKSUMS_MAX_BYTES),
+            fetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" })
+        });
+        return () => {
+            try {
+                spawn(path, ["--silent"], { detached: true, stdio: "ignore" }).unref();
+            } catch (caught) {
+                console.error(`Polaris ${release.version}: the installer did not start: ${String(caught)}`);
+                return;
+            }
+            app.quit();
+        };
     };
     const installed = (version: string, install: () => void) => {
         announced = version;
@@ -169,11 +226,18 @@ export function watchForUpdates(found: (update: Update) => void, failed?: (updat
     };
 
     const listenToSquirrel = () => {
-        autoUpdater.on("error", () => fallBack(true));
-        autoUpdater.on("update-not-available", () => fallBack());
+        autoUpdater.on("error", (error) => fallBack(true, error instanceof Error ? error.message : String(error ?? "")));
+        // Asked only once the release list named a newer version, so on Windows
+        // "nothing to install" is Squirrel failing to see it, not the truth.
+        autoUpdater.on("update-not-available", () =>
+            fallBack(process.platform === "win32", "Squirrel found nothing to install although a newer release is published.")
+        );
         autoUpdater.on("update-downloaded", () => {
             const version = installing;
-            if (version) installed(version, () => autoUpdater.quitAndInstall());
+            if (!version) return;
+            failures = 0;
+            handed = null;
+            installed(version, () => autoUpdater.quitAndInstall());
         });
     };
 
@@ -220,8 +284,12 @@ export function watchForUpdates(found: (update: Update) => void, failed?: (updat
             if (!release) return waiting ? { kind: "ready", version: waiting } : { kind: "current", version: app.getVersion() };
             if (release.version === waiting) return { kind: "ready", version: waiting };
             if (release.version === installing) return { kind: "downloading", version: installing };
-            // Announced and neither installing nor installed: its page is the way.
-            if (release.version === announced) return { kind: "available", version: release.version };
+            // Announced and neither installing nor installed: its page is the way,
+            // unless Squirrel failed on it and its wait to be tried again is over.
+            if (release.version === announced) {
+                if (!(mode.kind === "squirrel" && failures > 0 && Date.now() >= retryAt)) return { kind: "available", version: release.version };
+                announced = null;
+            }
             if (mode.kind === "page") {
                 announced = release.version;
                 found({ version: release.version, page: source.page(release.tag) });
@@ -235,10 +303,11 @@ export function watchForUpdates(found: (update: Update) => void, failed?: (updat
                 void viaAppImage(release, mode.path).catch(() => fallBack());
                 return { kind: "downloading", version: release.version };
             }
+            handed = release;
             try {
                 viaSquirrel(release);
-            } catch {
-                fallBack(true);
+            } catch (caught) {
+                fallBack(true, caught instanceof Error ? caught.message : String(caught));
                 return { kind: "available", version: release.version };
             }
             return { kind: "downloading", version: release.version };

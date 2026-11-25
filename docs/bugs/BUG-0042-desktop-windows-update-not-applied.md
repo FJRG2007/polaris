@@ -1,7 +1,7 @@
 ---
 id: BUG-0042
 title: A Windows copy of Polaris desktop on 0.1.52 never updates itself and says to download the new version by hand
-status: open
+status: fixed, watching
 area: desktop
 location: clients/desktop/src/main/updates.ts
 related:
@@ -43,6 +43,20 @@ it. An installed 0.1.52 cannot be changed to do anything else.
 
 `squirrel-identity.test.ts` now pins what every installed copy matches a
 release against, so a rename can never strand the installed base.
+
+## Fix (0.1.114)
+
+From 0.1.114 a Squirrel failure on Windows - an error, or "nothing to
+install" after the release list named a newer version - is logged with
+Squirrel's reason. The release's `Polaris-Setup.exe` is then downloaded,
+checked against the size the release lists and `SHA256SUMS`, and becomes the
+update's restart: it runs with `--silent` at the same moment an installed
+update would restart, so nobody is asked to download anything. Only when that
+fails too does the antivirus notice appear, with both reasons. Squirrel is
+tried again after 30 minutes, doubling up to a day (`setup-install.ts`).
+
+This does not reach a copy still on 0.1.113 or older until Squirrel works on
+it once: their updater is as shipped.
 
 ## For the person affected
 
