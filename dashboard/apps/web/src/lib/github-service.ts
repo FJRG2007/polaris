@@ -502,6 +502,8 @@ export interface GithubAccount {
     /** GitHub's numeric id. The identity that survives a rename. */
     id: number;
     login: string;
+    /** The display name the person set on GitHub, when they set one. */
+    name?: string | null;
     avatarUrl: string | null;
     /** The account's public address, when it has one. GitHub only lets a verified
      *  address be published, so this is one GitHub has proved - but most accounts
@@ -562,6 +564,7 @@ export async function readGithubAccount(token: string): Promise<GithubAccount> {
     const body = (await res.json()) as {
         id?: number;
         login?: string;
+        name?: string | null;
         avatar_url?: string;
         email?: string | null;
     };
@@ -570,6 +573,7 @@ export async function readGithubAccount(token: string): Promise<GithubAccount> {
     return {
         id: body.id,
         login: body.login,
+        name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : null,
         avatarUrl: body.avatar_url ?? null,
         email:
             typeof body.email === "string" && body.email.includes("@")

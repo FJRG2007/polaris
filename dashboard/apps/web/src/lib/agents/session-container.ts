@@ -10,7 +10,7 @@
 
 import * as commands from "./session-commands";
 import { sessionNetworks } from "./session-network";
-import { upWithFreshImage } from "./session-image";
+import { upWithSessionImage } from "./session-image";
 import { sessionLimits } from "./session-capacity";
 import { withContainerPorts } from "./session-ports";
 
@@ -41,15 +41,15 @@ export async function startContainer(
     const limits = await sessionLimits();
     const hostId = target.hostId;
     const up = (networks: string[]) =>
-        upWithFreshImage(
-            (pullPolicy) =>
+        upWithSessionImage(
+            (image, pullPolicy) =>
                 withContainerPorts(hostId, (ports) =>
                     ports.composeUp({
                         project: name,
                         services: [
                             {
                                 name,
-                                image: commands.SESSION_IMAGE,
+                                image,
                                 pullPolicy,
                                 env,
                                 ports: [],
@@ -107,7 +107,8 @@ export async function startContainer(
                         networks
                     })
                 ),
-            () => withContainerPorts(hostId, (ports) => ports.pull(commands.SESSION_IMAGE)),
+            (image) => withContainerPorts(hostId, (ports) => ports.pull(image)),
+            { machine: commands.SESSION_MACHINE_IMAGE, fallback: commands.SESSION_IMAGE },
             Date.now,
             hostId ?? undefined
         );

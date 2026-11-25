@@ -96,7 +96,7 @@ jobs:
           # An entry ending in `*` is every tag with that prefix: the tunnel
           # daemon is tagged per version, and a dashboard an install still runs,
           # or rolls back to, names its version, so no published one is dropped.
-          SERVICE_TAGS: latest-service-dns-blocker latest-service-vpn latest-service-tunnel-*
+          SERVICE_TAGS: latest-service-dns-blocker latest-service-agent-session latest-service-vpn latest-service-tunnel-*
         run: |
           set -uo pipefail
           repo=$(echo "$OWNER" | tr "[:upper:]" "[:lower:]")
