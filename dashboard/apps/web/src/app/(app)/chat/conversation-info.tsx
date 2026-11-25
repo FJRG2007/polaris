@@ -40,7 +40,7 @@ import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PolarMemberRow } from "./polar-member-row";
-import { SafetyNumberView } from "./safety-number";
+import { SafetyNumberView, usePeerVerified } from "./safety-number";
 import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import { useTypingIn } from "./typing-everywhere";
 import { useState, type ReactNode } from "react";
@@ -221,6 +221,9 @@ function InfoBody({
     const { viewerId, viewerName } = useChat();
     // Who is writing here, for the faces in the list of people below.
     const typists = useTypingIn(channel.id, viewerId);
+    // A one-to-one conversation only: in a group each pair compares its own number (design 4.6).
+    const safetyPeer = direct && sealedChatActive() ? (channel.others[0] ?? null) : null;
+    const safetyVerified = usePeerVerified(viewerId, safetyPeer?.id ?? "", null);
     // A group with one other person in it is still drawn as the group here.
     const face = direct ? person : channel.self ? conversationFace(channel, { id: viewerId, name: viewerName }) : null;
     // Somebody else on the other end: the one person a block can be about.
@@ -377,8 +380,6 @@ function InfoBody({
         );
     }
 
-    // A one-to-one conversation only: in a group each pair compares its own number (design 4.6).
-    const safetyPeer = direct && sealedChatActive() ? (channel.others[0] ?? null) : null;
     if (view === "safety" && safetyPeer) {
         return shell(
             t("info.safetyNumber"),
@@ -593,7 +594,7 @@ function InfoBody({
                     <SettingRow
                         icon={<KeyRound />}
                         label={t("info.safetyNumber")}
-                        value=""
+                        value={safetyVerified ? t("info.safetyVerified") : ""}
                         onClick={() => setView("safety")}
                     />
                 ) : null}

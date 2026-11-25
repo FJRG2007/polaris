@@ -18,6 +18,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { runAction } from "@/lib/run-action";
 import { BlockAfterReport } from "@/components/block-after-report";
 import { reportConversationAction, reportMessageAction } from "./actions";
+import { discloseSealed } from "@/lib/chat/e2ee/sealed-chat";
 import type { ChatReportReason } from "@polaris/core";
 import {
     CHAT_REPORT_REASONS,
@@ -43,6 +44,7 @@ export function ReportDialog({
     channelId = null,
     body = "",
     author = null,
+    sealedIn = null,
     open,
     onOpenChange
 }: {
@@ -59,6 +61,9 @@ export function ReportDialog({
      *  the same moment, and the half that otherwise does not happen. Null where
      *  the account is not known, and then nothing is offered. */
     author?: { id: string; name: string } | null;
+    /** The conversation a sealed message is in: its own key goes with the
+     *  report so a moderator can read it (lib/chat/e2ee/sealed-report). */
+    sealedIn?: string | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
@@ -75,10 +80,11 @@ export function ReportDialog({
         if (!messageId && !whole) return;
         setBusy(true);
         setError("");
+        const disclosure = messageId && sealedIn ? await discloseSealed(sealedIn, messageId) : null;
         const result = await runAction(
             () =>
                 messageId
-                    ? reportMessageAction({ messageId, reason, note })
+                    ? reportMessageAction({ messageId, reason, note, ...(disclosure ? { disclosure } : {}) })
                     : reportConversationAction({ channelId, reason, note }),
             setError
         );

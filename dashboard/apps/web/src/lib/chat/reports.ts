@@ -34,6 +34,7 @@ import { copyOntoReport, reportFiles, type ChatReportFileView } from "./report-f
 import { alertAdmins } from "@/lib/notifications/admins";
 import { ChatAccessError, ChatRuleError, requireChannel, type ChatActor } from "./access";
 import * as history from "./history-visibility";
+import * as sealedReport from "./e2ee/sealed-report";
 import { readReportContext, recentReadable, type ReportContextEntry } from "./report-context";
 
 /** How much of a message is copied onto the report. Enough to triage without
@@ -115,7 +116,7 @@ export interface ChatReportView {
  */
 export async function reportMessage(
     actor: ChatActor,
-    input: core.ChatReportInput
+    input: core.ChatReportInput & { readonly disclosure?: string }
 ): Promise<{ already: boolean }> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: input.messageId },
@@ -126,10 +127,32 @@ export async function reportMessage(
             body: true,
             deletedAt: true,
             replyToId: true,
+            clientKey: true,
+            e2eeCiphertext: true,
+            e2eeEpoch: true,
+            e2eeSenderLeaf: true,
+            e2eeSignature: true,
+            e2eeSignatureKey: true,
+            e2eeRevision: true,
             _count: { select: { attachments: true } }
         }
     });
     if (!message || message.deletedAt) throw new ChatAccessError({ key: "errors.messageMissing" });
+
+    // A sealed message's words are only what the reporter hands over, opened
+    // here with its own key and checked against its sender's signature
+    // (e2ee/sealed-report). Without a disclosure (an older client, a device
+    // that cannot open it) it is filed with no excerpt rather than refused; a
+    // disclosure that does not open it is refused, never filed as words.
+    let said: string | null = message.body;
+    if (sealedReport.isSealedRow(message)) {
+        said = null;
+        if (input.disclosure) {
+            const opened = await sealedReport.openReported(message, input.disclosure);
+            if (!opened) throw new ChatRuleError({ key: "errors.reportSealedUnreadable" });
+            said = sealedReport.reportedText(opened);
+        }
+    }
 
     // A report of "hola" is a row a moderator can only dismiss, and a queue with
     // enough of them in it is a queue nobody reads. Refused here rather than
@@ -141,7 +164,8 @@ export async function reportMessage(
     if (
         message._count.attachments === 0 &&
         !message.replyToId &&
-        core.isPleasantry(plainExcerpt(message.body, 200))
+        said !== null &&
+        core.isPleasantry(plainExcerpt(said, 200))
     ) {
         throw new ChatRuleError({ key: "errors.reportPleasantry" });
     }
@@ -163,7 +187,7 @@ export async function reportMessage(
         // deletes the row, and the queue would be left with an id and nothing to
         // decide about.
         authorId: message.authorId,
-        excerpt: plainExcerpt(message.body, EXCERPT)
+        excerpt: said === null ? "" : plainExcerpt(said, EXCERPT)
     };
 
     if (existing) {

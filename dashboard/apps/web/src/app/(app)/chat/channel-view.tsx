@@ -55,6 +55,8 @@ import { CallRosterList } from "./call-roster";
 import type { PollDraft } from "./poll-dialog";
 import { draftMessage, stillPending } from "./draft-message";
 import { ScheduledBar } from "./scheduled-bar";
+import { KeyChangeBar } from "./key-change-bar";
+import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import { ChannelHeader, PanelSearch } from "./channel-header";
 import { useWideScreen } from "./use-wide-screen";
 import { DirectProfile } from "./direct-profile";
@@ -2835,6 +2837,9 @@ export function ChannelView({
                     }
                     onAnswer={answerProposal}
                 />
+            )}
+            {channel.kind === "dm" && channel.others[0] && sealedChatActive() && (
+                <KeyChangeBar channelId={channel.id} viewerId={viewerId} peer={channel.others[0]} />
             )}
             {error && (
                 <p role="alert" className="px-4 pb-1 text-xs text-danger">

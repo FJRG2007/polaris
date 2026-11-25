@@ -63,6 +63,13 @@ const MEMBER_PAGES = 100;
 const LEGACY_SHARE_MS = 10 * 60 * 1000;
 /** Accounts per `roster` request. */
 const ROSTER_PAGE = 1_000;
+/**
+ * Accounts one `reconcile` adds at most: a `claim-key-packages` call's worth.
+ * In a large channel the rest are added by the sends after it, or join by their
+ * own external commit when they open it (proposal decision 9), so one send
+ * never stalls on thousands of adds.
+ */
+const ADD_BATCH = 100;
 const ACCOUNT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** `${userId}/${device}`, as the delivery service addresses a device. */
 const DEVICE_ADDRESS = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[A-Za-z0-9_-]{8,64}$/;
@@ -436,7 +443,7 @@ export class MlsDevice {
             await this.removeLeaves(channelId, (identity) => identity !== this.address && (retired.has(identity) || prefixes.some((prefix) => identity.startsWith(prefix))));
         }
         const present = new Set(this.rosterAccounts(this.requireGroup(channelId)));
-        const adding = [...joinable].filter((id) => !present.has(id) && !departed.has(id));
+        const adding = [...joinable].filter((id) => !present.has(id) && !departed.has(id)).slice(0, ADD_BATCH);
         if (!adding.length) return;
         await this.addAccounts(channelId, adding).catch((caught: unknown) => {
             console.warn("polaris: people new to a sealed conversation could not be added to its group:", caught);
@@ -662,6 +669,21 @@ export class MlsDevice {
             // A full store only loses the floor for this message; the message still opens.
             console.warn("polaris: a sealed message's revision could not be kept:", caught);
         }
+    }
+
+    /**
+     * This sealed message's own key and nonce, for a report (docs/chat-e2ee-mls.md,
+     * "Sealed reports"): only once the stored row's signature checks and it opens
+     * here, so a reader cannot hand over a disclosure for words they never saw.
+     * It opens this one version and nothing else. Null when it does not open.
+     */
+    async discloseSealed(channelId: string, messageId: string): Promise<string | null> {
+        const answer = await this.send({ op: "read-sealed", channelId, messageIds: [messageId] });
+        const row = (answer.messages as SealedWire[]).find((entry) => entry.id === messageId);
+        if (!row || !(await this.openStored(channelId, row))) return null;
+        const binding = { conversationId: channelId, epoch: BigInt(row.epoch), messageId: row.clientKey, senderLeaf: row.senderLeaf, revision: row.revision ?? 0 };
+        const key = await this.historyKey(channelId, binding.epoch).catch(() => null);
+        return key ? toText(await content.messageDisclosure(key, binding)) : null;
     }
 
     private async openStored(channelId: string, row: SealedStored): Promise<Uint8Array | null> {

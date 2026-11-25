@@ -704,6 +704,10 @@ export function MessageList({
                             ? { id: said.authorId, name: said.authorName }
                             : null;
                     })()}
+                    sealedIn={(() => {
+                        const said = messages.find((entry) => entry.id === reporting);
+                        return said?.sealed ? said.channelId : null;
+                    })()}
                     open={reporting !== null}
                     onOpenChange={(next) => !next && setReporting(null)}
                 />

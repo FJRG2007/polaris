@@ -99,14 +99,21 @@ function infoOf(binding: MessageBinding): Uint8Array<ArrayBuffer> {
     return owned(canonical(LABEL, "message", conversationId, BigInt(epoch).toString(), messageId, senderLeaf, ...revision));
 }
 
-async function keyAndNonce(historyKey: Uint8Array, info: Uint8Array<ArrayBuffer>): Promise<[CryptoKey, Uint8Array<ArrayBuffer>]> {
+async function derivedBits(historyKey: Uint8Array, info: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
     if (historyKey.length !== HISTORY_KEY_BYTES) throw new RangeError("A history key is 32 bytes");
     const base = await crypto.subtle.importKey("raw", owned(historyKey), "HKDF", false, ["deriveBits"]);
-    const bits = new Uint8Array(
+    return new Uint8Array(
         await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info }, base, (KEY_BYTES + NONCE_BYTES) * 8)
     );
+}
+
+async function splitBits(bits: Uint8Array): Promise<[CryptoKey, Uint8Array<ArrayBuffer>]> {
     const key = await crypto.subtle.importKey("raw", owned(bits.subarray(0, KEY_BYTES)), "AES-GCM", false, ["encrypt", "decrypt"]);
     return [key, owned(bits.subarray(KEY_BYTES))];
+}
+
+async function keyAndNonce(historyKey: Uint8Array, info: Uint8Array<ArrayBuffer>): Promise<[CryptoKey, Uint8Array<ArrayBuffer>]> {
+    return splitBits(await derivedBits(historyKey, info));
 }
 
 /** Seal one message's content (the serialized message payload) under `HK`. */
@@ -124,6 +131,43 @@ export async function openMessage(historyKey: Uint8Array, binding: MessageBindin
     try {
         const info = infoOf(binding);
         const [key, iv] = await keyAndNonce(historyKey, info);
+        const opened = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv, additionalData: owned(concat(sealed.subarray(0, 1), info)) },
+            key,
+            owned(sealed.subarray(1))
+        );
+        return new Uint8Array(opened);
+    } catch {
+        throw new MessageOpenError();
+    }
+}
+
+/** The size of a message disclosure: its own key and nonce, nothing else. */
+export const DISCLOSURE_BYTES = KEY_BYTES + NONCE_BYTES;
+
+/**
+ * One message's own key and nonce (the HKDF output for its binding), for a
+ * reader who hands that message - and only that message - to a moderator
+ * (docs/chat-e2ee-mls.md, "Sealed reports"). It opens no other message, no
+ * other revision of this one, and says nothing about `HK`: HKDF is one-way and
+ * every message derives from its own info.
+ */
+export async function messageDisclosure(historyKey: Uint8Array, binding: MessageBinding): Promise<Uint8Array> {
+    return derivedBits(historyKey, infoOf(binding));
+}
+
+/**
+ * Open a stored sealed message with a reader's disclosure of it. The stored
+ * ciphertext is what the sender signed, so the caller checks that signature
+ * (`verifyMessageSignature`) first: then what opens is what the sender sealed,
+ * since finding a second key that passes GCM's tag over a fixed ciphertext and
+ * AAD is a 2^-128 guess. One coarse error for every failure.
+ */
+export async function openDisclosed(disclosure: Uint8Array, binding: MessageBinding, sealed: Uint8Array): Promise<Uint8Array> {
+    if (disclosure.length !== DISCLOSURE_BYTES || sealed.length < 1 + TAG_BYTES || sealed[0] !== MESSAGE_CONTENT_VERSION) throw new MessageOpenError();
+    try {
+        const info = infoOf(binding);
+        const [key, iv] = await splitBits(disclosure);
         const opened = await crypto.subtle.decrypt(
             { name: "AES-GCM", iv, additionalData: owned(concat(sealed.subarray(0, 1), info)) },
             key,

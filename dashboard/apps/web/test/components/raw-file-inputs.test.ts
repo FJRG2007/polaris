@@ -33,8 +33,8 @@ const ALLOWED: Record<string, string> = {
         "Add more inside the photo editor: more from the phone's gallery, as the picker's own gallery button opens",
     "apps/web/src/app/(app)/chat/attach-sheet.tsx":
         "the composer's + on a phone: Camera and Photos open the phone's own camera and gallery, as the picker's camera button does; Files opens the picker",
-    "apps/web/src/app/(app)/vault/qr-scan.tsx":
-        "a 2FA QR carries the secret; the vault reads it only in the browser, and a Drive or address pick is fetched through the server",
+    "apps/web/src/components/qr-scan-dialog.tsx":
+        "the QR scanner: a vault 2FA QR carries the secret and a chat safety number QR is checked against this browser's own keys, so both are read only in the browser, and a Drive or address pick is fetched through the server",
     "apps/web/src/app/(app)/vault/recovery-codes.tsx":
         "recovery codes in the clear; the vault reads them only in the browser, and a Drive or address pick is fetched through the server",
     "apps/web/src/app/(app)/vault/settings/vault-import.tsx":

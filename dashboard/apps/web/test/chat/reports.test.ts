@@ -19,6 +19,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { chatText, type ChatText } from "@/lib/chat/text";
+import { sealedRow } from "./e2ee/support/sealed-row";
 
 const MESSAGE = "018f2b7a-0000-7000-8000-0000000000a1";
 const CHANNEL = "018f2b7a-0000-7000-8000-0000000000c1";
@@ -152,6 +153,38 @@ describe("reporting a message", () => {
         // is reading the storage format rather than the message.
         expect(written.excerpt).toContain("shouting");
         expect(written.excerpt).not.toContain("**");
+    });
+
+    it("copies a sealed message's words from the reader's disclosure", async () => {
+        const sealed = await sealedRow(CHANNEL, { body: "**sealed** abuse" });
+        findMessage.mockImplementation(async () => ({ id: MESSAGE, authorId: "bob", body: "", deletedAt: null, replyToId: null, _count: { attachments: 0 }, ...sealed.row }));
+
+        await reportMessage(actor, { messageId: MESSAGE, reason: "abuse", note: "", disclosure: sealed.disclosure });
+        expect(createReport.mock.calls[0]![0].data.excerpt).toBe("sealed abuse");
+    });
+
+    it("refuses a sealed report whose disclosure does not open the message", async () => {
+        const sealed = await sealedRow(CHANNEL, { body: "words" });
+        const other = await sealedRow(CHANNEL, { body: "other words" });
+        findMessage.mockImplementation(async () => ({ id: MESSAGE, authorId: "bob", body: "", deletedAt: null, replyToId: null, _count: { attachments: 0 }, ...sealed.row }));
+
+        await expect(reportMessage(actor, { messageId: MESSAGE, reason: "abuse", note: "", disclosure: other.disclosure })).rejects.toThrow();
+        expect(createReport).not.toHaveBeenCalled();
+    });
+
+    it("files a sealed report with no disclosure, with no words", async () => {
+        const sealed = await sealedRow(CHANNEL, { body: "hola" });
+        findMessage.mockImplementation(async () => ({ id: MESSAGE, authorId: "bob", body: "", deletedAt: null, replyToId: null, _count: { attachments: 0 }, ...sealed.row }));
+
+        await reportMessage(actor, { messageId: MESSAGE, reason: "spam", note: "" });
+        expect(createReport.mock.calls[0]![0].data.excerpt).toBe("");
+    });
+
+    it("refuses a sealed greeting once its words are known", async () => {
+        const sealed = await sealedRow(CHANNEL, { body: "hola" });
+        findMessage.mockImplementation(async () => ({ id: MESSAGE, authorId: "bob", body: "", deletedAt: null, replyToId: null, _count: { attachments: 0 }, ...sealed.row }));
+
+        await expect(reportMessage(actor, { messageId: MESSAGE, reason: "spam", note: "", disclosure: sealed.disclosure })).rejects.toThrow();
     });
 
     it("refuses a report of a message that is only a greeting", async () => {

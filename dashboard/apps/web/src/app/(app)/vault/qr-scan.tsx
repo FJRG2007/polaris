@@ -1,37 +1,13 @@
 "use client";
 
 /**
- * Reading the QR a site shows when it turns on two-factor.
- *
- * That square is an `otpauth://` link, and typing the secret under it by hand is
- * thirty-two characters of base32 with no word breaks - which is why people take
- * a screenshot of it and then have nowhere to put the screenshot. So both ways
- * in are here: point the camera at the screen it is on, or hand over the picture
- * that was already taken.
- *
- * It happens entirely in this tab. The frames never leave the browser, the
- * picture is never uploaded, and what comes out goes straight into a field that
- * is encrypted before it is stored - which is the only way a scanner belongs in
- * a vault whose server is not supposed to be able to read anything.
- *
- * The camera needs a secure address, which is the one failure worth naming
- * rather than reporting as "could not start": a browser on plain http refuses it
- * and says nothing an operator could act on.
+ * Reading the QR a site shows when it turns on two-factor: the shared scanner
+ * (`components/qr-scan-dialog.tsx`) in the vault's words, taking a pasted
+ * `otpauth://` link as well as a picture.
  */
 
-import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Camera, ImageUp, Loader2 } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
-
-/** How often a frame is read. Fast enough to feel immediate, slow enough that
- *  the decode is not competing with the camera for the same thread. */
-const SCAN_INTERVAL_MS = 220;
-
-/** A ceiling on the picture handed in. A QR is a few hundred pixels; anything
- *  larger is decoded from a scaled copy rather than at full size, because a
- *  12-megapixel photograph is a second of work per attempt. */
-const MAX_SIDE = 1600;
+import * as scan from "@/components/qr-scan-dialog";
 
 export function QrScanDialog({
     open,
@@ -45,215 +21,23 @@ export function QrScanDialog({
     onOpenChange: (open: boolean) => void;
 }) {
     const t = useTranslations("vault");
-    const video = useRef<HTMLVideoElement>(null);
-    const file = useRef<HTMLInputElement>(null);
-    const [scanning, setScanning] = useState(false);
-    const [reading, setReading] = useState(false);
-    const [error, setError] = useState("");
-
-    // The camera runs only while it is asked for, and its track is stopped on the
-    // way out - a stream left open keeps the recording light on.
-    useEffect(() => {
-        if (!open || !scanning) return;
-        const element = video.current;
-        if (!element) return;
-        let stream: MediaStream | null = null;
-        let timer = 0;
-        let live = true;
-
-        const start = async () => {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment" }
-                });
-                if (!live) return;
-                element.srcObject = stream;
-                await element.play();
-            } catch {
-                if (!live) return;
-                setScanning(false);
-                setError(
-                    t("qr.noCamera")
-                );
-                return;
-            }
-
-            const { default: jsQR } = await import("jsqr");
-            const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d", { willReadFrequently: true });
-            if (!context) return;
-
-            timer = window.setInterval(() => {
-                if (!element.videoWidth) return;
-                canvas.width = element.videoWidth;
-                canvas.height = element.videoHeight;
-                context.drawImage(element, 0, 0, canvas.width, canvas.height);
-                const frame = context.getImageData(0, 0, canvas.width, canvas.height);
-                const found = jsQR(frame.data, frame.width, frame.height, {
-                    inversionAttempts: "dontInvert"
-                });
-                if (!found?.data) return;
-                window.clearInterval(timer);
-                onFound(found.data);
-                onOpenChange(false);
-            }, SCAN_INTERVAL_MS);
-        };
-
-        void start();
-        return () => {
-            live = false;
-            window.clearInterval(timer);
-            for (const track of stream?.getTracks() ?? []) track.stop();
-        };
-        // `onFound` and `onOpenChange` are the caller's own closures and change
-        // on its every render; restarting the camera for that would restart it
-        // constantly.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, scanning]);
-
-    // Nothing is left running once the dialog is shut, including on the path
-    // where it is dismissed rather than answered.
-    useEffect(() => {
-        if (!open) {
-            setScanning(false);
-            setError("");
-        }
-    }, [open]);
-
-
-    const readPicture = async (picture: File) => {
-        setReading(true);
-        setError("");
-        try {
-            const bitmap = await createImageBitmap(picture);
-            const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-            const canvas = document.createElement("canvas");
-            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-            const context = canvas.getContext("2d", { willReadFrequently: true });
-            if (!context) throw new Error("no canvas");
-            context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-            bitmap.close();
-            const frame = context.getImageData(0, 0, canvas.width, canvas.height);
-            const { default: jsQR } = await import("jsqr");
-            // Both ways round here, unlike the camera: a screenshot may be of a
-            // dark-mode page, where the code is light on dark and the ordinary
-            // reading finds nothing.
-            const found = jsQR(frame.data, frame.width, frame.height, {
-                inversionAttempts: "attemptBoth"
-            });
-            if (!found?.data) {
-                setError(t("qr.notFound"));
-                return;
-            }
-            onFound(found.data);
-            onOpenChange(false);
-        } catch {
-            setError(t("qr.notPicture"));
-        } finally {
-            setReading(false);
-        }
+    const copy: scan.QrScanCopy = {
+        title: t("qr.title"),
+        intro: t("qr.intro"),
+        start: t("qr.start"),
+        stop: t("qr.stop"),
+        upload: t("qr.upload"),
+        noCamera: t("qr.noCamera"),
+        notFound: t("qr.notFound"),
+        notPicture: t("qr.notPicture")
     };
-
-    /**
-     * Paste, because that is what somebody with a screenshot actually does.
-     *
-     * Taking a picture of the code and pressing Ctrl+V is one gesture; saving it
-     * to a file, opening a chooser and finding it again is four. The listener is
-     * on the window rather than on a field, since there is no field here to
-     * paste into and nobody would think to look for one.
-     *
-     * Text is taken too: the same clipboard often holds the `otpauth://` link
-     * itself, offered beside the square as "can't scan it?", and refusing that
-     * because it is not a picture would be refusing the easier half of the same
-     * gesture.
-     */
-    useEffect(() => {
-        if (!open) return;
-        const onPaste = (event: ClipboardEvent) => {
-            const data = event.clipboardData;
-            if (!data) return;
-            const picture = [...data.files].find((entry) => entry.type.startsWith("image/"));
-            if (picture) {
-                event.preventDefault();
-                void readPicture(picture);
-                return;
-            }
-            const text = data.getData("text/plain").trim();
-            if (text.toLowerCase().startsWith("otpauth://")) {
-                event.preventDefault();
-                onFound(text);
-                onOpenChange(false);
-            }
-        };
-        window.addEventListener("paste", onPaste);
-        return () => window.removeEventListener("paste", onPaste);
-        // `onFound` and `onOpenChange` are the caller's closures and change on
-        // its every render; rebinding for that would be rebinding constantly.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open]);
-
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{t("qr.title")}</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-3">
-                    <p className="text-sm text-muted-foreground">
-                        {t("qr.intro")}
-                    </p>
-
-                    {scanning ? (
-                        <video
-                            ref={video}
-                            playsInline
-                            muted
-                            className="aspect-video w-full rounded-md border border-border bg-black object-cover"
-                        />
-                    ) : null}
-
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
-
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            type="button"
-                            variant={scanning ? "secondary" : "primary"}
-                            onClick={() => setScanning((was) => !was)}
-                        >
-                            <Camera className="size-4 shrink-0" />
-                            {scanning ? t("qr.stop") : t("qr.start")}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            disabled={reading}
-                            onClick={() => file.current?.click()}
-                        >
-                            {reading ? (
-                                <Loader2 className="size-4 shrink-0 animate-spin" />
-                            ) : (
-                                <ImageUp className="size-4 shrink-0" />
-                            )}
-                            {t("qr.upload")}
-                        </Button>
-                    </div>
-
-                    <input
-                        ref={file}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(event) => {
-                            const picture = event.target.files?.[0];
-                            // Cleared first, so choosing the same file twice
-                            // after a failure still counts as a change.
-                            event.target.value = "";
-                            if (picture) void readPicture(picture);
-                        }}
-                    />
-                </div>
-            </DialogContent>
-        </Dialog>
+        <scan.QrScanDialog
+            open={open}
+            copy={copy}
+            acceptsText={(text) => text.toLowerCase().startsWith("otpauth://")}
+            onFound={onFound}
+            onOpenChange={onOpenChange}
+        />
     );
 }
