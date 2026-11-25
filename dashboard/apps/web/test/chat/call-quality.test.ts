@@ -279,12 +279,16 @@ describe("the automatic walk on a backup line (data saver)", () => {
 });
 
 describe("how a shared screen is tuned", () => {
-    it("follows the framerate while nothing has had to give", () => {
+    it("hints by framerate but always keeps its size, giving up frames instead", () => {
+        // BUG-0036: a motion share gave up size first and reached a viewer at 540p.
         expect(quality.screenTuning("max", false)).toEqual({
             hint: "motion",
-            preference: "maintain-framerate"
+            preference: "maintain-resolution"
         });
-        expect(quality.screenTuning("medium", false).hint).toBe("detail");
+        expect(quality.screenTuning("medium", false)).toEqual({
+            hint: "detail",
+            preference: "maintain-resolution"
+        });
     });
 
     it("is held sharp once auto has brought it down", () => {
@@ -602,5 +606,36 @@ describe("stepping by hand", () => {
 
     it("has nowhere left to go from the top", () => {
         expect(shift(CAMERA_LADDER, "max", 1)).toBe("max");
+    });
+});
+
+describe("the smaller copies of a shared screen", () => {
+    it("falls back from 1080p to 720p, never to the client's 960x540", () => {
+        expect(quality.screenLayers({ width: 1920, height: 1080 })).toEqual([
+            { width: 1280, height: 720, maxBitrate: 1_500_000, maxFramerate: 15 }
+        ]);
+    });
+
+    it("puts a 1080p copy between 720p and a 4K source", () => {
+        const layers = quality.screenLayers({ width: 3840, height: 2160 });
+        expect(layers.map((one) => [one.width, one.height, one.maxFramerate])).toEqual([
+            [1280, 720, 15],
+            [1920, 1080, 30]
+        ]);
+        expect(layers[1].maxBitrate).toBe(5_000_000);
+    });
+
+    it("keeps an ultrawide's own shape and scales its allowance by its pixels", () => {
+        const [first] = quality.screenLayers({ width: 3440, height: 1440 });
+        expect(first.height).toBe(720);
+        expect(first.width).toBe(1720);
+        expect(first.maxBitrate).toBeGreaterThan(1_500_000);
+    });
+
+    it("never adds a copy as big as the source, and nothing for a small or unknown one", () => {
+        expect(quality.screenLayers({ width: 1600, height: 1200 }).every((one) => one.height < 1200)).toBe(true);
+        expect(quality.screenLayers({ width: 1280, height: 720 })).toEqual([]);
+        expect(quality.screenLayers({})).toEqual([]);
+        expect(quality.screenLayers(null)).toEqual([]);
     });
 });

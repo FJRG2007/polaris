@@ -11,7 +11,7 @@ Security findings are not kept here; they live in
 
 | ID | Title | Area | Status | Location | Reported |
 |----|-------|------|--------|----------|----------|
-| BUG-0001 | A shared screen goes out at low quality on a line that can carry the source | Calls | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/call-quality.ts | 2026-11-21 |
+| BUG-0001 | A shared screen goes out at low quality on a line that can carry the source | Calls | Regressed, see BUG-0036 | dashboard/apps/web/src/app/(app)/chat/call-quality.ts | 2026-11-21 |
 | BUG-0002 | A conversation scrolls up into older messages on its own | Chat | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/channel-view.tsx | 2026-11-21 |
 | BUG-0003 | Polar's messages are named "somebody who has left", and its delete preview has no face or AI tag | Chat | Fixed, watching | dashboard/apps/web/src/lib/chat/author-name.ts | 2026-11-21 |
 | BUG-0004 | Polar answers a mention with its tool call written out as text | Polar | Fixed, watching | dashboard/apps/web/src/lib/polar/mention-answer.ts | 2026-11-21 |
@@ -46,3 +46,4 @@ Security findings are not kept here; they live in
 | BUG-0033 | With Polaris unreachable, only the chat opens | Dashboard | Partly fixed | dashboard/apps/web/public/sw.js | 2026-11-23 |
 | BUG-0034 | In Polaris desktop the Christmas Polaris logo does not load | Desktop | Fixed, watching | clients/desktop/src/main/app-icon.ts | 2026-11-24 |
 | BUG-0035 | A note written offline is never saved | Dashboard | Partly fixed | dashboard/apps/web/src/app/(app)/notes/notes-view.tsx | 2026-11-23 |
+| BUG-0036 | A watched screen share arrives at 540p instead of full quality | Calls | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/call-quality.ts | 2026-11-24 |
