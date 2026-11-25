@@ -400,6 +400,7 @@ model User {
     chatChannelMemberships ChatChannelMember[]
     chatLock               ChatLock?
     chatPollVotes        ChatPollVote[]
+    chatPollBallots      ChatPollBallot[]
     contactNamesGiven    ContactName[]       @relation("ContactNamesGiven")
     contactNamesReceived ContactName[]       @relation("ContactNamesReceived")
     chatReportsMade     ChatReport[]         @relation("ChatReportsMade")
@@ -11654,6 +11655,7 @@ model ChatPoll {
 
     message ChatMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
     options ChatPollOption[]
+    ballots ChatPollBallot[]
 
     @@index([closesAt])
 }
@@ -11729,6 +11731,33 @@ model ChatPollVote {
 
     @@unique([optionId, userId])
     @@index([optionId])
+    @@index([userId])
+}
+
+// One person's sealed vote on a poll in a sealed conversation
+// (docs/chat-e2ee-mls.md, "Sealed votes").
+//
+// The answers picked are sealed in the voter's browser under the
+// conversation's history key, so this row says that somebody voted and never
+// what they picked: the tally is made in each member's browser. One row per
+// voter is what keeps it one vote per person; voting again replaces it and
+// taking the vote back deletes it. `ballotId` is a fresh random id per ballot,
+// bound into the seal and the order an anonymous poll's ballots are read in, so
+// that order says nothing about who cast which.
+model ChatPollBallot {
+    pollId    String   @db.Uuid
+    userId    String   @db.Uuid
+    ballotId  String   @db.Uuid
+    // The MLS epoch whose history key sealed it.
+    epoch     BigInt
+    sealed    Bytes
+    updatedAt DateTime @default(now()) @updatedAt
+
+    poll ChatPoll @relation(fields: [pollId], references: [messageId], onDelete: Cascade)
+    user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([pollId, userId])
+    @@unique([pollId, ballotId])
     @@index([userId])
 }
 

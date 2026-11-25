@@ -327,3 +327,41 @@ export async function removeSealedAccounts(channelId: string, userIds: readonly 
     if (!mls.hasGroup(channelId)) return;
     await mls.removeAccounts(channelId, [...userIds]);
 }
+
+/** A stored sealed ballot as the server hands it out (`poll-ballots.ts`). */
+export interface StoredBallot {
+    readonly ballotId: string;
+    readonly epoch: string;
+    readonly sealed: string;
+    readonly mine: boolean;
+    readonly voter?: { readonly id: string; readonly name: string };
+}
+
+/**
+ * Seal this account's vote on a sealed poll: the answer positions it picks,
+ * bound to this account on a public poll and to nobody on an anonymous one.
+ */
+export async function sealBallot(channelId: string, pollId: string, anonymous: boolean, picks: readonly number[]): Promise<{ ballotId: string; epoch: string; sealed: string }> {
+    const mls = await device();
+    await mls.ensureGroup(channelId);
+    return mls.sealBallot(channelId, pollId, anonymous ? null : viewer, picks);
+}
+
+/**
+ * What each of these ballots picks, in order; null for one that does not open
+ * here. A public ballot is opened as its named voter's (or this account's own),
+ * so one the server moved to somebody else's row does not open.
+ */
+export async function openBallots(channelId: string, pollId: string, anonymous: boolean, rows: readonly StoredBallot[]): Promise<(number[] | null)[]> {
+    if (!rows.length) return [];
+    const mls = await device();
+    const me = viewer;
+    return Promise.all(
+        rows.map((row) => {
+            const voter = anonymous ? null : (row.voter?.id ?? (row.mine ? me : null));
+            // A public ballot with nobody to bind it to cannot be checked, so it is not counted.
+            if (!anonymous && !voter) return null;
+            return mls.openBallot(channelId, pollId, voter, row);
+        })
+    );
+}

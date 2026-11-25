@@ -27,6 +27,7 @@ import * as saved from "@/lib/chat/saved-media";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import * as polls from "@/lib/chat/polls";
+import * as pollBallots from "@/lib/chat/poll-ballots";
 import * as locations from "@/lib/chat/locations";
 import * as pins from "@/lib/chat/pins";
 import * as reminders from "@/lib/chat/reminders";
@@ -758,6 +759,28 @@ export async function pollVotersAction(
     if (!parsed.success) return { error: (await getTranslations("chat"))("errors.pollGone") };
     const result = await guard(() => polls.readPollVoters(me, parsed.data));
     return result.error ? { error: result.error } : { answers: result.value };
+}
+
+/**
+ * Cast, replace or take back a sealed ballot on a poll in a sealed
+ * conversation; the server stores it without being able to read it.
+ */
+export async function castBallotAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = pollBallots.castBallotSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.voteNotCounted") };
+    return guard(() => pollBallots.castBallot(me, parsed.data));
+}
+
+/** One page of a sealed poll's ballots, which this browser opens and counts. */
+export async function pollBallotsAction(
+    input: unknown
+): Promise<{ page?: pollBallots.BallotsPage; error?: string }> {
+    const me = await actor();
+    const parsed = pollBallots.readBallotsSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.pollGone") };
+    const result = await guard(() => pollBallots.readBallots(me, parsed.data));
+    return result.error ? { error: result.error } : { page: result.value };
 }
 
 /** Close a poll early. Whoever asked it, and whoever moderates the room. */

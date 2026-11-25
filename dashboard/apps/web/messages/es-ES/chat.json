@@ -1624,6 +1624,7 @@
         "openUntilItIsClosed": "Abierta hasta que se cierre",
         "resultsShowWhenItCloses": "Resultados al cerrarse",
         "savingYourVote": "Guardando tu voto",
+        "voteNotCast": "No se emitió el voto. Inténtalo de nuevo.",
         "closing": "Cerrando...",
         "endPoll": "Cerrar",
         "votes": "{count, plural, one {1 voto} other {{count} votos}}",

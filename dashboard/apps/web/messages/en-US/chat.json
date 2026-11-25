@@ -1624,6 +1624,7 @@
         "openUntilItIsClosed": "Open until it is closed",
         "resultsShowWhenItCloses": "Results show when it closes",
         "savingYourVote": "Saving your vote",
+        "voteNotCast": "That vote was not cast. Try again.",
         "closing": "Closing...",
         "endPoll": "End poll",
         "votes": "{count, plural, one {1 vote} other {{count} votes}}",

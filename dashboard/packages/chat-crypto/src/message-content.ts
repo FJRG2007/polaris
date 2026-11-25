@@ -186,3 +186,89 @@ export async function openHistoryKey(recipientPrivateKey: CryptoKey, envelope: U
     if (key.length !== HISTORY_KEY_BYTES) throw new MessageOpenError();
     return key;
 }
+
+/**
+ * A sealed poll vote (docs/chat-e2ee-mls.md, "Sealed votes"): which answers
+ * one person picked, sealed under the conversation's `HK(c, e)` so the server
+ * keeps one ballot per voter - one vote per person - without being able to
+ * read what it says.
+ *
+ *     K, nonce = HKDF-SHA256(HK, salt = empty,
+ *                            info = canonical(LABEL, "ballot", conversation, epoch, poll, ballot, voter))
+ *     sealed   = version(1) || AES-256-GCM(K, nonce, picks, aad = version || info)
+ *
+ * `ballot` is a fresh random id for every ballot cast, so the derivation is
+ * unique even for two anonymous ballots in one epoch. `voter` is the voter's
+ * account id on a public poll, so a ballot moved to another voter's row does
+ * not open; empty on an anonymous one, which must open without naming anybody.
+ * The picks are a fixed three bytes (`encodeBallot`), so the length of a
+ * ballot says nothing about how many answers it holds.
+ */
+export interface BallotBinding {
+    readonly conversationId: string;
+    readonly epoch: bigint | number;
+    /** The poll's message id. */
+    readonly pollId: string;
+    /** This ballot's own random id. */
+    readonly ballotId: string;
+    /** The voter's account id on a public poll; null on an anonymous one. */
+    readonly voter: string | null;
+}
+
+const BALLOT_VERSION = 1;
+/** Answers a poll takes at most, one bit each in a ballot. */
+export const BALLOT_MAX_ANSWERS = 16;
+/** The size of every sealed ballot. */
+export const SEALED_BALLOT_BYTES = 1 + 3 + TAG_BYTES;
+
+function ballotInfo(binding: BallotBinding): Uint8Array<ArrayBuffer> {
+    const { conversationId, epoch, pollId, ballotId, voter } = binding;
+    if (!conversationId || !pollId || !ballotId) throw new RangeError("A ballot names its conversation, poll and id");
+    if (BigInt(epoch) < 0n) throw new RangeError("The epoch is not negative");
+    return owned(canonical(LABEL, "ballot", conversationId, BigInt(epoch).toString(), pollId, ballotId, voter ?? ""));
+}
+
+/** The answer positions picked, as the fixed-size plaintext of a ballot. */
+export function encodeBallot(picks: readonly number[]): Uint8Array {
+    let mask = 0;
+    for (const at of picks) {
+        if (!Number.isInteger(at) || at < 0 || at >= BALLOT_MAX_ANSWERS) throw new RangeError("An answer position is 0-15");
+        mask |= 1 << at;
+    }
+    return Uint8Array.of(BALLOT_VERSION, mask & 0xff, (mask >> 8) & 0xff);
+}
+
+/** The positions a ballot's plaintext picks, ascending; null for one that is not a ballot. */
+export function decodeBallot(bytes: Uint8Array): number[] | null {
+    if (bytes.length !== 3 || bytes[0] !== BALLOT_VERSION) return null;
+    const mask = bytes[1]! | (bytes[2]! << 8);
+    const picks: number[] = [];
+    for (let at = 0; at < BALLOT_MAX_ANSWERS; at += 1) if (mask & (1 << at)) picks.push(at);
+    return picks;
+}
+
+/** Seal a ballot's plaintext (`encodeBallot`) under `HK`. */
+export async function sealBallot(historyKey: Uint8Array, binding: BallotBinding, plaintext: Uint8Array): Promise<Uint8Array> {
+    const info = ballotInfo(binding);
+    const [key, iv] = await keyAndNonce(historyKey, info);
+    const version = Uint8Array.of(MESSAGE_CONTENT_VERSION);
+    const sealed = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: owned(concat(version, info)) }, key, owned(plaintext));
+    return concat(version, new Uint8Array(sealed));
+}
+
+/** Open a ballot sealed by `sealBallot`; one coarse error for every failure. */
+export async function openBallot(historyKey: Uint8Array, binding: BallotBinding, sealed: Uint8Array): Promise<Uint8Array> {
+    if (sealed.length < 1 + TAG_BYTES || sealed[0] !== MESSAGE_CONTENT_VERSION) throw new MessageOpenError();
+    try {
+        const info = ballotInfo(binding);
+        const [key, iv] = await keyAndNonce(historyKey, info);
+        const opened = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv, additionalData: owned(concat(sealed.subarray(0, 1), info)) },
+            key,
+            owned(sealed.subarray(1))
+        );
+        return new Uint8Array(opened);
+    } catch {
+        throw new MessageOpenError();
+    }
+}

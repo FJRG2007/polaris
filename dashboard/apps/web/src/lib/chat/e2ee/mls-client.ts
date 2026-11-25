@@ -532,6 +532,36 @@ export class MlsDevice {
     }
 
     /**
+     * Seal a poll ballot (`content.encodeBallot` picks) under the group's
+     * current history key, the group brought up to date first as for a send,
+     * so somebody who left cannot open it. `voter` is this account on a public
+     * poll and null on an anonymous one. Answers what the server stores.
+     */
+    async sealBallot(channelId: string, pollId: string, voter: string | null, picks: readonly number[]): Promise<{ ballotId: string; epoch: string; sealed: string }> {
+        this.requireGroup(channelId);
+        await this.pull(channelId);
+        await this.reconcile(channelId);
+        const epoch = this.member.epoch(this.requireGroup(channelId));
+        const key = await this.historyKey(channelId, epoch);
+        // Never voted in the clear instead: the caller shows the vote as not counted.
+        if (!key) throw new Error("this device holds no history key for the conversation's current epoch");
+        const ballotId = crypto.randomUUID();
+        const binding = { conversationId: channelId, epoch, pollId, ballotId, voter };
+        const sealed = await content.sealBallot(key, binding, content.encodeBallot(picks));
+        return { ballotId, epoch: epoch.toString(), sealed: toText(sealed) };
+    }
+
+    /** The picks of a stored ballot, or null for one that does not open here. */
+    async openBallot(channelId: string, pollId: string, voter: string | null, row: { ballotId: string; epoch: string; sealed: string }): Promise<number[] | null> {
+        const epoch = BigInt(row.epoch);
+        const key = await this.historyKey(channelId, epoch).catch(() => null);
+        if (!key) return null;
+        const binding = { conversationId: channelId, epoch, pollId, ballotId: row.ballotId, voter };
+        const opened = await content.openBallot(key, binding, fromText(row.sealed)).catch(() => null);
+        return opened ? content.decodeBallot(opened) : null;
+    }
+
+    /**
      * Read and open these sealed messages: each one's signature is checked
      * under the key the server held for its device, then its content opened
      * with the epoch's history key. A message that fails either comes back

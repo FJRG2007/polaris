@@ -47,6 +47,13 @@ export interface ChatPollView {
     /** Whether who picked what is never shown, to anybody. When false the card
      *  offers the list of who picked each answer, once the counts are showing. */
     readonly anonymous: boolean;
+    /**
+     * Voted on with sealed ballots (a poll in a sealed conversation): `votes`
+     * and `mine` count only what was voted in the clear before, and the
+     * browser adds the ballots it opens (`poll-ballots.ts`). `voters` and
+     * `voted` already count both.
+     */
+    readonly sealedVotes?: boolean;
     /** Whether it is over, worked out now rather than read off a flag some job
      *  was supposed to have written. */
     readonly closed: boolean;
@@ -110,6 +117,7 @@ export async function pollsFor(
             anonymous: true,
             closesAt: true,
             closedAt: true,
+            message: { select: { e2eeEpoch: true } },
             options: {
                 orderBy: { position: "asc" },
                 select: { id: true, text: true }
@@ -117,6 +125,15 @@ export async function pollsFor(
         }
     });
     if (polls.length === 0) return found;
+
+    // Who cast a sealed ballot, never what it picks: the server cannot read that.
+    const sealedIds = polls.filter((poll) => poll.message?.e2eeEpoch != null).map((poll) => poll.messageId);
+    const ballots = sealedIds.length
+        ? await prisma.chatPollBallot.findMany({
+              where: { pollId: { in: sealedIds } },
+              select: { pollId: true, userId: true }
+          })
+        : [];
 
     const optionIds = polls.flatMap((poll) => poll.options.map((option) => option.id));
     const votes: VoteRow[] = optionIds.length
@@ -144,10 +161,13 @@ export async function pollsFor(
         const people = new Set(
             votes.filter((cast) => ids.has(cast.optionId)).map((cast) => cast.userId)
         );
+        const sealedVotes = poll.message?.e2eeEpoch != null;
+        for (const ballot of ballots) if (ballot.pollId === poll.messageId) people.add(ballot.userId);
         found.set(poll.messageId, {
             multiple: poll.multiple,
             hideResults: poll.hideResults,
             anonymous: poll.anonymous,
+            ...(sealedVotes ? { sealedVotes } : {}),
             closed,
             closesAt: poll.closesAt?.toISOString() ?? null,
             endedEarly: poll.closedAt !== null,
@@ -290,6 +310,7 @@ export async function vote(
         select: {
             channelId: true,
             deletedAt: true,
+            e2eeEpoch: true,
             poll: {
                 select: {
                     multiple: true,
@@ -302,6 +323,10 @@ export async function vote(
     });
     if (!message?.poll) throw new ChatAccessError({ key: "errors.pollGone" });
     if (message.deletedAt) throw new ChatRuleError({ key: "errors.pollDeleted" });
+    // A sealed poll takes sealed ballots only (`poll-ballots.ts`): a vote in the
+    // clear would tell the server the very thing the ballot keeps from it. Only
+    // a page from before sealed votes sends one.
+    if (message.e2eeEpoch != null) throw new ChatRuleError({ key: "errors.sealedOnlyReload" });
     await requirePostable(actor, message.channelId, { reacting: true });
     await history.requireReadable(actor, message.channelId, input.messageId);
 

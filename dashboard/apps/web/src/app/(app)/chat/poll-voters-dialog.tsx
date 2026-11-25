@@ -32,10 +32,13 @@ import {
 export function PollVotersDialog({
     messageId,
     poll,
+    sealedVoters,
     onOpenChange
 }: {
     messageId: string;
     poll: ChatPollView;
+    /** A sealed poll's voters per answer, from the ballots this browser opened. */
+    sealedVoters?: ReadonlyMap<string, readonly { id: string; name: string }[]>;
     onOpenChange: (open: boolean) => void;
 }) {
     const t = useTranslations("chat");
@@ -60,7 +63,13 @@ export function PollVotersDialog({
         };
     }, [messageId, attempt, t]);
 
-    const byId = new Map(answers?.map((answer) => [answer.optionId, answer]));
+    // The server lists the votes cast in the clear; a sealed poll's ballots are named here.
+    const byId = new Map(
+        answers?.map((answer) => {
+            const extra = sealedVoters?.get(answer.optionId) ?? [];
+            return [answer.optionId, extra.length ? { ...answer, voters: [...answer.voters, ...extra] } : answer];
+        })
+    );
 
     return (
         <Dialog open onOpenChange={onOpenChange}>
