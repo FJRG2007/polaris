@@ -6,10 +6,10 @@
  *
  * The rows, their names and their explanations are known before the app is
  * asked anything, so they draw at once; the values come from the last answer
- * kept on this device and are swapped only where the app's answer differs
- * (`useAppSettingsValues`). A value this device has never seen is a
- * placeholder on that one control. A change shows immediately and is put back
- * when the app refuses it. The app says when a value changed anywhere else (its
+ * kept on this device - or the schema's defaults, on a device that has never
+ * seen an answer - and are swapped only where the app's answer differs
+ * (`useAppSettingsValues`). A change shows immediately and is put back when
+ * the app refuses it. The app says when a value changed anywhere else (its
  * tray, its own page, another window), and the page reads again then and
  * whenever it comes back into view.
  *
@@ -35,7 +35,7 @@ export { forgetAppSettingsSnapshot } from "@/components/this-app/app-settings-va
 
 const MODIFIER_KEYS = ["Control", "Alt", "Shift", "Meta"];
 
-/** Whether a setting is listed: every switch it sits under, all the way up, is on (none is, before the app's values arrive). */
+/** Whether a setting is listed: every switch it sits under, all the way up, is on. */
 export function settingShown(entry: core.AppSettingEntry, snapshot: core.AppSettingsSnapshot | null): boolean {
     let parent = entry.dependsOn;
     for (let depth = 0; parent && depth < 8; depth++) {
@@ -114,10 +114,10 @@ function InApp({
     category: core.AppSettingCategory;
 }) {
     const t = useTranslations("appSettings");
-    const { snapshot, unavailable, refresh, change, keep } = useAppSettingsValues(settings, category);
+    const { snapshot, known, unavailable, refresh, change, keep } = useAppSettingsValues(settings, category);
 
-    // Never seen on this device and the app did not answer: say so, with the rows' place kept.
-    if (!snapshot && unavailable) {
+    // Never seen on this device and the app did not answer: the defaults would be a guess, so say so.
+    if (!known && unavailable) {
         return (
             <Card>
                 <CardBody className="flex flex-col items-start gap-3">
@@ -130,14 +130,14 @@ function InApp({
         );
     }
 
-    // A row that only applies under another, or on a device that has its feature, waits for the app's values; the rest draw now.
+    // A row only one app's build has waits for that app to list the feature; the rest draw now.
     const entries = core
         .appSettingsIn(category)
-        .filter((entry) => core.appSettingOffered(entry, snapshot?.features ?? []) && settingShown(entry, snapshot));
+        .filter((entry) => core.appSettingOffered(entry, snapshot.features) && settingShown(entry, snapshot));
 
     return (
         <div className="flex flex-col gap-4">
-            {category === "voice" && snapshot?.voiceWidget && <VoiceWidgetPreview snapshot={snapshot} />}
+            {category === "voice" && snapshot.voiceWidget && <VoiceWidgetPreview snapshot={snapshot} />}
             {entries.length > 0 && (
                 <Card>
                     <CardBody className="flex flex-col gap-4">
@@ -154,12 +154,12 @@ function InApp({
                     </CardBody>
                 </Card>
             )}
-            {category === "voice" && snapshot?.voiceWidget && (
+            {category === "voice" && snapshot.voiceWidget && (
                 <OverlayGames snapshot={snapshot} settings={settings} onSnapshot={keep} />
             )}
             {category === "voice" && <ResetOverlay settings={settings} onSnapshot={keep} />}
             {category === "clipboard" && <ClearClipboard settings={settings} />}
-            {category === "advanced" && snapshot?.restartPending && (
+            {category === "advanced" && snapshot.restartPending && (
                 <Card>
                     <CardBody className="flex flex-wrap items-center justify-between gap-3">
                         <p className="min-w-0 text-sm text-muted-foreground">{t("restart.pending")}</p>
@@ -171,8 +171,8 @@ function InApp({
             )}
             {category === "hosts" && (
                 <Hosts
-                    servers={snapshot?.servers ?? null}
-                    server={snapshot?.server ?? null}
+                    servers={known ? snapshot.servers : null}
+                    server={snapshot.server}
                     hint={t("hosts.manageHint")}
                     onManage={() => void settings.manageHosts()}
                 />
@@ -201,8 +201,7 @@ function SettingRow({
     onSnapshot
 }: {
     entry: core.AppSettingEntry;
-    /** Null while this device has never seen a value: the control is a placeholder. */
-    snapshot: core.AppSettingsSnapshot | null;
+    snapshot: core.AppSettingsSnapshot;
     settings: NonNullable<PolarisDesktop["appSettings"]>;
     onChange: (change: core.AppSettingChange) => void;
     onSnapshot: (next: core.AppSettingsSnapshot) => void;
@@ -210,28 +209,14 @@ function SettingRow({
     const t = useTranslations("appSettings");
     const key = entry.key as core.AppSettingKey;
     let label: string = t(`items.${key}.label`);
-    if (key === "launcher") {
-        label = snapshot ? t("items.launcher.label", { key: snapshot.launcherKey }) : t("items.launcher.plain");
-    }
+    if (key === "launcher") label = t("items.launcher.label", { key: snapshot.launcherKey });
     let hint: string = t(`items.${key}.hint`);
-    if (key === "launcherClipboard" && snapshot && !snapshot.launcherClipboardPersists) hint = t("clipboard.memoryOnly");
+    if (key === "launcherClipboard" && !snapshot.launcherClipboardPersists) hint = t("clipboard.memoryOnly");
     // A key somebody chose replaces the default keys the hint names.
-    if (key === "voiceWidget" && snapshot?.overlayLockBinding && snapshot.overlayLockKey) {
+    if (key === "voiceWidget" && snapshot.overlayLockBinding && snapshot.overlayLockKey) {
         hint = t("items.voiceWidget.hintKey", { key: snapshot.overlayLockKey });
     }
 
-    if (!snapshot) {
-        return (
-            <Row label={label} hint={hint}>
-                <Skeleton
-                    aria-label={label}
-                    aria-busy="true"
-                    data-placeholder={key}
-                    className={entry.kind === "toggle" ? "h-5 w-9 rounded-full" : "h-8 w-32"}
-                />
-            </Row>
-        );
-    }
     if (entry.kind === "shortcut" && key === "overlayLockBinding") {
         const setOverlayShortcut = settings.setOverlayShortcut;
         if (!setOverlayShortcut) return null;

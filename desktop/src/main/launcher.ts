@@ -580,10 +580,31 @@ async function lookForLaunchers(): Promise<void> {
     launchersFound = findLaunchers(process.platform, apps.map((app) => app.label), running);
 }
 
-/** The key as the settings show it, after one fresh look at other launchers. */
-export async function launcherStatus(): Promise<LauncherStatus> {
-    await lookForLaunchers();
-    return status();
+/** The look under way, so several reads at once share one. */
+let looking: Promise<void> | null = null;
+
+function lookOnce(): Promise<void> {
+    looking ??= lookForLaunchers().finally(() => {
+        looking = null;
+    });
+    return looking;
+}
+
+/**
+ * The key as the settings show it, from what is known now. Never waits on a
+ * look at other launchers: that lists every running program (`tasklist` on
+ * Windows) and every installed one, and the settings page reads this on every
+ * open, change and focus. When the key is not held, a look runs in the
+ * background and `onLooked` hears it when the look changed what the settings say.
+ */
+export async function launcherStatus(onLooked?: () => void): Promise<LauncherStatus> {
+    const now = status();
+    if (now.enabled && !now.held && !pausedForGame()) {
+        void lookOnce().then(() => {
+            if (status().problem !== now.problem) onLooked?.();
+        });
+    }
+    return now;
 }
 
 function status(): LauncherStatus {
@@ -772,7 +793,7 @@ export function startLauncher(given: LauncherHost): void {
     watchClipboard();
     warmSoon();
     // Refused at start: look once at who has it, so the settings can say.
-    if (settings.toggle("launcher") && !heldAccelerator) void lookForLaunchers();
+    if (settings.toggle("launcher") && !heldAccelerator) void lookOnce();
 }
 
 /** Let the key go and close the window, as the app quits. */
