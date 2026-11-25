@@ -627,6 +627,16 @@ export async function sessionRepository(sessionId: string): Promise<string | nul
     return record?.repo?.repoFullName ?? null;
 }
 
+/** The person who started a session, whose own GitHub sign-in its git pushes
+ *  as. Null for a session that no longer exists or that nobody started. */
+export async function sessionStarter(sessionId: string): Promise<string | null> {
+    const record = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { startedById: true }
+    });
+    return record?.startedById ?? null;
+}
+
 /** Whose work a session is doing: the account that owns the repository it runs
  *  in, or - for a workspace, which has no repository to resolve through - the
  *  person who started it. What the tools it is given act as, so a session can
