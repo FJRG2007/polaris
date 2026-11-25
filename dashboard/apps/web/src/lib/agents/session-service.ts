@@ -984,6 +984,31 @@ export async function sessionMessages(
         .reverse();
 }
 
+/**
+ * The agent's tool calls and their results, oldest first: the newest `limit`,
+ * none older than `since` (the oldest message the thread holds, so the steps
+ * never reach further back than what they sit between). One indexed read
+ * (`sessionId, createdAt`); the rows were cut to the decoders' bounds when
+ * they were stored.
+ */
+export async function sessionToolRows(
+    sessionId: string,
+    since: string | null,
+    limit = 300
+): Promise<{ id: string; kind: string; subject: string; ref: string; body: string; at: string }[]> {
+    const records = await prisma.agentSessionMessage.findMany({
+        where: {
+            sessionId,
+            kind: { in: ["tool", "result"] },
+            ...(since ? { createdAt: { gte: new Date(since) } } : {})
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit,
+        select: { id: true, kind: true, subject: true, ref: true, body: true, createdAt: true }
+    });
+    return records.map(({ createdAt, ...rest }) => ({ ...rest, at: createdAt.toISOString() })).reverse();
+}
+
 /** Note that the machine got as far as having a process. */
 export async function markSessionStarted(
     sessionId: string,

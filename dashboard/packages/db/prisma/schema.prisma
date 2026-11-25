@@ -18210,6 +18210,10 @@ model PolarPreference {
     // The colors Polar Code paints code and diffs in: one of CODE_THEMES
     // (apps/web/src/lib/polar/code-theme.ts). Null is the design system's own.
     codeTheme      String?
+    // How Polar Code shows the agent's steps: compact (a line each) or
+    // detailed (cards open), from apps/web/src/lib/polar/code-steps.ts. Null
+    // is not chosen yet, read as compact.
+    codeSteps      String?
     updatedAt      DateTime @updatedAt
 }
 

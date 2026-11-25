@@ -1179,6 +1179,16 @@
                 "not_found": "Ya no existe.",
                 "changed": "Las herramientas del repo cambiaron. Revísalas otra vez."
             }
+        },
+        "codeSteps": {
+            "title": "Pasos en Code",
+            "intro": "Lo que muestra el trabajo del agente mientras corre y después.",
+            "label": "Ver pasos",
+            "failed": "No se pudo guardar cómo se ven los pasos. Inténtalo de nuevo.",
+            "names": {
+                "compact": "En palabras",
+                "detailed": "Con código y salida"
+            }
         }
     },
     "temporary": {
@@ -1967,6 +1977,51 @@
             "reviewChanges": "Revisa los últimos cambios",
             "updateDeps": "Actualiza dependencias viejas",
             "cleanUp": "Limpia código que nadie usa"
+        },
+        "stepsOf": "{count, plural, one {# paso} other {# pasos}}: {parts}",
+        "stepKinds": {
+            "command": "{count, plural, one {# comando} other {# comandos}}",
+            "edit": "{count, plural, one {# edición} other {# ediciones}}",
+            "read": "{count, plural, one {# archivo leído} other {# archivos leídos}}",
+            "search": "{count, plural, one {# búsqueda} other {# búsquedas}}",
+            "web": "{count, plural, one {# consulta web} other {# consultas web}}",
+            "task": "{count, plural, one {# ayudante} other {# ayudantes}}"
+        },
+        "stepState": {
+            "running": "En curso",
+            "done": "Hecho",
+            "failed": "Falló",
+            "ended": "Sin salida"
+        },
+        "step": {
+            "runningCommand": "Ejecutando {command}",
+            "ranCommand": "Ejecutó {command}",
+            "runningAny": "Ejecutando un comando",
+            "ranAny": "Lanzó comando",
+            "editing": "Editando {file}",
+            "edited": "Editó {file}",
+            "editingAny": "Editando archivo",
+            "editedAny": "Editó un archivo",
+            "reading": "Leyendo {file}",
+            "read": "Leyó {file}",
+            "readingAny": "Leyendo un archivo",
+            "readAny": "Leyó archivo",
+            "searching": "Buscando en el código",
+            "searched": "Buscó en el código",
+            "browsing": "Consultando en la web",
+            "browsed": "Consultó en la web",
+            "delegating": "Pasando una parte a un ayudante",
+            "delegated": "Pasó una parte a un ayudante",
+            "using": "Usando {tool}",
+            "used": "Usó {tool}",
+            "command": "Comando",
+            "noOutput": "No devolvió nada",
+            "took": "{seconds} s",
+            "showAll": "Ver las {count} líneas",
+            "showLess": "Ver menos",
+            "expandAll": "Abrir pasos",
+            "collapseAll": "Plegar pasos",
+            "offer": "¿Cómo quieres ver los pasos del agente? Puedes cambiarlo cuando quieras."
         }
     },
     "compare": {

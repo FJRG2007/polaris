@@ -63,7 +63,10 @@ interface Pending {
 export class AcpNormalizer {
     private pending: Pending | null = null;
     private segment = 0;
-    private readonly calls = new Map<string, { title: string; announced: boolean; done: boolean }>();
+    private readonly calls = new Map<
+        string,
+        { title: string; body: string; announced: boolean; done: boolean }
+    >();
 
     constructor(
         private readonly sessionId: string,
@@ -93,10 +96,8 @@ export class AcpNormalizer {
                 rows.push(...this.flush());
                 const ref = clip(update.toolCallId, MAX_ID_CHARS);
                 const known = this.calls.get(ref);
-                if (!known || !known.announced) {
-                    this.calls.set(ref, { title: update.title, announced: true, done: false });
-                    rows.push(this.callRow(ref, update.title, update.rawInput));
-                }
+                if (!known || !known.announced) rows.push(this.announce(ref, update.title, update.rawInput, known));
+                else rows.push(...this.revise(ref, known, update.title, update.rawInput));
                 if (update.status === "completed" || update.status === "failed")
                     rows.push(...this.resultRow(ref, update));
                 return rows;
@@ -105,10 +106,11 @@ export class AcpNormalizer {
                 rows.push(...this.flush());
                 const ref = clip(update.toolCallId, MAX_ID_CHARS);
                 const known = this.calls.get(ref);
-                if (!known?.announced && update.title) {
-                    this.calls.set(ref, { title: update.title, announced: true, done: false });
-                    rows.push(this.callRow(ref, update.title, update.rawInput));
-                }
+                if (!known?.announced && update.title) rows.push(this.announce(ref, update.title, update.rawInput, known));
+                // An agent announces a call before it knows it ("Terminal") and
+                // names it in an update ("`npm test`" with its command): the
+                // row takes the update, so the step shows what really ran.
+                else if (known?.announced) rows.push(...this.revise(ref, known, update.title, update.rawInput));
                 if (update.status === "completed" || update.status === "failed")
                     rows.push(...this.resultRow(ref, update));
                 return rows;
@@ -166,6 +168,39 @@ export class AcpNormalizer {
         ];
     }
 
+    private announce(
+        ref: string,
+        title: string,
+        rawInput: unknown,
+        known: { done: boolean } | undefined
+    ): HistoryRow {
+        const row = this.callRow(ref, title, rawInput);
+        this.calls.set(ref, { title: row.subject, body: row.body, announced: true, done: known?.done ?? false });
+        return row;
+    }
+
+    /** The call row again, when an update says more than the row does. */
+    private revise(
+        ref: string,
+        known: { title: string; body: string },
+        title: string | null | undefined,
+        rawInput: unknown
+    ): HistoryRow[] {
+        const subject = title?.trim() ? clip(title.trim(), MAX_SUBJECT_CHARS) : known.title;
+        const body = rawInput !== undefined && rawInput !== null ? toolInputSummary(rawInput) : known.body;
+        // Never trade what is known for nothing.
+        const nextBody = body || known.body;
+        if (subject === known.title && nextBody === known.body) return [];
+        known.title = subject;
+        known.body = nextBody;
+        return [{ ...this.callRow(ref, subject, null), body: nextBody, replace: true }];
+    }
+
+    /** The call announced so far, for its step event's name. */
+    titleOf(ref: string): string {
+        return this.calls.get(ref)?.title ?? "";
+    }
+
     private callRow(ref: string, title: string, rawInput: unknown): HistoryRow {
         return {
             vendorId: `${ref}:call`,
@@ -185,7 +220,7 @@ export class AcpNormalizer {
         const known = this.calls.get(ref);
         if (known?.done) return [];
         if (known) known.done = true;
-        else this.calls.set(ref, { title: "", announced: false, done: true });
+        else this.calls.set(ref, { title: "", body: "", announced: false, done: true });
         return [
             {
                 vendorId: `${ref}:result`,

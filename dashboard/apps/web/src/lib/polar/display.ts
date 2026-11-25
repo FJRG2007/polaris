@@ -13,6 +13,7 @@ import { sessionEngineSchema } from "@/lib/polar/native/engine-choice";
 import { PAYERS } from "@/lib/polar/shared";
 import { transcriptionChoiceSchema } from "@/lib/polar/transcription";
 import { codeThemeSchema } from "@/lib/polar/code-theme";
+import { CODE_STEP_VIEWS } from "@/lib/polar/code-steps";
 
 export const POLAR_DISPLAY_KEYS = [
     "showTokens",
@@ -97,7 +98,9 @@ export const polarPreferencesPatchSchema = z
         /** The engine Code sessions run on; null is Automatic. */
         sessionEngine: sessionEngineSchema.nullable().optional(),
         /** The colors Polar Code paints code and diffs in (`code-theme.ts`). */
-        codeTheme: codeThemeSchema.optional()
+        codeTheme: codeThemeSchema.optional(),
+        /** How Code shows the agent's steps (`code-steps.ts`). */
+        codeSteps: z.enum(CODE_STEP_VIEWS).optional()
     })
     .strict()
     .refine((patch) => Object.values(patch).some((value) => value !== undefined), {

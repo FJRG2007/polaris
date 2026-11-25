@@ -13,6 +13,7 @@
  */
 
 import * as search from "@/lib/agents/session-search";
+import * as steps from "@/lib/polar/code-steps";
 import * as core from "@polaris/core";
 import { repoAgentFiles, type RepoAgentFile } from "@/lib/polar/agents/repo-agents";
 import { z } from "zod";
@@ -128,11 +129,14 @@ export interface PolarCodeEntry {
     /** Stable across reads: a message's own row id, an event's kind and time. */
     readonly id: string;
     readonly at: string;
-    /** A message somebody said, or a line of what the agent did. */
-    readonly type: "message" | "event";
+    /** A message somebody said, a line of what the agent did, or one of its
+     *  tool calls. */
+    readonly type: "message" | "event" | "tool";
     readonly role: string;
     readonly text: string;
     readonly detail: string;
+    /** The call, its result and its state, on a `tool` entry. */
+    readonly step?: steps.CodeToolStep;
 }
 
 export interface PolarCodeThread {
@@ -338,7 +342,7 @@ export async function polarCodeThread(
     const access = await accessOf(user);
     if (access === "none") return null;
     const [detail, t, { context, model }, { todos, goal }, subagents] = await Promise.all([
-        sessionDetailAction(sessionId),
+        sessionDetailAction(sessionId, true),
         getTranslations("agents"),
         contextOf(sessionId),
         todosOf(sessionId),
@@ -361,7 +365,23 @@ export async function polarCodeThread(
         text: message.role === "system" ? agentText(t, message.body) : message.body,
         detail: ""
     }));
-    const events: PolarCodeEntry[] = threadEvents(detail.events).map((event, index) => {
+    // Every tool call as a step of its own, with what it ran and answered. A
+    // session whose calls were stored needs no "ran a tool" line as well.
+    const tools: PolarCodeEntry[] = steps
+        .codeToolSteps(detail.tools ?? [], !core.isSessionOver(detail.session.state))
+        .map(({ id, at, step }) => ({
+            id,
+            at,
+            type: "tool",
+            role: step.kind,
+            text: step.name,
+            detail: step.input,
+            step
+        }));
+    const shownEvents = tools.length > 0
+        ? detail.events.filter((event) => !steps.STEP_EVENT_KINDS.has(event.kind))
+        : detail.events;
+    const events: PolarCodeEntry[] = threadEvents(shownEvents).map((event, index) => {
         const key = SESSION_EVENT_KEYS[event.kind];
         return {
             id: `event:${event.kind}:${event.at}:${index}`,
@@ -382,7 +402,7 @@ export async function polarCodeThread(
     });
     // Stable on equal times, so a prompt and the event it caused keep the order
     // they were written in.
-    const entries = [...messages, ...events].sort((a, b) => a.at.localeCompare(b.at));
+    const entries = [...messages, ...events, ...tools].sort((a, b) => a.at.localeCompare(b.at));
     return {
         session: rowOf(t, detail.session, detail.events),
         entries,

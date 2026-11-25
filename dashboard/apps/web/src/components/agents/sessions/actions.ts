@@ -135,10 +135,12 @@ export async function listSessionsAction(
     });
 }
 
-export async function sessionDetailAction(sessionId: string): Promise<{
+export async function sessionDetailAction(sessionId: string, withTools?: unknown): Promise<{
     session: sessions.SessionView;
     events: { kind: string; detail: string; subject: string; at: string }[];
     messages: { id: string; role: string; body: string; authorId: string | null; at: string }[];
+    /** The agent's tool calls and results, when asked for. */
+    tools: { id: string; kind: string; subject: string; ref: string; body: string; at: string }[];
 } | null> {
     const user = await requirePermission("agents.read");
     const session = await sessions.getSession(sessionId, user.id);
@@ -147,7 +149,11 @@ export async function sessionDetailAction(sessionId: string): Promise<{
         sessions.sessionEvents(sessionId),
         sessions.sessionMessages(sessionId)
     ]);
-    return { session, events, messages };
+    // A full page of messages has older ones unread: the steps start where
+    // the messages do. Fewer is the whole session.
+    const since = messages.length >= 100 ? (messages[0]?.at ?? null) : null;
+    const tools = withTools === true ? await sessions.sessionToolRows(sessionId, since) : [];
+    return { session, events, messages, tools };
 }
 
 /**

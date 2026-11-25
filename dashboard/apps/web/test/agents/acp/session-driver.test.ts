@@ -210,7 +210,9 @@ describe.each(AGENTS)("recorded %s conversation through the driver", (cli) => {
             ["agent", "result", "12 passed"],
             ["agent", "text", "All green."]
         ]);
-        expect(events).toEqual(["prompt", "permission", "tool.start", "turn.end"]);
+        // The approval puts the session back to working; the call's own row
+        // then reports its step, start and end, as a hook does in a terminal.
+        expect(events).toEqual(["prompt", "permission", "tool.start", "tool.start", "tool.end", "turn.end"]);
         expect(driver.busy).toBe(false);
         driver.close();
     });

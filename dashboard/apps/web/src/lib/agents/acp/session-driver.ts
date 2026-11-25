@@ -56,6 +56,32 @@ export interface DriverDeps {
     sleep?: (ms: number) => Promise<void>;
 }
 
+const STEP_DETAIL_CHARS = 200;
+
+/**
+ * The step events a batch of rows stands for, the way a hook reports them in
+ * a terminal session: a call announced is `tool.start`, its result `tool.end`
+ * or `tool.failed`. A call described again is the same step and adds none.
+ * What the thread counts and the workspace wakes on (`lastToolAt`). Pure.
+ */
+export function stepEvents(
+    rows: readonly HistoryRow[],
+    names: { titleOf(ref: string): string }
+): { kind: core.AgentSessionEventKind; detail: string; subject: string }[] {
+    const events: { kind: core.AgentSessionEventKind; detail: string; subject: string }[] = [];
+    for (const row of rows) {
+        if (row.kind === "tool" && !row.replace)
+            events.push({ kind: "tool.start", detail: row.body.slice(0, STEP_DETAIL_CHARS), subject: row.subject });
+        else if (row.kind === "result")
+            events.push({
+                kind: row.subject === "error" ? "tool.failed" : "tool.end",
+                detail: "",
+                subject: names.titleOf(row.ref)
+            });
+    }
+    return events;
+}
+
 /** A refusal written for the person, shown as it stands. */
 export class AcpRefusal extends Error {
     constructor(message: string) {
@@ -208,6 +234,9 @@ export class AcpSessionDriver {
                 if (notification.sessionId !== connection.acpSessionId) return;
                 const rows = connection.normalizer.push(notification.update);
                 if (rows.length > 0) this.store(rows);
+                const steps = stepEvents(rows, connection.normalizer);
+                // After the rows, so a page woken by the event finds the step.
+                if (steps.length > 0) this.recordSteps(steps);
                 const draft = connection.normalizer.draft();
                 if (draft) this.draft.set(draft.id, draft.text);
                 else this.draft.end();
@@ -222,6 +251,8 @@ export class AcpSessionDriver {
                 const tool = (request.toolCall.title?.trim() || request.toolCall.kind || "tool").slice(0, 80);
                 await this.deps.recordEvents(this.sessionId, [{ kind: "permission", detail: tool, subject: tool }]);
                 const chosen = await ask(request, signal);
+                // Back to working once answered: the `permission` event left
+                // the session waiting, and the call's own row said so before.
                 await this.deps.recordEvents(this.sessionId, [{ kind: "tool.start", detail: "", subject: tool }]);
                 return chosen;
             },
@@ -274,6 +305,14 @@ export class AcpSessionDriver {
             if (!this.closedByUs) this.deps.log(`${this.sessionId}: the connection to the agent ended`);
         });
         return ready;
+    }
+
+    private recordSteps(
+        events: readonly { kind: core.AgentSessionEventKind; detail: string; subject: string }[]
+    ): void {
+        this.stored = this.stored
+            .then(() => this.deps.recordEvents(this.sessionId, events))
+            .catch((error: unknown) => this.deps.log(`${this.sessionId}: step events were not recorded`, error));
     }
 
     private store(rows: readonly HistoryRow[]): void {

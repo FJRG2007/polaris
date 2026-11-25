@@ -1179,6 +1179,16 @@
                 "not_found": "It no longer exists.",
                 "changed": "The repository's tools changed. Review them again."
             }
+        },
+        "codeSteps": {
+            "title": "Code steps",
+            "intro": "What the agent's work shows while it runs and after.",
+            "label": "Steps show",
+            "failed": "Could not save how steps show. Try again.",
+            "names": {
+                "compact": "In plain words",
+                "detailed": "With code and output"
+            }
         }
     },
     "temporary": {
@@ -1967,6 +1977,51 @@
             "reviewChanges": "Review the latest changes",
             "updateDeps": "Update outdated dependencies",
             "cleanUp": "Clean up code nobody uses"
+        },
+        "stepsOf": "{count, plural, one {# step} other {# steps}}: {parts}",
+        "stepKinds": {
+            "command": "{count, plural, one {# command} other {# commands}}",
+            "edit": "{count, plural, one {# edit} other {# edits}}",
+            "read": "{count, plural, one {# file read} other {# files read}}",
+            "search": "{count, plural, one {# search} other {# searches}}",
+            "web": "{count, plural, one {# web lookup} other {# web lookups}}",
+            "task": "{count, plural, one {# helper} other {# helpers}}"
+        },
+        "stepState": {
+            "running": "Running",
+            "done": "Done",
+            "failed": "Failed",
+            "ended": "No result"
+        },
+        "step": {
+            "runningCommand": "Running {command}",
+            "ranCommand": "Ran {command}",
+            "runningAny": "Running a command",
+            "ranAny": "Ran a command",
+            "editing": "Editing {file}",
+            "edited": "Edited {file}",
+            "editingAny": "Editing a file",
+            "editedAny": "Edited a file",
+            "reading": "Reading {file}",
+            "read": "Read {file}",
+            "readingAny": "Reading a file",
+            "readAny": "Read a file",
+            "searching": "Searching the code",
+            "searched": "Searched the code",
+            "browsing": "Looking it up online",
+            "browsed": "Looked it up online",
+            "delegating": "Handing part of it to a helper",
+            "delegated": "Handed part of it to a helper",
+            "using": "Using {tool}",
+            "used": "Used {tool}",
+            "command": "Command",
+            "noOutput": "Nothing came back",
+            "took": "{seconds} s",
+            "showAll": "Show all {count} lines",
+            "showLess": "Show less",
+            "expandAll": "Expand steps",
+            "collapseAll": "Collapse steps",
+            "offer": "How should the agent's steps show? You can change it any time."
         }
     },
     "compare": {

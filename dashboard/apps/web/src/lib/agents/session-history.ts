@@ -297,6 +297,17 @@ export async function storeHistoryRows(
         select: { vendorId: true }
     });
     const seen = new Set(known.map((one) => one.vendorId));
+    // A call the agent described again (`acp/normalize.ts`): the stored row
+    // takes its name and input, so the step shows what really ran.
+    const revised = rows.filter((one) => one.replace && one.kind === "tool" && seen.has(one.vendorId));
+    for (const one of revised)
+        await prisma.agentSessionMessage
+            .updateMany({
+                where: { sessionId, vendorId: one.vendorId, kind: "tool" },
+                data: { subject: one.subject, body: one.body }
+            })
+            .catch(() => undefined);
+    if (revised.length > 0) touchSession(sessionId);
     const fresh = rows.filter((one) => !seen.has(one.vendorId));
     if (fresh.length === 0) return 0;
 

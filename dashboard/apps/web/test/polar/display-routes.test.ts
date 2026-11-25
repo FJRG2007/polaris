@@ -92,7 +92,8 @@ describe("chat display settings", () => {
             writingContext: "",
             writingSkills: [],
             sessionEngine: null,
-            codeTheme: "polaris"
+            codeTheme: "polaris",
+            codeSteps: null
         });
     });
 
@@ -111,7 +112,8 @@ describe("chat display settings", () => {
             writingContext: "I sign as Ana.",
             writingSkills: ["Tone"],
             sessionEngine: "opencode",
-            codeTheme: "nord"
+            codeTheme: "nord",
+            codeSteps: null
         };
         expect(await (await preferences.GET()).json()).toEqual(state.preference);
     });
@@ -173,7 +175,10 @@ describe("chat display settings", () => {
         expect(state.upserts.map((entry) => entry.update)).toEqual([{ codeTheme: "gruvbox" }]);
         expect((await patch({ codeTheme: "matrix" })).status).toBe(400);
         expect((await patch({ codeTheme: null })).status).toBe(400);
-        expect(state.upserts).toHaveLength(1);
+        expect((await patch({ codeSteps: "detailed" })).status).toBe(200);
+        expect(state.upserts.at(-1)?.update).toEqual({ codeSteps: "detailed" });
+        expect((await patch({ codeSteps: "loud" })).status).toBe(400);
+        expect(state.upserts).toHaveLength(2);
     });
 
     it("refuse an empty change, an unknown key and a value that is not a switch", async () => {

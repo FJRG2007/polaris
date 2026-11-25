@@ -44,7 +44,9 @@ import {
 } from "@/lib/polar/agents/code-sources";
 import { CodeModelPicker } from "@/components/polar/code-model-picker";
 import { neighbourSession, useCodeKeys, useStopTwice } from "@/components/polar/polar-code-keys";
-import { useCodeTheme } from "@/components/polar/polar-display";
+import { useCodeSteps, useCodeTheme } from "@/components/polar/polar-display";
+import { CodeStepCard, StepsOffer, StepsToggle, stepLine, stepsSummary } from "@/components/polar/code-steps-view";
+import { DEFAULT_CODE_STEP_VIEW } from "@/lib/polar/code-steps";
 import { CodeAccountSwitch } from "@/components/polar/code-account-switch";
 import { CodeAgentSwitch, canSwitchAgent } from "@/components/polar/code-agent-switch";
 import { KNOWN_ENGINES } from "@/components/polar/session-engine";
@@ -1963,6 +1965,16 @@ function CodeThread({
 
     const session = thread?.session;
     const blocks = useMemo(() => codeBlocks(thread?.entries ?? []), [thread]);
+    // How the agent's steps show: the person's pick, compact until they make one.
+    const stepsPick = useCodeSteps();
+    const stepView = stepsPick ?? DEFAULT_CODE_STEP_VIEW;
+    const hasSteps = useMemo(() => (thread?.entries ?? []).some((entry) => entry.type === "tool"), [thread]);
+    /** The live line a running turn shows, even folded: "Running npm test". */
+    const currentStep = (entries: readonly PolarCodeEntry[]): string | null => {
+        const last = entries.at(-1);
+        if (!last) return null;
+        return last.step ? stepLine(t, last.step, stepView) : last.text;
+    };
     // The places a stopped session can be continued on, read once it stopped.
     const places = useCodeComputers(!live && !!thread?.canManage && canPrompt);
     // The agent mid-turn draws its steps moving; a message on its way to it
@@ -2311,6 +2323,7 @@ function CodeThread({
                         {session.stateLabel}
                     </span>
                 ) : null}
+                {hasSteps ? <StepsToggle view={stepView} /> : null}
                 {thread?.canManage ? (
                     <button
                         type="button"
@@ -2357,6 +2370,7 @@ function CodeThread({
                     <p className="text-sm text-muted-foreground">{t("code.gone")}</p>
                 ) : (
                     <>
+                        {hasSteps && stepsPick === null && thread.canManage ? <StepsOffer /> : null}
                         {blocks.map((block, index) =>
                             block.kind === "message" ? (
                                 <CodeMessage
@@ -2370,14 +2384,22 @@ function CodeThread({
                                     key={`${block.entries[0]?.at}-${index}`}
                                     messageId={`code:${sessionId}:${index}`}
                                     streaming={turning && !pending && index === blocks.length - 1}
-                                    current={block.entries.at(-1)?.text ?? null}
+                                    current={currentStep(block.entries)}
                                     tools={block.entries.length}
-                                    failed={0}
+                                    failed={block.entries.filter((entry) => entry.step?.state === "failed").length}
                                     seconds={null}
-                                    summary={t("code.steps", { count: block.entries.length })}
+                                    summary={stepsSummary(t, block.entries)}
+                                    follow={{ open: stepView === "detailed" }}
                                 >
-                                    <ol className="space-y-1">
-                                        {block.entries.map((entry, line) => (
+                                    <ol className="flex min-w-0 flex-col gap-1">
+                                        {block.entries.map((entry, line) =>
+                                            entry.step ? (
+                                                <CodeStepCard
+                                                    key={entry.id || `${entry.at}-${line}`}
+                                                    step={entry.step}
+                                                    view={stepView}
+                                                />
+                                            ) : (
                                             <li
                                                 key={`${entry.at}-${line}`}
                                                 className="flex min-w-0 gap-1.5"
@@ -2394,7 +2416,8 @@ function CodeThread({
                                                     </span>
                                                 ) : null}
                                             </li>
-                                        ))}
+                                            )
+                                        )}
                                     </ol>
                                 </Work>
                             )
