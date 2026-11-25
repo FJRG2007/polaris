@@ -34,6 +34,7 @@ import { RotateCcw, TriangleAlert, WifiOff } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
 import { checkForNewBuild } from "@/lib/new-build";
+import { reportClientError } from "@/lib/client-error";
 import { RouteSkeleton } from "@/components/route-skeleton";
 import { resetNetworkStreak, useNetworkRetry } from "@/lib/network-retry";
 
@@ -53,11 +54,12 @@ export default function AppError({
 
     useEffect(() => {
         console.error(error);
+        if (!staleBuild) reportClientError(error, "app");
         setAttempts(countFailure(error));
         // Not every stale build says so in words the patterns below recognise. Ask
         // outright, so the banner can name the cause even when this screen cannot.
         void checkForNewBuild();
-    }, [error]);
+    }, [error, staleBuild]);
 
     // Before anything is drawn: an old tab is a reload, not a message. It returns
     // false when the tab has already reloaded for this, and then the card below

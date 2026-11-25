@@ -11,11 +11,12 @@ import "./globals.css";
 import "@polaris/ui/styles.css";
 import esES from "../../messages/es-ES/common.json";
 import enUS from "../../messages/en-US/common.json";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FONT_CLASSES } from "./fonts";
 import { readLocaleCookie } from "@/lib/i18n/cookie";
 import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
 import { resetNetworkStreak, useNetworkRetry } from "@/lib/network-retry";
+import { reportClientError } from "@/lib/client-error";
 import {
     createTranslator,
     DEFAULT_LOCALE,
@@ -50,13 +51,27 @@ function useReaderLocale(): Locale {
     return locale;
 }
 
+/**
+ * What was thrown, as an Error. Anything can be thrown - a string, or nothing
+ * at all - and this screen reads `.message` off it; a screen that throws while
+ * reporting a failure is how the framework's own bare "Application error" page
+ * ends up shown in its place.
+ */
+function asError(thrown: unknown): Error & { digest?: string } {
+    if (thrown instanceof Error) return thrown;
+    if (thrown && typeof thrown === "object" && typeof (thrown as { message?: unknown }).message === "string")
+        return thrown as Error;
+    return new Error(thrown === undefined || thrown === null ? "Unknown error" : String(thrown));
+}
+
 export default function GlobalError({
-    error,
+    error: thrown,
     reset
 }: {
     error: Error & { digest?: string };
     reset: () => void;
 }) {
+    const error = useMemo(() => asError(thrown), [thrown]);
     const staleBuild = isStaleBuildError(error);
     // A request that never reached the server is retried by itself first; the
     // card below speaks only once that ran out, and then about the connection.
@@ -69,8 +84,11 @@ export default function GlobalError({
         namespace: "common"
     });
 
+    // Logged here and told to the server, so the next one of these has a
+    // stack somebody can read without the reader's devtools.
     useEffect(() => {
         console.error(error);
+        reportClientError(error, "global");
     }, [error]);
 
     // A tab that outlived a deploy is holding chunks the server no longer serves.
