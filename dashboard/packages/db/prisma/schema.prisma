@@ -17047,6 +17047,18 @@ model SecuritySetting {
     firewallClosing   Int?
     // The owner was told the firewall waits on them; cleared once it is on.
     firewallNotifiedAt DateTime?
+    // SSH sign-in as last read: "on" | "armed" | "off" | "unavailable" | "unknown";
+    // whether it is key-only whoever made it so, and why it cannot be (null = it can).
+    ssh               String    @default("unknown")
+    sshAt             DateTime?
+    sshHardened       Boolean?
+    sshBlocked        String?
+    // What a person last chose ("on" | "off"); null means nobody did. Polaris
+    // never turns password sign-in off by itself.
+    sshChoice         String?
+    sshChosenAt       DateTime?
+    // The owner was told the server still takes passwords.
+    sshNotifiedAt     DateTime?
     updatedAt   DateTime  @updatedAt
 
     target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)

@@ -14,6 +14,7 @@ import { securityCatalogs } from "../../messages";
 import { FindingsTable } from "./findings-table";
 import { ImagesPanel } from "./images-panel";
 import { FirewallPanel } from "./firewall-panel";
+import { SshPanel } from "./ssh-panel";
 import { FocusCard, verdictLine } from "./focus-card";
 import * as schemas from "../model/schemas";
 import * as subjects from "../model/subjects";
@@ -867,6 +868,15 @@ function HostPanel({
         }),
         [server]
     );
+    const sshSummary = useMemo(
+        () => ({
+            ssh: server?.ssh ?? "unknown",
+            sshHardened: server?.sshHardened ?? null,
+            sshBlocked: server?.sshBlocked ?? null,
+            sshOffByHandAt: server?.sshOffByHandAt ?? null
+        }),
+        [server]
+    );
     useEffect(() => {
         setUpdates(server?.updates ?? "unknown");
         setEvery(server?.everyHours ?? 0);
@@ -1004,6 +1014,7 @@ function HostPanel({
                     summary={firewallSummary}
                     submit={submit}
                 />
+                <SshPanel t={t} targetId={targetId} summary={sshSummary} submit={submit} />
                 {updates === "unsupported" ? null : (
                     <HeldPackages
                         t={t}

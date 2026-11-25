@@ -123,6 +123,8 @@ export const firewallApplyInput = z
     .object({ targetId: id, keep: z.array(portWord).max(256) })
     .strict();
 
+export const sshInput = z.object({ targetId: id }).strict();
+
 /** How often a server is scanned by itself; 0 is never. */
 export const SCHEDULE_HOURS = [0, 6, 12, 24, 168] as const;
 

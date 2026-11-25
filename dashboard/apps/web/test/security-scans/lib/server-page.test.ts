@@ -60,7 +60,11 @@ describe("listServers", () => {
                 held: [],
                 firewall: "unknown",
                 firewallClosing: null,
-                firewallOffByHandAt: null
+                firewallOffByHandAt: null,
+                ssh: "unknown",
+                sshHardened: null,
+                sshBlocked: null,
+                sshOffByHandAt: null
             }
         ]);
         expect(page.next).not.toBeNull();

@@ -22,6 +22,7 @@ import { decodeLockfiles, dependencyContext, shortHash } from "@polaris/deploy";
 import { host } from "@polaris/app-host";
 import { securityTFor } from "./i18n";
 import { planFirewalls } from "./firewall-service";
+import { planSshHardening } from "./ssh-service";
 import {
     exportImage,
     exportPackages,
@@ -252,6 +253,13 @@ export async function listServers(request: {
             firewallOffByHandAt:
                 t.securitySetting?.firewallChoice === "off"
                     ? (t.securitySetting.firewallChosenAt?.toISOString() ?? null)
+                    : null,
+            ssh: t.securitySetting?.ssh ?? "unknown",
+            sshHardened: t.securitySetting?.sshHardened ?? null,
+            sshBlocked: t.securitySetting?.sshBlocked ?? null,
+            sshOffByHandAt:
+                t.securitySetting?.sshChoice === "off"
+                    ? (t.securitySetting.sshChosenAt?.toISOString() ?? null)
                     : null
         })),
         next: targets.length > request.limit && last ? encodeCursor(last.name, last.id) : null
@@ -1850,6 +1858,9 @@ export async function tick(): Promise<void> {
     );
     await planFirewalls(now).catch((caught) =>
         console.error("polaris: security scans could not plan host firewalls:", caught)
+    );
+    await planSshHardening(now).catch((caught) =>
+        console.error("polaris: security scans could not plan SSH hardening:", caught)
     );
     await drain();
     await prune(now);

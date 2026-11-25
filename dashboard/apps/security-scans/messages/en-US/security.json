@@ -171,7 +171,15 @@
         "firewallRouter": "This server is the network's router; its firewall is managed in the Router app.",
         "firewallUnavailable": "This server's system has no firewall Polaris can manage.",
         "firewallRolledBack": "The server undid the change because Polaris could not reach it afterwards. Nothing was left closed.",
-        "firewallUnconfirmed": "Polaris could not confirm the change in time, so the server undoes it by itself within two minutes."
+        "firewallUnconfirmed": "Polaris could not confirm the change in time, so the server undoes it by itself within two minutes.",
+        "sshFailed": "SSH sign-in could not be read or changed on this server.",
+        "sshUnavailable": "This server has no SSH server Polaris can manage.",
+        "sshNoKeys": "No account on this server has a key, so passwords stay on.",
+        "sshPolarisPassword": "Polaris signs in to this server with a password. Edit the server to use a key first.",
+        "sshInvalid": "The server refused the new SSH settings, so nothing changed.",
+        "sshOverridden": "Another SSH setting on this server keeps passwords on, so nothing changed.",
+        "sshRolledBack": "The server undid the change because a key could not sign in afterwards. Passwords still work.",
+        "sshUnconfirmed": "Polaris could not confirm the change in time, so the server undoes it by itself within two minutes."
     },
     "alerts": {
         "title": "{count, plural, one {A new serious vulnerability in {app}} other {# new serious vulnerabilities in {app}}}",
@@ -329,6 +337,42 @@
                 "title": "{server} has no firewall",
                 "body": "Every port listening on {server} can be reached from outside. Review what turning the firewall on would close."
             }
+        }
+    },
+    "ssh": {
+        "title": "SSH sign-in",
+        "on": "Key only",
+        "hint": {
+            "on": "Only a key signs in. Passwords are refused, so they cannot be guessed.",
+            "armed": "A change is being checked. The server undoes it by itself if a key cannot sign in again.",
+            "already": "Passwords are already refused here. Only a key signs in.",
+            "off": "Anyone can try passwords on this server over SSH.",
+            "offByHand": "Turned off by hand on {when}. Polaris leaves passwords on.",
+            "polarisPassword": "Passwords still work. Polaris signs in here with a password, so it cannot turn them off.",
+            "noKeys": "Passwords still work. No account here has a key to sign in with instead.",
+            "unavailable": "This server has no SSH server Polaris can manage.",
+            "unknown": "Not read yet."
+        },
+        "turnOn": "Turn off passwords",
+        "turnOff": "Allow passwords",
+        "cancel": "Cancel",
+        "dialogTitle": "Sign in with a key only",
+        "dialogHint": "Password sign-in is turned off and root keeps only key sign-in. If a key cannot sign in afterwards, the server undoes it by itself within two minutes.",
+        "keeps": "Keep signing in with a key",
+        "keepsNone": "No account has a key.",
+        "loses": "Stop signing in over SSH",
+        "losesHint": "These accounts only have a password.",
+        "blocked": {
+            "unavailable": "This server has no SSH server Polaris can manage.",
+            "passwordLogin": "Polaris signs in here with a password. Edit the server to use a key first.",
+            "noKeys": "No account here has a key, so turning passwords off would lock everyone out."
+        },
+        "applying": "Applying and checking that a key still signs in...",
+        "done": "Passwords are off on this server.",
+        "offDone": "Passwords are allowed again.",
+        "notify": {
+            "title": "{server} still takes passwords",
+            "body": "Anyone can try passwords on {server} over SSH. Review who keeps access and turn passwords off."
         }
     }
 }

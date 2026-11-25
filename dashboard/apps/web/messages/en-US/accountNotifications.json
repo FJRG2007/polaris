@@ -442,6 +442,10 @@
             "label": "A server without a firewall",
             "description": "A server has no firewall on, and the review of what turning it on would close waits on you."
         },
+        "securitySsh": {
+            "label": "A server that takes passwords",
+            "description": "A server still lets anyone try a password over SSH, and turning that off waits on you."
+        },
         "placesAlert": {
             "label": "An alert you wrote went off",
             "description": "Something one of your alerts asked about happened."

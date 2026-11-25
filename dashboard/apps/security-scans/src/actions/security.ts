@@ -273,3 +273,28 @@ export async function focusAction(input: unknown) {
     if (!parsed.success) return { ok: false, error: "invalid" } as const;
     return run(async () => (await service()).focusScan(parsed.data.scanId));
 }
+
+const ssh = () => import("../lib/ssh-service");
+
+/** The server's SSH sign-in, and who turning passwords off would shut out. */
+export async function sshAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.sshInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => (await ssh()).readSsh(parsed.data.targetId));
+}
+
+/** Turn password sign-in off; kept only once a fresh key login confirms it. */
+export async function applySshAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.sshInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => (await ssh()).applySsh(parsed.data.targetId));
+}
+
+export async function sshOffAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.sshInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => (await ssh()).sshOff(parsed.data.targetId));
+}

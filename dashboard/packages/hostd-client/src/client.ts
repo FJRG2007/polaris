@@ -268,7 +268,11 @@ export class HostdClient {
             | "firewall-status"
             | "firewall-apply"
             | "firewall-confirm"
-            | "firewall-off",
+            | "firewall-off"
+            | "ssh-status"
+            | "ssh-apply"
+            | "ssh-confirm"
+            | "ssh-off",
         target: { package?: string; version?: string; apply?: string; ports?: string[] } = {}
     ): Promise<{ exitCode: number; output: string } | "busy" | "timeout" | null> {
         const response = await this.call(
@@ -281,7 +285,8 @@ export class HostdClient {
             response.status === 400 &&
             (action.startsWith("reboot-") ||
                 action.startsWith("package") ||
-                action.startsWith("firewall-"))
+                action.startsWith("firewall-") ||
+                action.startsWith("ssh-"))
         )
             return null;
         if (response.status === 409) return "busy";

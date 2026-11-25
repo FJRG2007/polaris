@@ -171,7 +171,15 @@
         "firewallRouter": "Este servidor es el router de la red; su cortafuegos se gestiona en la app Router.",
         "firewallUnavailable": "El sistema de este servidor no tiene un cortafuegos que Polaris pueda gestionar.",
         "firewallRolledBack": "El servidor deshizo el cambio porque Polaris no pudo alcanzarlo después. No quedó nada cerrado.",
-        "firewallUnconfirmed": "Polaris no pudo confirmar el cambio a tiempo, así que el servidor lo deshace solo en menos de dos minutos."
+        "firewallUnconfirmed": "Polaris no pudo confirmar el cambio a tiempo, así que el servidor lo deshace solo en menos de dos minutos.",
+        "sshFailed": "No se pudo leer ni cambiar el acceso SSH de este servidor.",
+        "sshUnavailable": "Este servidor no tiene un SSH que Polaris pueda gestionar.",
+        "sshNoKeys": "Ninguna cuenta de este servidor tiene llave; siguen las contraseñas.",
+        "sshPolarisPassword": "Polaris entra en este servidor con contraseña. Edítalo para usar una llave.",
+        "sshInvalid": "El servidor rechazó los nuevos ajustes de SSH; no cambió nada.",
+        "sshOverridden": "Otro ajuste SSH de este servidor mantiene las contraseñas; no cambió nada.",
+        "sshRolledBack": "El servidor deshizo el cambio porque una llave no pudo entrar. Las contraseñas siguen.",
+        "sshUnconfirmed": "Polaris no pudo confirmar el cambio a tiempo; el servidor lo deshace solo en dos minutos."
     },
     "alerts": {
         "title": "{count, plural, one {Una vulnerabilidad grave nueva en {app}} other {# vulnerabilidades graves nuevas en {app}}}",
@@ -329,6 +337,42 @@
                 "title": "{server} no tiene cortafuegos",
                 "body": "Cualquier puerto que escuche en {server} es accesible desde fuera. Revisa qué cerraría activar el cortafuegos."
             }
+        }
+    },
+    "ssh": {
+        "title": "Acceso SSH",
+        "on": "Solo llave",
+        "hint": {
+            "on": "Solo entra una llave. Se rechazan contraseñas y no se pueden adivinar.",
+            "armed": "Se comprueba un cambio. El servidor lo deshace solo si una llave no puede volver a entrar.",
+            "already": "Aquí ya se rechazan contraseñas. Solo entra una llave.",
+            "off": "Cualquiera puede probar contraseñas en este servidor por SSH.",
+            "offByHand": "Desactivado a mano el {when}. Polaris deja las contraseñas.",
+            "polarisPassword": "Las contraseñas funcionan. Polaris entra aquí con contraseña y no puede quitarlas.",
+            "noKeys": "Las contraseñas funcionan. Ninguna cuenta tiene llave para entrar en su lugar.",
+            "unavailable": "Este servidor no tiene un SSH que Polaris pueda gestionar.",
+            "unknown": "Sin leer aún."
+        },
+        "turnOn": "Quitar contraseñas",
+        "turnOff": "Permitir claves",
+        "cancel": "Cancelar",
+        "dialogTitle": "Entrar solo con llave",
+        "dialogHint": "Se desactiva entrar con contraseña y root solo entra con llave. Si una llave no puede entrar después, el servidor lo deshace solo en dos minutos.",
+        "keeps": "Siguen entrando con llave",
+        "keepsNone": "Ninguna cuenta tiene llave.",
+        "loses": "Dejan de entrar por SSH",
+        "losesHint": "Estas cuentas solo tienen contraseña.",
+        "blocked": {
+            "unavailable": "Este servidor no tiene un SSH que Polaris pueda gestionar.",
+            "passwordLogin": "Polaris entra aquí con contraseña. Edita el servidor para usar una llave.",
+            "noKeys": "Ninguna cuenta tiene llave; quitar contraseñas dejaría a todos fuera."
+        },
+        "applying": "Aplicando y comprobando que una llave sigue entrando...",
+        "done": "Contraseñas quitadas en este servidor.",
+        "offDone": "Contraseñas permitidas de nuevo.",
+        "notify": {
+            "title": "{server} aún acepta claves",
+            "body": "Cualquiera puede probar contraseñas en {server} por SSH. Revisa quién mantiene acceso y quítalas."
         }
     }
 }

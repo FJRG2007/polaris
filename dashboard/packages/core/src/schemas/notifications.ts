@@ -464,6 +464,14 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "security.ssh",
+        group: "security",
+        label: "A server that takes passwords",
+        description: "A server still lets anyone try a password over SSH, and turning that off waits on you.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "account.signin",
         group: "security",
         label: "Sign-in waiting for approval",

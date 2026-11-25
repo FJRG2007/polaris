@@ -442,6 +442,10 @@
             "label": "Servidor sin cortafuegos",
             "description": "Un servidor no tiene cortafuegos y la revisión de lo que cerraría activarlo te espera."
         },
+        "securitySsh": {
+            "label": "Servidor que acepta claves",
+            "description": "Un servidor aún deja probar contraseñas por SSH y desactivarlo te espera."
+        },
         "placesAlert": {
             "label": "Ha saltado una alerta tuya",
             "description": "Ha pasado algo de lo que preguntaba una de tus alertas."

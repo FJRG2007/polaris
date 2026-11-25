@@ -70,6 +70,23 @@ pub const FIREWALL_CONFIRM_SCRIPT: &str = r#"D=/var/lib/polaris-firewall; system
 
 pub const FIREWALL_OFF_SCRIPT: &str = r#"D=/var/lib/polaris-firewall; systemctl stop polaris-firewall-rollback.timer polaris-firewall-rollback.service >/dev/null 2>&1; nft delete table inet polaris_host >/dev/null 2>&1; systemctl disable polaris-firewall.service >/dev/null 2>&1; rm -f /etc/systemd/system/polaris-firewall.service; systemctl daemon-reload >/dev/null 2>&1; case $(cat $D/replaced 2>/dev/null) in ufw) ufw --force enable >/dev/null 2>&1 ;; firewalld) systemctl enable --now firewalld >/dev/null 2>&1 ;; esac; rm -rf $D; echo POLARIS_FIREWALL=off"#;
 
+/// SSH hardening: a drop-in, `/etc/ssh/sshd_config.d/00-polaris.conf`, that
+/// turns password and keyboard-interactive sign-in off and keeps root to a key
+/// (only when root could sign in with a password before). Sorted first so it
+/// wins, since sshd keeps the first value it reads. Apply refuses when no
+/// account that can log in has a key, checks the result with `sshd -t`, reads
+/// the effective settings back with `sshd -T` (another file may still win),
+/// and reloads sshd behind the same 120 s undo as the firewall: only a confirm
+/// under the same id - which the dashboard sends over a fresh key login - keeps
+/// it. A restart while armed undoes it before sshd starts.
+pub const SSH_STATUS_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; D=/var/lib/polaris-ssh; F=/etc/ssh/sshd_config.d/00-polaris.conf; command -v sshd >/dev/null 2>&1 || { echo POLARIS_SSH=unavailable; exit 0; }; if [ -f $F ]; then if [ -f $D/pending ]; then echo POLARIS_SSH=armed; else echo POLARIS_SSH=on; fi; else echo POLARIS_SSH=off; fi; sshd -T 2>/dev/null | awk '$1 == "passwordauthentication" || $1 == "permitrootlogin" || $1 == "kbdinteractiveauthentication" || $1 == "challengeresponseauthentication" || $1 == "pubkeyauthentication" {print "POLARIS_SSHD=" $1 " " $2}'; awk -F: '($3 == 0 || $3 >= 1000) && $7 !~ /(nologin|false|sync|halt|shutdown)$/ {print $1 " " $6}' /etc/passwd 2>/dev/null | head -n 200 | while read -r u h; do k=0; for f in "$h/.ssh/authorized_keys" "$h/.ssh/authorized_keys2"; do [ -f "$f" ] && k=$((k + $(grep -cE '^[^#[:space:]]' "$f" 2>/dev/null))); done; s=$(awk -F: -v u="$u" '$1 == u {print $2}' /etc/shadow 2>/dev/null); case "$s" in '' | '*'* | '!'*) p=no ;; *) p=yes ;; esac; echo "POLARIS_ACCOUNT=$u $k $p"; done; true"#;
+
+pub const SSH_APPLY_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; D=/var/lib/polaris-ssh; F=/etc/ssh/sshd_config.d/00-polaris.conf; id=$1; command -v sshd >/dev/null 2>&1 || { echo POLARIS_SSH=unavailable; exit 0; }; keys=0; for h in $(awk -F: '($3 == 0 || $3 >= 1000) && $7 !~ /(nologin|false|sync|halt|shutdown)$/ {print $6}' /etc/passwd 2>/dev/null); do grep -qsE '^[^#[:space:]]' "$h/.ssh/authorized_keys" "$h/.ssh/authorized_keys2" && keys=1; done; [ $keys = 1 ] || { echo POLARIS_SSH=nokeys; exit 0; }; mkdir -p $D /etc/ssh/sshd_config.d && chmod 700 $D || { echo POLARIS_SSH=failed; exit 0; }; undo() { if [ -s $D/good.conf ]; then cp $D/good.conf $F; else rm -f $F; fi; }; r=$(sshd -T 2>/dev/null | awk '$1 == "permitrootlogin" {print $2}'); { printf '%s\n' '# Written by Polaris: sign in with a key only. Removed when SSH hardening is turned off.' 'PasswordAuthentication no' 'ChallengeResponseAuthentication no' 'PubkeyAuthentication yes'; [ "$r" = yes ] && echo 'PermitRootLogin prohibit-password'; } > $D/next.conf; cp $D/next.conf $F && chmod 644 $F || { undo; echo POLARIS_SSH=failed; exit 0; }; sshd -t >/dev/null 2>&1 || { undo; echo POLARIS_SSH=invalid; exit 0; }; sshd -T 2>/dev/null | awk '$1 == "passwordauthentication" && $2 == "no" {p = 1} $1 == "permitrootlogin" && $2 != "yes" {r = 1} END {exit !(p && r)}' || { undo; echo POLARIS_SSH=overridden; exit 0; }; printf '%s\n' '#!/bin/sh' 'D=/var/lib/polaris-ssh' 'F=/etc/ssh/sshd_config.d/00-polaris.conf' 'if [ -s $D/good.conf ]; then cp $D/good.conf $F; else rm -f $F; fi' 'systemctl try-reload-or-restart ssh.service >/dev/null 2>&1 || systemctl try-reload-or-restart sshd.service >/dev/null 2>&1' 'rm -f $D/pending' 'echo rolled-back > $D/ending' > $D/rollback.sh; printf '%s\n' '[Unit]' 'Description=Polaris SSH hardening' 'Before=ssh.service sshd.service ssh.socket sshd.socket' 'RequiresMountsFor=/var/lib/polaris-ssh' '[Service]' 'Type=oneshot' 'ExecStart=/bin/sh -c "[ -f /var/lib/polaris-ssh/pending ] && /bin/sh /var/lib/polaris-ssh/rollback.sh; true"' '[Install]' 'WantedBy=multi-user.target' > /etc/systemd/system/polaris-ssh.service; systemctl daemon-reload >/dev/null 2>&1; systemctl enable polaris-ssh.service >/dev/null 2>&1; systemctl stop polaris-ssh-rollback.timer polaris-ssh-rollback.service >/dev/null 2>&1; systemctl reset-failed polaris-ssh-rollback.service >/dev/null 2>&1; rm -f $D/ending; echo "$id" > $D/pending; systemd-run --quiet --unit=polaris-ssh-rollback --timer-property=AccuracySec=1s --on-active=120 /bin/sh $D/rollback.sh >/dev/null 2>&1 || { rm -f $D/pending; undo; echo POLARIS_SSH=failed; exit 0; }; if systemctl try-reload-or-restart ssh.service >/dev/null 2>&1 || systemctl try-reload-or-restart sshd.service >/dev/null 2>&1; then echo POLARIS_SSH=armed; else systemctl stop polaris-ssh-rollback.timer >/dev/null 2>&1; /bin/sh $D/rollback.sh; echo POLARIS_SSH=failed; fi"#;
+
+pub const SSH_CONFIRM_SCRIPT: &str = r#"D=/var/lib/polaris-ssh; F=/etc/ssh/sshd_config.d/00-polaris.conf; systemctl stop polaris-ssh-rollback.timer >/dev/null 2>&1; n=0; while systemctl is-active --quiet polaris-ssh-rollback.service 2>/dev/null && [ $n -lt 30 ]; do sleep 1; n=$((n + 1)); done; if [ -f $D/pending ] && [ "$(cat $D/pending)" = "$1" ] && [ -f $F ]; then cp $F $D/good.conf && rm -f $D/pending && echo POLARIS_SSH=confirmed; elif [ -f $D/ending ]; then echo POLARIS_SSH=rolled-back; else echo POLARIS_SSH=unknown; fi; true"#;
+
+pub const SSH_OFF_SCRIPT: &str = r#"D=/var/lib/polaris-ssh; systemctl stop polaris-ssh-rollback.timer polaris-ssh-rollback.service >/dev/null 2>&1; rm -f /etc/ssh/sshd_config.d/00-polaris.conf; systemctl try-reload-or-restart ssh.service >/dev/null 2>&1 || systemctl try-reload-or-restart sshd.service >/dev/null 2>&1; systemctl disable polaris-ssh.service >/dev/null 2>&1; rm -f /etc/systemd/system/polaris-ssh.service; systemctl daemon-reload >/dev/null 2>&1; rm -rf $D; echo POLARIS_SSH=off"#;
+
 #[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum HostAction {
@@ -88,6 +105,10 @@ pub enum HostAction {
     FirewallApply,
     FirewallConfirm,
     FirewallOff,
+    SshStatus,
+    SshApply,
+    SshConfirm,
+    SshOff,
 }
 
 #[derive(Deserialize, Debug)]
@@ -175,7 +196,10 @@ impl HostSecurityRequest {
         let takes_version = self.action == HostAction::PackageRollback;
         let takes_apply = matches!(
             self.action,
-            HostAction::FirewallApply | HostAction::FirewallConfirm
+            HostAction::FirewallApply
+                | HostAction::FirewallConfirm
+                | HostAction::SshApply
+                | HostAction::SshConfirm
         );
         let takes_ports = self.action == HostAction::FirewallApply;
         match (&self.apply, takes_apply) {
@@ -253,6 +277,10 @@ pub fn argv(action: HostAction, arguments: &[String]) -> Vec<String> {
                 HostAction::FirewallApply => FIREWALL_APPLY_SCRIPT,
                 HostAction::FirewallConfirm => FIREWALL_CONFIRM_SCRIPT,
                 HostAction::FirewallOff => FIREWALL_OFF_SCRIPT,
+                HostAction::SshStatus => SSH_STATUS_SCRIPT,
+                HostAction::SshApply => SSH_APPLY_SCRIPT,
+                HostAction::SshConfirm => SSH_CONFIRM_SCRIPT,
+                HostAction::SshOff => SSH_OFF_SCRIPT,
                 _ => UPDATES_OFF_SCRIPT,
             };
             args.extend([
@@ -967,5 +995,65 @@ mod tests {
         assert!(FIREWALL_CONFIRM_SCRIPT.contains("cp $D/next.nft $D/good.nft"));
         // The router's own table is never stacked on.
         assert!(FIREWALL_APPLY_SCRIPT.contains("nft list table inet polaris_router"));
+    }
+
+    #[test]
+    fn ssh_actions_take_an_apply_id_only_where_a_change_is_confirmed() {
+        let id = "0f8c2a4e-1b2c-4d5e-8f90-123456789abc";
+        assert_eq!(request(r#"{"action":"ssh-status"}"#), Some(vec![]));
+        assert_eq!(request(r#"{"action":"ssh-off"}"#), Some(vec![]));
+        for action in ["ssh-apply", "ssh-confirm"] {
+            assert_eq!(
+                request(&format!(r#"{{"action":"{action}","apply":"{id}"}}"#)),
+                Some(vec![id.to_string()])
+            );
+            assert_eq!(request(&format!(r#"{{"action":"{action}"}}"#)), None);
+            assert_eq!(
+                request(&format!(
+                    r#"{{"action":"{action}","apply":"{id}","ports":["tcp:22"]}}"#
+                )),
+                None
+            );
+            assert_eq!(
+                request(&format!(r#"{{"action":"{action}","apply":"x; reboot"}}"#)),
+                None
+            );
+        }
+        assert_eq!(
+            request(&format!(r#"{{"action":"ssh-status","apply":"{id}"}}"#)),
+            None
+        );
+    }
+
+    #[test]
+    fn ssh_hardening_is_checked_before_sshd_reloads_and_undone_unless_confirmed() {
+        let args = argv(HostAction::SshApply, &["abcdef12".to_string()]);
+        assert!(args.contains(&SSH_APPLY_SCRIPT.to_string()));
+        assert_eq!(&args[args.len() - 2..], ["polaris", "abcdef12"]);
+        let keys = SSH_APPLY_SCRIPT.find("POLARIS_SSH=nokeys").unwrap();
+        let check = SSH_APPLY_SCRIPT.find("sshd -t >/dev/null").unwrap();
+        let effective = SSH_APPLY_SCRIPT.find("POLARIS_SSH=overridden").unwrap();
+        let arm = SSH_APPLY_SCRIPT
+            .find("systemd-run --quiet --unit=polaris-ssh-rollback")
+            .unwrap();
+        let reload = SSH_APPLY_SCRIPT
+            .rfind("if systemctl try-reload-or-restart")
+            .unwrap();
+        assert!(keys < check && check < effective && effective < arm && arm < reload);
+        // Root is only ever narrowed, never opened: the line is written only
+        // when root could already sign in with a password.
+        assert!(SSH_APPLY_SCRIPT
+            .contains("[ \"$r\" = yes ] && echo 'PermitRootLogin prohibit-password'"));
+        // Only a confirm makes it the one kept.
+        assert!(!SSH_APPLY_SCRIPT.contains("$D/good.conf &&"));
+        assert!(SSH_CONFIRM_SCRIPT.contains("cp $F $D/good.conf"));
+        for script in [
+            SSH_STATUS_SCRIPT,
+            SSH_APPLY_SCRIPT,
+            SSH_CONFIRM_SCRIPT,
+            SSH_OFF_SCRIPT,
+        ] {
+            assert!(!script.bytes().any(|b| b < 0x20 || b == 0x7f));
+        }
     }
 }
