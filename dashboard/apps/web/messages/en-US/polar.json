@@ -1589,14 +1589,15 @@
         "taskOn": "Code: {repo}",
         "taskClear": "Stop reading the repository",
         "issue": {
-            "label": "Issue",
+            "label": "From an issue",
             "none": "none",
             "pick": "Start from an open issue",
             "search": "Find an issue or type its number",
-            "failed": "GitHub would not list the issues. Try again in a moment.",
+            "failed": "GitHub would not list the issues.",
             "empty": "No open issues",
             "noMatch": "No issue matches",
-            "clear": "Remove the issue"
+            "clear": "Remove the issue",
+            "retry": "Try again"
         },
         "skill": {
             "label": "Skill",
@@ -1695,9 +1696,10 @@
             "invalid": "That message can't be changed."
         },
         "export": {
-            "label": "Download transcript",
             "markdown": "Markdown",
-            "jsonl": "JSONL"
+            "jsonl": "JSONL",
+            "asMarkdown": "Download as Markdown",
+            "asJsonl": "Download as JSONL"
         },
         "transcript": {
             "you": "You",
@@ -2022,7 +2024,8 @@
             "expandAll": "Expand steps",
             "collapseAll": "Collapse steps",
             "offer": "How should the agent's steps show? You can change it any time."
-        }
+        },
+        "menu": "Session actions"
     },
     "compare": {
         "open": "Ask several models",

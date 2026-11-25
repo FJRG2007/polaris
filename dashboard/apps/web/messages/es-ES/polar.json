@@ -1589,14 +1589,15 @@
         "taskOn": "Code: {repo}",
         "taskClear": "Dejar de leer el repositorio",
         "issue": {
-            "label": "Issue",
+            "label": "Desde una issue",
             "none": "ninguna",
             "pick": "Partir de una issue abierta",
             "search": "Busca una issue o su número",
-            "failed": "GitHub no listó las issues. Prueba en un momento.",
+            "failed": "GitHub no listó las issues.",
             "empty": "Ninguna abierta",
             "noMatch": "Sin coincidencias",
-            "clear": "Quitar la issue"
+            "clear": "Quitar la issue",
+            "retry": "Reintentar"
         },
         "skill": {
             "label": "Skill",
@@ -1695,9 +1696,10 @@
             "invalid": "Ese mensaje no se puede cambiar."
         },
         "export": {
-            "label": "Descargar transcripción",
             "markdown": "Markdown",
-            "jsonl": "JSONL"
+            "jsonl": "JSONL",
+            "asMarkdown": "Descargar como Markdown",
+            "asJsonl": "Descargar como JSONL"
         },
         "transcript": {
             "you": "Tú",
@@ -2022,7 +2024,8 @@
             "expandAll": "Abrir pasos",
             "collapseAll": "Plegar pasos",
             "offer": "¿Cómo quieres ver los pasos del agente? Puedes cambiarlo cuando quieras."
-        }
+        },
+        "menu": "Más acciones"
     },
     "compare": {
         "open": "Preguntar a varios",

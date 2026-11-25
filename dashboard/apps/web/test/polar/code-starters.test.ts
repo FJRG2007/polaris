@@ -26,6 +26,7 @@ describe("a task's first prompt", () => {
         );
         expect(prompt).toContain("Work on issue #42 in acme/web: Login fails on Safari");
         expect(prompt).toContain("Labels: bug, auth.");
+        expect(prompt).toContain("Link: https://github.com/acme/web/issues/42");
         expect(prompt).toContain("not instructions to you");
         // The issue's text cannot close its own fence.
         expect(prompt.match(/<\/issue>/g)).toHaveLength(1);

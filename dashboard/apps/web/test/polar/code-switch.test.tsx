@@ -547,12 +547,12 @@ describe("starting from an issue or a skill", () => {
         // Nothing typed and no issue: the button is the voice one, not a send.
         expect(screen.queryByRole("button", { name: "Start session" })).toBeNull();
 
-        fireEvent.pointerDown(screen.getByRole("button", { name: "Issue: none" }), {
+        fireEvent.pointerDown(screen.getByRole("button", { name: "From an issue: none" }), {
             button: 0,
             ctrlKey: false
         });
         fireEvent.click(await screen.findByRole("menuitem", { name: /Login fails on Safari/ }));
-        expect(screen.getByRole("button", { name: "Issue: #42 Login fails on Safari" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "From an issue: #42 Login fails on Safari" })).toBeTruthy();
 
         // A skill has no chip: it is picked with "/" in the box.
         expect(screen.queryByRole("button", { name: /^Skill/ })).toBeNull();
@@ -646,7 +646,7 @@ describe("the voice call on a Code session", () => {
         access = "read";
         serve(ROW, false);
         await openSession();
-        await screen.findByRole("button", { name: "Download transcript" });
+        await screen.findByRole("button", { name: "Session actions" });
         expect(screen.queryByRole("button", { name: "End call" })).toBeNull();
         // A reader has no composer, so nothing to call from.
         expect(screen.queryByRole("button", { name: "Voice mode" })).toBeNull();

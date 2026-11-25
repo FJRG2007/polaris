@@ -10,7 +10,7 @@ import { useState } from "react";
 import { saveFile } from "@/components/transfers/move-file";
 import * as codeStatus from "@/lib/polar/code-status";
 import type { PolarCodeThread } from "@/lib/polar/code";
-import { Download, GitBranch, Pencil, X } from "lucide-react";
+import { Download, GitBranch, Keyboard, MoreHorizontal, Pencil, X } from "lucide-react";
 import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
 import type { TranscriptFormat } from "@/lib/polar/code-transcript";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -247,27 +247,35 @@ export function CodeQueuedList({
     );
 }
 
-/** The session bar's download menu: the transcript as Markdown or JSONL. */
-export function CodeExportMenu({ sessionId }: { sessionId: string }) {
+/** The session bar's "..." menu: what a session is rarely asked for - its
+ *  transcript as Markdown or JSONL, and the keyboard shortcuts - kept out of
+ *  the bar so only what most turns use stays in sight. */
+export function CodeSessionMenu({ sessionId, onKeysHelp }: { sessionId: string; onKeysHelp: () => void }) {
     const t = useTranslations("polar");
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    aria-label={t("code.export.label")}
-                    title={t("code.export.label")}
+                    aria-label={t("code.menu")}
+                    title={t("code.menu")}
                     className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:size-11"
                 >
-                    <Download className="size-4" />
+                    <MoreHorizontal className="size-4" />
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="min-w-48">
                 <DropdownMenuItem onSelect={() => downloadTranscript(sessionId, "md", t("code.export.markdown"))}>
-                    {t("code.export.markdown")}
+                    <Download />
+                    {t("code.export.asMarkdown")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => downloadTranscript(sessionId, "jsonl", t("code.export.jsonl"))}>
-                    {t("code.export.jsonl")}
+                    <Download />
+                    {t("code.export.asJsonl")}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="max-md:hidden" onSelect={onKeysHelp}>
+                    <Keyboard />
+                    {t("code.keys.shortcuts")}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

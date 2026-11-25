@@ -113,7 +113,7 @@ import { ContextBar } from "@/components/polar/polar-context";
 import * as codeStatus from "@/lib/polar/code-status";
 import {
     CodeContextCard,
-    CodeExportMenu,
+    CodeSessionMenu,
     CodeQueuedList,
     CodeStatusLine,
     downloadTranscript
@@ -142,7 +142,9 @@ import {
     readPermissionMode,
     readRepo,
     REPOS_ROUTE,
-    useRepoName
+    useRepoName,
+    knownRepoName,
+    rememberRepoName
 } from "@/components/polar/polar-code-context";
 import { githubRepoOf } from "@/lib/agents/repo-ref";
 import type { PendingPermission } from "@/lib/agents/session-permissions";
@@ -168,7 +170,6 @@ import {
     Globe,
     MousePointer2,
     SquareTerminal,
-    Keyboard,
     MessageSquare,
     PanelRight,
     Pencil,
@@ -208,23 +209,20 @@ const PolarCodeWorkspace = dynamic(
     { ssr: false }
 );
 
-/** A session's pull request, its Share button and Continue on phone, in the
- *  Agents app's words.
+/** A session's pull request and its Share button, in the Agents app's words.
  *  Drawn only where somebody can steer the session, so loaded there. */
 const SessionTools = dynamic(
     () =>
         Promise.all([
             import("@/components/agents/sessions/session-pull"),
             import("@/components/agents/sessions/share-button"),
-            import("@/components/i18n/client-namespaces"),
-            import("@/components/agents/sessions/continue-button")
-        ]).then(([pull, share, i18n, phone]) =>
+            import("@/components/i18n/client-namespaces")
+        ]).then(([pull, share, i18n]) =>
             function SessionTools({ session }: { session: SessionView }) {
                 return (
                     <i18n.ClientMessages namespaces={["agents"]} fallback={null}>
                         {session.pullRequest ? <pull.SessionPull session={session} /> : null}
                         <share.SessionShareButton sessionId={session.id} title={session.title} />
-                        <phone.ContinueOnPhoneButton sessionId={session.id} />
                     </i18n.ClientMessages>
                 );
             }
@@ -1056,6 +1054,8 @@ function CodeStart({
     // A repository picked from GitHub that could not be set up, and what kept it.
     const [repoGap, setRepoGap] = useState<{ id: string; gap: GithubAppGap } | null>(null);
     const [connecting, setConnecting] = useState(false);
+    // The GitHub repository being connected, named on the chip meanwhile.
+    const [pendingRepo, setPendingRepo] = useState<string | null>(null);
     const [busy, startTransition] = useTransition();
     const parts = useCodeComposerParts(busy);
     // Full access until the stored pick is read: the server render has no storage.
@@ -1334,6 +1334,7 @@ function CodeStart({
         setError(null);
         setRepoGap(null);
         setConnecting(true);
+        setPendingRepo(id);
         void runAction(
             () =>
                 postCode<{ id?: string; error?: string; githubGap?: GithubAppGap }>(REPOS_ROUTE, {
@@ -1343,12 +1344,17 @@ function CodeStart({
         )
             .then((result) => {
                 if (result?.id) {
+                    const name = knownRepoName(id);
+                    if (name) rememberRepoName(result.id, name);
                     onRepo(result.id);
                     onRefresh();
                 } else if (result?.githubGap) setRepoGap({ id, gap: result.githubGap });
                 else if (result?.error) setError(result.error);
             })
-            .finally(() => setConnecting(false));
+            .finally(() => {
+                setConnecting(false);
+                setPendingRepo(null);
+            });
     };
 
     const shownError = error ?? choicesError;
@@ -1435,6 +1441,7 @@ function CodeStart({
                         branch={baseRef}
                         onBranch={onBaseRef}
                         disabled={busy || pending || connecting}
+                        pendingRepo={connecting ? pendingRepo : null}
                     />
                     {repoId !== NO_REPO ? (
                         <CodeIssueChip
@@ -2335,17 +2342,8 @@ function CodeThread({
                         <PanelRight className="size-4" />
                     </button>
                 ) : null}
-                <button
-                    type="button"
-                    onClick={onKeysHelp}
-                    aria-label={t("code.keys.shortcuts")}
-                    title={t("code.keys.shortcuts")}
-                    className="max-md:hidden inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:size-11"
-                >
-                    <Keyboard className="size-4" />
-                </button>
-                {thread ? <CodeExportMenu sessionId={sessionId} /> : null}
                 {thread?.canManage ? <SessionTools session={thread.view} /> : null}
+                {thread ? <CodeSessionMenu sessionId={sessionId} onKeysHelp={onKeysHelp} /> : null}
             </CodeSessionBar>
             <PolarThreadFrame fullPage={fullPage} dock={dock}>
                 {thread === undefined && failed ? (
