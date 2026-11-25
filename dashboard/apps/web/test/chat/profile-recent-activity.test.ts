@@ -25,6 +25,9 @@ let presence: { presence: string; presenceUntil: Date | null } = {
 /** Who asked the game servers app, so a refusal can be shown never to ask. */
 let serverReads: string[] = [];
 let seatReads: string[] = [];
+/** The playtime kept per game the desktop app saw, as `UserGameTime` holds it. */
+let played: { key: string; name: string; lastReportAt: Date }[] = [];
+let playedReads: { userId: string; key?: { notIn: string[] } }[] = [];
 
 vi.mock("@/lib/privacy-service", () => ({
     allowedBy: async (viewer: { id: string }, field: string, ids: readonly string[]) =>
@@ -58,6 +61,25 @@ vi.mock("@/lib/app-extensions/registry", () => ({
 vi.mock("@polaris/db", () => ({
     prisma: {
         user: { findUnique: async () => presence },
+        userGameTime: {
+            findMany: async ({
+                where,
+                take
+            }: {
+                where: { userId: string; lastReportAt: { gte: Date }; key?: { notIn: string[] } };
+                take: number;
+            }) => {
+                playedReads.push({ userId: where.userId, key: where.key });
+                return played
+                    .filter((row) => row.lastReportAt >= where.lastReportAt.gte)
+                    .filter((row) => !where.key?.notIn.includes(row.key))
+                    .sort((a, b) => b.lastReportAt.getTime() - a.lastReportAt.getTime())
+                    .slice(0, take);
+            }
+        },
+        gameArtKey: {
+            findMany: async () => [{ key: "witcher3.exe", ref: "gog:1207664663" }]
+        },
         arcadeSessionPlayer: {
             findMany: async ({ where }: { where: { userId: string } }) => {
                 seatReads.push(where.userId);
@@ -82,6 +104,8 @@ beforeEach(() => {
     presence = { presence: "online", presenceUntil: null };
     serverReads = [];
     seatReads = [];
+    played = [];
+    playedReads = [];
 });
 
 describe("a reader in the activity audience", () => {
@@ -100,23 +124,99 @@ describe("a reader in the activity audience", () => {
     });
 });
 
+describe("a game the desktop app saw running", () => {
+    beforeEach(() => {
+        played = [
+            {
+                key: "rocketleague.exe",
+                name: "Rocket League",
+                lastReportAt: new Date("2026-11-05T22:00:00Z")
+            }
+        ];
+    });
+
+    it("is listed once it ends, not only Minecraft server visits", async () => {
+        const list = await recentActivityFor(ADA, "grace", NOW);
+        expect(list.map((entry) => entry.key)).toEqual([
+            "arcade:chess",
+            "played:rocketleague.exe",
+            "server:mc1"
+        ]);
+        expect(list[1]).toMatchObject({
+            source: "game",
+            name: "Rocket League",
+            details: "",
+            endedAt: "2026-11-05T22:00:00.000Z",
+            imageUrl: expect.stringContaining("steam%3A252950")
+        });
+    });
+
+    it("is drawn by the store id an earlier report taught for the program", async () => {
+        played = [
+            {
+                key: "witcher3.exe",
+                name: "The Witcher 3",
+                lastReportAt: new Date("2026-11-06T08:00:00Z")
+            }
+        ];
+        const [entry] = (await recentActivityFor(ADA, "grace", NOW)).filter(
+            (item) => item.key === "played:witcher3.exe"
+        );
+        expect(entry?.imageUrl).toContain("gog");
+    });
+
+    it("is left out once hidden, by asking for it not to be read", async () => {
+        settings = { ...settings, hiddenGames: ["rocketleague.exe"] };
+        const list = await recentActivityFor(ADA, "grace", NOW);
+        expect(list.map((entry) => entry.key)).not.toContain("played:rocketleague.exe");
+        expect(playedReads[0]?.key).toEqual({ notIn: ["rocketleague.exe"] });
+    });
+
+    it("is not read while games are switched off", async () => {
+        settings = { ...settings, games: false };
+        const list = await recentActivityFor(ADA, "grace", NOW);
+        expect(list.map((entry) => entry.source)).toEqual(["minecraft"]);
+        expect(playedReads).toEqual([]);
+    });
+
+    it("gives way to the server visit when it was Minecraft", async () => {
+        played = [
+            { key: "javaw.exe", name: "Minecraft", lastReportAt: new Date("2026-11-05T10:00:00Z") },
+            ...played
+        ];
+        const list = await recentActivityFor(ADA, "grace", NOW);
+        expect(
+            list.filter((entry) => entry.name === "Minecraft").map((entry) => entry.key)
+        ).toEqual(["server:mc1"]);
+        expect(list.map((entry) => entry.key)).toContain("played:rocketleague.exe");
+    });
+
+    it("is not listed past the recent window", async () => {
+        played = [
+            { key: "old.exe", name: "Old Game", lastReportAt: new Date("2026-07-01T00:00:00Z") }
+        ];
+        const list = await recentActivityFor(ADA, "grace", NOW);
+        expect(list.map((entry) => entry.key)).not.toContain("played:old.exe");
+    });
+});
+
 describe("what is refused, without reading anything behind it", () => {
     it("a reader outside the activity audience", async () => {
         audience = new Set();
         expect(await recentActivityFor(ADA, "grace", NOW)).toEqual([]);
-        expect([...serverReads, ...seatReads]).toEqual([]);
+        expect([...serverReads, ...seatReads, ...playedReads]).toEqual([]);
     });
 
     it("anybody, while sharing is switched off", async () => {
         settings = { ...settings, share: false };
         expect(await recentActivityFor(ADA, "grace", NOW)).toEqual([]);
-        expect([...serverReads, ...seatReads]).toEqual([]);
+        expect([...serverReads, ...seatReads, ...playedReads]).toEqual([]);
     });
 
     it("anybody else, while they are invisible", async () => {
         presence = { presence: "invisible", presenceUntil: null };
         expect(await recentActivityFor(ADA, "grace", NOW)).toEqual([]);
-        expect([...serverReads, ...seatReads]).toEqual([]);
+        expect([...serverReads, ...seatReads, ...playedReads]).toEqual([]);
     });
 });
 

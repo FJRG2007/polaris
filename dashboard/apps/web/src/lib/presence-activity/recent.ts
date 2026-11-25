@@ -2,10 +2,17 @@
  * What somebody did lately, for the "Recent activity" list on their profile.
  *
  * Only what Polaris itself keeps a record of after it has ended: a visit to a
- * game server here (the game servers app's sessions, through its extension) and
- * a game played together in the Games app. A game the desktop app saw running or
- * a song on a music service leaves nothing behind once it stops - its row is
- * deleted - so it is never listed here, and nothing is guessed in its place.
+ * game server here (the game servers app's sessions, through its extension), a
+ * game played together in the Games app, and a game the desktop app saw running.
+ * The last is read from the playtime kept per game (`UserGameTime`), whose last
+ * report is when it was last seen running: the `UserActivity` row that showed
+ * "Playing" is deleted when the game closes, so it cannot be the record. A song
+ * on a music service leaves nothing behind once it stops, so it is never listed
+ * here, and nothing is guessed in its place.
+ *
+ * A desktop game still running is listed too, by when it was last reported: the
+ * screens already show it under "Now" and leave it out of this list while it is
+ * there (`RecentActivityList`), so it moves here by itself once it is closed.
  *
  * The same rules as what they are doing now (`activitiesFor`): the person's
  * `activity` audience, their switch for sharing at all, and the switch for each
@@ -20,6 +27,8 @@ import { allowedBy } from "@/lib/privacy-service";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import { callActivityGames, playedRecentlyFor } from "@/lib/app-extensions/registry";
+import { artRefFor, artRoute } from "./game-art-sources";
+import { nameRefOf } from "./game-art-lookup";
 
 /** How far back "recent" reaches. */
 export const RECENT_WINDOW_MS = 90 * 24 * 60 * 60_000;
@@ -63,14 +72,22 @@ export async function recentActivityFor(
     if (!self && invisible(person, now)) return [];
 
     const since = new Date(now.getTime() - RECENT_WINDOW_MS);
-    const [servers, together] = await Promise.all([
+    const gamesOn = core.activitySourceOn(own, "game");
+    const [servers, together, played] = await Promise.all([
         core.activitySourceOn(own, "minecraft")
             ? playedRecentlyFor(personId, since, RECENT_LIMIT)
             : Promise.resolve([]),
-        core.activitySourceOn(own, "game")
+        gamesOn
             ? playedTogetherRecently(viewer.id, personId, since).catch(() => [])
+            : Promise.resolve([]),
+        gamesOn
+            ? playedOnComputerRecently(personId, own.hiddenGames, since).catch(() => [])
             : Promise.resolve([])
     ]);
+    // Minecraft on a server here is also Minecraft running on their computer,
+    // and the visit is the entry that knows which server: one game, one entry,
+    // as the cards of what they are doing now are drawn.
+    const onServer = new Set(servers.map((visit) => visit.game.toLowerCase()));
 
     const list: RecentActivityView[] = [
         ...servers.map((visit) => ({
@@ -82,7 +99,8 @@ export async function recentActivityFor(
             gameId: visit.gameId ?? null,
             endedAt: visit.endedAt.toISOString()
         })),
-        ...together
+        ...together,
+        ...played.filter((entry) => !onServer.has(entry.name.toLowerCase()))
     ];
     return list.sort((a, b) => b.endedAt.localeCompare(a.endedAt)).slice(0, RECENT_LIMIT);
 }
@@ -133,4 +151,49 @@ async function playedTogetherRecently(
         if (found.length >= RECENT_LIMIT) break;
     }
     return found;
+}
+
+/**
+ * Games the desktop app saw running, the last time each was reported. A game
+ * hidden since is left out, as it is from what they are doing now. Its picture is
+ * found as a report's is (`reportGame`): the curated store id, the one an earlier
+ * report taught for the program, or the game's name to look up.
+ */
+async function playedOnComputerRecently(
+    personId: string,
+    hidden: readonly string[],
+    since: Date
+): Promise<RecentActivityView[]> {
+    const rows = await prisma.userGameTime.findMany({
+        where: {
+            userId: personId,
+            lastReportAt: { gte: since },
+            ...(hidden.length > 0 ? { key: { notIn: [...hidden] } } : {})
+        },
+        select: { key: true, name: true, lastReportAt: true },
+        orderBy: { lastReportAt: "desc" },
+        // Room for the Minecraft a server visit stands in for, which may have
+        // been reported under more than one program.
+        take: RECENT_LIMIT * 2
+    });
+    if (rows.length === 0) return [];
+    const learned = await prisma.gameArtKey
+        .findMany({
+            where: { key: { in: rows.map((row) => row.key) } },
+            select: { key: true, ref: true }
+        })
+        .catch(() => []);
+    const taught = new Map(learned.map((row) => [row.key, row.ref]));
+    return rows.map((row) => {
+        const art = artRefFor(row.key, null, taught.get(row.key)) ?? nameRefOf(row.name);
+        return {
+            source: "game" as const,
+            key: `played:${row.key}`,
+            name: row.name,
+            details: "",
+            imageUrl: art ? artRoute(art) : null,
+            gameId: null,
+            endedAt: row.lastReportAt.toISOString()
+        };
+    });
 }

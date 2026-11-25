@@ -208,7 +208,11 @@ export function ProfileCard({
                 <ActivityCards personId={profile.id} />
                 {/* What they did lately, through their activity setting on the
                     server - the list the larger profile in chat draws. */}
-                <RecentActivityList heading={t("profile.recentActivity")} recent={profile.recent} />
+                <RecentActivityList
+                    personId={profile.id}
+                    heading={t("profile.recentActivity")}
+                    recent={profile.recent}
+                />
 
                 {!own && signedIn ? (
                     <ProfileActions

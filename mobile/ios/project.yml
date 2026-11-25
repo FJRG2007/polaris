@@ -6,8 +6,8 @@ options:
   developmentLanguage: en
 settings:
   base:
-    MARKETING_VERSION: "0.1.4"
-    CURRENT_PROJECT_VERSION: "5"
+    MARKETING_VERSION: "0.1.5"
+    CURRENT_PROJECT_VERSION: "6"
     SWIFT_VERSION: "5.0"
 targets:
   Polaris:
