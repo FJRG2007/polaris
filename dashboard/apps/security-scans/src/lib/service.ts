@@ -244,7 +244,8 @@ export async function listServers(request: {
                 t.securitySetting?.updatesChoice === "off"
                     ? (t.securitySetting.updatesChosenAt?.toISOString() ?? null)
                     : null,
-            rebootAt: t.securitySetting?.rebootAt?.toISOString() ?? null
+            rebootAt: t.securitySetting?.rebootAt?.toISOString() ?? null,
+            held: t.securitySetting?.heldPackages ?? []
         })),
         next: targets.length > request.limit && last ? encodeCursor(last.name, last.id) : null
     };
@@ -1418,7 +1419,8 @@ function waitingData(report: parse.UpdatesReport) {
                   reboot: report.reboot,
                   rebootAt: report.rebootAt,
                   ...(report.reboot === "none" ? { rebootNotifiedAt: null } : {})
-              })
+              }),
+        ...(report.held === null ? {} : { heldPackages: [...report.held] })
     };
 }
 
@@ -1428,6 +1430,44 @@ export async function scheduleRestart(targetId: string, schedule: boolean) {
     const target = await targetRow(targetId);
     const { output } = await runHostAction(target, schedule ? "reboot-schedule" : "reboot-cancel");
     if (!/POLARIS_REBOOT=/.test(output)) throw new ScanFailure("updatesFailed");
+    return automaticUpdates(targetId);
+}
+
+/** A package's installed version, whether it is held, and the versions the
+ *  host's package manager still offers for it. */
+export async function packageVersions(targetId: string, name: string) {
+    const target = await targetRow(targetId);
+    const { output } = await runHostAction(target, "package-versions", { package: name });
+    const report = parse.parsePackageVersions(output);
+    if (!report) throw new ScanFailure("updatesFailed");
+    if (report.state === "missing") throw new ScanFailure("packageMissing");
+    if (report.state === "unsupported") throw new ScanFailure("fixUnsupported");
+    return report;
+}
+
+/** Keep a package where it is - the automatic updates and Polaris's own fixes
+ *  skip it - or let it go again. Answers the host's state after. */
+export async function holdPackage(targetId: string, name: string, hold: boolean) {
+    const target = await targetRow(targetId);
+    const { output } = await runHostAction(target, hold ? "package-hold" : "package-unhold", {
+        package: name
+    });
+    const state = parse.parseHoldLog(output);
+    if (state === "missing") throw new ScanFailure("packageMissing");
+    if (state === "unsupported") throw new ScanFailure("fixUnsupported");
+    if (state !== (hold ? "held" : "released")) throw new ScanFailure("holdFailed");
+    return automaticUpdates(targetId);
+}
+
+/** Put a package back on a version the package manager still offers, and keep
+ *  it there, for when an update broke something. */
+export async function rollbackPackage(targetId: string, name: string, version: string) {
+    const target = await targetRow(targetId);
+    const { output } = await runHostAction(target, "package-rollback", { package: name, version });
+    const state = parse.parseRollbackLog(output);
+    if (state === "unavailable") throw new ScanFailure("versionGone");
+    if (state === "unsupported") throw new ScanFailure("fixUnsupported");
+    if (state !== "done") throw new ScanFailure("rollbackFailed");
     return automaticUpdates(targetId);
 }
 

@@ -114,10 +114,11 @@ async function localDaemon(): Promise<HostdClient> {
  *  same `docker run` over SSH as an argument list quoted word by word. */
 export async function runHostAction(
     target: ScanTarget,
-    action: HostAction
+    action: HostAction,
+    words: { package: string; version?: string } | null = null
 ): Promise<{ exitCode: number; output: string }> {
     if (target.kind === "local" || !target.hostId) {
-        const result = await (await localDaemon()).hostSecurity(action);
+        const result = await (await localDaemon()).hostSecurity(action, words ?? {});
         if (result === null) throw new ScanFailure("daemonOutdated");
         if (result === "busy" || result === "timeout") throw new ScanFailure(result);
         return result;
@@ -133,7 +134,9 @@ export async function runHostAction(
     try {
         const parts: Buffer[] = [];
         let size = 0;
-        const result = await execCommand(client, quoteArgv(hostArgv(action)), {
+        const result = await execCommand(client, quoteArgv(
+                hostArgv(action, words ? [words.package, ...(words.version ? [words.version] : [])] : [])
+            ), {
             onStdout: (chunk) => {
                 if (size >= MAX_LOG) return;
                 size += chunk.length;

@@ -14,6 +14,7 @@ import { securityCatalogs } from "../../messages";
 import { FindingsTable } from "./findings-table";
 import { ImagesPanel } from "./images-panel";
 import { FocusCard, verdictLine } from "./focus-card";
+import * as schemas from "../model/schemas";
 import * as subjects from "../model/subjects";
 import { NO_LANDING, SECURITY_PATH, type Landing } from "../model/landing";
 import type { SecurityTranslator } from "../lib/i18n";
@@ -25,7 +26,14 @@ import {
     Card,
     CardBody,
     ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
     EmptyState,
+    Input,
     Select,
     Skeleton,
     Switch,
@@ -596,6 +604,244 @@ function waitingFrom(
     };
 }
 
+const NO_HELD: readonly string[] = [];
+
+/** The packages a server keeps on their version, each with Release, and the
+ *  dialog that holds one or moves it to another version the server offers. */
+function HeldPackages({
+    t,
+    targetId,
+    held,
+    submit
+}: {
+    t: SecurityTranslator;
+    targetId: string;
+    held: readonly string[];
+    submit: Submit;
+}) {
+    const [shown, setShown] = useState(held);
+    const [open, setOpen] = useState(false);
+    useEffect(() => setShown(held), [held]);
+    const release = async (name: string) => {
+        const previous = shown;
+        setShown((list) => list.filter((n) => n !== name));
+        await submit(async () => {
+            const result = await actions.holdPackageAction({ targetId, package: name, hold: false });
+            if (!result.ok) setShown(previous);
+            return result;
+        }, t("held.done"));
+    };
+    return (
+        <div className="flex flex-col gap-2 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="min-w-0">
+                    <span className="block font-medium">{t("held.title")}</span>
+                    <span className="text-muted-foreground">{t("held.hint")}</span>
+                </span>
+                <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+                    {t("held.manage")}
+                </Button>
+            </div>
+            {shown.length === 0 ? (
+                <p className="text-muted-foreground">{t("held.none")}</p>
+            ) : (
+                <ul className="flex flex-col gap-1">
+                    {shown.map((name) => (
+                        <li key={name} className="flex min-w-0 items-center gap-2">
+                            <span className="min-w-0 flex-1 truncate font-mono" title={name}>
+                                {name}
+                            </span>
+                            <Button size="xs" variant="ghost" onClick={() => void release(name)}>
+                                {t("held.release")}
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {open ? (
+                <PackageDialog
+                    t={t}
+                    targetId={targetId}
+                    onClose={() => setOpen(false)}
+                    submit={submit}
+                />
+            ) : null}
+        </div>
+    );
+}
+
+type Versions = { installed: string | null; held: boolean; versions: readonly string[]; };
+
+function PackageDialog({
+    t,
+    targetId,
+    onClose,
+    submit
+}: {
+    t: SecurityTranslator;
+    targetId: string;
+    onClose: () => void;
+    submit: Submit;
+}) {
+    const [name, setName] = useState("");
+    const [touched, setTouched] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [failure, setFailure] = useState<string | null>(null);
+    const [found, setFound] = useState<{ name: string; versions: Versions; } | null>(null);
+    const checked = schemas.packageName.safeParse(name);
+    const invalid = touched && name.trim() !== "" && !checked.success;
+    const lookUp = async () => {
+        setTouched(true);
+        if (!checked.success || busy) return;
+        setBusy(true);
+        setFailure(null);
+        const result = await actions.packageVersionsAction({ targetId, package: checked.data });
+        setBusy(false);
+        if (!result.ok) {
+            setFound(null);
+            return setFailure(t(`errors.${result.error}` as never) || t("errors.failed"));
+        }
+        setFound({ name: checked.data, versions: result.data });
+    };
+    const change = async (work: () => Promise<{ ok: boolean; error?: string; }>, done: string) => {
+        setBusy(true);
+        await submit(async () => {
+            const result = await work();
+            if (result.ok) onClose();
+            return result;
+        }, done);
+        setBusy(false);
+    };
+    const others = found
+        ? found.versions.versions.filter((v) => v !== found.versions.installed)
+        : [];
+    return (
+        <Dialog open onOpenChange={(next) => !next && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t("held.dialogTitle")}</DialogTitle>
+                    <DialogDescription>{t("held.dialogHint")}</DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-3 text-sm">
+                    <form
+                        className="flex flex-col gap-1"
+                        noValidate
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            void lookUp();
+                        }}
+                    >
+                        <label htmlFor={`${targetId}-package`} className="font-medium">
+                            {t("held.name")} *
+                        </label>
+                        <div className="flex min-w-0 gap-2">
+                            <Input
+                                id={`${targetId}-package`}
+                                className="min-w-0 flex-1 font-mono"
+                                autoComplete="off"
+                                spellCheck={false}
+                                placeholder={t("held.namePlaceholder")}
+                                value={name}
+                                aria-invalid={invalid || undefined}
+                                onChange={(event) => {
+                                    setName(event.target.value);
+                                    setFound(null);
+                                }}
+                                onBlur={() => setTouched(true)}
+                            />
+                            <Button type="submit" disabled={busy} aria-disabled={!checked.success}>
+                                {t("held.lookUp")}
+                            </Button>
+                        </div>
+                        {invalid ? <p className="text-danger">{t("held.nameInvalid")}</p> : null}
+                    </form>
+                    {failure ? <p className="text-danger">{failure}</p> : null}
+                    {busy && !found ? <Skeleton className="h-16 w-full" /> : null}
+                    {found ? (
+                        <div className="flex flex-col gap-2">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                <span className="min-w-0 truncate font-mono" title={found.name}>
+                                    {found.name}
+                                </span>
+                                <span className="text-muted-foreground">
+                                    {t("held.installed", {
+                                        version: found.versions.installed ?? "-"
+                                    })}
+                                </span>
+                                {found.versions.held ? (
+                                    <Badge variant="neutral">{t("held.isHeld")}</Badge>
+                                ) : (
+                                    <Button
+                                        size="xs"
+                                        variant="outline"
+                                        disabled={busy}
+                                        onClick={() =>
+                                            void change(
+                                                () =>
+                                                    actions.holdPackageAction({
+                                                        targetId,
+                                                        package: found.name,
+                                                        hold: true
+                                                    }),
+                                                t("held.done")
+                                            )
+                                        }
+                                    >
+                                        {t("held.hold")}
+                                    </Button>
+                                )}
+                            </div>
+                            <p className="font-medium">{t("held.versions")}</p>
+                            {others.length === 0 ? (
+                                <p className="text-muted-foreground">{t("held.noVersions")}</p>
+                            ) : (
+                                <ul className="flex max-h-60 flex-col gap-1 overflow-y-auto">
+                                    {others.map((version) => (
+                                        <li key={version} className="flex min-w-0 items-center gap-2">
+                                            <span
+                                                className="min-w-0 flex-1 truncate font-mono"
+                                                title={version}
+                                            >
+                                                {version}
+                                            </span>
+                                            <Button
+                                                size="xs"
+                                                variant="ghost"
+                                                disabled={busy}
+                                                onClick={() =>
+                                                    void change(
+                                                        () =>
+                                                            actions.rollbackPackageAction({
+                                                                targetId,
+                                                                package: found.name,
+                                                                version
+                                                            }),
+                                                        t("held.moved", {
+                                                            package: found.name,
+                                                            version
+                                                        })
+                                                    )
+                                                }
+                                            >
+                                                {t("held.use")}
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    ) : null}
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="ghost" onClick={onClose}>
+                        {t("held.close")}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function HostPanel({
     t,
     targetId,
@@ -743,6 +989,14 @@ function HostPanel({
                         ) : null}
                     </div>
                 ) : null}
+                {updates === "unsupported" ? null : (
+                    <HeldPackages
+                        t={t}
+                        targetId={targetId}
+                        held={server?.held ?? NO_HELD}
+                        submit={submit}
+                    />
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span className="min-w-0">
                         <span className="block font-medium">{t("host.schedule")}</span>

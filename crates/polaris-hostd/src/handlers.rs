@@ -1361,7 +1361,10 @@ fn host_security_run<R: Read>(req: &Request, body: &mut R) -> Response {
         Ok(r) => r,
         Err(_) => return Response::bad_request("invalid host security request"),
     };
-    match host_security::run(request.action) {
+    let Some(arguments) = request.arguments() else {
+        return Response::bad_request("invalid host security request");
+    };
+    match host_security::run(request.action, &arguments) {
         Ok(Ok(run)) => Response::json(
             200,
             "OK",

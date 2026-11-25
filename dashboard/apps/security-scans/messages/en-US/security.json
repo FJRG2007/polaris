@@ -162,7 +162,11 @@
         "reportUnreadable": "The scanner's report could not be read. Update Polaris from Settings, then scan again.",
         "sidecarRefused": "It could not be turned off. Try again from its own page.",
         "fixFailed": "The security updates could not be applied. Try again later.",
-        "fixUnsupported": "This server's distribution has no supported updates tool."
+        "fixUnsupported": "This server's distribution has no supported updates tool.",
+        "packageMissing": "That package is not installed on this server.",
+        "holdFailed": "The package manager refused the change. Try again later.",
+        "versionGone": "That version is no longer offered for this server. Pick another one.",
+        "rollbackFailed": "The package could not move to that version. Try another one."
     },
     "alerts": {
         "title": "{count, plural, one {A new serious vulnerability in {app}} other {# new serious vulnerabilities in {app}}}",
@@ -250,5 +254,27 @@
             "unsupported": "This distribution has no supported updates tool.",
             "off": "Automatic updates are off, so nothing was installed."
         }
+    },
+    "held": {
+        "title": "Held packages",
+        "hint": "Held packages stay on their version. Automatic updates skip them.",
+        "none": "No package is held.",
+        "release": "Release",
+        "manage": "Hold or roll back",
+        "dialogTitle": "Hold or roll back a package",
+        "dialogHint": "For when an update broke something: keep a package where it is, or move it to a version the server still offers.",
+        "name": "Package",
+        "namePlaceholder": "openssl",
+        "nameInvalid": "Letters, digits and + . _ - only, starting with a letter or digit.",
+        "lookUp": "Look up",
+        "installed": "Installed: {version}",
+        "isHeld": "Held",
+        "hold": "Hold this version",
+        "versions": "Versions offered",
+        "noVersions": "The server offers no other version of this package.",
+        "use": "Use and hold",
+        "close": "Close",
+        "done": "Held packages updated.",
+        "moved": "{package} is on {version} and held there."
     }
 }

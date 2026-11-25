@@ -17028,6 +17028,9 @@ model SecuritySetting {
     rebootAt       DateTime?
     // The owner was told a restart is needed; cleared once it is not.
     rebootNotifiedAt DateTime?
+    // Packages kept where they are (apt-mark hold / dnf versionlock), as the
+    // last status read listed them.
+    heldPackages String[]  @default([])
     updatedAt   DateTime  @updatedAt
 
     target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)

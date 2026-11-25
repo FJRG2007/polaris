@@ -4,8 +4,11 @@
 //! Neither fits a deploy spec - both need the host's root mounted, which a spec
 //! may never ask for - so each is one fixed `docker run` built here from a
 //! closed set of actions. Nothing in the request reaches the command line but
-//! the action's name, which picks one of the scripts below; there is no shell
-//! between this process and `docker`, and the scripts take no arguments.
+//! the action's name (and a package action's checked words, below), which picks
+//! one of the scripts below; there is no shell
+//! between this process and `docker`. A package action also takes one package
+//! (and a rollback one version), validated here and passed to the script as its
+//! own positional words, never spliced into it.
 //!
 //! The scripts are word for word the ones the dashboard runs over SSH on a
 //! remote server (`apps/security-scans/src/model/specs.ts`); a dashboard test
@@ -31,7 +34,7 @@ pub const MAX_OUTPUT: usize = 4 * 1024 * 1024;
 
 pub const AUDIT_SCRIPT: &str = r#"apk add --no-cache --quiet lynis >/dev/null 2>&1 || { echo POLARIS_NO_TOOL; exit 20; }; nice -n 19 lynis audit system --rootdir /host --quick --no-colors --no-log --report-file /tmp/report.dat >/dev/null 2>&1; [ -s /tmp/report.dat ] || exit 21; echo POLARIS_REPORT; cat /tmp/report.dat"#;
 
-pub const UPDATES_STATUS_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if command -v apt-get >/dev/null 2>&1; then if grep -qs 'Unattended-Upgrade "1"' /etc/apt/apt.conf.d/20auto-upgrades && dpkg -s unattended-upgrades >/dev/null 2>&1; then echo POLARIS_UPDATES=on; else echo POLARIS_UPDATES=off; fi; echo "POLARIS_PENDING=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | grep -c '^Inst ')"; echo "POLARIS_SECURITY=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | grep '^Inst ' | grep -ci security)"; [ -f /var/run/reboot-required ] && echo POLARIS_REBOOT=required; elif command -v dnf >/dev/null 2>&1; then if systemctl is-enabled dnf-automatic.timer >/dev/null 2>&1; then echo POLARIS_UPDATES=on; else echo POLARIS_UPDATES=off; fi; echo "POLARIS_PENDING=$(dnf -q -C check-update 2>/dev/null | grep -c '^[[:alnum:]]')"; echo "POLARIS_SECURITY=$(dnf -q -C check-update --security 2>/dev/null | grep -c '^[[:alnum:]]')"; command -v needs-restarting >/dev/null 2>&1 && { needs-restarting -r >/dev/null 2>&1 || echo POLARIS_REBOOT=required; }; else echo POLARIS_UPDATES=unsupported; fi; [ -f /run/systemd/shutdown/scheduled ] && echo "POLARIS_REBOOT_AT=$(sed -n 's/^USEC=//p' /run/systemd/shutdown/scheduled)"; true"#;
+pub const UPDATES_STATUS_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if command -v apt-get >/dev/null 2>&1; then if grep -qs 'Unattended-Upgrade "1"' /etc/apt/apt.conf.d/20auto-upgrades && dpkg -s unattended-upgrades >/dev/null 2>&1; then echo POLARIS_UPDATES=on; else echo POLARIS_UPDATES=off; fi; echo "POLARIS_PENDING=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | grep -c '^Inst ')"; echo "POLARIS_SECURITY=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | grep '^Inst ' | grep -ci security)"; [ -f /var/run/reboot-required ] && echo POLARIS_REBOOT=required; echo POLARIS_HOLDS; apt-mark showhold 2>/dev/null | sed 's/^/POLARIS_HELD=/'; elif command -v dnf >/dev/null 2>&1; then if systemctl is-enabled dnf-automatic.timer >/dev/null 2>&1; then echo POLARIS_UPDATES=on; else echo POLARIS_UPDATES=off; fi; echo "POLARIS_PENDING=$(dnf -q -C check-update 2>/dev/null | grep -c '^[[:alnum:]]')"; echo "POLARIS_SECURITY=$(dnf -q -C check-update --security 2>/dev/null | grep -c '^[[:alnum:]]')"; command -v needs-restarting >/dev/null 2>&1 && { needs-restarting -r >/dev/null 2>&1 || echo POLARIS_REBOOT=required; }; echo POLARIS_HOLDS; dnf -q -C versionlock list 2>/dev/null | awk '/^Package name: / {print "POLARIS_HELD=" $3; next} /^#/ || / / || NF == 0 {next} {n = split($0, a, "-"); if (n > 2) {s = a[1]; for (i = 2; i <= n - 2; i++) s = s "-" a[i]; print "POLARIS_HELD=" s}}'; else echo POLARIS_UPDATES=unsupported; fi; [ -f /run/systemd/shutdown/scheduled ] && echo "POLARIS_REBOOT_AT=$(sed -n 's/^USEC=//p' /run/systemd/shutdown/scheduled)"; true"#;
 
 pub const UPDATES_ON_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; nice -n 10 apt-get update -qq >/dev/null && nice -n 10 apt-get install -y -qq unattended-upgrades >/dev/null && printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades && mkdir -p /etc/systemd/system/apt-daily-upgrade.timer.d && printf '[Timer]\nOnCalendar=\nOnCalendar=*-*-* 04:00\nRandomizedDelaySec=30m\n' > /etc/systemd/system/apt-daily-upgrade.timer.d/polaris.conf && { systemctl daemon-reload >/dev/null 2>&1 || true; } && echo POLARIS_UPDATES=on; elif command -v dnf >/dev/null 2>&1; then nice -n 10 dnf install -y -q dnf-automatic >/dev/null && sed -i -e 's/^upgrade_type *=.*/upgrade_type = security/' -e 's/^apply_updates *=.*/apply_updates = yes/' /etc/dnf/automatic.conf && mkdir -p /etc/systemd/system/dnf-automatic.timer.d && printf '[Timer]\nOnCalendar=\nOnCalendar=*-*-* 04:00\nRandomizedDelaySec=30m\n' > /etc/systemd/system/dnf-automatic.timer.d/polaris.conf && { systemctl daemon-reload >/dev/null 2>&1 || true; } && systemctl enable --now dnf-automatic.timer >/dev/null 2>&1 && echo POLARIS_UPDATES=on; else echo POLARIS_UPDATES=unsupported; fi"#;
 
@@ -43,6 +46,14 @@ pub const REBOOT_CANCEL_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "P
 
 pub const PACKAGES_FIX_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; nice -n 10 apt-get update -qq >/dev/null 2>&1; if ! command -v unattended-upgrade >/dev/null 2>&1; then echo POLARIS_FIX=unavailable; elif nice -n 10 unattended-upgrade >/dev/null 2>&1; then echo POLARIS_FIX=done; else echo POLARIS_FIX=failed; fi; [ -f /var/run/reboot-required ] && echo POLARIS_REBOOT=required; elif command -v dnf >/dev/null 2>&1; then if nice -n 10 dnf upgrade --security -y -q >/dev/null 2>&1; then echo POLARIS_FIX=done; else echo POLARIS_FIX=failed; fi; command -v needs-restarting >/dev/null 2>&1 && { needs-restarting -r >/dev/null 2>&1 || echo POLARIS_REBOOT=required; }; else echo POLARIS_FIX=unsupported; fi; true"#;
 
+pub const PACKAGE_VERSIONS_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if command -v apt-get >/dev/null 2>&1; then dpkg -s "$1" 2>/dev/null | grep -q '^Status: install ok installed' || { echo POLARIS_PACKAGE=missing; exit 0; }; echo "POLARIS_INSTALLED=$(dpkg -s "$1" 2>/dev/null | sed -n 's/^Version: //p')"; apt-mark showhold 2>/dev/null | grep -qxF "$1" && echo POLARIS_KEPT=yes; apt-cache madison "$1" 2>/dev/null | awk -F'|' '{gsub(/ /, "", $2); if ($2 != "" && !seen[$2]++) print "POLARIS_VERSION=" $2}'; elif command -v dnf >/dev/null 2>&1; then rpm -q "$1" >/dev/null 2>&1 || { echo POLARIS_PACKAGE=missing; exit 0; }; echo "POLARIS_INSTALLED=$(rpm -q --qf '%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}' "$1" | head -n 1)"; dnf -q versionlock list 2>/dev/null | awk '/^Package name: / {print "POLARIS_HELD=" $3; next} /^#/ || / / || NF == 0 {next} {n = split($0, a, "-"); if (n > 2) {s = a[1]; for (i = 2; i <= n - 2; i++) s = s "-" a[i]; print "POLARIS_HELD=" s}}' | grep -qxF "POLARIS_HELD=$1" && echo POLARIS_KEPT=yes; dnf -q --showduplicates list "$1" 2>/dev/null | awk 'NF == 3 && !seen[$2]++ {print "POLARIS_VERSION=" $2}'; else echo POLARIS_PACKAGE=unsupported; fi; true"#;
+
+pub const PACKAGE_HOLD_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if command -v apt-get >/dev/null 2>&1; then dpkg -s "$1" 2>/dev/null | grep -q '^Status: install ok installed' || { echo POLARIS_HOLD=missing; exit 0; }; if apt-mark hold "$1" >/dev/null 2>&1; then echo POLARIS_HOLD=held; else echo POLARIS_HOLD=failed; fi; elif command -v dnf >/dev/null 2>&1; then rpm -q "$1" >/dev/null 2>&1 || { echo POLARIS_HOLD=missing; exit 0; }; if { dnf -q versionlock list >/dev/null 2>&1 || nice -n 10 dnf install -y -q 'dnf-command(versionlock)' >/dev/null 2>&1; } && dnf -q versionlock add "$1" >/dev/null 2>&1; then echo POLARIS_HOLD=held; else echo POLARIS_HOLD=failed; fi; else echo POLARIS_HOLD=unsupported; fi; true"#;
+
+pub const PACKAGE_UNHOLD_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if command -v apt-get >/dev/null 2>&1; then if apt-mark unhold "$1" >/dev/null 2>&1; then echo POLARIS_HOLD=released; else echo POLARIS_HOLD=failed; fi; elif command -v dnf >/dev/null 2>&1; then dnf -q versionlock delete "$1" >/dev/null 2>&1; if dnf -q versionlock list 2>/dev/null | awk '/^Package name: / {print "POLARIS_HELD=" $3; next} /^#/ || / / || NF == 0 {next} {n = split($0, a, "-"); if (n > 2) {s = a[1]; for (i = 2; i <= n - 2; i++) s = s "-" a[i]; print "POLARIS_HELD=" s}}' | grep -qxF "POLARIS_HELD=$1"; then echo POLARIS_HOLD=failed; else echo POLARIS_HOLD=released; fi; else echo POLARIS_HOLD=unsupported; fi; true"#;
+
+pub const PACKAGE_ROLLBACK_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; apt-cache madison "$1" 2>/dev/null | awk -F'|' '{gsub(/ /, "", $2); if ($2 != "" && !seen[$2]++) print "POLARIS_VERSION=" $2}' | grep -qxF "POLARIS_VERSION=$2" || { echo POLARIS_ROLLBACK=unavailable; exit 0; }; if nice -n 10 apt-get install -y -qq --no-remove --allow-downgrades -o Dpkg::Options::=--force-confold "$1=$2" >/dev/null 2>&1; then apt-mark hold "$1" >/dev/null 2>&1; echo POLARIS_ROLLBACK=done; else echo POLARIS_ROLLBACK=failed; fi; elif command -v dnf >/dev/null 2>&1; then dnf -q --showduplicates list "$1" 2>/dev/null | awk 'NF == 3 && !seen[$2]++ {print "POLARIS_VERSION=" $2}' | grep -qxF "POLARIS_VERSION=$2" || { echo POLARIS_ROLLBACK=unavailable; exit 0; }; if nice -n 10 dnf downgrade -y -q "$1-$2" >/dev/null 2>&1; then { dnf -q versionlock list >/dev/null 2>&1 || nice -n 10 dnf install -y -q 'dnf-command(versionlock)' >/dev/null 2>&1; }; dnf -q versionlock add "$1" >/dev/null 2>&1; echo POLARIS_ROLLBACK=done; else echo POLARIS_ROLLBACK=failed; fi; else echo POLARIS_ROLLBACK=unsupported; fi; true"#;
+
 #[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum HostAction {
@@ -53,18 +64,76 @@ pub enum HostAction {
     RebootSchedule,
     RebootCancel,
     PackagesFix,
+    PackageVersions,
+    PackageHold,
+    PackageUnhold,
+    PackageRollback,
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HostSecurityRequest {
     pub action: HostAction,
+    /// The one package a package action is about; refused on every other.
+    #[serde(default)]
+    pub package: Option<String>,
+    /// The version a rollback goes to; refused on every other action.
+    #[serde(default)]
+    pub version: Option<String>,
+}
+
+/// A package name as dpkg and rpm write them: letters, digits and `+._-`,
+/// never starting with a sign, so it can never read as an option.
+pub fn valid_package(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 128
+        && bytes[0].is_ascii_alphanumeric()
+        && bytes.iter().all(|b| b.is_ascii_alphanumeric() || b"+._-".contains(b))
+}
+
+/// A package version as dpkg and rpm write them (epoch, `~` and `:` included).
+pub fn valid_version(version: &str) -> bool {
+    let bytes = version.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 128
+        && bytes[0].is_ascii_alphanumeric()
+        && bytes.iter().all(|b| b.is_ascii_alphanumeric() || b".+~:_-".contains(b))
+}
+
+impl HostSecurityRequest {
+    /// The positional arguments the action's script reads as `$1` and `$2`,
+    /// or `None` when the request names a package or version the action does
+    /// not take, leaves out one it needs, or names one that is not well formed.
+    pub fn arguments(&self) -> Option<Vec<String>> {
+        let takes_package = matches!(
+            self.action,
+            HostAction::PackageVersions
+                | HostAction::PackageHold
+                | HostAction::PackageUnhold
+                | HostAction::PackageRollback
+        );
+        let takes_version = self.action == HostAction::PackageRollback;
+        match (&self.package, takes_package) {
+            (None, false) => {}
+            (Some(name), true) if valid_package(name) => {}
+            _ => return None,
+        }
+        match (&self.version, takes_version) {
+            (None, false) => {}
+            (Some(version), true) if valid_version(version) => {}
+            _ => return None,
+        }
+        Some(self.package.iter().chain(self.version.iter()).cloned().collect())
+    }
 }
 
 /// The arguments after `docker` for an action. The audit sees the host
 /// read-only and changes nothing; only the updates switch needs the host's root
-/// writable, its process tree (to reach systemd) and its network.
-pub fn argv(action: HostAction) -> Vec<String> {
+/// writable, its process tree (to reach systemd) and its network. A package
+/// action's name and version follow the script as its own arguments (`$0` is
+/// "polaris"), so they reach the shell as words and are never read as code.
+pub fn argv(action: HostAction, arguments: &[String]) -> Vec<String> {
     let mut args: Vec<&str> = vec![
         "run",
         "--rm",
@@ -91,6 +160,10 @@ pub fn argv(action: HostAction) -> Vec<String> {
                 HostAction::RebootSchedule => REBOOT_SCHEDULE_SCRIPT,
                 HostAction::RebootCancel => REBOOT_CANCEL_SCRIPT,
                 HostAction::PackagesFix => PACKAGES_FIX_SCRIPT,
+                HostAction::PackageVersions => PACKAGE_VERSIONS_SCRIPT,
+                HostAction::PackageHold => PACKAGE_HOLD_SCRIPT,
+                HostAction::PackageUnhold => PACKAGE_UNHOLD_SCRIPT,
+                HostAction::PackageRollback => PACKAGE_ROLLBACK_SCRIPT,
                 _ => UPDATES_OFF_SCRIPT,
             };
             args.extend([
@@ -110,7 +183,12 @@ pub fn argv(action: HostAction) -> Vec<String> {
             ]);
         }
     }
-    args.into_iter().map(String::from).collect()
+    let mut args: Vec<String> = args.into_iter().map(String::from).collect();
+    if !arguments.is_empty() {
+        args.push("polaris".to_string());
+        args.extend(arguments.iter().cloned());
+    }
+    args
 }
 
 static RUNNING: Mutex<()> = Mutex::new(());
@@ -167,13 +245,13 @@ pub enum RunError {
 
 /// Run an action to the end. `Err(Busy)` when another one is still running,
 /// `Err(TimedOut)` when it outlived `ACTION_DEADLINE` and was stopped.
-pub fn run(action: HostAction) -> io::Result<Result<HostRun, RunError>> {
+pub fn run(action: HostAction, arguments: &[String]) -> io::Result<Result<HostRun, RunError>> {
     let Ok(_guard) = RUNNING.try_lock() else {
         return Ok(Err(RunError::Busy));
     };
     let deadline = Instant::now() + ACTION_DEADLINE;
     let mut child = Command::new("docker")
-        .args(argv(action))
+        .args(argv(action, arguments))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -567,7 +645,7 @@ mod tests {
 
     #[test]
     fn audit_is_read_only_and_unprivileged() {
-        let args = argv(HostAction::Audit);
+        let args = argv(HostAction::Audit, &[]);
         assert!(args.contains(&"/:/host:ro".to_string()));
         assert!(!args.contains(&"--privileged".to_string()));
         assert_eq!(args.last().map(String::as_str), Some(AUDIT_SCRIPT));
@@ -582,8 +660,12 @@ mod tests {
             (HostAction::RebootSchedule, REBOOT_SCHEDULE_SCRIPT),
             (HostAction::RebootCancel, REBOOT_CANCEL_SCRIPT),
             (HostAction::PackagesFix, PACKAGES_FIX_SCRIPT),
+            (HostAction::PackageVersions, PACKAGE_VERSIONS_SCRIPT),
+            (HostAction::PackageHold, PACKAGE_HOLD_SCRIPT),
+            (HostAction::PackageUnhold, PACKAGE_UNHOLD_SCRIPT),
+            (HostAction::PackageRollback, PACKAGE_ROLLBACK_SCRIPT),
         ] {
-            let args = argv(action);
+            let args = argv(action, &[]);
             assert!(args.contains(&"--privileged".to_string()));
             let chroot = args.iter().position(|a| a == "chroot").unwrap();
             assert_eq!(args[chroot + 1], "/host");
@@ -602,8 +684,71 @@ mod tests {
             REBOOT_CANCEL_SCRIPT,
             PACKAGES_FIX_SCRIPT,
             PACKAGES_SCRIPT,
+            PACKAGE_VERSIONS_SCRIPT,
+            PACKAGE_HOLD_SCRIPT,
+            PACKAGE_UNHOLD_SCRIPT,
+            PACKAGE_ROLLBACK_SCRIPT,
         ] {
             assert!(!script.bytes().any(|b| b < 0x20 || b == 0x7f));
+        }
+    }
+
+    fn request(json: &str) -> Option<Vec<String>> {
+        serde_json::from_str::<HostSecurityRequest>(json).ok()?.arguments()
+    }
+
+    #[test]
+    fn package_actions_take_one_well_formed_package_and_only_they_do() {
+        assert_eq!(
+            request(r#"{"action":"package-hold","package":"openssl"}"#),
+            Some(vec!["openssl".to_string()])
+        );
+        assert_eq!(
+            request(
+                r#"{"action":"package-rollback","package":"libssl3","version":"1:3.0.15-1~deb12u1"}"#
+            ),
+            Some(vec!["libssl3".to_string(), "1:3.0.15-1~deb12u1".to_string()])
+        );
+        assert_eq!(request(r#"{"action":"updates-on"}"#), Some(vec![]));
+        for bad in [
+            r#"{"action":"package-hold"}"#,
+            r#"{"action":"package-hold","package":"-y"}"#,
+            r#"{"action":"package-hold","package":"a;reboot"}"#,
+            r#"{"action":"package-hold","package":"a b"}"#,
+            r#"{"action":"package-hold","package":"$(id)"}"#,
+            r#"{"action":"package-hold","package":"a\nb"}"#,
+            r#"{"action":"package-hold","package":""}"#,
+            r#"{"action":"package-hold","package":"openssl","version":"1.0"}"#,
+            r#"{"action":"package-rollback","package":"openssl"}"#,
+            r#"{"action":"package-rollback","package":"openssl","version":"1.0 && reboot"}"#,
+            r#"{"action":"package-rollback","package":"openssl","version":"-1"}"#,
+            r#"{"action":"updates-on","package":"openssl"}"#,
+            r#"{"action":"audit","version":"1"}"#,
+        ] {
+            assert_eq!(request(bad), None, "{bad}");
+        }
+        assert!(!valid_package(&"a".repeat(129)));
+    }
+
+    #[test]
+    fn package_arguments_follow_the_script_as_their_own_words() {
+        let args = argv(
+            HostAction::PackageRollback,
+            &["libssl3".to_string(), "3.0.15-1".to_string()],
+        );
+        let script = args.iter().position(|a| a == PACKAGE_ROLLBACK_SCRIPT).unwrap();
+        assert_eq!(&args[script - 1], "-c");
+        assert_eq!(&args[script + 1..], ["polaris", "libssl3", "3.0.15-1"]);
+        for script in [
+            PACKAGE_VERSIONS_SCRIPT,
+            PACKAGE_HOLD_SCRIPT,
+            PACKAGE_UNHOLD_SCRIPT,
+            PACKAGE_ROLLBACK_SCRIPT,
+        ] {
+            // Outside the single-quoted awk and sed programs, the words are only
+            // ever read inside double quotes, never spliced into a bare word.
+            let shell: String = script.split('\'').step_by(2).collect();
+            assert!(!shell.contains(" $1") && !shell.contains(" $2"));
         }
     }
 }

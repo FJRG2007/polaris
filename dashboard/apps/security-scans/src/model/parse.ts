@@ -279,6 +279,17 @@ export interface UpdatesReport {
     /** Null when the script did not say (an older daemon's copy of it). */
     readonly reboot: RebootState | null;
     readonly rebootAt: Date | null;
+    /** Packages kept where they are; null when the script did not list them. */
+    readonly held: readonly string[] | null;
+}
+
+const PACKAGE_WORD = "[A-Za-z0-9][A-Za-z0-9+._-]{0,127}";
+const VERSION_WORD = "[A-Za-z0-9][A-Za-z0-9.+~:_-]{0,127}";
+
+/** Every value of a `NAME=value` line whose value matches `word`, once each. */
+function values(text: string, name: string, word: string): string[] {
+    const found = text.matchAll(new RegExp(`^${name}=(${word})\\s*$`, "gm"));
+    return [...new Set([...found].map((m) => m[1]!))];
 }
 
 function count(text: string, name: string): number | null {
@@ -319,8 +330,56 @@ export function parseUpdatesLog(text: string): UpdatesReport {
         pending,
         securityPending: count(text, "POLARIS_SECURITY"),
         reboot,
-        rebootAt
+        rebootAt,
+        held: /^POLARIS_HOLDS\s*$/m.test(text)
+            ? values(text, "POLARIS_HELD", PACKAGE_WORD).slice(0, 200)
+            : null
     };
+}
+
+/** One package on a host: what is installed, whether it is held, what else
+ *  the package manager offers. `missing` when it is not installed. */
+export interface PackageVersions {
+    readonly state: "ok" | "missing" | "unsupported";
+    readonly installed: string | null;
+    readonly held: boolean;
+    readonly versions: readonly string[];
+}
+
+export function parsePackageVersions(text: string): PackageVersions | null {
+    const said = /POLARIS_PACKAGE=(missing|unsupported)/.exec(text)?.[1] as
+        | "missing"
+        | "unsupported"
+        | undefined;
+    const installed = new RegExp(`^POLARIS_INSTALLED=(${VERSION_WORD})\\s*$`, "m").exec(
+        text
+    )?.[1];
+    if (!said && !installed) return null;
+    return {
+        state: said ?? "ok",
+        installed: installed ?? null,
+        held: /^POLARIS_KEPT=yes/m.test(text),
+        versions: values(text, "POLARIS_VERSION", VERSION_WORD).slice(0, 50)
+    };
+}
+
+export type HoldState = "held" | "released" | "missing" | "failed" | "unsupported";
+export type RollbackState = "done" | "failed" | "unavailable" | "unsupported";
+
+export function parseHoldLog(text: string): HoldState | null {
+    return (
+        (/POLARIS_HOLD=(held|released|missing|failed|unsupported)/.exec(text)?.[1] as
+            | HoldState
+            | undefined) ?? null
+    );
+}
+
+export function parseRollbackLog(text: string): RollbackState | null {
+    return (
+        (/POLARIS_ROLLBACK=(done|failed|unavailable|unsupported)/.exec(text)?.[1] as
+            | RollbackState
+            | undefined) ?? null
+    );
 }
 
 /* -------------------------------------------------------------------------- */

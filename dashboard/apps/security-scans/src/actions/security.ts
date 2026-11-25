@@ -200,6 +200,37 @@ export async function restartAction(input: unknown) {
     );
 }
 
+export async function packageVersionsAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.packageInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () =>
+        (await service()).packageVersions(parsed.data.targetId, parsed.data.package)
+    );
+}
+
+export async function holdPackageAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.holdInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () =>
+        (await service()).holdPackage(parsed.data.targetId, parsed.data.package, parsed.data.hold)
+    );
+}
+
+export async function rollbackPackageAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.rollbackInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () =>
+        (await service()).rollbackPackage(
+            parsed.data.targetId,
+            parsed.data.package,
+            parsed.data.version
+        )
+    );
+}
+
 export async function scheduleAction(input: unknown) {
     await requireSecurityUser();
     const parsed = schemas.scheduleInput.safeParse(input);

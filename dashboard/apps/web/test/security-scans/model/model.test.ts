@@ -128,7 +128,8 @@ describe("automatic updates output", () => {
             securityPending: null,
             // An older daemon's script says nothing about restarts: unknown, not "none".
             reboot: null,
-            rebootAt: null
+            rebootAt: null,
+            held: null
         });
         expect(
             parse.parseUpdatesLog("POLARIS_DISTRO id=\nPOLARIS_UPDATES=unsupported")
@@ -168,6 +169,63 @@ describe("automatic updates output", () => {
         for (const script of Object.values(specs.UPDATES_SCRIPTS)) {
             expect(/[\u0000-\u001f\u007f]/.test(script)).toBe(false);
         }
+    });
+});
+
+describe("held packages", () => {
+    it("lists what a status read says is held, and nothing when it did not say", () => {
+        const read = parse.parseUpdatesLog(
+            "POLARIS_UPDATES=on\nPOLARIS_HOLDS\nPOLARIS_HELD=openssl\nPOLARIS_HELD=libc6\nPOLARIS_HELD=openssl\nPOLARIS_HELD=$(id)\n"
+        );
+        expect(read.held).toEqual(["openssl", "libc6"]);
+        expect(parse.parseUpdatesLog("POLARIS_UPDATES=on\nPOLARIS_HOLDS\n").held).toEqual([]);
+        expect(parse.parseUpdatesLog("POLARIS_UPDATES=on\n").held).toBeNull();
+    });
+
+    it("reads a package's versions, and a missing one", () => {
+        expect(
+            parse.parsePackageVersions(
+                "POLARIS_DISTRO id=debian\nPOLARIS_INSTALLED=3.0.15-1~deb12u1\nPOLARIS_KEPT=yes\nPOLARIS_VERSION=3.0.15-1~deb12u1\nPOLARIS_VERSION=3.0.14-1~deb12u2\n"
+            )
+        ).toEqual({
+            state: "ok",
+            installed: "3.0.15-1~deb12u1",
+            held: true,
+            versions: ["3.0.15-1~deb12u1", "3.0.14-1~deb12u2"]
+        });
+        expect(parse.parsePackageVersions("POLARIS_PACKAGE=missing")?.state).toBe("missing");
+        expect(parse.parsePackageVersions("garbage")).toBeNull();
+        expect(parse.parseHoldLog("POLARIS_HOLD=held")).toBe("held");
+        expect(parse.parseRollbackLog("POLARIS_ROLLBACK=unavailable")).toBe("unavailable");
+        expect(parse.parseRollbackLog("")).toBeNull();
+    });
+
+    it("passes the package as the script's own words, never inside it", () => {
+        const args = specs.hostArgv("package-rollback", ["libssl3", "1:3.0.15-1"]);
+        expect(args.slice(-3)).toEqual(["polaris", "libssl3", "1:3.0.15-1"]);
+        expect(args.at(-4)).toBe(specs.UPDATES_SCRIPTS["package-rollback"]);
+        expect(specs.hostArgv("package-hold").at(-1)).toBe(specs.UPDATES_SCRIPTS["package-hold"]);
+        // A rollback never removes another package to make room.
+        expect(specs.UPDATES_SCRIPTS["package-rollback"]).toContain("--no-remove");
+    });
+
+    it("accepts the names the daemon accepts and nothing that reads as an option or code", () => {
+        for (const ok of ["openssl", "libstdc++6", "python3.11", "NetworkManager", "perl_x"]) {
+            expect(schemas.packageName.safeParse(ok).success).toBe(true);
+        }
+        for (const bad of ["", "-y", "a b", "a;reboot", "$(id)", "a\nb", "a".repeat(129)]) {
+            expect(schemas.packageName.safeParse(bad).success).toBe(false);
+        }
+        expect(schemas.packageVersion.safeParse("1:3.0.15-1~deb12u1").success).toBe(true);
+        expect(schemas.packageVersion.safeParse("-1").success).toBe(false);
+        expect(
+            schemas.rollbackInput.safeParse({
+                targetId: "00000000-0000-4000-8000-000000000000",
+                package: "openssl",
+                version: "1.0",
+                extra: 1
+            }).success
+        ).toBe(false);
     });
 });
 
