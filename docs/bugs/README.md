@@ -48,3 +48,5 @@ Security findings are not kept here; they live in
 | BUG-0035 | A note written offline is never saved | Dashboard | Partly fixed | dashboard/apps/web/src/app/(app)/notes/notes-view.tsx | 2026-11-23 |
 | BUG-0036 | A watched screen share arrives at 540p instead of full quality | Calls | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/call-quality.ts | 2026-11-24 |
 | BUG-0037 | Screens show translation keys instead of their words | Dashboard | Fixed, watching | dashboard/apps/web/test/i18n/client-namespaces.test.ts | 2026-11-25 |
+| BUG-0038 | Every page of the public domain is shown as "Not secure" although its certificate is valid | Dashboard | Fixed, watching | dashboard/apps/web/src/lib/local-address.ts | 2026-11-25 |
+| BUG-0039 | After an update, Polaris desktop says the page's code was changed | Integrity | Open, fix in progress | dashboard/packages/core/src/integrity-guard.ts | 2026-11-25 |

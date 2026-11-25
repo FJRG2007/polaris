@@ -10,6 +10,7 @@ related:
   - dashboard/packages/core/test/integrity.test.ts
   - dashboard/apps/extension/src/entrypoints/background.ts
   - desktop/src/main/integrity.ts
+  - docs/bugs/BUG-0039-integrity-flags-previous-build-after-update.md
 reported: 2026-11-23
 fixed: 2026-11-23
 fix_commit: "fix(integrity): a dynamic route's code no longer reads as changed (e3c1f78a05)"
