@@ -141,6 +141,7 @@ const load = {
     deployRuntime: once(() => import("@/lib/deploy/runtime")),
     sidecarSwitch: once(() => import("@/lib/sidecar-switch")),
     deployService: once(() => import("@/lib/deploy-service")),
+    terminalService: once(() => import("@/lib/terminal-service")),
     domainDns: once(() => import("@/lib/domain-dns")),
     appEdge: once(() => import("@/lib/app-edge")),
     domainService: once(() => import("@/lib/domain-service")),
@@ -418,6 +419,9 @@ export const serverHost = {
         hostPortForApp,
         readAppRuntimeLog: later(load.deployService, "readAppRuntimeLog"),
         setApplicationRunning: later(load.deployService, "setApplicationRunning")
+    },
+    terminalService: {
+        mintConsoleTicket: later(load.terminalService, "mintConsoleTicket")
     },
     domainDns: {
         provisionHostnameDns: later(load.domainDns, "provisionHostnameDns")

@@ -45,6 +45,7 @@ import {
     safeEqual,
     sessionsRequest
 } from "./terminal-sessions.mjs";
+import { followConsole } from "./console-follow.mjs";
 import { RUNNER_LIMITS, RUNNER_SOCKET_PATH, createRunnerSidecar } from "./runner-sidecar.mjs";
 import { TERMINAL_CLOSE, TERMINAL_LIMITS, TERMINAL_SOCKET_PATH, createTerminalRelay } from "./terminal-relay.mjs";
 import os from "node:os";
@@ -215,6 +216,14 @@ wss.on("connection", async (ws, req) => {
     ws.on("error", (err) => console.error(`polaris ws: socket error - ${err?.message ?? err}`));
     const token = (req.headers["sec-websocket-protocol"] || "").split(",")[0]?.trim();
     const ticket = token ? await redeem(token) : null;
+    // A game server's console is output only, and never opens an exec.
+    if (ticket && ticket.mode === "console") {
+        await followConsole(ticket, ws, {
+            openLogs: (options) => new HostdClient().deployLogs(options),
+            live: liveTerminals
+        });
+        return;
+    }
     const interactive = ["terminal", "ssh", "ssh-root", "docker", "agent", "agent-shell"];
     if (!ticket || !interactive.includes(ticket.mode)) {
         console.error(

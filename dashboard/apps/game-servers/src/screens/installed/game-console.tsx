@@ -27,6 +27,7 @@ import { recentItemsAction, sendConsoleCommandAction } from "./minecraft-actions
 import {
     AlertTriangle,
     CornerDownLeft,
+    Download,
     History,
     ListOrdered,
     Plus,
@@ -94,9 +95,9 @@ import {
     pollWhileVisible
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import { useConsoleStream, type ConsoleStatus } from "./use-console-stream";
 
-const { useRuntimeLog } = hostUi.appAppsInstalledIdUseRuntimeLog;
-const { LogViewer } = hostUi.logViewer;
+const { TerminalView } = hostUi.terminalView;
 const { writeSnapshot } = hostUi.snapshotCache;
 const { useKeptSnapshot } = hostUi.liveRead;
 const { mergeUnchanged } = hostUi.structuralMerge;
@@ -178,7 +179,15 @@ export function GameConsole({
 }) {
     const schemaText = useSchemaText();
     const t = useGameText("games");
-    const { log, refresh } = useRuntimeLog(applicationId, true, 400);
+    // A line typed at the terminal's own prompt goes the way the box's does.
+    const submitTyped = useRef<(line: string) => void>(() => undefined);
+    const { transport, transportKey, status, log, refresh, writeReply } = useConsoleStream({
+        installedAppId,
+        applicationId,
+        running,
+        history: () => history.current,
+        onSubmit: (typed) => submitTyped.current(typed)
+    });
     // Polaris's own variables are Minecraft's; on another game only the
     // person's own apply.
     const edition = game === "java" || game === "bedrock" ? game : null;
@@ -377,6 +386,15 @@ export function GameConsole({
         },
         [installedAppId, refresh]
     );
+    submitTyped.current = submit;
+
+    // Every answer lands in the terminal, below the output it came with.
+    const written = useRef<Reply | null>(null);
+    useEffect(() => {
+        const from = written.current ? replies.indexOf(written.current) + 1 : 0;
+        for (const reply of replies.slice(from)) writeReply(reply.command, reply.output, reply.failed);
+        written.current = replies.at(-1) ?? null;
+    }, [replies, writeReply]);
 
     /** Put a command where the arrows and the history menu find it again. */
     const remember = useCallback(
@@ -779,19 +797,6 @@ export function GameConsole({
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{t("console.console")}</p>
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void refresh()}
-                        aria-label={t("console.refreshTheConsole")}
-                        title={t("console.refreshTheConsole")}
-                    >
-                        <RefreshCw className="size-4" />
-                    </Button>
-                </div>
-
                 {refused && (
                     <div
                         role="status"
@@ -813,88 +818,92 @@ export function GameConsole({
                     </div>
                 )}
 
-                <LogViewer
-                    log={log}
-                    name={logName}
-                    searchable
-                    emptyText={running ? t("console.waitingForOutput") : t("console.serverStopped")}
-                    className="h-96"
-                />
-
-                {replies.length > 0 && (
-                    <div className="flex max-h-40 flex-col gap-1 overflow-y-auto overscroll-contain rounded-md border border-border bg-surface p-2 font-mono text-xs">
-                        {replies.map((reply, index) => (
-                            <div
-                                key={`${reply.command}-${index}`}
-                                className="flex min-w-0 flex-col"
-                            >
-                                <span
-                                    className="truncate text-muted-foreground"
-                                    title={reply.command}
+                <TerminalView
+                    transport={transport}
+                    transportKey={transportKey}
+                    label={t("console.console")}
+                    status={consoleStatusText(t, status, running)}
+                    polarPlace={t("console.console")}
+                    height="h-96"
+                    toolbar={
+                        <>
+                            {status === "polling" && (
+                                <Button
+                                    size="xs"
+                                    variant="ghost"
+                                    onClick={() => void refresh()}
+                                    aria-label={t("console.refreshTheConsole")}
+                                    title={t("console.refreshTheConsole")}
                                 >
-                                    &gt; {reply.command}
-                                </span>
-                                <span className={cn("break-words", reply.failed && "text-danger")}>
-                                    {reply.output}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* The commands this server is run with, behind one button so a
-                    long list neither pushes the console down nor wraps into a
-                    wall of buttons. */}
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                    {saved.length > 0 && (
-                        <KeptCommandsMenu
-                            saved={saved}
-                            canRun={running && !pending && heard && queue === null}
-                            canManage={heard}
-                            onRun={pressSaved}
-                            onEdit={(entry) => {
-                                setKeepError("");
-                                setKeeping({
-                                    id: entry.id,
-                                    label: entry.label,
-                                    command: entry.command,
-                                    variables: entry.variables ?? []
-                                });
-                            }}
-                            onSchedule={(entry) => {
-                                setAskError("");
-                                setAsking({ entry, mode: "schedule" });
-                            }}
-                            onRepeat={(entry) => {
-                                setAskError("");
-                                setAsking({ entry, mode: "run", repeat: true });
-                            }}
-                            onLoad={(entry) =>
-                                isSequence(entry.command)
-                                    ? setBatch(entry.command)
-                                    : load(entry.command)
-                            }
-                            onDuplicate={(entry) => {
-                                setKeepError("");
-                                setKeeping(
-                                    duplicateDraft(entry, (name) => t("console.copyName", { name }))
-                                );
-                            }}
-                            onForget={(entry) => forget(entry.id)}
-                        />
-                    )}
-                    <Button
-                        size="xs"
-                        variant="ghost"
-                        disabled={pending}
-                        onClick={() => {
-                            setKeepError("");
-                            setKeeping({ label: "", command: line.trim(), variables: [] });
-                        }}
-                    >
-                        <Plus className="size-3.5" /> {t("console.keepACommand")}
-                    </Button>
-                </div>
+                                    <RefreshCw className="size-3.5" />
+                                </Button>
+                            )}
+                            <Button
+                                size="xs"
+                                variant="ghost"
+                                disabled={!log}
+                                onClick={() => downloadLog(logName, log)}
+                                aria-label={t("console.downloadLog")}
+                                title={t("console.downloadLog")}
+                            >
+                                <Download className="size-3.5" />
+                            </Button>
+                        {/* The commands this server is run with, behind one button so a
+                            long list neither pushes the console down nor wraps into a
+                            wall of buttons. */}
+                        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            {saved.length > 0 && (
+                                <KeptCommandsMenu
+                                    saved={saved}
+                                    canRun={running && !pending && heard && queue === null}
+                                    canManage={heard}
+                                    onRun={pressSaved}
+                                    onEdit={(entry) => {
+                                        setKeepError("");
+                                        setKeeping({
+                                            id: entry.id,
+                                            label: entry.label,
+                                            command: entry.command,
+                                            variables: entry.variables ?? []
+                                        });
+                                    }}
+                                    onSchedule={(entry) => {
+                                        setAskError("");
+                                        setAsking({ entry, mode: "schedule" });
+                                    }}
+                                    onRepeat={(entry) => {
+                                        setAskError("");
+                                        setAsking({ entry, mode: "run", repeat: true });
+                                    }}
+                                    onLoad={(entry) =>
+                                        isSequence(entry.command)
+                                            ? setBatch(entry.command)
+                                            : load(entry.command)
+                                    }
+                                    onDuplicate={(entry) => {
+                                        setKeepError("");
+                                        setKeeping(
+                                            duplicateDraft(entry, (name) => t("console.copyName", { name }))
+                                        );
+                                    }}
+                                    onForget={(entry) => forget(entry.id)}
+                                />
+                            )}
+                            <Button
+                                size="xs"
+                                variant="ghost"
+                                disabled={pending}
+                                onClick={() => {
+                                    setKeepError("");
+                                    setKeeping({ label: "", command: line.trim(), variables: [] });
+                                }}
+                            >
+                                <Plus className="size-3.5" /> {t("console.keepACommand")}
+                            </Button>
+                        </div>
+                        </>
+                    }
+                />
 
                 <ConsoleSchedules schedules={schedules} pending={pending} onRemove={unschedule} />
 
@@ -1239,6 +1248,25 @@ export function GameConsole({
 }
 
 /** What a sequence will do, in one line under the box it is written in. */
+/** The console's state, said in the terminal's header. */
+function consoleStatusText(t: GameText<"games">, status: ConsoleStatus, running: boolean): string {
+    if (status === "live") return t("console.live");
+    if (status === "polling") return running ? t("console.live") : t("console.serverStopped");
+    if (status === "refused") return t("console.noConsoleAccess");
+    if (status === "ended") return running ? t("console.reconnecting") : t("console.serverStopped");
+    return t("console.connecting");
+}
+
+/** Save what the console holds as a text file. */
+function downloadLog(name: string, log: string): void {
+    const url = URL.createObjectURL(new Blob([log], { type: "text/plain" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${name}.log`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function queueSummary(t: GameText<"games">, steps: readonly QueueStep[]): string {
     const commands = commandCount(steps);
     const waited = steps.reduce((total, step) => total + (step.kind === "wait" ? step.ms : 0), 0);

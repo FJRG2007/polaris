@@ -73,6 +73,13 @@ describe("redeemTerminalTicket", () => {
         expect(redeemed && "docker" in redeemed ? redeemed.docker : undefined).toMatchObject({ transport: "ssh" });
     });
 
+    it("keeps a game console a console, never a shell", async () => {
+        row = ticket("console");
+        const redeemed = await redeemTerminalTicket("token");
+        expect(redeemed?.mode).toBe("console");
+        expect(redeemed?.containerRef).toBe("polaris-agent-1");
+    });
+
     it("keeps a container terminal a container terminal", async () => {
         row = ticket("terminal");
         expect((await redeemTerminalTicket("token"))?.mode).toBe("terminal");

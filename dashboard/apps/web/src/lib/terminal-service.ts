@@ -36,7 +36,15 @@ export const RUNNER_REF = "runner:";
  *  command. Kept as separate modes rather than a flag on the ticket because the
  *  mode is what the sidecar turns into a command, and the client never gets to
  *  name that command. */
-export type TerminalMode = "terminal" | "logs" | "ssh" | "ssh-root" | "docker" | "agent" | "agent-shell";
+export type TerminalMode =
+    | "terminal"
+    | "logs"
+    | "ssh"
+    | "ssh-root"
+    | "docker"
+    | "agent"
+    | "agent-shell"
+    | "console";
 
 export interface MintTicketInput {
     targetId: string;
@@ -222,7 +230,28 @@ function resolveMode(value: string): TerminalMode {
     if (value === "docker") return "docker";
     if (value === "agent") return "agent";
     if (value === "agent-shell") return "agent-shell";
+    if (value === "console") return "console";
     return "terminal";
+}
+
+/**
+ * A ticket for a game server's live console: its container's output, the
+ * recent part first and then as it is printed. Output only - the sidecar opens
+ * no exec for it, and a command still goes through the console's own action,
+ * where it is checked and audited. The caller has checked `games.console`.
+ *
+ * Null when the server runs somewhere the sidecar cannot follow (a registered
+ * server rather than this box); the console then reads its log as before.
+ */
+export async function mintConsoleTicket(
+    userId: string,
+    ownerId: string,
+    applicationId: string
+): Promise<string | null> {
+    const { localRuntimeContainer } = await import("@/lib/deploy-service");
+    const container = await localRuntimeContainer(applicationId, ownerId);
+    if (!container) return null;
+    return mintTerminalTicket(userId, { targetId: applicationId, containerRef: container, mode: "console" });
 }
 
 /**
