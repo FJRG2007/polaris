@@ -308,6 +308,15 @@ describe("AcpSessionDriver", () => {
         driver.close();
     });
 
+    it("sends session/cancel even when this driver did not start the turn", async () => {
+        // A dashboard restarted mid-turn holds no turn: the stop must still reach the agent.
+        const pipe = new FakePipe(agentFor("cursor"));
+        const { driver } = harness("cursor", pipe);
+        await expect(driver.cancel()).resolves.toBe(true);
+        await vi.waitFor(() => expect(pipe.received.some((frame) => frame.method === "session/cancel")).toBe(true));
+        driver.close();
+    });
+
     it("refuses a mode the agent does not have", async () => {
         const pipe = new FakePipe(agentFor("gemini"));
         const { driver } = harness("gemini", pipe);

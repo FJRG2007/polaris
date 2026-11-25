@@ -169,11 +169,13 @@ export class CodexSessionDriver {
     }
 
     /** Stop the running turn, if there is one. */
-    async cancel(): Promise<void> {
+    async cancel(): Promise<boolean> {
         const connection = this.connection;
         const id = this.turn?.id;
-        if (!connection || !id) return;
+        // Codex stops a turn by its id, which only the driver that started it holds.
+        if (!connection || !id) return false;
         await connection.rpc.request("turn/interrupt", { threadId: connection.threadId, turnId: id });
+        return true;
     }
 
     /** The mode for the next turn: Codex takes a turn's approval policy and

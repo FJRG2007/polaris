@@ -1863,10 +1863,13 @@ function CodeThread({
         }
         if (command === "stop") return stopTurn();
         const text = cli ? codeCommands.forwardedText(command, rest, cli) : null;
+        // A command this agent has no spelling of says so instead of doing nothing.
         if (text) sendText(text);
+        else setInfo(t("slash.code.notHere", { command }));
     };
 
-    const canStop = live && (thread?.canManage ?? false) && canPrompt;
+    // Stopping is steering the session, not starting one: whoever manages it may.
+    const canStop = live && (thread?.canManage ?? false);
     useCodeKeys(keysRoot, fullPage, {
         "code.interrupt": () => {
             if (!canStop) return false;
@@ -2055,17 +2058,21 @@ function CodeThread({
     };
 
     /** Change a queued message, or take it back into the reply box. */
-    const changeQueued = (id: string, text: string | null) => {
+    /** Change the queue: edit or take back a message (text, or null), move
+     *  one, send one now, or stop the turn and take every typed one back. */
+    const changeQueued = (id: string, text: string | null) =>
+        queueAction(text === null ? { action: "remove", sessionId, id } : { action: "edit", sessionId, id, text });
+    const queueAction = (
+        body:
+            | { action: "edit"; sessionId: string; id: string; text: string }
+            | { action: "remove" | "now"; sessionId: string; id: string }
+            | { action: "move"; sessionId: string; id: string; direction: "up" | "down" }
+            | { action: "stop"; sessionId: string }
+    ) => {
         setError(null);
         startTransition(() => {
             void runAction(
-                () =>
-                    postCode<{ text?: string; gone?: boolean; error?: string }>(
-                        "/api/polar/code/queue",
-                        text === null
-                            ? { action: "remove", sessionId, id }
-                            : { action: "edit", sessionId, id, text }
-                    ),
+                () => postCode<{ text?: string; gone?: boolean; error?: string }>("/api/polar/code/queue", body),
                 setError
             ).then((result) => {
                 if (result?.error) setError(result.error);
@@ -2201,6 +2208,9 @@ function CodeThread({
                 disabled={busy}
                 onEdit={(id, text) => changeQueued(id, text)}
                 onTakeBack={(id) => changeQueued(id, null)}
+                onMove={(id, direction) => queueAction({ action: "move", sessionId, id, direction })}
+                onSendNow={canStop ? (id) => queueAction({ action: "now", sessionId, id }) : null}
+                onStopAll={canStop && turning ? () => queueAction({ action: "stop", sessionId }) : null}
             />
             {thread.context ? (
                 // How full the agent's own conversation is: the tool compacts it
@@ -2330,12 +2340,14 @@ function CodeThread({
                 attach={parts.attach}
                 voiceMode={parts.voiceMode}
                 submit={{
-                    busy: false,
+                    // Mid-turn with nothing typed the button stops the turn, as
+                    // in Chat; with words in the box it sends them (queued).
+                    busy: canStop && turning && !reply.trim(),
                     disabled:
                         !reply.trim() || busy || parts.uploads.uploading || parts.uploads.failed,
                     sendLabel: t("code.send"),
-                    stopLabel: t("code.send"),
-                    onStop: () => undefined
+                    stopLabel: t("code.queue.stopTurn"),
+                    onStop: stopTurn
                 }}
             />
             </div>

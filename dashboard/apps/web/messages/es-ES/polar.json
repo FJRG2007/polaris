@@ -261,6 +261,7 @@
             "export": "Descargar la transcripción (jsonl para JSONL)",
             "diff": "Ver archivos y cambios",
             "renameFailed": "No se pudo renombrar. Reinténtalo.",
+            "notHere": "/{command} no existe para este agente.",
             "goal": "Que el agente siga hasta que se cumpla algo",
             "plan": "Planificar primero, sin cambiar nada",
             "simplify": "Limpiar el código cambiado",
@@ -1691,6 +1692,11 @@
             "close": "Cerrar"
         },
         "queue": {
+            "sendNow": "Parar el turno y enviar esto ya",
+            "up": "Subir",
+            "down": "Bajar",
+            "stopAll": "Parar sin enviar nada",
+            "stopTurn": "Parar al agente",
             "title": "En cola, se envía cuando el agente acabe su turno",
             "edit": "Editar",
             "remove": "Recuperar",

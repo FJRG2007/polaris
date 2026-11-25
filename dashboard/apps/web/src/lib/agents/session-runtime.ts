@@ -1599,20 +1599,39 @@ export async function changeSessionEffort(
 export async function interruptSession(sessionId: string): Promise<void> {
     const placement = await reconcileTerminalBack(sessionId, await sessionPlacement(sessionId));
     if (placement?.place === "computer") return computer.interruptOnComputer(sessionId);
+    // Every place a turn can run in is asked, since the one holding it is not
+    // always the one the session is set to: a Chat session's turn can be in
+    // the runner after a fallback, and a turn a restarted dashboard started is
+    // held by no driver in this process.
+    let stopped = false;
     if (placement && acpProviders.usesAcp(placement))
-        return acpCall(() => acpDrivers.acpDriver(sessionId, placement.cli).cancel());
-    if (placement) {
-        const stopped = await runInSession(
+        stopped = await acpCall(() => acpDrivers.acpDriver(sessionId, placement.cli).cancel()).catch(
+            (error: unknown) => {
+                console.error(`[agent-session] ${sessionId}: Chat did not take the stop`, error);
+                return false;
+            }
+        );
+    const runner = placement
+        ? await runInSession(sessionId, commands.interruptTurnCommand(stateDirFor(placement))).catch(() => null)
+        : null;
+    if (runner?.code === 0) return;
+    // No runner (or none that answered): the agent runs typed in its
+    // terminal, where Ctrl+C stops it.
+    if (!runner || runner.code === commands.NOT_QUEUED.interactive) {
+        const typed = await steer(
             sessionId,
-            commands.interruptTurnCommand(stateDirFor(placement))
-        ).catch(() => null);
-        if (stopped?.code === 0) return;
+            commands.interruptCommand(),
+            "The agent's terminal did not take the interrupt"
+        ).then(
+            () => true,
+            (error: unknown) => {
+                if (!stopped) throw error;
+                return false;
+            }
+        );
+        if (typed) return;
     }
-    await steer(
-        sessionId,
-        commands.interruptCommand(),
-        "The agent's terminal did not take the interrupt"
-    );
+    if (!stopped) throw new SessionRefusal("The agent is not running a turn that can be stopped from here.");
 }
 
 /**
@@ -1790,9 +1809,9 @@ async function remoteTurn(
 
 /** An ACP call whose refusal is a sentence for the person, and whose other
  *  failures (the agent's own words, a machine's) stay in the log. */
-async function acpCall(work: () => Promise<void>): Promise<void> {
+async function acpCall<T>(work: () => Promise<T>): Promise<T> {
     try {
-        await work();
+        return await work();
     } catch (error) {
         if (error instanceof AcpRefusal) throw new SessionRefusal(error.message);
         throw error;

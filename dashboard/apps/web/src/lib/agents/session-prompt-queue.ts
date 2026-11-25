@@ -123,6 +123,84 @@ export async function takeBackQueuedPrompt(sessionId: string, id: string): Promi
 }
 
 /**
+ * Where a queued message goes when it is moved one place up or down, or sent
+ * now (to the front): the `createdAt` it takes, which is the order the queue
+ * is read in. Null when it is already there or is not in the list. A move
+ * trades places with its neighbour; the front goes a millisecond before the
+ * head. Pure.
+ */
+export function reorderedAt(
+    rows: readonly { id: string; createdAt: Date }[],
+    id: string,
+    to: "up" | "down" | "front"
+): { at: Date; neighbour?: { id: string; at: Date } } | null {
+    const index = rows.findIndex((row) => row.id === id);
+    const row = rows[index];
+    if (!row) return null;
+    if (to === "front") {
+        const head = rows[0];
+        return index === 0 || !head ? null : { at: new Date(head.createdAt.getTime() - 1) };
+    }
+    const other = rows[to === "up" ? index - 1 : index + 1];
+    if (!other) return null;
+    // Two typed in the same millisecond still trade places.
+    const same = other.createdAt.getTime() === row.createdAt.getTime();
+    const at = same ? new Date(other.createdAt.getTime() + (to === "up" ? -1 : 1)) : other.createdAt;
+    return { at, neighbour: { id: other.id, at: row.createdAt } };
+}
+
+/**
+ * Move a waiting message one place up or down, or to the front so it is the
+ * next to go. False when it already went (or is already there).
+ */
+export async function reorderQueuedPrompt(
+    sessionId: string,
+    id: string,
+    to: "up" | "down" | "front"
+): Promise<boolean> {
+    const rows = await prisma.agentQueuedPrompt.findMany({
+        where: { sessionId },
+        orderBy: { createdAt: "asc" },
+        take: QUEUE_MAX,
+        select: { id: true, createdAt: true }
+    });
+    const move = reorderedAt(rows, id, to);
+    if (!move) return rows.some((row) => row.id === id) && to === "front";
+    const writes = [prisma.agentQueuedPrompt.updateMany({ where: { id, sessionId }, data: { createdAt: move.at } })];
+    if (move.neighbour)
+        writes.push(
+            prisma.agentQueuedPrompt.updateMany({
+                where: { id: move.neighbour.id, sessionId },
+                data: { createdAt: move.neighbour.at }
+            })
+        );
+    const [moved] = await prisma.$transaction(writes);
+    return moved?.count === 1;
+}
+
+/**
+ * Take every message the person typed back out of the queue, oldest first,
+ * for "stop and wait": nothing they typed goes once the turn is stopped, and
+ * the words come back to the box instead of being lost. Polaris's own
+ * messages about the pull request stay.
+ */
+export async function takeBackTypedPrompts(sessionId: string): Promise<string[]> {
+    const rows = await prisma.agentQueuedPrompt.findMany({
+        where: { sessionId, feedbackKey: null },
+        orderBy: { createdAt: "asc" },
+        take: QUEUE_MAX,
+        select: { id: true, text: true }
+    });
+    const back: string[] = [];
+    for (const row of rows) {
+        // A row delivery claimed first already went.
+        if ((await prisma.agentQueuedPrompt.deleteMany({ where: { id: row.id, sessionId } })).count === 1)
+            back.push(row.text);
+    }
+    return back;
+}
+
+/**
  * Send a message to the agent now: its files placed on the machine, the
  * message kept on the session, then handed to the agent. A refusal about the
  * files comes back; anything the machine answers throws.

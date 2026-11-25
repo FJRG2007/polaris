@@ -185,10 +185,14 @@ export class AcpSessionDriver {
     }
 
     /** Stop the running turn, if there is one. */
-    async cancel(): Promise<void> {
-        const connection = this.connection;
-        if (!connection || !this.turn) return;
+    async cancel(): Promise<boolean> {
+        // A driver that did not start the turn (the dashboard restarted or
+        // updated mid-turn) still asks: session/cancel stops whatever the
+        // agent is running in the session, whoever sent it.
+        const connection = this.connection ?? (await this.connect().catch(() => null));
+        if (!connection) return false;
         await connection.client.cancel(connection.acpSessionId);
+        return true;
     }
 
     /** Put the agent in the mode a Polaris permission mode stands for. */

@@ -14,6 +14,7 @@ vi.mock("@/lib/agents/session-attachments", () => ({}));
 import {
     deliverNextQueued,
     deliveryBatch,
+    reorderedAt,
     shouldQueuePrompt,
     type QueuePorts
 } from "@/lib/agents/session-prompt-queue";
@@ -153,5 +154,33 @@ describe("Polaris's own messages", () => {
         expect(deliveryBatch([typed("a", 1), typed("b", 2)]).map((row) => row.id)).toEqual(["a"]);
         expect(deliveryBatch([own("x", 1, "ci:1"), typed("b", 2), own("y", 3, "ci:2")]).map((row) => row.id)).toEqual(["x"]);
         expect(deliveryBatch([])).toEqual([]);
+    });
+});
+
+describe("reorderedAt", () => {
+    const at = (ms: number) => new Date(ms);
+    const rows = [
+        { id: "a", createdAt: at(1000) },
+        { id: "b", createdAt: at(2000) },
+        { id: "c", createdAt: at(2000) }
+    ];
+
+    it("trades places with the neighbour", () => {
+        expect(reorderedAt(rows, "b", "up")).toEqual({ at: at(1000), neighbour: { id: "a", at: at(2000) } });
+    });
+
+    it("still moves past a message typed in the same millisecond", () => {
+        expect(reorderedAt(rows, "b", "down")).toEqual({ at: at(2001), neighbour: { id: "c", at: at(2000) } });
+    });
+
+    it("puts a message a millisecond before the head to send it next", () => {
+        expect(reorderedAt(rows, "c", "front")).toEqual({ at: at(999) });
+    });
+
+    it("does nothing at an end, at the front already, or for a message that went", () => {
+        expect(reorderedAt(rows, "a", "up")).toBeNull();
+        expect(reorderedAt(rows, "c", "down")).toBeNull();
+        expect(reorderedAt(rows, "a", "front")).toBeNull();
+        expect(reorderedAt(rows, "gone", "up")).toBeNull();
     });
 });

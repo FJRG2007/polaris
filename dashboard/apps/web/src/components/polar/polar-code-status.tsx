@@ -10,7 +10,7 @@ import { useState } from "react";
 import { saveFile } from "@/components/transfers/move-file";
 import * as codeStatus from "@/lib/polar/code-status";
 import type { PolarCodeThread } from "@/lib/polar/code";
-import { Download, GitBranch, Keyboard, MoreHorizontal, Pencil, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, GitBranch, Keyboard, MoreHorizontal, Pencil, SendHorizontal, X } from "lucide-react";
 import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
 import type { TranscriptFormat } from "@/lib/polar/code-transcript";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -154,27 +154,46 @@ export function CodeContextCard({
     );
 }
 
-/** The messages typed while the agent works, each editable or taken back
- *  until the turn ends and the oldest is sent. */
+const QUEUE_ICON_BUTTON =
+    "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50 [@media(pointer:coarse)]:size-11";
+
+/** The messages typed while the agent works, each editable, movable, sent
+ *  now (the turn stops and it goes next) or taken back until the turn ends
+ *  and the oldest is sent. `onStopAll` stops the turn and sends none of them. */
 export function CodeQueuedList({
     waiting,
     disabled,
     onEdit,
-    onTakeBack
+    onTakeBack,
+    onMove,
+    onSendNow,
+    onStopAll
 }: {
     waiting: PolarCodeThread["waiting"];
     disabled: boolean;
     onEdit: (id: string, text: string) => void;
     onTakeBack: (id: string) => void;
+    onMove: (id: string, direction: "up" | "down") => void;
+    /** Null where nobody may steer the session. */
+    onSendNow: ((id: string) => void) | null;
+    /** Null while the agent is not mid-turn. */
+    onStopAll: (() => void) | null;
 }) {
     const t = useTranslations("polar");
     const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
     if (waiting.length === 0) return null;
     return (
         <section aria-label={t("code.queue.title")} className="flex min-w-0 flex-col gap-1">
-            <p className="px-1 text-xs text-muted-foreground">{t("code.queue.title")}</p>
+            <div className="flex min-w-0 items-center gap-2 px-1">
+                <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{t("code.queue.title")}</p>
+                {onStopAll ? (
+                    <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={onStopAll}>
+                        {t("code.queue.stopAll")}
+                    </Button>
+                ) : null}
+            </div>
             <ol className="flex min-w-0 flex-col gap-1">
-                {waiting.map((item) => (
+                {waiting.map((item, index) => (
                     <li
                         key={item.id}
                         className="flex min-w-0 items-start gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-sm"
@@ -218,6 +237,42 @@ export function CodeQueuedList({
                                         </span>
                                     ) : null}
                                 </p>
+                                {onSendNow ? (
+                                    <button
+                                        type="button"
+                                        disabled={disabled}
+                                        onClick={() => onSendNow(item.id)}
+                                        aria-label={t("code.queue.sendNow")}
+                                        title={t("code.queue.sendNow")}
+                                        className={QUEUE_ICON_BUTTON}
+                                    >
+                                        <SendHorizontal className="size-3.5" />
+                                    </button>
+                                ) : null}
+                                {waiting.length > 1 ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            disabled={disabled || index === 0}
+                                            onClick={() => onMove(item.id, "up")}
+                                            aria-label={t("code.queue.up")}
+                                            title={t("code.queue.up")}
+                                            className={QUEUE_ICON_BUTTON}
+                                        >
+                                            <ArrowUp className="size-3.5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={disabled || index === waiting.length - 1}
+                                            onClick={() => onMove(item.id, "down")}
+                                            aria-label={t("code.queue.down")}
+                                            title={t("code.queue.down")}
+                                            className={QUEUE_ICON_BUTTON}
+                                        >
+                                            <ArrowDown className="size-3.5" />
+                                        </button>
+                                    </>
+                                ) : null}
                                 <button
                                     type="button"
                                     disabled={disabled}

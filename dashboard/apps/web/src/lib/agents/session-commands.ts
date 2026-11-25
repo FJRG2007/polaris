@@ -1298,6 +1298,9 @@ export function runnerReadyCommand(stateDir: string): string {
 /** What `queuePromptCommand` exits with when the prompt is not queued. */
 export const NOT_QUEUED = { interactive: 3, interfaceOpen: 4 } as const;
 
+/** What `interruptTurnCommand` exits with when the runner had no turn to stop. */
+export const NOT_INTERRUPTED = { noTurn: 5 } as const;
+
 /**
  * Hand the runner a prompt: written aside, then renamed into the queue, so the
  * runner never reads half of one. Exits `NOT_QUEUED.interactive` for a session
@@ -1407,7 +1410,7 @@ export function effortCommand(stateDir: string, command: string, level: string):
 export function interruptTurnCommand(stateDir: string): string {
     return [
         `${runnerIn(stateDir)} || exit ${NOT_QUEUED.interactive}`,
-        `[ -f "${stateDir}/turn.txt" ] || exit 0`,
+        `[ -f "${stateDir}/turn.txt" ] || exit ${NOT_INTERRUPTED.noTurn}`,
         `: > "${stateDir}/interrupted"`,
         `tmux send-keys -t ${shellQuote(`${TMUX_SESSION}:${RUNNER_WINDOW}`)} C-c`
     ].join("\n");

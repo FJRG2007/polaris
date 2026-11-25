@@ -121,7 +121,26 @@ export const polarCodeQueueSchema = z.discriminatedUnion("action", [
             sessionId: z.string().trim().uuid(),
             id: z.string().trim().uuid()
         })
-        .strict()
+        .strict(),
+    // One place up or down in the queue.
+    z
+        .object({
+            action: z.literal("move"),
+            sessionId: z.string().trim().uuid(),
+            id: z.string().trim().uuid(),
+            direction: z.enum(["up", "down"])
+        })
+        .strict(),
+    // Stop what the agent is doing and give it this message next.
+    z
+        .object({
+            action: z.literal("now"),
+            sessionId: z.string().trim().uuid(),
+            id: z.string().trim().uuid()
+        })
+        .strict(),
+    // Stop the turn and wait: what was typed comes back to the box unsent.
+    z.object({ action: z.literal("stop"), sessionId: z.string().trim().uuid() }).strict()
 ]);
 
 /** As many lines of activity as the thread shows; the session's own page keeps

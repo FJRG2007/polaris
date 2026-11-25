@@ -18,6 +18,7 @@ import * as steps from "@/lib/polar/code-steps";
 import * as core from "@polaris/core";
 import { repoAgentFiles, type RepoAgentFile } from "@/lib/polar/agents/repo-agents";
 import { z } from "zod";
+import { after } from "next/server";
 import { getTranslations } from "@/lib/i18n/request";
 import { GOAL_CONDITION_MAX, readGoal, type PolarGoal } from "@/lib/polar/goals";
 import { clearSessionGoal, setSessionGoal } from "@/lib/agents/session-goal";
@@ -1133,10 +1134,16 @@ export async function polarCodeEdit(user: SessionUser, body: unknown): Promise<{
     return { ok: await renameSession(edit.sessionId, user.id, edit.title) };
 }
 
+/** How long after "send now" stops a turn the message is sent anyway, when
+ *  the agent's stop reported no turn end. */
+const QUEUE_NOW_GRACE_MS = 4_000;
+
 /**
- * Change a message waiting in a session's queue, or take it back. A taken-back
- * message answers with its text, for the reply box; one already sent answers
- * `gone`, so the screen can say it went.
+ * Change a message waiting in a session's queue: edit it, take it back, move
+ * it, or send it now (the turn stops and it goes next); or stop the turn and
+ * wait, with every typed message handed back. A taken-back message answers
+ * with its text, for the reply box; one already sent answers `gone`, so the
+ * screen can say it went.
  */
 export async function polarCodeQueue(
     user: SessionUser,
@@ -1148,7 +1155,36 @@ export async function polarCodeQueue(
     if (!parsed.success) return { error: t("code.queue.invalid") };
     const edit = parsed.data;
     // Only the person who started the session steers it.
-    if (!(await getSession(edit.sessionId, user.id))) return { error: t("code.queue.invalid") };
+    const session = await getSession(edit.sessionId, user.id);
+    if (!session) return { error: t("code.queue.invalid") };
+    if (edit.action === "stop") {
+        // Taken back before the turn stops, so its end has nothing typed to send.
+        const back = await promptQueue.takeBackTypedPrompts(edit.sessionId);
+        const stopped = await interruptSessionAction(edit.sessionId);
+        if (stopped.error) return stopped;
+        return back.length > 0 ? { text: back.join("\n\n") } : {};
+    }
+    if (edit.action === "move")
+        return (await promptQueue.reorderQueuedPrompt(edit.sessionId, edit.id, edit.direction)) ? {} : { gone: true };
+    if (edit.action === "now") {
+        if (!(await promptQueue.reorderQueuedPrompt(edit.sessionId, edit.id, "front"))) return { gone: true };
+        // At its prompt the agent takes it at once; mid-turn the turn is
+        // stopped and its end sends the front of the queue.
+        if (core.isSessionListening(session.state)) {
+            await promptQueue.deliverNextQueued(edit.sessionId);
+            return {};
+        }
+        const stopped = await interruptSessionAction(edit.sessionId);
+        if (stopped.error) return stopped;
+        // A stop that reports no turn end (an agent that just sits at its
+        // prompt afterwards) still gets it: claiming a row twice cannot send it twice.
+        after(async () => {
+            await new Promise((resolve) => setTimeout(resolve, QUEUE_NOW_GRACE_MS));
+            const now = await getSession(edit.sessionId, user.id).catch(() => null);
+            if (now && core.isSessionListening(now.state)) await promptQueue.deliverNextQueued(edit.sessionId);
+        });
+        return {};
+    }
     if (edit.action === "edit")
         return (await promptQueue.editQueuedPrompt(edit.sessionId, edit.id, edit.text)) ? {} : { gone: true };
     const text = await promptQueue.takeBackQueuedPrompt(edit.sessionId, edit.id);
