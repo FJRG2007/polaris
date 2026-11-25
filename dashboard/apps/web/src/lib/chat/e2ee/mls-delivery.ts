@@ -313,6 +313,39 @@ export async function putHistoryKeys(
     });
 }
 
+/** Whether `recipient` has an envelope of the conversation's history key for `epoch`. */
+export async function holdsHistoryKey(channelId: string, epoch: bigint, recipient: string): Promise<boolean> {
+    const row = await prisma.chatHistoryKey.findUnique({ where: { channelId_epoch_recipient: { channelId, epoch, recipient } }, select: { recipient: true } });
+    return row !== null;
+}
+
+/** Audience ids `legacyKeyGaps` checks per round trip. */
+const GAP_SCAN = 500;
+
+/**
+ * The public account keys of `audience` members with no envelope of the
+ * conversation's history key for `epoch`, at most `limit` of them: who a
+ * member holding that key still has to seal it to. Members with no account key
+ * are not listed - there is nothing to seal to yet.
+ */
+export async function legacyKeyGaps(channelId: string, epoch: bigint, audience: readonly string[], limit = MAX_CLAIM_USERS) {
+    const found: { userId: string; hpkePublicKey: Uint8Array }[] = [];
+    for (let at = 0; at < audience.length && found.length < limit; at += GAP_SCAN) {
+        const slice = audience.slice(at, at + GAP_SCAN);
+        const held = await prisma.chatHistoryKey.findMany({ where: { channelId, epoch, recipient: { in: slice } }, select: { recipient: true } });
+        const have = new Set(held.map((row) => row.recipient));
+        const missing = slice.filter((id) => !have.has(id));
+        for (let from = 0; from < missing.length && found.length < limit; from += MAX_CLAIM_USERS) {
+            const keys = await prisma.chatAccountKey.findMany({
+                where: { userId: { in: missing.slice(from, from + MAX_CLAIM_USERS) } },
+                select: { userId: true, hpkePublicKey: true }
+            });
+            for (const key of keys) if (found.length < limit) found.push({ userId: key.userId, hpkePublicKey: new Uint8Array(key.hpkePublicKey) });
+        }
+    }
+    return found;
+}
+
 /** Every history-key envelope sealed to this recipient in the conversation, oldest epoch first. */
 export async function historyKeys(channelId: string, recipient: string, fromEpoch = 0n, limit = MAX_EVENTS_PER_READ) {
     const rows = await prisma.chatHistoryKey.findMany({

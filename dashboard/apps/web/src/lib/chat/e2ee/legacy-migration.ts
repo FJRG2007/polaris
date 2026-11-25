@@ -38,8 +38,9 @@ import * as content from "@polaris/chat-crypto/message-content";
 import { accountPublicKeys, putHistoryKeys } from "./mls-delivery";
 import { encodeSealedContent, decodeSealedContent, type SealedContent } from "./sealed-chat";
 
-/** The epoch migrated history is sealed under: above any MLS epoch a group reaches (Postgres bigint max). */
-export const LEGACY_EPOCH = 9223372036854775807n;
+import { LEGACY_EPOCH } from "./mls-history-keys";
+
+export { LEGACY_EPOCH };
 /** What a migrated row names as its device. */
 export const MIGRATION_DEVICE = "migration";
 /** The sender leaf migrated rows are bound to (they came from no MLS leaf). */
@@ -346,7 +347,8 @@ async function nextConversations(after: string | null, take: number): Promise<st
             ...(after ? { id: { gt: after } } : {}),
             messages: { some: { kind: "text", body: { not: "" }, e2eeCiphertext: null } },
             // A cut conversation's history key is gone; one kept with stragglers is reported, not retried.
-            NOT: { migration: { state: "cut" } }
+            // One rolled back stays plain until an admin migrates it again.
+            NOT: { migration: { state: { in: ["cut", "rolledBack"] } } }
         },
         select: { id: true },
         orderBy: { id: "asc" },
@@ -362,7 +364,9 @@ async function nextConversations(after: string | null, take: number): Promise<st
  */
 export async function runLegacyMigration(options: { pauseMs?: number; sleep?: (ms: number) => Promise<void> } = {}): Promise<Record<MigrationOutcome, number>> {
     const counts: Record<MigrationOutcome, number> = { cut: 0, pending: 0, failed: 0, off: 0 };
-    if (!chatE2eeEnabled() || !(await backupReady())) return counts;
+    if (!chatE2eeEnabled()) return counts;
+    await purgeRollbackCopies();
+    if (!(await backupReady())) return counts;
     const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
     let after: string | null = null;
     for (;;) {
@@ -383,12 +387,140 @@ export async function runLegacyMigration(options: { pauseMs?: number; sleep?: (m
 }
 
 /** What the admin line shows: how many conversations with history are cut, and why the rest are not. */
-export async function migrationProgress(): Promise<{ cut: number; remaining: number; failed: number; waitingOnBackup: boolean }> {
-    const [cut, failed, remaining, ready] = await Promise.all([
+export async function migrationProgress(): Promise<{ cut: number; remaining: number; failed: number; rolledBack: number; waitingOnBackup: boolean }> {
+    const [cut, failed, rolledBack, remaining, ready] = await Promise.all([
         prisma.chatMigration.count({ where: { state: "cut" } }),
         prisma.chatMigration.count({ where: { state: "failed" } }),
-        prisma.chatChannel.count({ where: { messages: { some: { kind: "text", body: { not: "" }, e2eeCiphertext: null } } } }),
+        prisma.chatMigration.count({ where: { state: "rolledBack" } }),
+        prisma.chatChannel.count({
+            where: { messages: { some: { kind: "text", body: { not: "" }, e2eeCiphertext: null } }, NOT: { migration: { state: "rolledBack" } } }
+        }),
         backupReady()
     ]);
-    return { cut, remaining, failed, waitingOnBackup: !ready };
+    return { cut, remaining, failed, rolledBack, waitingOnBackup: !ready };
+}
+
+/** How long a cut conversation's plain text is kept for a rollback (proposal 13, decision 4). */
+export const ROLLBACK_DAYS = 30;
+const PURGE_BATCH = 1000;
+
+function rollbackSince(now: Date): Date {
+    return new Date(now.getTime() - ROLLBACK_DAYS * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * Delete the plain copies older than the rollback window, a batch at a time so
+ * a large instance never holds one long statement. After this the migrated
+ * history exists only sealed. Returns how many copies went.
+ */
+export async function purgeRollbackCopies(now = new Date()): Promise<number> {
+    const before = rollbackSince(now);
+    let purged = 0;
+    for (;;) {
+        const gone = await prisma.$executeRaw`DELETE FROM "ChatMigrationRollback" WHERE ctid IN (SELECT ctid FROM "ChatMigrationRollback" WHERE "createdAt" < ${before} LIMIT ${PURGE_BATCH})`;
+        purged += gone;
+        if (gone < PURGE_BATCH) return purged;
+    }
+}
+
+export type RollbackOutcome = { restored: number; kept: number } | "notCut" | "expired";
+
+const unsealed = { e2eeCiphertext: null, e2eeEpoch: null, e2eeSenderLeaf: null, e2eeDevice: null, e2eeSignature: null, e2eeSignatureKey: null, e2eeRevision: null };
+
+/**
+ * Put a cut conversation's history back as it was before the migration, from
+ * its plain copies: each message the migrator sealed gets its text (and its
+ * edit history) back and loses the seal, in one transaction per message,
+ * guarded on the row still being the migrator's seal. A message edited sealed
+ * after the cut keeps its seal and its copies (`kept`): its text moved on, so
+ * the copy no longer says what it does. Repeating it after a crash finishes
+ * the rest. The conversation is then `rolledBack` - the migrator skips it
+ * until `migrateAgain` - and the legacy key envelopes go once no row needs
+ * them. A conversation with its own MLS group stays sealed only for new
+ * writes: only the migrated past becomes plain.
+ */
+export async function rollBackConversation(channelId: string, now = new Date()): Promise<RollbackOutcome> {
+    const migration = await prisma.chatMigration.findUnique({ where: { channelId }, select: { state: true, cutAt: true } });
+    if (migration?.state !== "cut") return "notCut";
+    if (!migration.cutAt || migration.cutAt < rollbackSince(now)) return "expired";
+    let restored = 0;
+    let kept = 0;
+    let after: string | null = null;
+    for (;;) {
+        const page: { messageId: string }[] = await prisma.chatMigrationRollback.findMany({
+            where: { channelId, kind: "message", ...(after ? { messageId: { gt: after } } : {}) },
+            select: { messageId: true },
+            orderBy: { messageId: "asc" },
+            take: BATCH
+        });
+        if (!page.length) break;
+        after = page[page.length - 1]!.messageId;
+        const ids = page.map((m) => m.messageId);
+        const copies = await prisma.chatMigrationRollback.findMany({
+            where: { channelId, messageId: { in: ids } },
+            select: { id: true, kind: true, messageId: true, body: true, translation: true }
+        });
+        for (const messageId of ids) {
+            const own = copies.filter((copy) => copy.messageId === messageId);
+            const message = own.find((copy) => copy.kind === "message")!;
+            const done = await prisma.$transaction(async (tx) => {
+                const back = await tx.chatMessage.updateMany({
+                    where: { id: messageId, channelId, e2eeDevice: MIGRATION_DEVICE, body: "" },
+                    data: { ...unsealed, body: message.body, translation: message.translation ?? Prisma.DbNull }
+                });
+                if (!back.count) return false;
+                for (const edit of own.filter((copy) => copy.kind === "edit"))
+                    await tx.chatMessageEdit.updateMany({ where: { id: edit.id, messageId, e2eeDevice: MIGRATION_DEVICE, body: "" }, data: { ...unsealed, body: edit.body } });
+                await tx.chatMigrationRollback.deleteMany({ where: { messageId } });
+                return true;
+            });
+            if (done) restored++;
+            else kept++;
+        }
+    }
+    const stillSealed = await prisma.chatMessage.count({ where: { channelId, e2eeDevice: MIGRATION_DEVICE }, take: 1 });
+    if (!stillSealed) await prisma.chatHistoryKey.deleteMany({ where: { channelId, epoch: LEGACY_EPOCH } });
+    await prisma.chatMigration.update({ where: { channelId }, data: { state: "rolledBack", reason: kept ? "keptEdited" : null, signKey: null } });
+    return { restored, kept };
+}
+
+/** Let the migrator take a rolled-back conversation again on its next pass. */
+export async function migrateAgain(channelId: string): Promise<boolean> {
+    const moved = await prisma.chatMigration.updateMany({ where: { channelId, state: "rolledBack" }, data: { state: "pending", reason: null, cutAt: null } });
+    return moved.count > 0;
+}
+
+export type MigratedConversation = {
+    channelId: string;
+    state: "cut" | "failed" | "rolledBack";
+    reason: string | null;
+    /** The channel's and its space's name; null for a direct or group message, whose people are not the admin's to see. */
+    name: string | null;
+    space: string | null;
+    cutAt: string | null;
+    /** Whether its plain copies are still inside the rollback window. */
+    canRollBack: boolean;
+};
+
+/** The conversations an admin can act on, latest first: cut (rollback), rolled back (migrate again) and failed. */
+export async function migratedConversations(now = new Date(), take = 20): Promise<MigratedConversation[]> {
+    const since = rollbackSince(now);
+    const rows = await prisma.chatMigration.findMany({
+        where: { OR: [{ state: "cut", cutAt: { gte: since } }, { state: { in: ["failed", "rolledBack"] } }] },
+        select: { channelId: true, state: true, reason: true, cutAt: true, channel: { select: { name: true, dmKey: true, space: { select: { name: true } } } } },
+        orderBy: { updatedAt: "desc" },
+        take
+    });
+    return rows.map((row) => {
+        const direct = row.channel.dmKey !== null || !row.channel.space;
+        return {
+            channelId: row.channelId,
+            state: row.state as MigratedConversation["state"],
+            reason: row.reason,
+            name: direct ? null : row.channel.name,
+            space: direct ? null : (row.channel.space?.name ?? null),
+            cutAt: row.cutAt?.toISOString() ?? null,
+            canRollBack: row.state === "cut" && Boolean(row.cutAt && row.cutAt >= since)
+        };
+    });
 }

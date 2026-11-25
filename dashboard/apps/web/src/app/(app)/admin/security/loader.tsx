@@ -6,6 +6,7 @@ import { CardSkeleton } from "../region-skeletons";
 import { AfterPaint } from "@/components/after-paint";
 import { PlayerAddressesCard } from "./player-addresses-card";
 import { PasswordMigrationCard } from "./password-migration-card";
+import { ChatMigrationCard } from "./chat-migration-card";
 
 /** Sign-in rules are security settings, so they are never kept in the tab. */
 export function SecurityAdminLoader({ revision }: { revision: number }) {
@@ -33,6 +34,11 @@ export function SecurityAdminLoader({ revision }: { revision: number }) {
                     <div className="max-w-2xl">
                         <PasswordMigrationCard moved={data.passwords.moved} total={data.passwords.total} />
                     </div>
+                    {data.chatMigration ? (
+                        <div className="max-w-2xl">
+                            <ChatMigrationCard progress={data.chatMigration.progress} conversations={data.chatMigration.conversations} />
+                        </div>
+                    ) : null}
                 </>
             )}
         </AfterPaint>

@@ -3289,6 +3289,29 @@
             "title": "Contraseñas que no salen del navegador",
             "summary": "{total, plural, =0 {Aún no hay cuentas que entren con contraseña.} other {{moved} de {shown} cuentas con contraseña entran sin enviarla. El resto pasa en su próximo inicio, sin hacer nada.}}"
         },
+        "chatMigration": {
+            "title": "Chats existentes, cifrados",
+            "summary": "{total, plural, =0 {Ninguna conversación tiene historial de antes del chat cifrado.} other {{cut} de {shown} conversaciones con historial anterior están cifradas. El resto pasa solo, unas pocas cada diez minutos.}}",
+            "waitingOnBackup": "Esperando una copia de la base de datos de Polaris del último día antes de mover historial.",
+            "failed": "{count, plural, one {{shown} conversación no se pudo comprobar y sigue como estaba; se reintenta en la próxima pasada.} other {{shown} conversaciones no se pudieron comprobar y siguen como estaban; se reintentan en la próxima pasada.}}",
+            "direct": "Mensaje directo",
+            "cutAt": "Cifrada {when}",
+            "stateFailed": "No se pudo comprobar, sigue igual",
+            "stateRolledBack": "Devuelta a como estaba",
+            "rollBack": "Devolver",
+            "rollBackTitle": "¿Devolver esta conversación a como estaba?",
+            "rollBackDescription": "Su historial de antes del chat cifrado vuelve a guardarse como antes y no se mueve otra vez hasta que lo indiques. Lo enviado desde entonces sigue cifrado.",
+            "rolledBack": "{count, plural, one {{shown} mensaje devuelto.} other {{shown} mensajes devueltos.}}",
+            "migrateAgain": "Cifrar de nuevo",
+            "queued": "Se cifra de nuevo en la próxima pasada.",
+            "errors": {
+                "notFound": "Esa conversación no se está moviendo.",
+                "notCut": "Esa conversación aún no está cifrada; no hay nada que devolver.",
+                "expired": "Su copia se guardó {days} días y ya no existe; sigue cifrada.",
+                "notRolledBack": "Esa conversación no se devolvió; no hay nada que cifrar de nuevo.",
+                "failed": "No se pudo devolver. No cambió nada; inténtalo otra vez."
+            }
+        },
         "playerAddresses": {
             "title": "Mostrar las direcciones de los jugadores a quienes gestionan servidores de juego",
             "hint": "Desactivado por defecto. Quienes gestionan siguen permitiendo, quitando y comparando direcciones, que ven como un código por servidor. Activado, ven las direcciones reales desde las que se conectan e inician sesión."

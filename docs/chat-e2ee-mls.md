@@ -403,7 +403,7 @@ share of the work, not of the code.
 | 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). A page loaded before sealed chat was on is told to reload instead (`errors.sealedOnlyReload`, see "Sealed only"). A conversation the migration cut is sealed only before any browser has made its group (`conversationSealed` reads `ChatMigration`). Left: a sealed form for editing an old plain message in a sealed conversation. | Yes | ~85% |
 | 3 | **Message kinds that are still plain.** Built (2026-11-25): attachments, see "Sealed files"; polls, see "Sealed polls" (question and answers sealed; votes sealed with the tally in each browser, see "Sealed votes"; public or anonymous chosen at creation, see "Public and anonymous votes"). Left: voice notes recorded in a sealed conversation ride the sealed-file path (their length and shape are inside the seal) but are not verified in a browser; sealed reactions (proposal: "votos cifrados; recuento en el cliente"; votes done), scheduled messages, forum post titles, server-side translations, link cards, files sent to be seen once and files left in a Drive (refused in a sealed conversation, nothing sent in the clear). Until each has its sealed form a sealed conversation cannot send it. | Yes | ~52% (text, edits, replies, threads, Polar, webhooks, files - with the gallery, forum list and video stills - poll questions, answers and votes are sealed) |
 | 4 | **Default-on switch.** Built (2026-11-25): `chatE2eeEnabled()` is `chatE2eeFrom(env, CHAT_E2EE_DEFAULT_ON)` in `flag.ts` - `1` on, `0` off, anything else the default - so turning it on is changing `CHAT_E2EE_DEFAULT_ON` to `true` in a release, on with nothing set and `0` kept as the kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md); tested in `test/chat/e2ee/flag.test.ts`. Left: the flip itself (last), and a kill switch that does not lock anybody out of a conversation already sealed only (today `0` makes every sealed route answer 404). | Yes | ~40% |
-| 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback` for the 30-day rollback), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Left: the admin progress line (`migrationProgress()` exists, no screen yet), rollback (restore from `ChatMigrationRollback`), the purge after 30 days (decision 4), attachments/polls/system rows (row 3), members with no account key yet getting the legacy key later (needs `ORK` or a member device re-sealing it), a "history before [date]" label. | Yes (owner: every existing chat migrated) | ~45% |
+| 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback`), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Built 2026-11-25 (round 26, see "Rollback, purge and late members"): the admin line (Management > Security), the per-conversation rollback from `ChatMigrationRollback` and "Seal it again", the purge after 30 days (decision 4), and members whose account key came after the cut getting the legacy key from a member's browser (`legacy-key-gaps`). Left: attachments/polls/system rows (row 3), a "history before [date]" label, members nobody holding the key ever meets again (needs `ORK`, row 6). Not verified: the admin line and rollback in a browser and against a real PostgreSQL. | Yes (owner: every existing chat migrated) | ~65% |
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
 | 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info. Left: `AccountKeyVerifier` still has no log behind it, so a server could hand out a substitute account key - the append-only key log with a signed root and inclusion and consistency checks in the browser; key-change notices in the conversation; the verified mark; scanning the other person's QR in the app. | Yes, for "government-grade" | ~15% |
 | 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody. Left: the screen for the instance limit (the `Setting` key is read, 7-90) and the organisation's own limit, the "new device added" notice on the account's other devices, a device list with revoke. | Yes, for post-compromise security | ~50% |
@@ -743,6 +743,42 @@ key and every signature checked, the rollback copy holding the three texts,
 plain writes refused, a second run changing nothing, and the state and copies
 gone with the conversation. Not exercised: a running dashboard doing it on its
 timer, a large instance (throughput unmeasured).
+
+### Rollback, purge and late members (built 2026-11-25)
+
+- **Admin line** (Management > Security, only while sealed chat is on): how
+  many conversations with earlier history are sealed, a warning while no
+  backup from the last day exists, the failed count, and the 20 latest
+  conversations an admin can act on. A direct or group message is named
+  "Direct message": who talks to whom is not the admin's to see.
+- **Rollback** (`rollBackConversation`, audit `chat.migration.rollback`): for
+  a cut conversation inside the 30 days, each message still holding the
+  migrator's seal gets its text, translation and edit history back from its
+  copy and loses the seal, one transaction per message, guarded on the row
+  still being the migrator's. A message edited sealed after the cut keeps its
+  seal and copy (`reason = keptEdited`). The legacy envelopes go once no row
+  needs them. State `rolledBack`: the migrator skips it until "Seal it again"
+  (`migrateAgain`, audit `chat.migration.retry`) puts it back to `pending`.
+  New writes stay sealed only if the conversation has its own MLS group.
+- **Purge** (`purgeRollbackCopies`, every pass while sealed chat is on, before
+  the backup gate): copies older than 30 days are deleted 1,000 at a time.
+  After that a cut conversation cannot be rolled back (`expired`).
+- **Late members**: the server forgets `HK(c, legacy)` at the cut, so a member
+  with no account key then has nothing to open that history with. Before
+  each send a member's browser asks `legacy-key-gaps` (at most every ten
+  minutes per conversation): answered only to a member holding a legacy
+  envelope, it lists up to 100 people in the conversation's audience who have
+  an account key and no envelope; the browser seals the key it opened to each
+  and stores them with `put-history-keys` (first write wins). The audience is
+  the one the migration sealed to, so this gives the history to nobody the
+  plain history was not shown to. Same trust in server-given account keys as
+  every epoch's envelope (row 7).
+
+Verified: `test/chat/e2ee/legacy-rollback.test.ts` (restore, kept rows,
+envelopes kept while needed, refused when not cut or expired, repeatable,
+migrate again, batched purge, the gap query, the browser sealing to a late
+member's account key and that key opening it, the throttle). Not exercised:
+a real PostgreSQL (the purge is raw SQL on `ctid`), the card in a browser.
 
 ## Sealed only (built 2026-11-24)
 
