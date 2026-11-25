@@ -35,7 +35,10 @@ import {
 } from "@polaris/ui";
 import { useChat } from "./chat-context";
 import { useChatStream } from "./use-chat-stream";
+import { sendWithFiles } from "./send-with-files";
 import { useOpenedSealed } from "./opened-sealed";
+import { hasSealedTitle, openedPost } from "./sealed-forum";
+import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import type { SealedFileRef } from "@/lib/chat/e2ee/sealed-chat";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
@@ -71,7 +74,9 @@ function keyOf(channelId: string, filter: Filter): string {
 }
 
 /** Send a new post: its first message through the messages route, with the
- *  title and tags beside it, the same way a message with files goes. */
+ *  title and tags beside it, the same way a message with files goes. A page
+ *  that seals puts the title in the seal with the words and files, never in
+ *  the clear. */
 export async function sendForumPost(input: {
     readonly channelId: string;
     readonly title: string;
@@ -79,6 +84,7 @@ export async function sendForumPost(input: {
     readonly tagIds: readonly string[];
     readonly files?: readonly File[];
 }): Promise<{ id?: string; error?: string }> {
+    if (sealedChat.sealedChatActive()) return sendSealedPost(input);
     const form = new FormData();
     form.set("body", input.body);
     form.set("forumTitle", input.title);
@@ -93,6 +99,34 @@ export async function sendForumPost(input: {
         if (!response.ok || !answer.id) return { error: answer.error ?? "" };
         return { id: answer.id };
     } catch {
+        return { error: "" };
+    }
+}
+
+async function sendSealedPost(input: Parameters<typeof sendForumPost>[0]): Promise<{ id?: string; error?: string }> {
+    const forum = { title: input.title, tagIds: input.tagIds };
+    if (input.files?.length) {
+        const sent = await sendWithFiles({
+            channelId: input.channelId,
+            body: input.body,
+            files: input.files,
+            forum,
+            notUploaded: () => "",
+            notSent: ""
+        });
+        return sent === "sent" ? {} : { error: sent.error ?? "" };
+    }
+    try {
+        const id = await sealedChat.sendSealedMessage({
+            channelId: input.channelId,
+            body: input.body,
+            clientKey: crypto.randomUUID(),
+            title: input.title,
+            forumTags: input.tagIds
+        });
+        return { id };
+    } catch (caught) {
+        console.warn("polaris: a sealed forum post was not sent:", caught);
         return { error: "" };
     }
 }
@@ -176,11 +210,54 @@ export function ForumView({
     }, []);
 
     /**
+     * A sealed post's new title is a new version of its first message, sealed
+     * here like any edit of it (drawn at once, put back if refused); its tags
+     * are kept beside it on the server, as a plain post's are.
+     */
+    const [sealedEdits, setSealedEdits] = useState(0);
+    const saveSealedEdit = useCallback(
+        async (stored: ChatForumPostView, shown: string, title: string, tagIds: readonly string[]) => {
+            const tagsChanged = tagIds.length !== stored.tagIds.length || tagIds.some((id) => !stored.tagIds.includes(id));
+            const content = sealedChat.openedContent(stored.root.id, stored.root.sealedEditedAt);
+            if (tagsChanged) drawPost({ ...stored, tagIds });
+            let failed: string | undefined;
+            if (title !== shown) {
+                if (!content) failed = "";
+                else {
+                    const edit = sealedChat.editSealedMessage({
+                        ...content,
+                        title,
+                        channelId,
+                        messageId: stored.root.id,
+                        ...(stored.root.sealedEditedAt ? { editedAt: stored.root.sealedEditedAt } : {})
+                    });
+                    setSealedEdits((count) => count + 1);
+                    failed = await edit.then(
+                        () => undefined,
+                        () => ""
+                    );
+                    setSealedEdits((count) => count + 1);
+                }
+            }
+            if (failed === undefined && tagsChanged) {
+                const result: { error?: string } = await updateForumPostAction({ postId: stored.id, tagIds }).catch(() => ({ error: "" }));
+                failed = result.error;
+            }
+            if (failed === undefined) return void load();
+            if (tagsChanged) drawPost(stored);
+            toast.show({ title: t("forum.notSaved"), body: failed || undefined });
+        },
+        [channelId, drawPost, load, t, toast]
+    );
+
+    /**
      * A post's new title and tags: drawn at once, put back as they were if the
      * server refuses them, with its reason in a note.
      */
     const saveEdit = useCallback(
         async (before: ChatForumPostView, title: string, tagIds: readonly string[]) => {
+            const stored = listings.get(latest.current)?.posts.find((post) => post.id === before.id);
+            if (stored && hasSealedTitle(stored)) return saveSealedEdit(stored, before.title, title, tagIds);
             drawPost({ ...before, title, tagIds });
             const result: { error?: string } = await updateForumPostAction({
                 postId: before.id,
@@ -191,7 +268,7 @@ export function ForumView({
             drawPost(before);
             toast.show({ title: t("forum.notSaved"), body: result.error || undefined });
         },
-        [drawPost, t, toast]
+        [drawPost, saveSealedEdit, t, toast]
     );
 
     const editable = (post: ChatForumPostView): boolean =>
@@ -224,17 +301,19 @@ export function ForumView({
         [forum]
     );
 
-    // A sealed post's words and files, opened on this page (its title is not sealed yet).
+    // A sealed post's title, words and files, opened on this page.
     const roots = useMemo(() => (listing?.posts ?? []).map((post) => post.root), [listing]);
     const openedRoots = useOpenedSealed(roots, postMediaRef);
-    const posts = useMemo(
-        () =>
-            (listing?.posts ?? []).map((post, at) => {
-                const root = openedRoots[at];
-                return root && root !== post.root ? { ...post, root } : post;
-            }),
-        [listing, openedRoots]
-    );
+    const posts = useMemo(() => {
+        // Drawn again after a sealed title is edited here, which changes no row the server sent.
+        void sealedEdits;
+        const out: ChatForumPostView[] = [];
+        (listing?.posts ?? []).forEach((post, at) => {
+            const drawn = openedPost(post, openedRoots[at] ?? post.root, filter.query);
+            if (drawn) out.push(drawn);
+        });
+        return out;
+    }, [listing, openedRoots, filter.query, sealedEdits]);
     return (
         <div className="flex h-full min-h-0 flex-col">
             <div className="flex flex-col gap-3 border-b border-border px-4 py-3">
@@ -332,7 +411,7 @@ export function ForumView({
                             <Skeleton key={row} className="h-16 w-full" />
                         ))}
                     </div>
-                ) : listing.posts.length === 0 && pending.length === 0 ? (
+                ) : posts.length === 0 && pending.length === 0 ? (
                     <div className="flex h-full items-center justify-center p-6">
                         <EmptyState
                             title={

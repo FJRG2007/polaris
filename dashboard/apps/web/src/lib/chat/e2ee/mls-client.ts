@@ -540,6 +540,8 @@ export class MlsDevice {
             uploads?: readonly string[];
             /** A sealed poll: how many answers it has (their words are in the seal) and its rules. */
             poll?: { options: number; multiple: boolean; hideResults: boolean; anonymous: boolean; hours: number };
+            /** A new forum post: its tags (its title is in the seal). */
+            forum?: { tagIds: readonly string[] };
         } = {}
     ): Promise<string> {
         this.requireGroup(channelId);
@@ -563,6 +565,7 @@ export class MlsDevice {
             replyToId: options.replyToId ?? null,
             ...(options.uploads?.length ? { uploads: [...options.uploads] } : {}),
             ...(options.poll ? { poll: options.poll } : {}),
+            ...(options.forum ? { forum: { tagIds: [...options.forum.tagIds] } } : {}),
             epoch: epoch.toString(),
             senderLeaf: binding.senderLeaf,
             ciphertext: toText(ciphertext),

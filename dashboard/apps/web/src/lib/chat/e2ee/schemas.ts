@@ -174,6 +174,8 @@ export const mlsBody = z.discriminatedUnion("op", [
             })
             .strict()
             .optional(),
+        // A new forum post whose title is in the seal: only its tags, which the forum's list filters on.
+        forum: z.object({ tagIds: core.chatForumPostFieldsSchema.shape.tagIds }).strict().optional(),
         epoch,
         senderLeaf: z.number().int().min(0).max(0xffffffff),
         ciphertext: base64Url(17, 256 * 1024),
