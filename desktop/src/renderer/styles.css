@@ -190,6 +190,93 @@ input[aria-invalid="true"] {
     border-color: var(--danger);
 }
 
+/* One box per digit (code-boxes.ts): the boxes are drawn, the real input lies
+   over them, transparent, so it still takes the typing, the paste and the focus. */
+.code-boxes {
+    position: relative;
+    display: flex;
+    gap: 6px;
+    height: 2.25rem;
+    max-width: 17rem;
+}
+
+.code-boxes.disabled {
+    opacity: 0.5;
+}
+
+.code-box {
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--text-dialog);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.code-box[data-active] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.code-caret {
+    position: absolute;
+    width: 1px;
+    height: 50%;
+    background: var(--text);
+    animation: code-caret 1s step-end infinite;
+}
+
+.code-box[data-filled] .code-caret {
+    left: 4px;
+}
+
+@keyframes code-caret {
+    50% {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .code-caret {
+        animation: none;
+    }
+}
+
+.code-boxes input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: transparent;
+    caret-color: transparent;
+    font-family: monospace;
+    letter-spacing: -0.5em;
+    cursor: text;
+}
+
+.code-boxes input::selection {
+    background: transparent;
+}
+
+.code-boxes input:focus-visible {
+    outline: none;
+}
+
+.code-boxes input:disabled {
+    cursor: not-allowed;
+}
+
 .reveal {
     position: absolute;
     right: 6px;

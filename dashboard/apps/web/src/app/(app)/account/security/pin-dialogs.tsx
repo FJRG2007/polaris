@@ -9,7 +9,8 @@
  */
 
 import { useEffect, useState, type FormEvent } from "react";
-import { codeDigits } from "@/components/code-input";
+import { CodeInput } from "@/components/code-input";
+import { PIN_MAX, PIN_MIN } from "@/components/quick-pin-input";
 import { setPinSchema } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { clearPinAction, setPinAction } from "./actions";
@@ -50,6 +51,10 @@ export function SetPinDialog({
     // Save stays off until the form would pass, so a letter or a short PIN is
     // never something to press and be refused for.
     const ready = setPinSchema.safeParse(input).success;
+    // A PIN is 4 to 6 digits, so its own field draws six boxes; the repeat draws
+    // as many as the PIN has once it is long enough to be one - never fewer than
+    // the repeat already holds, so a PIN shortened afterwards hides no digit.
+    const confirmLength = pin.length >= PIN_MIN ? Math.max(pin.length, confirmPin.length) : PIN_MAX;
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -82,25 +87,26 @@ export function SetPinDialog({
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         {t("pin.pin")}
-                        <Input
+                        <CodeInput
                             name="pin"
-                            type="password"
-                            inputMode="numeric"
+                            masked
                             autoComplete="new-password"
+                            length={PIN_MAX}
                             value={pin}
-                            onChange={(event) => setPin(codeDigits(event.target.value))}
+                            onValueChange={setPin}
                             required
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         {t("pin.confirm")}
-                        <Input
+                        <CodeInput
                             name="confirmPin"
-                            type="password"
-                            inputMode="numeric"
+                            masked
+                            autoFocus={false}
                             autoComplete="new-password"
+                            length={confirmLength}
                             value={confirmPin}
-                            onChange={(event) => setConfirmPin(codeDigits(event.target.value))}
+                            onValueChange={setConfirmPin}
                             required
                         />
                         {confirmPin.length >= pin.length && confirmPin !== "" && confirmPin !== pin ? (

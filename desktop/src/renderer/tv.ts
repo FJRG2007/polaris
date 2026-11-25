@@ -4,6 +4,7 @@
  */
 
 import { available, byId, say } from "./dom";
+import { codeBoxes } from "./code-boxes";
 import { readTvAddress } from "@/shared/tv-address";
 import type { TvControl, TvControlRung, TvInstallState, TvOutcome, TvPhase, TvWaiting } from "@/shared/bridge";
 
@@ -107,6 +108,8 @@ const heading = byId<HTMLHeadingElement>("title");
 const address = byId<HTMLInputElement>("address");
 const codeField = byId<HTMLLabelElement>("code-field");
 const code = byId<HTMLInputElement>("code");
+/** The TV shows six digits, so the field is six boxes. */
+const pairingBoxes = codeBoxes(code, 6);
 const addressError = byId<HTMLParagraphElement>("address-error");
 const found = byId<HTMLDivElement>("found");
 const modeSystem = byId<HTMLInputElement>("mode-system");
@@ -166,6 +169,7 @@ function render(state: TvInstallState): void {
     const pairing = asksCode();
     codeField.hidden = !pairing;
     code.disabled = !idle;
+    pairingBoxes.refresh();
     address.disabled = !idle;
     modeSystem.disabled = !idle;
     modeApp.disabled = !idle;
@@ -254,9 +258,8 @@ bridge.onState((next) => {
     latest = next;
     render(next);
 });
+// The boxes keep it to digits, as the TV shows them; anything else is dropped.
 code.addEventListener("input", () => {
-    // Digits only, as the TV shows them; anything else typed or pasted is dropped.
-    code.value = code.value.replace(/\D/g, "").slice(0, 6);
     if (latest) render(latest);
 });
 address.addEventListener("input", () => {
