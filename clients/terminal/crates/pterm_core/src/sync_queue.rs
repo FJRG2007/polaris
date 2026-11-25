@@ -317,14 +317,20 @@ impl<T: SyncQueueTaskTrait> SyncQueue<T> {
     /// causing receivers to resolve to `Err(Canceled)`. The currently executing task
     /// (if any) is aborted via its `AbortHandle`.
     pub fn cancel_all(&self) {
+        // Hold the map lock for the whole cancellation. The processor takes a
+        // task out of the map and publishes its abort handle under this same
+        // lock, so it can neither start the next queued task between the abort
+        // and the drain, nor dequeue a task whose handle is not yet visible here.
+        let mut task_map = self.task_map.lock().unwrap();
+
+        // Drain all pending tasks from the map. Dropping the QueuedTask entries
+        // drops their oneshot senders, signaling cancellation to receivers.
+        task_map.clear();
+
         // Abort the currently executing task, if any.
         if let Some(handle) = self.active_task_handle.lock().unwrap().take() {
             handle.abort();
         }
-
-        // Drain all pending tasks from the map. Dropping the QueuedTask entries
-        // drops their oneshot senders, signaling cancellation to receivers.
-        self.task_map.lock().unwrap().clear();
     }
 
     async fn retry_with_backoff<Fut>(
@@ -369,19 +375,26 @@ impl<T: SyncQueueTaskTrait> SyncQueue<T> {
         broadcast_sender: Option<BroadcastSender<BroadcastResult<T>>>,
     ) {
         while let Some(task_id) = receiver.next().await {
-            // Remove the task from the map. If it's missing, it was cancelled.
-            let Some(mut queued_task) = task_map.lock().unwrap().remove(&task_id) else {
-                continue;
-            };
-
-            let retry_options = queued_task.retry_options;
-            let rate_limit_config = rate_limit_config.clone();
-
             // Wrap the task in Abortable so cancel_all can abort it.
             // Rate limiting is inside the abortable so cancellation also
             // interrupts a task waiting for a rate-limit token.
             let (abort_handle, abort_registration) = AbortHandle::new_pair();
-            *active_task_handle.lock().unwrap() = Some(abort_handle);
+
+            // Remove the task from the map and publish its abort handle in one
+            // critical section (map lock, then handle lock - the same order as
+            // cancel_all), so a cancel_all never sees a task that is neither
+            // queued nor abortable. If it's missing, it was cancelled.
+            let mut queued_task = {
+                let mut task_map = task_map.lock().unwrap();
+                let Some(queued_task) = task_map.remove(&task_id) else {
+                    continue;
+                };
+                *active_task_handle.lock().unwrap() = Some(abort_handle);
+                queued_task
+            };
+
+            let retry_options = queued_task.retry_options;
+            let rate_limit_config = rate_limit_config.clone();
 
             let abortable_result = Abortable::new(
                 async {
