@@ -63,6 +63,7 @@ export * from "./app-icon-season.js";
 export * from "./sleep.js";
 export * from "./service-templates.js";
 export * from "./environment-promotion.js";
+export * from "./environment-sync.js";
 export * from "./php-serialize.js";
 export * from "./mailbox-folder-look.js";
 export * from "./mailbox-list.js";
