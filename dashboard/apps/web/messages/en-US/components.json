@@ -306,6 +306,8 @@
         "actions": "Actions",
         "calculator": "Calculator",
         "host": {
+            "url": "Link",
+            "urlTitle": "Open {host}",
             "apps": "Applications",
             "web": "Web",
             "polar": "Polar",

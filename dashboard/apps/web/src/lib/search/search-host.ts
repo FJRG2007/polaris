@@ -14,7 +14,7 @@ import { z } from "zod";
 import { SYSTEM_COMMAND_IDS } from "@polaris/core";
 
 /** The kinds of row a host may add, each drawn with its own icon and words. */
-export const HOST_ROW_KINDS = ["answer", "system", "app", "polar", "web", "clip"] as const;
+export const HOST_ROW_KINDS = ["url", "answer", "system", "app", "polar", "web", "clip"] as const;
 
 export type HostRowKind = (typeof HOST_ROW_KINDS)[number];
 

@@ -49,6 +49,7 @@ import { showNotice } from "./notices";
 import { recordLauncherUse, usageScores } from "./launcher-usage";
 import { searchableCommand, systemCommands, type SystemCommand } from "@/shared/system-commands";
 import { byFrecency } from "../../../../dashboard/packages/core/src/frecency";
+import { typedUrl } from "../../../../dashboard/packages/core/src/typed-url";
 import { LAUNCHER_CHANNELS, rankedMatches, webSearchUrl, type LauncherAnswer, type LauncherRow } from "@/shared/launcher";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, powerMonitor, safeStorage, screen, session, type IpcMainInvokeEvent } from "electron";
 
@@ -259,6 +260,11 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
             add({ kind: "clip", title: clip.text.replace(/\s+/g, " ").slice(0, 200), subtitle: "Clipboard - Enter copies it" }, () => void clipboard.writeText(clip.text));
         }
     } else if (query) {
+        // An address typed whole leads: it is what Enter should do. Only http,
+        // https and mailto qualify (`@polaris/core` `typedUrl`), and
+        // `openExternal` checks the scheme again before anything opens.
+        const link = typedUrl(query);
+        if (link) add({ kind: "url", title: `Open ${link.host}`, subtitle: link.url }, () => openExternal(link.url));
         if (origin && !hostOnly) {
             const entryKey = (entry: IndexEntry) => `polaris:${entry.href}`;
             for (const entry of rankedMatches(query, index?.server === origin ? index.entries : [], PER_KIND, entryKey, uses)) {

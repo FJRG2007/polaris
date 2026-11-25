@@ -18,8 +18,8 @@ import { SearchItem } from "@polaris/ui/search-panel";
 import { Avatar } from "@/components/avatar";
 import type { LucideIcon } from "lucide-react";
 import type { ClockCommand, RecentSearch } from "@polaris/core";
-import { LAUNCHER_COMMANDS } from "@polaris/core";
-import { AlarmClock, AppWindow, Calculator, Clipboard, Clock, Copy, CornerDownLeft, Globe, Power, Timer, Watch, X } from "lucide-react";
+import { LAUNCHER_COMMANDS, typedUrl } from "@polaris/core";
+import { AlarmClock, AppWindow, Calculator, Clipboard, Clock, Copy, CornerDownLeft, Globe, Link, Power, Timer, Watch, X } from "lucide-react";
 import type { HostRow, HostRowKind } from "@/lib/search/search-host";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
@@ -348,6 +348,7 @@ const CONFIRMED = new Set<string>(LAUNCHER_COMMANDS.filter((command) => command.
 
 /** The heading a host's row is listed under. */
 export function hostGroup(t: Translate, kind: HostRowKind): string {
+    if (kind === "url") return t("search.host.url");
     if (kind === "answer") return t("search.calculator");
     if (kind === "system") return t("search.host.system");
     if (kind === "app") return t("search.host.apps");
@@ -363,13 +364,15 @@ export function HostResultRow({ row, query, ...props }: RowProps & { row: HostRo
     // says what kind of row it is and, for a program or a copy, its text.
     const quoted = query.slice(0, 120);
     const label =
-        row.kind === "web"
-            ? t("search.host.webTitle", { query: quoted })
-            : row.kind === "polar"
-              ? t("search.host.polarTitle", { query: quoted })
-              : row.kind === "system" && row.command
-                ? t(`search.host.commands.${row.command}`)
-                : row.title;
+        row.kind === "url"
+            ? t("search.host.urlTitle", { host: typedUrl(query)?.host ?? row.title })
+            : row.kind === "web"
+              ? t("search.host.webTitle", { query: quoted })
+              : row.kind === "polar"
+                ? t("search.host.polarTitle", { query: quoted })
+                : row.kind === "system" && row.command
+                  ? t(`search.host.commands.${row.command}`)
+                  : row.title;
     const context =
         row.kind === "web"
             ? t("search.host.webHint")
@@ -383,7 +386,7 @@ export function HostResultRow({ row, query, ...props }: RowProps & { row: HostRo
                     ? t(row.command && CONFIRMED.has(row.command) ? "search.host.systemConfirmHint" : "search.host.systemHint")
                     : row.subtitle;
     const fallback =
-        row.kind === "answer" ? Calculator : row.kind === "system" ? Power : row.kind === "web" ? Globe : row.kind === "clip" ? Clipboard : AppWindow;
+        row.kind === "url" ? Link : row.kind === "answer" ? Calculator : row.kind === "system" ? Power : row.kind === "web" ? Globe : row.kind === "clip" ? Clipboard : AppWindow;
     const Icon = fallback;
     const icon =
         row.kind === "polar" ? (

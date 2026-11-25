@@ -5,6 +5,7 @@
  * ask to open an arbitrary address or program.
  */
 
+import { normalizeSearchText } from "../../../../dashboard/packages/core/src/search-text";
 import type { SystemCommandId } from "../../../../dashboard/packages/core/src/launcher-commands";
 
 export const LAUNCHER_CHANNELS = {
@@ -17,7 +18,7 @@ export const LAUNCHER_CHANNELS = {
     addons: "launcher:addons"
 } as const;
 
-export type LauncherRowKind = "answer" | "polaris" | "page" | "system" | "app" | "polar" | "web" | "clip";
+export type LauncherRowKind = "url" | "answer" | "polaris" | "page" | "system" | "app" | "polar" | "web" | "clip";
 
 export interface LauncherRow {
     readonly id: string;
@@ -54,26 +55,97 @@ export interface PolarisLauncher {
 export interface Searchable {
     readonly label: string;
     readonly context: string;
+    /** Other names it answers to as well as its label: a program's file name, its folder, a name somebody gave it. */
+    readonly aliases?: readonly string[];
+}
+
+/** The score of each kind of match; a step is wider than `USE_BOOST_MAX` plus the finer order inside one kind. */
+const SCORE = { exact: 100, start: 80, word: 60, inside: 40, letters: 20, context: 10 } as const;
+
+/** Text as the launcher compares it: no accents, lowercase, one space between words. */
+function folded(value: string): string {
+    return normalizeSearchText(value);
+}
+
+/**
+ * Where each word of a name starts, as Flow Launcher's acronym pass reads
+ * them: after a space or a mark, a capital after a small letter
+ * ("PowerShell"), and a run of digits ("Windows 11", "GTA5").
+ */
+function wordStarts(name: string): string[] {
+    const spaced = name
+        .replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2")
+        .replace(/(\p{L})(\p{N})/gu, "$1 $2")
+        .replace(/(\p{N})(\p{L})/gu, "$1 $2");
+    return folded(spaced)
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter(Boolean);
+}
+
+/** Whether every letter of `q` is the first of a word of the name, in order: "gta" for Grand Theft Auto V. */
+function acronymOf(q: string, words: readonly string[]): boolean {
+    if (q.length < 2 || /\s/.test(q)) return false;
+    let at = 0;
+    for (const word of words) {
+        if (at < q.length && word[0] === q[at]) at += 1;
+    }
+    return at === q.length;
+}
+
+/**
+ * The letters of `q` in order inside `name`, scored under 1 so it only orders
+ * matches of the same kind: an earlier first letter and a tighter span rank
+ * higher, as Flow Launcher's fuzzy pass does. Null when they are not all there.
+ */
+function lettersInOrder(q: string, name: string): number | null {
+    const letters = q.replace(/\s+/g, "");
+    if (letters.length < 2) return null;
+    let at = 0;
+    let first = -1;
+    let last = -1;
+    for (let index = 0; index < name.length && at < letters.length; index += 1) {
+        if (name[index] !== letters[at]) continue;
+        if (first < 0) first = index;
+        last = index;
+        at += 1;
+    }
+    if (at < letters.length) return null;
+    const span = last - first + 1;
+    return 0.5 * (letters.length / span) + 0.4 / (1 + first);
+}
+
+/** How one name of the thing is found by `q`, already folded; 0 for not at all. */
+function nameScore(q: string, raw: string): number {
+    const name = folded(raw);
+    if (!name) return 0;
+    // A shorter name that matches as well is the likelier one: "Steam" before "Steam Link".
+    const short = 0.4 / (1 + Math.max(0, name.length - q.length));
+    if (name === q) return SCORE.exact;
+    if (name.startsWith(q)) return SCORE.start + short;
+    const words = wordStarts(raw);
+    if (name.split(/[\s\-_/.]+/).some((word) => word.startsWith(q)) || words.some((word) => word.startsWith(q))) return SCORE.word + short;
+    if (acronymOf(q, words)) return SCORE.word + short / 2;
+    if (name.includes(q)) return SCORE.inside + short;
+    const order = lettersInOrder(q, name);
+    return order === null ? 0 : SCORE.letters + order;
 }
 
 /**
  * How well `query` finds `item`, or 0 for not at all: the whole name first,
- * then its start, a word's start, anywhere in it, its letters in order, and
- * last a match in the context line.
+ * then its start, a word's start or its initials ("gta", "vsc"), anywhere in
+ * it, its letters in order, and last a match in the context line. Accents
+ * never matter, and every alias is scored the same way, the best one counting.
  */
 export function matchScore(query: string, item: Searchable): number {
-    const q = query.trim().toLowerCase();
+    const q = folded(query);
     if (!q) return 0;
-    const label = item.label.toLowerCase();
-    if (label === q) return 100;
-    if (label.startsWith(q)) return 80;
-    if (label.split(/[\s\-_/.]+/).some((word) => word.startsWith(q))) return 60;
-    if (label.includes(q)) return 40;
-    let at = 0;
-    for (const char of label) if (char === q[at]) at += 1;
-    if (at === q.length && q.length >= 2) return 20;
-    if (item.context.toLowerCase().includes(q)) return 10;
-    return 0;
+    let best = nameScore(q, item.label);
+    for (const alias of item.aliases ?? []) {
+        // An alias never ties the label above it: the label is what is shown.
+        best = Math.max(best, nameScore(q, alias) - 0.05);
+    }
+    if (best > 0) return best;
+    return folded(item.context).includes(q) ? SCORE.context : 0;
 }
 
 /** The best `limit` matches, best first; ties keep their order. */

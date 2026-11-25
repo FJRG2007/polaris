@@ -227,3 +227,50 @@ describe("ranking by use", () => {
         expect(rankedMatches("sl", items, 5, key, new Map([["Notes", 50]])).map(key)).not.toContain("Notes");
     });
 });
+
+describe("finding a program the way it is remembered", () => {
+    const programs = [
+        { label: "Git Bash", context: "" },
+        { label: "Grand Theft Auto V", context: "" },
+        { label: "GitHub Desktop", context: "" },
+        { label: "Visual Studio Code", context: "" },
+        { label: "Windows PowerShell", context: "" },
+        { label: "Fortnite", context: "", aliases: ["FortniteLauncher", "Epic Games"] }
+    ];
+    const labels = (query: string) => topMatches(query, programs, 6).map((item) => item.label);
+
+    it("ranks a name's initials above its letters merely in order", () => {
+        expect(labels("gta")[0]).toBe("Grand Theft Auto V");
+        expect(matchScore("gta", programs[1]!)).toBeGreaterThan(matchScore("gta", programs[0]!));
+        expect(labels("gtav")[0]).toBe("Grand Theft Auto V");
+        expect(labels("vsc")[0]).toBe("Visual Studio Code");
+    });
+
+    it("reads a capital inside a word as the start of one", () => {
+        expect(labels("ps")).toContain("Windows PowerShell");
+        expect(matchScore("shell", programs[4]!)).toBeGreaterThanOrEqual(60);
+    });
+
+    it("does not care about accents either way", () => {
+        const accented = [{ label: "Configuración", context: "" }, { label: "Pokémon Showdown", context: "" }];
+        expect(topMatches("configuracion", accented, 5).map((item) => item.label)).toEqual(["Configuración"]);
+        expect(topMatches("pokemon", accented, 5).map((item) => item.label)).toEqual(["Pokémon Showdown"]);
+        expect(matchScore("Pokémon", { label: "Pokemon Showdown", context: "" })).toBeGreaterThanOrEqual(80);
+    });
+
+    it("finds a program by another of its names, its label still first on a tie", () => {
+        expect(labels("epic")).toContain("Fortnite");
+        expect(matchScore("fortnitelauncher", programs[5]!)).toBeGreaterThan(90);
+        const tie = [{ label: "Steam helper", context: "", aliases: ["Steam"] }, { label: "Steam", context: "" }];
+        expect(topMatches("steam", tie, 5).map((item) => item.label)[0]).toBe("Steam");
+    });
+
+    it("puts the shorter of two equal matches first", () => {
+        expect(topMatches("steam", [{ label: "Steam Link", context: "" }, { label: "Steamworks", context: "" }, { label: "Steam", context: "" }], 5)[0]!.label).toBe("Steam");
+    });
+
+    it("keeps use from lifting letters-in-order above initials", () => {
+        const key = (item: { label: string; }) => item.label;
+        expect(rankedMatches("gta", programs, 5, key, new Map([["Git Bash", 1e9]])).map(key)[0]).toBe("Grand Theft Auto V");
+    });
+});

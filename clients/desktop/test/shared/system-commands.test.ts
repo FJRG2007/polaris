@@ -40,6 +40,6 @@ describe("the launcher's system commands", () => {
     it("is found by its other words", () => {
         const restart = systemCommands("linux", {}).find((command) => command.id === "restart")!;
         expect(matchScore("reboot", searchableCommand(restart))).toBeGreaterThan(0);
-        expect(matchScore("rest", searchableCommand(restart))).toBe(80);
+        expect(matchScore("rest", searchableCommand(restart))).toBeGreaterThanOrEqual(80);
     });
 });

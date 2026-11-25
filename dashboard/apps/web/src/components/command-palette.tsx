@@ -138,7 +138,8 @@ type Row =
     | { kind: "entry"; id: string; group: string; entry: CommandEntry }
     | { kind: "hit"; id: string; group: string; hit: SearchHit }
     | { kind: "recent"; id: string; group: string; entry: core.RecentSearch }
-    | { kind: "host"; id: string; group: string; row: HostRow };
+    | { kind: "host"; id: string; group: string; row: HostRow }
+    | { kind: "link"; id: string; group: string; link: core.TypedUrl };
 
 /** The row's id in the document, for `aria-activedescendant` to point at. */
 function rowElementId(row: Row): string {
@@ -729,8 +730,21 @@ export function CommandPalette({
                 row
             }));
 
-        return [...sum, ...clock, ...remembered, ...commands, ...found, ...hosted];
+        // An address typed whole leads: Enter opens it. A host opens it
+        // itself (a desktop window cannot open a tab), so its row is used and
+        // this page only offers its own where there is no host.
+        const typed = core.typedUrl(trimmed);
+        const hostLinks = hosted.filter((row) => row.kind === "host" && row.row.kind === "url");
+        const links: Row[] = host
+            ? hostLinks
+            : typed && !scope
+              ? [{ kind: "link", id: "link", group: hostGroup(t, "url"), link: typed }]
+              : [];
+        const others = hosted.filter((row) => !hostLinks.includes(row));
+
+        return [...links, ...sum, ...clock, ...remembered, ...commands, ...found, ...others];
     }, [
+        host,
         hostRows,
         calculation,
         recentRows,
@@ -852,6 +866,13 @@ export function CommandPalette({
         if (row.kind === "host") {
             openedRef.current = true;
             host?.run(row.row.id);
+            setOpen(false);
+            return;
+        }
+        if (row.kind === "link") {
+            // Only http, https or mailto reach here (`core.typedUrl`).
+            openedRef.current = true;
+            window.open(row.link.url, "_blank", "noopener");
             setOpen(false);
             return;
         }
@@ -1160,6 +1181,19 @@ export function CommandPalette({
                                                 key={row.id}
                                                 id={rowElementId(row)}
                                                 hit={row.hit}
+                                                selected={selected}
+                                                onSelect={select}
+                                                onHover={hover}
+                                            />
+                                        );
+                                    }
+                                    if (row.kind === "link") {
+                                        return (
+                                            <HostResultRow
+                                                key={row.id}
+                                                id={rowElementId(row)}
+                                                row={{ id: row.id, kind: "url", title: row.link.host, subtitle: row.link.url }}
+                                                query={trimmed}
                                                 selected={selected}
                                                 onSelect={select}
                                                 onHover={hover}
