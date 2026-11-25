@@ -2030,7 +2030,7 @@
             "expandAll": "Abrir pasos",
             "collapseAll": "Plegar pasos",
             "offer": "¿Cómo quieres ver los pasos del agente? Puedes cambiarlo cuando quieras.",
-            "ranVerb": "Ejecutó",
+            "ranVerb": "Lanzó",
             "runningVerb": "Ejecutando",
             "readVerb": "Leyó",
             "readingVerb": "Leyendo",
