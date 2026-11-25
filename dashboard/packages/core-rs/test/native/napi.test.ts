@@ -59,7 +59,19 @@ beforeEach(() => {
     core.setBindingSource(core.nativeSource());
 });
 
+/**
+ * Hold the facade's clock still, so every call lands inside its timeout. The
+ * equivalence tests below assert that the Rust path answered every call; a
+ * busy CI runner stalling one call past the 50 ms budget is a scheduling
+ * event, not a difference, and it must not stand in for one. The timeout has
+ * its own test ("slower than its timeout"), which runs on the real clock.
+ */
+function holdClock() {
+    vi.spyOn(globalThis.performance, "now").mockReturnValue(0);
+}
+
 afterEach(() => {
+    vi.restoreAllMocks();
     core.setMode("probe", null);
     core.setMode("phone", null);
 });
@@ -68,6 +80,7 @@ describe("Node binding: golden vectors", () => {
     for (const [domain, op] of allVectorFiles()) {
         it(`${domain}/${op}: the raw binding and the facade in rust mode match every vector`, () => {
             const file = loadVectors(domain, op);
+            holdClock();
             core.setMode("phone", "rust");
             if (domain === "phone") phone.toE164(PHONE_RESET_INPUT);
             expect(replay(file, RAW_OPS[`${domain}/${op}`]!)).toEqual([]);
@@ -195,7 +208,10 @@ describe("Node binding: phone property equivalence with the TypeScript twin", ()
     const seen = (fn: () => unknown) => canonical(outcome(() => fn() ?? `<${String(fn())}>`));
     const same = (a: () => unknown, b: () => unknown) => expect(seen(a)).toBe(seen(b));
 
-    beforeEach(() => core.setMode("phone", "rust"));
+    beforeEach(() => {
+        holdClock();
+        core.setMode("phone", "rust");
+    });
 
     it("toE164, formatPhoneAsTyped, splitPhone, formatPhoneInternational and phoneCountryOf agree (10,000 runs each)", () => {
         fc.assert(
