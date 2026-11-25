@@ -1,0 +1,55 @@
+
+HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{FIXTURE-GTAV-0001}
+    DisplayName    REG_SZ    Grand Theft Auto V
+    Publisher    REG_SZ    Rockstar Games
+    InstallLocation    REG_SZ    D:\Fixture Games\Rockstar Games\Grand Theft Auto V
+    DisplayIcon    REG_SZ    D:\Fixture Games\Rockstar Games\Grand Theft Auto V\PlayGTAV.exe,0
+    UninstallString    REG_SZ    "D:\Fixture Games\Rockstar Games\Launcher\Launcher.exe" -uninstall=gta5
+
+HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{FIXTURE-LAUNCHER-0002}
+    DisplayName    REG_SZ    Rockstar Games Launcher
+    InstallLocation    REG_SZ    "D:\Fixture Games\Rockstar Games\Launcher"
+    DisplayIcon    REG_SZ    "D:\Fixture Games\Rockstar Games\Launcher\Launcher.exe",0
+
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\FixtureTool
+    DisplayName    REG_SZ    Fixture Tool
+    DisplayIcon    REG_EXPAND_SZ    %FIXTURE_ROOT%\Fixture Tool\tool.exe
+
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{FIXTURE-VCRT-0003}
+    DisplayName    REG_SZ    Microsoft Visual C++ 2022 X64 Minimum Runtime - 14.40.33810
+    DisplayIcon    REG_SZ    C:\ProgramData\Package Cache\vc_runtimeMinimum_x64.exe
+    SystemComponent    REG_DWORD    0x1
+
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\FixtureEditor
+    DisplayName    REG_SZ    Fixture Editor
+    InstallLocation    REG_SZ    D:\Fixture Apps\Editor
+    DisplayIcon    REG_SZ    D:\Fixture Apps\Editor\unins000.exe
+
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\FixtureOutside
+    DisplayName    REG_SZ    Fixture Outside
+    InstallLocation    REG_SZ    D:\Fixture Apps\Outside
+    DisplayIcon    REG_SZ    D:\Elsewhere\outside.exe
+
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\FixturePatch
+    DisplayName    REG_SZ    Fixture Editor Patch 2
+    ParentKeyName    REG_SZ    FixtureEditor
+    DisplayIcon    REG_SZ    D:\Fixture Apps\Editor\editor.exe
+
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\FixtureGone
+    DisplayName    REG_SZ    Fixture Gone
+    DisplayIcon    REG_SZ    D:\Fixture Apps\Gone\gone.exe
+
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\FixtureIconOnly
+    DisplayName    REG_SZ    Fixture Icon Only
+    DisplayIcon    REG_SZ    D:\Fixture Apps\Icon\app.ico
+
+HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Battle.net
+    DisplayName    REG_SZ    Battle.net
+    InstallLocation    REG_SZ    D:\Fixture Games\Battle.net
+    DisplayIcon    REG_SZ    D:\Fixture Games\Battle.net\Battle.net.exe
+
+HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\World of Warcraft
+    DisplayName    REG_SZ    World of Warcraft
+    InstallLocation    REG_SZ    D:\Fixture Games\World of Warcraft
+    DisplayIcon    REG_SZ    D:\Fixture Games\World of Warcraft\_retail_\Wow.exe
+    UninstallString    REG_SZ    "C:\ProgramData\Battle.net\Agent\Blizzard Uninstaller.exe" --lang=enUS --uid=wow_enus --displayname="World of Warcraft"

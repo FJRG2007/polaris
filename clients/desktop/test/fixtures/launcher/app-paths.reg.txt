@@ -1,0 +1,16 @@
+
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\fixturepad.exe
+    (Default)    REG_SZ    "D:\Fixture Apps\Pad\fixturepad.exe"
+    Path    REG_SZ    D:\Fixture Apps\Pad
+
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\wordpad.exe
+    (Default)    REG_EXPAND_SZ    %SystemRoot%\System32\write.exe
+
+HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\fixturecode.exe
+    (Predeterminado)    REG_SZ    D:\Fixture Apps\Code\fixturecode.exe
+
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\quiet.exe
+    (Default)    REG_SZ    D:\Fixture Apps\Quiet\quiet.exe
+
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\fixturestore.exe
+    (Default)    REG_SZ    C:\Program Files\WindowsApps\Fixture.Store_1.0_x64__fixture\fixturestore.exe

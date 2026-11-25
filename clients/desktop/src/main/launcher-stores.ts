@@ -28,8 +28,12 @@ export type AppLaunch =
     | { readonly kind: "uri"; readonly uri: string; }
     /** A packaged (Store, Xbox) app, by its AppUserModelID. */
     | { readonly kind: "packaged"; readonly id: string; }
-    /** An executable inside a game's own folder, started there with no arguments. */
-    | { readonly kind: "exe"; readonly path: string; readonly cwd: string; };
+    /**
+     * An executable inside a game's own folder, started there - with no
+     * arguments, or a store launcher's own launch arguments built from its
+     * registry entry (`launcher-programs.ts`), never from typed text.
+     */
+    | { readonly kind: "exe"; readonly path: string; readonly cwd: string; readonly args?: readonly string[]; };
 
 export interface StoreApp {
     readonly label: string;
@@ -145,8 +149,13 @@ export function parseRegQuery(output: string): RegistryKey[] {
     return keys;
 }
 
+/** `reg query` with these arguments: its output, or null when it failed. */
+export function regQuery(args: readonly string[]): Promise<string | null> {
+    return run("reg.exe", ["query", ...args]);
+}
+
 async function registry(args: readonly string[]): Promise<RegistryKey[]> {
-    const output = await run("reg.exe", ["query", ...args]);
+    const output = await regQuery(args);
     return output ? parseRegQuery(output) : [];
 }
 

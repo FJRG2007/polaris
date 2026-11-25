@@ -1,25 +1,38 @@
 /**
- * The programs installed on this computer, for the launcher to open: on
- * Windows the Start menu's shortcuts, then what Windows' own search misses -
- * Store and Xbox apps and the games of Epic, Steam, GOG and Ubisoft
- * (`launcher-stores.ts`); on macOS the `.app` bundles in the Applications
- * folders. Read from the file system when the launcher first opens and again
- * on an open after `FRESH_MS`, never on a timer, and opened the way each was
- * listed - a shortcut through the shell as a double-click would, a game through
- * its store's own link - never with arguments the launcher made up.
+ * The programs installed on this computer, for the launcher to open. On
+ * Windows, in the order Vicinae's `win-app-database.cpp` reads them, each
+ * program listed once - as the first source to list it, with the names of
+ * every copy: Store and Xbox apps, the Start menu's shortcuts, the Desktop's,
+ * the games of Epic, Steam, GOG and Ubisoft (`launcher-stores.ts`), then what
+ * only the registry knows (`launcher-programs.ts`: `App Paths`, uninstall
+ * entries). On macOS the `.app` bundles in the Applications folders.
+ *
+ * The listing is kept on disk, so the first open after a restart answers from
+ * it instead of waiting on a read; it is read again on an open after
+ * `FRESH_MS`, a short while after a shortcut appears or goes in a folder it
+ * watches, and when the game watcher asks after `MAX_AGE_MS` - never on a
+ * timer of its own and never on the press itself. Each is opened the way it
+ * was listed - a shortcut through the shell as a double-click would, a game
+ * through its store's own link or launcher - never with arguments the launcher
+ * made up from typed text. A shortcut is read for its target without
+ * resolving it, which can wait on the network.
  *
  * Linux is not indexed: a `.desktop` entry handed to the shell opens in a text
  * editor on most desktops, and running its `Exec` line safely means a parser
  * for the Desktop Entry spec's field codes, which this does not carry yet.
  */
 
+import { z } from "zod";
 import { join } from "node:path";
-import { shell } from "electron";
 import { homedir } from "node:os";
+import { app, shell } from "electron";
 import { spawn } from "node:child_process";
-import { readdir } from "node:fs/promises";
 import type { StoreGame } from "./game-detect";
-import { isPackagedAppId, isVettedLaunchUri, storeApps, type AppLaunch } from "./launcher-stores";
+import { exeDescription } from "./launcher-exe-info";
+import { readFileSync, watch, type FSWatcher } from "node:fs";
+import { readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { isPackagedAppId, isVettedLaunchUri, regQuery, storeApps, type AppLaunch } from "./launcher-stores";
+import * as programs from "./launcher-programs";
 
 export interface InstalledApp {
     readonly label: string;
@@ -31,13 +44,25 @@ export interface InstalledApp {
     readonly icon?: string;
     /** A store game's install folder. */
     readonly folder?: string;
+    /** Other names it is found by: its executable's, its folder's, another source's. */
+    readonly aliases?: readonly string[];
+    /** What a shortcut or entry starts, when known. */
+    readonly target?: string;
 }
 
 /** How long a listing is trusted before the next open reads it again. */
 const FRESH_MS = 10 * 60_000;
+/** The oldest a listing may get while the launcher is not opened: the game watcher reads it again past this (Flow Launcher's 30 h). */
+export const MAX_AGE_MS = 30 * 60 * 60_000;
+/** A watched folder settles this long after its last change before it is read again, and waits at most `WATCH_MAX_MS`. */
+export const WATCH_SETTLE_MS = 3_000;
+export const WATCH_MAX_MS = 20_000;
 /** The most apps kept, so an odd machine cannot fill memory with shortcuts. */
 const MAX_APPS = 4000;
 const MAX_DEPTH = 3;
+/** Bumped whenever what a listing holds changes, so an older one on disk is read again rather than trusted. */
+export const INDEX_VERSION = 2;
+const MAX_INDEX_BYTES = 8 * 1024 * 1024;
 
 interface Listing {
     readonly apps: readonly InstalledApp[];
@@ -49,6 +74,76 @@ let cached: (Listing & { readonly at: number; }) | null = null;
 let reading: Promise<Listing> | null = null;
 /** Whether a listing was ever started, so the game watcher starts at most one itself. */
 let started = false;
+let diskLoaded = false;
+
+const text = (max: number) => z.string().min(1).max(max);
+const launchSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("open"), path: text(2000) }),
+    z.object({ kind: z.literal("uri"), uri: text(2000) }),
+    z.object({ kind: z.literal("packaged"), id: text(500) }),
+    z.object({ kind: z.literal("exe"), path: text(2000), cwd: text(2000), args: z.array(text(2000)).max(4).optional() })
+]);
+const indexSchema = z.object({
+    version: z.literal(INDEX_VERSION),
+    at: z.number().int().nonnegative(),
+    apps: z.array(z.object({
+        label: text(300),
+        path: text(2000),
+        launch: launchSchema.optional(),
+        icon: text(2000).optional(),
+        folder: text(2000).optional(),
+        aliases: z.array(text(300)).max(12).optional(),
+        target: text(2000).optional()
+    })).max(MAX_APPS),
+    games: z.array(z.object({ name: text(300), folder: text(2000), store: text(300).optional() })).max(MAX_APPS)
+});
+
+/**
+ * A listing kept on disk, or null when it is missing, from another version,
+ * or not what one looks like. What it says is checked again before anything
+ * in it is opened, as a fresh listing's would be.
+ */
+export function parseIndex(json: unknown): (Listing & { readonly at: number; }) | null {
+    const parsed = indexSchema.safeParse(json);
+    return parsed.success ? parsed.data : null;
+}
+
+/** Where the listing is kept, or null when there is no profile folder to keep it in. */
+function indexFile(): string | null {
+    try {
+        const folder = app.getPath("userData");
+        return folder ? join(folder, "launcher-index.json") : null;
+    } catch {
+        return null;
+    }
+}
+
+/** The listing kept on disk, read once, so the first open after a restart has something to show. */
+function loadIndex(): void {
+    if (diskLoaded) return;
+    diskLoaded = true;
+    const path = indexFile();
+    if (!path) return;
+    try {
+        const raw = readFileSync(path, "utf8");
+        if (raw.length <= MAX_INDEX_BYTES) cached ??= parseIndex(JSON.parse(raw));
+    } catch {
+        // None yet, or unreadable: the first listing writes one.
+    }
+}
+
+/** Keep a listing on disk, replacing the last one whole: a failed write leaves the old one. */
+async function saveIndex(listing: Listing & { readonly at: number; }): Promise<void> {
+    const path = indexFile();
+    if (!path) return;
+    const temp = `${path}.${process.pid}.${listing.at}.tmp`;
+    try {
+        await writeFile(temp, JSON.stringify({ version: INDEX_VERSION, ...listing }), { mode: 0o600 });
+        await rename(temp, path);
+    } catch {
+        await rm(temp, { force: true }).catch(() => undefined);
+    }
+}
 
 function roots(platform: NodeJS.Platform): string[] {
     if (platform === "win32") {
@@ -57,6 +152,14 @@ function roots(platform: NodeJS.Platform): string[] {
     }
     if (platform === "darwin") return ["/Applications", "/Applications/Utilities", "/System/Applications", join(homedir(), "Applications")];
     return [];
+}
+
+function userDesktop(): string | undefined {
+    try {
+        return app.getPath("desktop");
+    } catch {
+        return undefined;
+    }
 }
 
 /**
@@ -72,7 +175,28 @@ export function isProgramShortcut(label: string): boolean {
     return !/^uninstall/i.test(label) && !NOT_A_PROGRAM.test(label);
 }
 
-async function walk(platform: NodeJS.Platform, dir: string, depth: number, out: InstalledApp[]): Promise<void> {
+/**
+ * What a Windows shortcut starts, or null when it cannot be read. Electron's
+ * own reader, which reads what the shortcut stores and does not resolve it
+ * (resolving can wait on a network share); only real on Windows.
+ */
+function shortcutTarget(path: string): string | null {
+    try {
+        const target = shell.readShortcutLink(path).target;
+        return target && /\.exe$/i.test(target) ? target : null;
+    } catch {
+        return null;
+    }
+}
+
+/** What an Internet shortcut opens (`steam://rungameid/570`), so the store's own row and it are one program. */
+async function internetShortcutTarget(path: string): Promise<string | null> {
+    const info = await stat(path).catch(() => null);
+    if (!info || info.size > 64 * 1024) return null;
+    return readFile(path, "utf8").then(programs.urlShortcutTarget, () => null);
+}
+
+async function walk(platform: NodeJS.Platform, dir: string, depth: number, out: InstalledApp[], maxDepth = MAX_DEPTH): Promise<void> {
     if (out.length >= MAX_APPS) return;
     const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
@@ -82,48 +206,115 @@ async function walk(platform: NodeJS.Platform, dir: string, depth: number, out: 
             continue;
         }
         if (entry.isDirectory()) {
-            if (depth < MAX_DEPTH) await walk(platform, path, depth + 1, out);
+            if (depth < maxDepth) await walk(platform, path, depth + 1, out, maxDepth);
             continue;
         }
-        if (!/\.(lnk|url)$/i.test(entry.name)) continue;
-        const label = entry.name.replace(/\.(lnk|url)$/i, "");
+        if (!/\.(lnk|url|appref-ms)$/i.test(entry.name)) continue;
+        const label = entry.name.replace(/\.(lnk|url|appref-ms)$/i, "");
         if (!isProgramShortcut(label)) continue;
-        out.push({ label, path });
+        if (/\.lnk$/i.test(entry.name)) {
+            const target = shortcutTarget(path);
+            out.push(target ? { label, path, target, aliases: programs.exeAliases(target) } : { label, path });
+        } else if (/\.url$/i.test(entry.name)) {
+            const target = await internetShortcutTarget(path);
+            out.push(target ? { label, path, target } : { label, path });
+        } else {
+            out.push({ label, path });
+        }
     }
+}
+
+const files: programs.ProgramFiles = {
+    exists: (path) => stat(path).then((info) => info.isFile(), () => false),
+    exes: async (folder) => {
+        const entries = await readdir(folder, { withFileTypes: true }).catch(() => []);
+        return entries.filter((entry) => entry.isFile() && /\.exe$/i.test(entry.name)).slice(0, 200).map((entry) => join(folder, entry.name));
+    },
+    describe: exeDescription
+};
+
+/** What only the registry knows on Windows: `App Paths`, then uninstall entries. */
+async function registryPrograms(): Promise<[programs.FoundProgram[], programs.FoundProgram[]]> {
+    const [appPaths, uninstall] = await Promise.all([programs.readHives(programs.APP_PATHS_HIVES, regQuery), programs.readHives(programs.UNINSTALL_HIVES, regQuery)]);
+    return Promise.all([programs.appPathPrograms(appPaths, files, process.env).catch(() => []), programs.uninstallPrograms(uninstall, files, process.env).catch(() => [])]);
 }
 
 async function read(platform: NodeJS.Platform): Promise<Listing> {
-    const out: InstalledApp[] = [];
-    for (const root of roots(platform)) await walk(platform, root, 0, out);
-    const stores = platform === "win32" ? await storeApps().catch(() => []) : [];
-    // A game with a Start menu shortcut is listed once, by its shortcut.
-    out.push(...stores);
-    const seen = new Set<string>();
-    const apps = out
-        .filter((app) => {
-            const key = app.label.toLowerCase();
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-        })
-        .slice(0, MAX_APPS);
-    const games = stores.flatMap((app) => (app.folder ? [{ name: app.label, folder: app.folder, ...(app.store ? { store: app.store } : {}) }] : []));
-    return { apps, games };
+    const menu: InstalledApp[] = [];
+    for (const root of roots(platform)) await walk(platform, root, 0, menu);
+    const desktop: InstalledApp[] = [];
+    if (platform === "win32") for (const root of programs.desktopFolders(userDesktop(), process.env)) await walk(platform, root, 0, desktop, 0);
+    const [stores, [appPaths, uninstall]] = platform === "win32"
+        ? await Promise.all([storeApps().catch(() => []), registryPrograms().catch((): [programs.FoundProgram[], programs.FoundProgram[]] => [[], []])])
+        : [[], [[], []] as [programs.FoundProgram[], programs.FoundProgram[]]];
+    const packaged = stores.filter((store) => store.launch.kind === "packaged");
+    const games = stores.filter((store) => store.launch.kind !== "packaged");
+    const apps = programs.mergePrograms<InstalledApp>([packaged, menu, desktop, games, appPaths, uninstall], MAX_APPS);
+    const storeGames = stores.flatMap((store) => (store.folder ? [{ name: store.label, folder: store.folder, ...(store.store ? { store: store.store } : {}) }] : []));
+    return { apps, games: storeGames };
 }
 
-/** The installed apps: the last listing straight away, read again behind it when stale. */
-export function installedApps(platform: NodeJS.Platform = process.platform): readonly InstalledApp[] {
-    if ((!cached || Date.now() - cached.at > FRESH_MS) && !reading) {
-        started = true;
-        reading = read(platform)
-            .then((listing) => {
-                cached = { at: Date.now(), ...listing };
-                return listing;
-            })
-            .finally(() => {
-                reading = null;
+function refresh(platform: NodeJS.Platform): void {
+    if (reading) return;
+    started = true;
+    watchFolders(platform);
+    reading = read(platform)
+        .then((listing) => {
+            cached = { at: Date.now(), ...listing };
+            void saveIndex(cached);
+            return listing;
+        })
+        .finally(() => {
+            reading = null;
+        });
+}
+
+let watchers: FSWatcher[] | null = null;
+let settle: NodeJS.Timeout | null = null;
+let firstChange = 0;
+
+/**
+ * When to read a watched folder again after a change: `settle` after the last
+ * change, but no later than `max` after the first one, so an installer that
+ * writes for a minute is read once it is done and a stream of changes cannot
+ * put the read off forever. Pure, for the tests.
+ */
+export function settleDelay(now: number, first: number, settleMs = WATCH_SETTLE_MS, maxMs = WATCH_MAX_MS): number {
+    return Math.max(0, Math.min(settleMs, first + maxMs - now));
+}
+
+/** Watch where shortcuts appear - the Start menu, both Desktops, per-user installs - and read again once a change settles. */
+function watchFolders(platform: NodeJS.Platform): void {
+    if (watchers || (platform !== "win32" && platform !== "darwin")) return;
+    watchers = [];
+    const folders = platform === "win32"
+        ? [...roots(platform), ...programs.desktopFolders(userDesktop(), process.env), ...(process.env.LOCALAPPDATA ? [join(process.env.LOCALAPPDATA, "Programs")] : [])]
+        : roots(platform);
+    for (const folder of folders) {
+        try {
+            const watcher = watch(folder, { recursive: true, persistent: false }, (_event, name) => {
+                if (name && !/\.(lnk|url|appref-ms|exe|app)$/i.test(String(name))) return;
+                const now = Date.now();
+                if (!settle) firstChange = now;
+                else clearTimeout(settle);
+                settle = setTimeout(() => {
+                    settle = null;
+                    refresh(platform);
+                }, settleDelay(now, firstChange));
+                settle.unref?.();
             });
+            watcher.on("error", () => watcher.close());
+            watchers.push(watcher);
+        } catch {
+            // Missing or not watchable: the next open reads it anyway.
+        }
     }
+}
+
+/** The installed apps: the last listing straight away (from disk after a restart), read again behind it when stale. */
+export function installedApps(platform: NodeJS.Platform = process.platform): readonly InstalledApp[] {
+    loadIndex();
+    if (!cached || Date.now() - cached.at > FRESH_MS) refresh(platform);
     return cached?.apps ?? [];
 }
 
@@ -135,13 +326,15 @@ export async function installedAppsRead(platform: NodeJS.Platform = process.plat
 
 /**
  * The installed store games and their folders from the last listing, for the
- * game watcher, which asks on every look: answered from memory, never read
- * again for it. The one exception is the first ask when the launcher never
- * listed anything (switched off, say), which starts one listing; after that it
- * is kept fresh by the launcher being opened.
+ * game watcher, which asks on every look: answered from memory. It starts a
+ * listing only when none was ever started (the launcher switched off, say) or
+ * the last one is older than `MAX_AGE_MS`.
  */
 export function installedGames(platform: NodeJS.Platform = process.platform): readonly StoreGame[] {
-    if (!started && platform === "win32") installedApps(platform);
+    if (platform === "win32") {
+        loadIndex();
+        if (!started || !cached || Date.now() - cached.at > MAX_AGE_MS) refresh(platform);
+    }
     return cached?.games ?? [];
 }
 
@@ -180,7 +373,7 @@ export function openListedApp(path: string): boolean {
             return true;
         case "exe":
             if (!/\.exe$/i.test(launch.path)) return false;
-            start(launch.path, [], launch.cwd);
+            start(launch.path, launch.args ?? [], launch.cwd);
             return true;
     }
 }
