@@ -1691,7 +1691,8 @@ function CodeThread({
     // message from the person - counted, so a repeat of an earlier line is not
     // mistaken for this one.
     const said = thread?.entries.filter((entry) => entry.role === "user").length ?? 0;
-    const [sent, setSent] = useState<{ text: string; said: number } | null>(null);
+    // `during`: sent while a turn ran, whose steps stay open under it.
+    const [sent, setSent] = useState<{ text: string; said: number; during: boolean } | null>(null);
     const pending = sent !== null && said <= sent.said;
     useEffect(() => {
         if (sent !== null && !pending) setSent(null);
@@ -1713,7 +1714,7 @@ function CodeThread({
         if (prompt.length > PROMPT_MAX) return setError(t("code.pick.tooLong"));
         setError(null);
         setInfo(null);
-        setSent({ text, said });
+        setSent({ text, said, during: thread?.session.live === true && thread.session.state === "working" });
         setReply("");
         if (carried.length > 0) setPicks([]);
         startTransition(() => {
@@ -2390,7 +2391,11 @@ function CodeThread({
                                 <Work
                                     key={`${block.entries[0]?.at}-${index}`}
                                     messageId={`code:${sessionId}:${index}`}
-                                    streaming={turning && !pending && index === blocks.length - 1}
+                                    // A message sent mid-turn leaves the running steps
+                                    // open; one sent after it does not reopen the last.
+                                    streaming={
+                                        turning && (!pending || sent?.during === true) && index === blocks.length - 1
+                                    }
                                     current={currentStep(block.entries)}
                                     tools={block.entries.length}
                                     failed={block.entries.filter((entry) => entry.step?.state === "failed").length}
