@@ -209,12 +209,14 @@ jobs:
           # Windows runners' 16G, and far more than macOS's 7G. Building one job
           # at a time to keep them apart serialised the other ~90 test binaries
           # too (19 min on Linux). Instead the build runs in two steps: first
-          # everything except the app package's own targets, at full width -
-          # only the library is large there - then the rest, where the harness
-          # is the one large process, two at a time (one on macOS). On Linux a
-          # larger swap file is the safety net, not the plan, and a sampler
-          # reports memory every 15 s because a runner killed for memory leaves
-          # no trace of its own.
+          # everything except the app package's own targets, at full width,
+          # then the rest one job at a time. Excluding the app package changes
+          # feature resolution, so the second step rebuilds the app's library
+          # next to its harness rather than reusing the first step's: at two
+          # jobs they overlapped (~10G + ~7G) and one Linux runner swapped
+          # itself out of contact with GitHub. On Linux a larger swap file is
+          # the safety net, not the plan, and a sampler reports memory every
+          # 15 s because a runner killed for memory leaves no trace of its own.
           if [ "${{ matrix.os }}" = "linux" ]; then
             sudo fallocate -l 12G /mnt/polaris-swap && sudo chmod 600 /mnt/polaris-swap \
               && sudo mkswap /mnt/polaris-swap >/dev/null && sudo swapon /mnt/polaris-swap || true
@@ -253,11 +255,7 @@ jobs:
           # `cargo nextest` builds through `cargo test --no-run` with the same
           # profile and features, so nothing built here is built again below.
           cargo test --no-run --workspace --locked --exclude serve-wasm --exclude polaris-terminal
-          if [ "${{ matrix.os }}" = "macos" ]; then
-            export CARGO_BUILD_JOBS=1
-          else
-            export CARGO_BUILD_JOBS=2
-          fi
+          export CARGO_BUILD_JOBS=1
           cargo nextest run --workspace --locked --no-fail-fast \
             --exclude serve-wasm \
             -E "$filter"
