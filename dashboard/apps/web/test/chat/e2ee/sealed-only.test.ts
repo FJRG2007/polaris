@@ -7,13 +7,16 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ groups: new Set<string>() }));
+const state = vi.hoisted(() => ({ groups: new Set<string>(), cut: new Set<string>() }));
 
 vi.mock("@polaris/db", () => ({
     Prisma: { DbNull: null },
     prisma: {
         mlsGroup: {
             count: async ({ where }: { where: { channelId: string } }) => (state.groups.has(where.channelId) ? 1 : 0)
+        },
+        chatMigration: {
+            count: async ({ where }: { where: { channelId: string; state: string } }) => (where.state === "cut" && state.cut.has(where.channelId) ? 1 : 0)
         }
     }
 }));
@@ -28,6 +31,7 @@ const PLAIN = "plain-channel";
 describe("sealed only", () => {
     beforeEach(() => {
         state.groups = new Set([SEALED]);
+        state.cut = new Set();
         process.env.POLARIS_INTERNAL_CHAT_E2EE = "1";
     });
     afterEach(() => {
@@ -39,6 +43,12 @@ describe("sealed only", () => {
         await expect(refusePlainIfSealed(SEALED)).rejects.toMatchObject({ message: expect.any(String) });
         const refusal = await refusePlainIfSealed(SEALED).catch((caught: unknown) => caught);
         expect(JSON.stringify(refusal)).toContain("errors.sealedOnly");
+    });
+
+    it("refuses a plain write into a conversation the migration cut before any group exists", async () => {
+        state.cut = new Set([PLAIN]);
+        expect(await conversationSealed(PLAIN)).toBe(true);
+        await expect(refusePlainIfSealed(PLAIN)).rejects.toBeInstanceOf(ChatRuleError);
     });
 
     it("takes a plain write into a conversation that has no group", async () => {

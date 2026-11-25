@@ -1602,6 +1602,8 @@ export async function remove(
             await tx.chatReaction.deleteMany({ where: { messageId } });
             // The answers and their votes cascade from this one row.
             await tx.chatPoll.deleteMany({ where: { messageId } });
+            // The rollback copy of a migrated message's words goes with them.
+            await tx.chatMigrationRollback.deleteMany({ where: { messageId } });
             await tx.chatMessage.update({
                 where: { id: messageId },
                 // A pin on a line that no longer says anything is a bar above

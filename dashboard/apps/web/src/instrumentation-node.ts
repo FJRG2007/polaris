@@ -151,6 +151,28 @@ export async function registerNode(): Promise<void> {
         startPendingScans();
     }).catch((error) => console.error("polaris: could not start waiting scans:", error));
 
+    // Existing conversations' plain history, sealed by the server a conversation
+    // at a time (docs/chat-e2ee-mls.md, "Migration of existing chats"). A no-op
+    // while sealed chat is off or there is no backup from the last day; one
+    // process only, so two dashboards never seal the same conversation at once.
+    void whenAlone(async () => {
+        const { runLegacyMigration } = await import("./lib/chat/e2ee/legacy-migration");
+        let running = false;
+        const pass = async () => {
+            if (running) return;
+            running = true;
+            try {
+                await runLegacyMigration();
+            } catch (error) {
+                console.error("polaris: the chat history migration pass failed:", error);
+            } finally {
+                running = false;
+            }
+        };
+        void pass();
+        setInterval(() => void pass(), 10 * 60 * 1000).unref();
+    }).catch((error) => console.error("polaris: could not start the chat history migration:", error));
+
     // The key the media server signs with, minted here rather than by the
     // installer: .env is only ever written by a script and an installed Polaris
     // is only ever updated from a button, so a key that had to appear there is a

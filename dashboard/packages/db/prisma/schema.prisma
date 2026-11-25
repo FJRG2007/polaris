@@ -10912,6 +10912,7 @@ model ChatChannel {
     avatar   ChatChannelAvatar?
     members  ChatChannelMember[]
     messages ChatMessage[]
+    migration ChatMigration?
     meetings Meeting[]
     scheduled ChatScheduledMessage[]
     uploads  ChatUpload[]
@@ -11271,6 +11272,7 @@ model ChatMessage {
     reminders   ChatReminder[]
     linkFlags   ChatMessageLinkFlag[]
     edits       ChatMessageEdit[]
+    migrationRollback ChatMigrationRollback[]
     reports     ChatReport[]
     polarCalls  PolarChatCall[]
     hiddenFor   ChatMessageHidden[]
@@ -19344,6 +19346,52 @@ model MlsGroupEvent {
 
     @@index([channelId, seq])
     @@index([recipient, seq])
+}
+
+// Where an existing conversation's plain history is on its way to sealed
+// (docs/chat-e2ee-mls.md, "Migration of existing chats"; proposal 8): one row
+// per conversation the migrator has looked at. `state` is pending | converting
+// | cut | failed. `cut` is sealed only: its messages were sealed under a
+// one-time history key for the legacy epoch, verified, and their plain text
+// moved to `ChatMigrationRollback`. `reason` says why one is pending or failed
+// (noAccountKey, noMembers, mismatch). `signKey` is the public half of the
+// one-time Ed25519 key that signed the sealed history.
+model ChatMigration {
+    channelId String    @id @db.Uuid
+    state     String    @default("pending")
+    reason    String?
+    sealed    Int       @default(0)
+    signKey   Bytes?
+    cutAt     DateTime?
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+    @@index([state])
+}
+
+// The plain text a cut conversation's rows held, kept for the 30-day rollback
+// (proposal 13, decision 4) and nothing else: no screen and no API reads it.
+// `kind` is message (body and translation of a ChatMessage) or edit (body of a
+// ChatMessageEdit), and `messageId` the message either belongs to, so deleting
+// the message deletes its copy. Deleted by the purge once the rollback window
+// closes.
+model ChatMigrationRollback {
+    id          String   @db.Uuid
+    kind        String
+    messageId   String   @db.Uuid
+    channelId   String   @db.Uuid
+    body        String
+    translation Json?
+    createdAt   DateTime @default(now())
+
+    message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@id([kind, id])
+    @@index([messageId])
+    @@index([channelId])
+    @@index([createdAt])
 }
 
 // The conversation's history key for one epoch, sealed to one account's key

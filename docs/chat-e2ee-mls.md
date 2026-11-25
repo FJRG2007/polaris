@@ -403,10 +403,10 @@ share of the work, not of the code.
 | # | Gap | Blocks default-on? | Done |
 | --- | --- | --- | --- |
 | 1 | **Real-browser run of the sealed flows.** The text flows passed end to end against a production build on 2026-11-24 (see the note under this table). Also passed in a browser (2026-11-24, round 18): the launcher's Chat search finding a sealed message by its words on the sender's and the reader's browser; a webhook posting over HTTP into a sealed group (204, stored sealed under the given name, opened by both members, `?wait=true` answered); two tabs of one browser sending in turn and at once, every message opened by the other side - which showed the tabs fighting over the device, now fixed ("Every tab of a browser shares its device"; the fix itself is unit-tested and not yet re-run in a browser). Not yet: the chat panel's own search, the "Polar in this chat" switch (the driver did not reach it through the info panel), Polar's Approve and Cancel (needs a provider). | Yes | ~65% |
-| 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). A page loaded before sealed chat was on is told to reload instead (`errors.sealedOnlyReload`, see "Sealed only"). Left: the per-conversation state the migration (row 5) needs to switch a conversation to sealed-only before its group exists. | Yes | ~75% |
+| 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). A page loaded before sealed chat was on is told to reload instead (`errors.sealedOnlyReload`, see "Sealed only"). A conversation the migration cut is sealed only before any browser has made its group (`conversationSealed` reads `ChatMigration`). Left: a sealed form for editing an old plain message in a sealed conversation. | Yes | ~85% |
 | 3 | **Message kinds that are still plain.** Attachments (file bytes and names), voice notes, polls, scheduled messages, forum post titles, server-side translations, link cards. Each needs a sealed form (proposal 10b for files: encrypted in the browser, the key inside the sealed message). Until then a sealed conversation leaks whatever is sent as one of these. | Yes | ~15% (text, edits, replies, threads, Polar, webhooks are sealed) |
 | 4 | **Default-on switch.** `chatE2eeEnabled()` reads `=== "1"`. Default-on has to be on with nothing set and keep an env kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md). | Yes | 0% (one line, last) |
-| 5 | **Migration of existing chats** (proposal 8): nothing is built - no per-conversation state table, no server-side migrator sealing legacy history under `HK(c, legacy)`, no backup gate, no M3 verification, no cut-over, no purge of the plain columns, no admin progress line. Today an existing conversation becomes sealed only from the next message a sealed browser sends; everything before stays plain. | Yes (owner: every existing chat migrated) | 0% |
+| 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback` for the 30-day rollback), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Left: the admin progress line (`migrationProgress()` exists, no screen yet), rollback (restore from `ChatMigrationRollback`), the purge after 30 days (decision 4), attachments/polls/system rows (row 3), members with no account key yet getting the legacy key later (needs `ORK` or a member device re-sealing it), a "history before [date]" label. | Yes (owner: every existing chat migrated) | ~45% |
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
 | 7 | **Key transparency** (proposal 4.6): `AccountKeyVerifier` has no log behind it, so a server could hand out a substitute account key. Safety numbers and key-change notices are not built. | Yes, for "government-grade" | 0% |
 | 8 | **Device hygiene**: a signed-out browser's leaf stays in each group until someone removes it; inactive-device removal (decision 7) and the "new device added" notice are not built. | Yes, for post-compromise security | ~10% |
@@ -416,7 +416,7 @@ share of the work, not of the code.
 | 12 | **Large channels**: steady-state commit size with a filled tree is unmeasured (phase 0); batched adds and removes for 10,000-member channels are not built. | For big spaces | ~20% |
 
 Rough overall to "on by default, every existing chat migrated, recoverable":
-about 35%. Text messaging between people on the web, with edits, Polar and
+about 40%. Text messaging between people on the web, with edits, Polar and
 webhooks, is built and covered by tests against the real MLS binding; the
 migration, the plain-write cut, the other message kinds, `ORK` and
 transparency are the bulk of what is left.
@@ -441,6 +441,51 @@ missing at build time) ships sealed chat switched on but unable to open a
 device - every send stays "not sent yet" in the outbox, and nothing is sent in
 the clear instead. CI sets `POLARIS_CORE_RS_REQUIRED=1`, so a published image
 always carries it.
+
+## Migration of existing chats (built 2026-11-25)
+
+`lib/chat/e2ee/legacy-migration.ts`, run by the dashboard every 10 minutes
+(`instrumentation-node.ts`, one process via `whenAlone`). Nothing runs while
+sealed chat is off, or while there is no available backup of Polaris's own
+database (`ProtectedResource` kind `polaris-database`) from the last 24 hours
+(proposal 8.5). Per conversation with plain text messages:
+
+1. `HK(c, legacy)` and a one-time Ed25519 key are made in memory. `HK` is sealed
+   to every member account key (`ChatHistoryKey`, epoch `LEGACY_EPOCH` =
+   2^63-1, above any epoch an MLS group reaches) before anything is sealed
+   under it. Nobody with an account key: `pending` / `noAccountKey`.
+2. Every `kind = "text"` row with words and no device seal is sealed exactly as
+   a browser seals one: same content (`encodeSealedContent`, with its
+   translation), `messageId` its `clientKey` (set to the row id when it had
+   none), sender leaf 0, device `migration`, signed by the one-time key. Its
+   edit history is revisions 0..n-1, the message revision n. Readers open these
+   with no change (`openStored` checks the row's signature key and fetches
+   the account envelope for the epoch).
+3. M3: every row is opened again with `HK` and compared with its plain text; a
+   row edited meanwhile is sealed again; a version that does not open to its
+   text, or text a reader could not open, leaves the conversation `failed`,
+   exactly as it was.
+4. Cut: state `cut` (from then `conversationSealed` refuses plain writes), then
+   each row's text is moved to `ChatMigrationRollback` and emptied in one
+   transaction, guarded on the text still being what was verified. Rows that
+   raced the cut are sealed in up to five catch-up rounds; any left are
+   logged and recorded as `reason = stragglers`.
+5. `HK` is zeroed. A cut is never repeated: the key is gone.
+
+Resumable: any state but `cut` clears what an earlier run sealed (those rows
+still hold their text) and the legacy envelopes, then starts over. Deleting a
+message deletes its rollback copy; deleting a conversation deletes its state
+and copies (foreign keys, migration `20281130000000_chat_legacy_migration`).
+
+Verified: unit tests (`test/chat/e2ee/legacy-migration.test.ts`: the seal
+verifies and opens with the reader's checks, bindings, envelope to an account
+key) and one run against a real PostgreSQL 17 with every migration applied: a
+crashed half-done run resumed, two messages and one edit sealed, verified and
+cut, envelopes for both members, the history opened with a member's account
+key and every signature checked, the rollback copy holding the three texts,
+plain writes refused, a second run changing nothing, and the state and copies
+gone with the conversation. Not exercised: a running dashboard doing it on its
+timer, a large instance (throughput unmeasured).
 
 ## Sealed only (built 2026-11-24)
 

@@ -12,8 +12,16 @@
 import { prisma } from "@polaris/db";
 import { chatE2eeEnabled } from "./flag";
 
-/** Whether a conversation is sealed: sealed chat is on and its MLS group exists. */
+/**
+ * Whether a conversation is sealed: sealed chat is on, and its MLS group exists
+ * or the migration cut it (its history sealed, `legacy-migration.ts`) - a cut
+ * conversation is sealed only before any browser has made its group.
+ */
 export async function conversationSealed(channelId: string): Promise<boolean> {
     if (!chatE2eeEnabled()) return false;
-    return (await prisma.mlsGroup.count({ where: { channelId }, take: 1 })) > 0;
+    const [group, cut] = await Promise.all([
+        prisma.mlsGroup.count({ where: { channelId }, take: 1 }),
+        prisma.chatMigration.count({ where: { channelId, state: "cut" }, take: 1 })
+    ]);
+    return group + cut > 0;
 }
