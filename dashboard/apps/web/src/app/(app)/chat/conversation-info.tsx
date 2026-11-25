@@ -40,6 +40,8 @@ import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PolarMemberRow } from "./polar-member-row";
+import { SafetyNumberView } from "./safety-number";
+import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import { useTypingIn } from "./typing-everywhere";
 import { useState, type ReactNode } from "react";
 import { blockPersonAction, unblockPersonAction } from "@/app/(app)/account/privacy/actions";
@@ -66,6 +68,7 @@ import {
     Search,
     Settings2,
     ShieldCheck,
+    KeyRound,
     ShieldOff,
     Star,
     Timer,
@@ -117,7 +120,7 @@ export interface ConversationInfoEntries {
 export type InfoLayout = "page" | "panel";
 
 /** The chooser standing in for the page, or the page itself. */
-type View = "main" | "mute" | "notify" | "vanish" | "privacy" | "media";
+type View = "main" | "mute" | "notify" | "vanish" | "privacy" | "media" | "safety";
 
 export function ConversationInfo({
     channel,
@@ -374,6 +377,15 @@ function InfoBody({
         );
     }
 
+    // A one-to-one conversation only: in a group each pair compares its own number (design 4.6).
+    const safetyPeer = direct && sealedChatActive() ? (channel.others[0] ?? null) : null;
+    if (view === "safety" && safetyPeer) {
+        return shell(
+            t("info.safetyNumber"),
+            <SafetyNumberView channelId={channel.id} peerId={safetyPeer.id} peerName={safetyPeer.name} />
+        );
+    }
+
     if (view === "media") {
         return shell(t("info.media"), <SharedMediaAll media={media} wide={layout === "page"} />);
     }
@@ -575,6 +587,14 @@ function InfoBody({
                         label={t("chatPrivacy.linkPreviews")}
                         checked={vanishRules.linkPreviews}
                         onChange={entries.vanish.onLinkPreviews}
+                    />
+                ) : null}
+                {safetyPeer ? (
+                    <SettingRow
+                        icon={<KeyRound />}
+                        label={t("info.safetyNumber")}
+                        value=""
+                        onClick={() => setView("safety")}
                     />
                 ) : null}
                 {entries.onTranslation && (

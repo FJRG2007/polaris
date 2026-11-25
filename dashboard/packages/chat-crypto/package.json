@@ -45,13 +45,17 @@
             "types": "./dist/platform-store.d.ts",
             "import": "./dist/platform-store.js"
         },
+        "./safety-number": {
+            "types": "./dist/safety-number.d.ts",
+            "import": "./dist/safety-number.js"
+        },
         "./opaque-server": {
             "types": "./dist/opaque-server.d.ts",
             "import": "./dist/opaque-server.js"
         }
     },
     "scripts": {
-        "build": "tsup src/account-key.ts src/locks.ts src/device-lock.ts src/password-lock.ts src/passkey-lock.ts src/hybrid-envelope.ts src/message-content.ts src/file-content.ts src/opaque-server.ts src/qr-approval.ts src/platform-store.ts --format esm --dts --clean",
+        "build": "tsup src/account-key.ts src/locks.ts src/device-lock.ts src/password-lock.ts src/passkey-lock.ts src/hybrid-envelope.ts src/message-content.ts src/file-content.ts src/opaque-server.ts src/qr-approval.ts src/platform-store.ts src/safety-number.ts --format esm --dts --clean",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
