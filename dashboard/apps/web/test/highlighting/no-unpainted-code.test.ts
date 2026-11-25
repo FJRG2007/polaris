@@ -33,6 +33,7 @@ const PLAIN_PRE: Record<string, string> = {
     "apps/web/src/app/(app)/apps/servers/edge-panel.tsx": "an edge repair log",
     "apps/web/src/app/(app)/drive/viewer/text-editor.tsx": "a plain text file with find marks",
     "apps/web/src/app/(app)/mail-server/[id]/overview-tab.tsx": "a setup log",
+    "apps/web/src/components/polar/code-steps-view.tsx": "a tool step's output in Polar Code, a log with no grammar",
     "apps/web/src/app/(app)/telemetry/event-detail.tsx": "stack frames painted per line by the highlighter, and a non-JSON body",
     "apps/web/src/app/vs/[id]/send-reader.tsx": "a shared plain text",
     "apps/web/src/components/code-surface.tsx": "the highlighter itself",
