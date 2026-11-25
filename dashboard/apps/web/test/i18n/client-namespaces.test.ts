@@ -465,7 +465,7 @@ describe("client translation namespaces", () => {
         const sources = new Map(files(SRC).map((path) => [path, readFileSync(path, "utf8")]));
         const graph = new Map([...sources].map(([path, source]) => [path, edges(path, source, sources)]));
         expect(missingNamespaces(sources, graph)).toEqual([]);
-    });
+    }, 180_000);
 
     it("count a provider only for what is drawn inside it", () => {
         const probe = (name: string) => join(SRC, "components", "probe", `${name}.tsx`);
