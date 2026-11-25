@@ -93,6 +93,7 @@ export const findingInput = z.object({ findingId: id });
 export const quarantineInput = z.object({ quarantineId: id, op: z.enum(["restore", "delete"]) });
 
 export const updatesInput = z.object({ targetId: id, enabled: z.boolean() });
+export const restartInput = z.object({ targetId: id, schedule: z.boolean() });
 
 /** How often a server is scanned by itself; 0 is never. */
 export const SCHEDULE_HOURS = [0, 6, 12, 24, 168] as const;

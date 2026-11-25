@@ -375,7 +375,13 @@ export function sbomSpec(volume: string): ComposeSpec {
 /* Host-level work                                                             */
 /* -------------------------------------------------------------------------- */
 
-export type HostAction = "audit" | "updates-status" | "updates-on" | "updates-off";
+export type HostAction =
+    | "audit"
+    | "updates-status"
+    | "updates-on"
+    | "updates-off"
+    | "reboot-schedule"
+    | "reboot-cancel";
 
 /** The hardening audit, run against the host's root mounted read-only. */
 export const AUDIT_SCRIPT =
@@ -385,9 +391,14 @@ const DISTRO = '. /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"';
 
 /** The automatic security updates switch, run inside the host's root. */
 export const UPDATES_SCRIPTS: Readonly<Record<Exclude<HostAction, "audit">, string>> = {
-    "updates-status": `${DISTRO}; if command -v apt-get >/dev/null 2>&1; then if grep -qs 'Unattended-Upgrade "1"' /etc/apt/apt.conf.d/20auto-upgrades && dpkg -s unattended-upgrades >/dev/null 2>&1; then echo POLARIS_UPDATES=on; else echo POLARIS_UPDATES=off; fi; elif command -v dnf >/dev/null 2>&1; then if systemctl is-enabled dnf-automatic.timer >/dev/null 2>&1; then echo POLARIS_UPDATES=on; else echo POLARIS_UPDATES=off; fi; else echo POLARIS_UPDATES=unsupported; fi`,
-    "updates-on": `${DISTRO}; if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; nice -n 10 apt-get update -qq >/dev/null && nice -n 10 apt-get install -y -qq unattended-upgrades >/dev/null && printf 'APT::Periodic::Update-Package-Lists "1";\\nAPT::Periodic::Unattended-Upgrade "1";\\n' > /etc/apt/apt.conf.d/20auto-upgrades && echo POLARIS_UPDATES=on; elif command -v dnf >/dev/null 2>&1; then nice -n 10 dnf install -y -q dnf-automatic >/dev/null && sed -i -e 's/^upgrade_type *=.*/upgrade_type = security/' -e 's/^apply_updates *=.*/apply_updates = yes/' /etc/dnf/automatic.conf && systemctl enable --now dnf-automatic.timer >/dev/null 2>&1 && echo POLARIS_UPDATES=on; else echo POLARIS_UPDATES=unsupported; fi`,
-    "updates-off": `${DISTRO}; if command -v apt-get >/dev/null 2>&1; then printf 'APT::Periodic::Update-Package-Lists "0";\\nAPT::Periodic::Unattended-Upgrade "0";\\n' > /etc/apt/apt.conf.d/20auto-upgrades && echo POLARIS_UPDATES=off; elif command -v dnf >/dev/null 2>&1; then systemctl disable --now dnf-automatic.timer >/dev/null 2>&1; echo POLARIS_UPDATES=off; else echo POLARIS_UPDATES=unsupported; fi`
+    "updates-status": `${DISTRO}; if command -v apt-get >/dev/null 2>&1; then if grep -qs 'Unattended-Upgrade "1"' /etc/apt/apt.conf.d/20auto-upgrades && dpkg -s unattended-upgrades >/dev/null 2>&1; then echo POLARIS_UPDATES=on; else echo POLARIS_UPDATES=off; fi; echo "POLARIS_PENDING=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | grep -c '^Inst ')"; echo "POLARIS_SECURITY=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | grep '^Inst ' | grep -ci security)"; [ -f /var/run/reboot-required ] && echo POLARIS_REBOOT=required; elif command -v dnf >/dev/null 2>&1; then if systemctl is-enabled dnf-automatic.timer >/dev/null 2>&1; then echo POLARIS_UPDATES=on; else echo POLARIS_UPDATES=off; fi; echo "POLARIS_PENDING=$(dnf -q -C check-update 2>/dev/null | grep -c '^[[:alnum:]]')"; echo "POLARIS_SECURITY=$(dnf -q -C check-update --security 2>/dev/null | grep -c '^[[:alnum:]]')"; command -v needs-restarting >/dev/null 2>&1 && { needs-restarting -r >/dev/null 2>&1 || echo POLARIS_REBOOT=required; }; else echo POLARIS_UPDATES=unsupported; fi; [ -f /run/systemd/shutdown/scheduled ] && echo "POLARIS_REBOOT_AT=$(sed -n 's/^USEC=//p' /run/systemd/shutdown/scheduled)"; true`,
+    "updates-on": `${DISTRO}; if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; nice -n 10 apt-get update -qq >/dev/null && nice -n 10 apt-get install -y -qq unattended-upgrades >/dev/null && printf 'APT::Periodic::Update-Package-Lists "1";\\nAPT::Periodic::Unattended-Upgrade "1";\\n' > /etc/apt/apt.conf.d/20auto-upgrades && mkdir -p /etc/systemd/system/apt-daily-upgrade.timer.d && printf '[Timer]\\nOnCalendar=\\nOnCalendar=*-*-* 04:00\\nRandomizedDelaySec=30m\\n' > /etc/systemd/system/apt-daily-upgrade.timer.d/polaris.conf && { systemctl daemon-reload >/dev/null 2>&1 || true; } && echo POLARIS_UPDATES=on; elif command -v dnf >/dev/null 2>&1; then nice -n 10 dnf install -y -q dnf-automatic >/dev/null && sed -i -e 's/^upgrade_type *=.*/upgrade_type = security/' -e 's/^apply_updates *=.*/apply_updates = yes/' /etc/dnf/automatic.conf && mkdir -p /etc/systemd/system/dnf-automatic.timer.d && printf '[Timer]\\nOnCalendar=\\nOnCalendar=*-*-* 04:00\\nRandomizedDelaySec=30m\\n' > /etc/systemd/system/dnf-automatic.timer.d/polaris.conf && { systemctl daemon-reload >/dev/null 2>&1 || true; } && systemctl enable --now dnf-automatic.timer >/dev/null 2>&1 && echo POLARIS_UPDATES=on; else echo POLARIS_UPDATES=unsupported; fi`,
+    "updates-off": `${DISTRO}; if command -v apt-get >/dev/null 2>&1; then printf 'APT::Periodic::Update-Package-Lists "0";\\nAPT::Periodic::Unattended-Upgrade "0";\\n' > /etc/apt/apt.conf.d/20auto-upgrades && echo POLARIS_UPDATES=off; elif command -v dnf >/dev/null 2>&1; then systemctl disable --now dnf-automatic.timer >/dev/null 2>&1; echo POLARIS_UPDATES=off; else echo POLARIS_UPDATES=unsupported; fi`,
+
+    // Only when the host says a restart is pending; systemd announces it to every
+    // session on the machine and can still be cancelled until it happens.
+    "reboot-schedule": `${DISTRO}; if [ -f /var/run/reboot-required ] || { command -v needs-restarting >/dev/null 2>&1 && ! needs-restarting -r >/dev/null 2>&1; }; then shutdown -r 04:30 'Polaris: restarting at 04:30 to finish security updates' >/dev/null 2>&1 && echo POLARIS_REBOOT=scheduled; else echo POLARIS_REBOOT=none; fi; [ -f /run/systemd/shutdown/scheduled ] && echo "POLARIS_REBOOT_AT=$(sed -n 's/^USEC=//p' /run/systemd/shutdown/scheduled)"; true`,
+    "reboot-cancel": `${DISTRO}; shutdown -c 'Polaris: the restart was cancelled' >/dev/null 2>&1; echo POLARIS_REBOOT=cancelled`
 };
 
 /** The container a host action runs in. One name, so two can never overlap. */

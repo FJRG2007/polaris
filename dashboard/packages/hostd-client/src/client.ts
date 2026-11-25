@@ -247,13 +247,22 @@ export class HostdClient {
      * Run one of the daemon's fixed host security actions to the end: the
      * hardening audit or the automatic security updates switch. Null from a
      * daemon that predates the call, "busy" while another is running, "timeout"
-     * when it ran too long and the daemon stopped it.
+     * when it ran too long and the daemon stopped it. A daemon from before the
+     * restart actions refuses their name as a bad request, which is the same
+     * "predates the call".
      */
     public async hostSecurity(
-        action: "audit" | "updates-status" | "updates-on" | "updates-off"
+        action:
+            | "audit"
+            | "updates-status"
+            | "updates-on"
+            | "updates-off"
+            | "reboot-schedule"
+            | "reboot-cancel"
     ): Promise<{ exitCode: number; output: string } | "busy" | "timeout" | null> {
         const response = await this.call("POST", "/v1/host/security", JSON.stringify({ action }));
         if (response.status === 404) return null;
+        if (response.status === 400 && action.startsWith("reboot-")) return null;
         if (response.status === 409) return "busy";
         if (response.status === 504) return "timeout";
         if (response.status !== 200) {

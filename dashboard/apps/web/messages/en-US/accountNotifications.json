@@ -434,6 +434,10 @@
             "label": "A serious vulnerability in a running image",
             "description": "A scan found a new critical or high vulnerability in an image one of your servers runs."
         },
+        "securityUpdates": {
+            "label": "A server's security updates",
+            "description": "Polaris turned automatic security updates on for a server, or a server needs a restart to finish them."
+        },
         "placesAlert": {
             "label": "An alert you wrote went off",
             "description": "Something one of your alerts asked about happened."

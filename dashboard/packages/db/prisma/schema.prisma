@@ -17014,6 +17014,20 @@ model SecuritySetting {
     updates     String    @default("unknown")
     updatesAt   DateTime?
     distro      String?
+    // What a person last set the switch to ("on" | "off") and when; null means
+    // nobody ever chose, which is the only case Polaris turns updates on itself.
+    updatesChoice   String?
+    updatesChosenAt DateTime?
+    // When Polaris turned updates on by itself, once per server.
+    updatesArmedAt DateTime?
+    // Packages waiting, and how many of them are security fixes, as last read.
+    pending        Int?
+    securityPending Int?
+    // none | required | scheduled
+    reboot         String    @default("none")
+    rebootAt       DateTime?
+    // The owner was told a restart is needed; cleared once it is not.
+    rebootNotifiedAt DateTime?
     updatedAt   DateTime  @updatedAt
 
     target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)

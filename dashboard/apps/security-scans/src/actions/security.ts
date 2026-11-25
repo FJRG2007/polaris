@@ -170,6 +170,15 @@ export async function updatesStatusAction(input: unknown) {
     return run(async () => (await service()).automaticUpdates(parsed.data.targetId));
 }
 
+export async function restartAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.restartInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () =>
+        (await service()).scheduleRestart(parsed.data.targetId, parsed.data.schedule)
+    );
+}
+
 export async function scheduleAction(input: unknown) {
     await requireSecurityUser();
     const parsed = schemas.scheduleInput.safeParse(input);

@@ -14,7 +14,8 @@ import * as specs from "../model/specs";
 import * as images from "../model/images";
 import * as history from "../model/history";
 import * as subjects from "../model/subjects";
-import { findingsHome, OWN_IMAGES_PATH, ownImagesHref } from "../model/landing";
+import * as updatesModel from "../model/updates";
+import { findingsHome, OWN_IMAGES_PATH, ownImagesHref, SECURITY_PATH } from "../model/landing";
 import { gunzip, gzip } from "node:zlib";
 import { Readable } from "node:stream";
 import { decodeLockfiles, dependencyContext, shortHash } from "@polaris/deploy";
@@ -233,7 +234,16 @@ export async function listServers(request: {
             local: t.kind === "local",
             everyHours: t.securitySetting?.everyHours ?? 0,
             updates: t.securitySetting?.updates ?? "unknown",
-            distro: t.securitySetting?.distro ?? null
+            distro: t.securitySetting?.distro ?? null,
+            pending: t.securitySetting?.pending ?? null,
+            securityPending: t.securitySetting?.securityPending ?? null,
+            reboot: (t.securitySetting?.reboot ?? "none") as parse.RebootState,
+            // Turned off by a person: Polaris leaves it off, and says so.
+            offByHandAt:
+                t.securitySetting?.updatesChoice === "off"
+                    ? (t.securitySetting.updatesChosenAt?.toISOString() ?? null)
+                    : null,
+            rebootAt: t.securitySetting?.rebootAt?.toISOString() ?? null
         })),
         next: targets.length > request.limit && last ? encodeCursor(last.name, last.id) : null
     };
@@ -1239,21 +1249,152 @@ async function targetRow(targetId: string): Promise<ScanTarget> {
     return target;
 }
 
-/** Read the host's automatic updates state, or switch it, and record it. */
-export async function automaticUpdates(targetId: string, enabled?: boolean) {
+/** Read the host's automatic updates state, or switch it, and record it. A
+ *  person's switch is recorded as their choice; Polaris's own never is. */
+export async function automaticUpdates(
+    targetId: string,
+    enabled?: boolean,
+    by: "person" | "polaris" = "person"
+) {
     const target = await targetRow(targetId);
     const action =
         enabled === undefined ? "updates-status" : enabled ? "updates-on" : "updates-off";
     const { output } = await runHostAction(target, action);
     const report = parse.parseUpdatesLog(output);
     if (!report.state) throw new ScanFailure("updatesFailed");
-    const data = { updates: report.state, distro: report.distro, updatesAt: new Date() };
+    const data = {
+        updates: report.state,
+        distro: report.distro,
+        updatesAt: new Date(),
+        // A person's choice outranks the pass that turns updates on by default,
+        // and an "off" stays off for good.
+        ...(enabled === undefined || by === "polaris"
+            ? {}
+            : { updatesChoice: enabled ? "on" : "off", updatesChosenAt: new Date() }),
+        ...waitingData(report)
+    };
     await prisma.securitySetting.upsert({
         where: { targetId },
         create: { targetId, ...data },
         update: data
     });
     return report;
+}
+
+/** What a status read says the server is waiting on, as columns. A switch or an
+ *  older daemon's copy of the script says nothing about it, so nothing changes. */
+function waitingData(report: parse.UpdatesReport) {
+    return {
+        ...(report.pending === null ? {} : { pending: report.pending }),
+        ...(report.securityPending === null ? {} : { securityPending: report.securityPending }),
+        ...(report.reboot === null
+            ? {}
+            : {
+                  reboot: report.reboot,
+                  rebootAt: report.rebootAt,
+                  ...(report.reboot === "none" ? { rebootNotifiedAt: null } : {})
+              })
+    };
+}
+
+/** Schedule the restart that finishes the updates (04:30, the host's own time, and
+ *  only when the host says one is pending), or call a scheduled one off. */
+export async function scheduleRestart(targetId: string, schedule: boolean) {
+    const target = await targetRow(targetId);
+    const { output } = await runHostAction(target, schedule ? "reboot-schedule" : "reboot-cancel");
+    if (!/POLARIS_REBOOT=/.test(output)) throw new ScanFailure("updatesFailed");
+    return automaticUpdates(targetId);
+}
+
+/** How often each server's updates are read again by themselves. */
+const UPDATES_READ_MS = 12 * 60 * 60_000;
+/** How long a server that could not be reached waits before the next attempt. */
+const UPDATES_RETRY_MS = 6 * 60 * 60_000;
+const updatesTriedAt = new Map<string, number>();
+
+/**
+ * Polaris keeps the servers it manages patched: every server gets automatic
+ * security updates turned on once, unless somebody already chose for it, and is
+ * read again twice a day for what it is waiting on. A restart the updates need
+ * is announced to the owner once, with the button that schedules it; Polaris
+ * never restarts a machine nobody asked it to. A few servers per pass, so a
+ * fleet is reached over a few minutes rather than all at once.
+ */
+async function planUpdates(now: Date): Promise<void> {
+    const targets = await prisma.deployTarget.findMany({
+        where: {
+            OR: [
+                { securitySetting: null },
+                { securitySetting: { updatesChoice: null, updatesArmedAt: null } },
+                { securitySetting: { updatesAt: null } },
+                {
+                    securitySetting: {
+                        updatesAt: { lt: new Date(now.getTime() - UPDATES_READ_MS) }
+                    }
+                }
+            ]
+        },
+        select: { id: true, ownerId: true, name: true, securitySetting: true },
+        orderBy: { id: "asc" },
+        take: 50
+    });
+    let reached = 0;
+    for (const target of targets) {
+        if (reached >= 3) break;
+        if (now.getTime() - (updatesTriedAt.get(target.id) ?? 0) < UPDATES_RETRY_MS) continue;
+        updatesTriedAt.set(target.id, now.getTime());
+        reached += 1;
+        const setting = target.securitySetting;
+        try {
+            if (updatesModel.armsUpdates(setting)) {
+                const report = await automaticUpdates(target.id, true, "polaris");
+                await prisma.securitySetting.update({
+                    where: { targetId: target.id },
+                    // Armed by Polaris, once; not anybody's choice.
+                    data: { updatesArmedAt: now }
+                });
+                if (report.state === "on" && setting?.updates !== "on") {
+                    await announceUpdates(target, "armed");
+                }
+            }
+            const report = await automaticUpdates(target.id);
+            updatesTriedAt.delete(target.id);
+            const fresh = await prisma.securitySetting.findUnique({
+                where: { targetId: target.id },
+                select: { rebootNotifiedAt: true }
+            });
+            if (report.reboot === "required" && !fresh?.rebootNotifiedAt) {
+                await announceUpdates(target, "restart");
+                await prisma.securitySetting.update({
+                    where: { targetId: target.id },
+                    data: { rebootNotifiedAt: now }
+                });
+            }
+        } catch (caught) {
+            // Unreachable, the limited edition, an old daemon: tried again later.
+            if (!(caught instanceof ScanFailure)) {
+                console.error("polaris: security updates pass failed for a server:", caught);
+            }
+        }
+    }
+}
+
+async function announceUpdates(
+    target: { id: string; ownerId: string; name: string },
+    what: "armed" | "restart"
+): Promise<void> {
+    const t = await securityTFor(target.ownerId);
+    await host.notificationsDispatch
+        .notify({
+            userId: target.ownerId,
+            event: "security.updates",
+            level: what === "restart" ? "warning" : "info",
+            title: t(`updates.${what}.title`, { server: target.name }),
+            body: t(`updates.${what}.body`, { server: target.name }),
+            href: `${SECURITY_PATH}?${new URLSearchParams({ target: target.id })}`,
+            metadata: { targetId: target.id }
+        })
+        .catch(() => undefined);
 }
 
 export async function setSchedule(targetId: string, everyHours: number): Promise<void> {
@@ -1525,6 +1666,9 @@ export async function tick(): Promise<void> {
         data: { state: "failed", finishedAt: now, error: "lost" }
     });
     await planSchedules(now);
+    await planUpdates(now).catch((caught) =>
+        console.error("polaris: security scans could not plan updates:", caught)
+    );
     await planNewImages(now);
     await planServerImages(now).catch((caught) =>
         console.error("polaris: security scans could not plan server images:", caught)

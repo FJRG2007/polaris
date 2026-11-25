@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import * as parse from "@polaris-app/security-scans/src/model/parse";
 import * as specs from "@polaris-app/security-scans/src/model/specs";
 import * as schemas from "@polaris-app/security-scans/src/model/schemas";
+import * as updatesModel from "@polaris-app/security-scans/src/model/updates";
 
 const HASH_A = "a".repeat(64);
 const HASH_B = "b".repeat(64);
@@ -122,13 +123,70 @@ describe("automatic updates output", () => {
     it("reads the state and the distribution", () => {
         expect(parse.parseUpdatesLog("POLARIS_DISTRO id=debian\nPOLARIS_UPDATES=on\n")).toEqual({
             state: "on",
-            distro: "debian"
+            distro: "debian",
+            pending: null,
+            securityPending: null,
+            // An older daemon's script says nothing about restarts: unknown, not "none".
+            reboot: null,
+            rebootAt: null
         });
-        expect(parse.parseUpdatesLog("POLARIS_DISTRO id=\nPOLARIS_UPDATES=unsupported")).toEqual({
-            state: "unsupported",
-            distro: null
-        });
+        expect(
+            parse.parseUpdatesLog("POLARIS_DISTRO id=\nPOLARIS_UPDATES=unsupported")
+        ).toMatchObject({ state: "unsupported", distro: null });
         expect(parse.parseUpdatesLog("garbage").state).toBeNull();
+    });
+
+    it("reads what the server is waiting on and a restart it needs", () => {
+        const waiting = parse.parseUpdatesLog(
+            "POLARIS_DISTRO id=ubuntu\nPOLARIS_UPDATES=on\nPOLARIS_PENDING=130\nPOLARIS_SECURITY=4\nPOLARIS_REBOOT=required\n"
+        );
+        expect(waiting).toMatchObject({ pending: 130, securityPending: 4, reboot: "required" });
+        const clean = parse.parseUpdatesLog("POLARIS_UPDATES=off\nPOLARIS_PENDING=0\nPOLARIS_SECURITY=0\n");
+        expect(clean.reboot).toBe("none");
+    });
+
+    it("reads a scheduled restart from systemd's microseconds", () => {
+        const at = parse.parseUpdatesLog(
+            "POLARIS_UPDATES=on\nPOLARIS_PENDING=0\nPOLARIS_SECURITY=0\nPOLARIS_REBOOT=required\nPOLARIS_REBOOT_AT=1764214200000000\n"
+        );
+        expect(at.reboot).toBe("scheduled");
+        expect(at.rebootAt?.getTime()).toBe(1764214200000);
+        // A cancelled one is gone from systemd, so nothing is scheduled.
+        expect(parse.parseUpdatesLog("POLARIS_REBOOT=cancelled").reboot).toBe("none");
+    });
+
+    it("restarts only when the host says one is pending, and sets the nightly window", () => {
+        const schedule = specs.UPDATES_SCRIPTS["reboot-schedule"];
+        expect(schedule).toContain("if [ -f /var/run/reboot-required ]");
+        expect(schedule).toContain("shutdown -r 04:30 'Polaris:");
+        expect(specs.hostArgv("reboot-cancel").at(-1)).toContain("shutdown -c");
+        expect(specs.hostArgv("reboot-schedule")).toContain("--privileged");
+        const on = specs.UPDATES_SCRIPTS["updates-on"];
+        expect(on).toContain("apt-daily-upgrade.timer.d/polaris.conf");
+        expect(on).toContain("dnf-automatic.timer.d/polaris.conf");
+        // The scripts reach the daemon and SSH as one line.
+        for (const script of Object.values(specs.UPDATES_SCRIPTS)) {
+            expect(/[\u0000-\u001f\u007f]/.test(script)).toBe(false);
+        }
+    });
+});
+
+describe("updates on by default", () => {
+    it("turns them on once, only for a server nobody chose for", () => {
+        expect(updatesModel.armsUpdates(null)).toBe(true);
+        expect(updatesModel.armsUpdates({ updatesChoice: null, updatesArmedAt: null })).toBe(true);
+        // Already armed once: a later "off" by the host itself is not undone either.
+        expect(
+            updatesModel.armsUpdates({ updatesChoice: null, updatesArmedAt: new Date(0) })
+        ).toBe(false);
+    });
+
+    it("keeps a person's off for good, before or after Polaris armed it", () => {
+        expect(updatesModel.armsUpdates({ updatesChoice: "off", updatesArmedAt: null })).toBe(false);
+        expect(
+            updatesModel.armsUpdates({ updatesChoice: "off", updatesArmedAt: new Date(0) })
+        ).toBe(false);
+        expect(updatesModel.armsUpdates({ updatesChoice: "on", updatesArmedAt: null })).toBe(false);
     });
 });
 

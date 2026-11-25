@@ -561,6 +561,41 @@ function FilesPanel({
     );
 }
 
+interface Waiting {
+    readonly pending: number | null;
+    readonly securityPending: number | null;
+    readonly reboot: "none" | "required" | "scheduled";
+    readonly rebootAt: string | null;
+}
+
+function waitingOf(server: Server | null): Waiting {
+    return {
+        pending: server?.pending ?? null,
+        securityPending: server?.securityPending ?? null,
+        reboot: server?.reboot ?? "none",
+        rebootAt: server?.rebootAt ?? null
+    };
+}
+
+/** A fresh read, keeping what it did not say (an older daemon's script). */
+function waitingFrom(
+    report: {
+        pending: number | null;
+        securityPending: number | null;
+        reboot: Waiting["reboot"] | null;
+        rebootAt: Date | string | null;
+    },
+    last: Waiting
+): Waiting {
+    if (report.reboot === null) return last;
+    return {
+        pending: report.pending,
+        securityPending: report.securityPending,
+        reboot: report.reboot,
+        rebootAt: report.rebootAt ? new Date(report.rebootAt).toISOString() : null
+    };
+}
+
 function HostPanel({
     t,
     targetId,
@@ -575,10 +610,23 @@ function HostPanel({
     const [updates, setUpdates] = useState(server?.updates ?? "unknown");
     const [every, setEvery] = useState(server?.everyHours ?? 0);
     const [pending, setPending] = useState(false);
+    const [waiting, setWaiting] = useState(() => waitingOf(server));
+    const [offByHandAt, setOffByHandAt] = useState(server?.offByHandAt ?? null);
     useEffect(() => {
         setUpdates(server?.updates ?? "unknown");
         setEvery(server?.everyHours ?? 0);
+        setWaiting(waitingOf(server));
+        setOffByHandAt(server?.offByHandAt ?? null);
     }, [server]);
+    const restart = async (schedule: boolean) => {
+        setPending(true);
+        await submit(async () => {
+            const result = await actions.restartAction({ targetId, schedule });
+            if (result.ok) setWaiting((last) => waitingFrom(result.data, last));
+            return result;
+        });
+        setPending(false);
+    };
     const switchUpdates = async (enabled: boolean) => {
         const previous = updates;
         setUpdates(enabled ? "on" : "off");
@@ -586,7 +634,10 @@ function HostPanel({
         await submit(async () => {
             const result = await actions.updatesAction({ targetId, enabled });
             if (!result.ok) setUpdates(previous);
-            else setUpdates(result.data.state ?? previous);
+            else {
+                setUpdates(result.data.state ?? previous);
+                setOffByHandAt(enabled ? null : new Date().toISOString());
+            }
             return result;
         });
         setPending(false);
@@ -628,6 +679,8 @@ function HostPanel({
                                     const result = await actions.updatesStatusAction({ targetId });
                                     if (result.ok && result.data.state)
                                         setUpdates(result.data.state);
+                                    if (result.ok)
+                                        setWaiting((last) => waitingFrom(result.data, last));
                                     return result;
                                 });
                                 setPending(false);
@@ -643,6 +696,45 @@ function HostPanel({
                         />
                     </div>
                 </div>
+                {updates === "off" && offByHandAt ? (
+                    <p className="text-sm text-muted-foreground">
+                        {t("host.offByHand", { when: new Date(offByHandAt).toLocaleString() })}
+                    </p>
+                ) : null}
+                {updates === "on" || waiting.pending !== null || waiting.reboot !== "none" ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="min-w-0 text-muted-foreground">
+                            {waiting.pending === null
+                                ? t("host.window")
+                                : t("host.waiting", {
+                                      count: waiting.pending,
+                                      security: waiting.securityPending ?? 0
+                                  })}
+                            {waiting.reboot === "required" ? ` ${t("host.restartNeeded")}` : ""}
+                            {waiting.reboot === "scheduled"
+                                ? ` ${t("host.restartAt", {
+                                      when: waiting.rebootAt
+                                          ? new Date(waiting.rebootAt).toLocaleString()
+                                          : "04:30"
+                                  })}`
+                                : ""}
+                        </span>
+                        {waiting.reboot === "required" ? (
+                            <Button size="sm" disabled={pending} onClick={() => void restart(true)}>
+                                {t("host.restart")}
+                            </Button>
+                        ) : waiting.reboot === "scheduled" ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={pending}
+                                onClick={() => void restart(false)}
+                            >
+                                {t("host.restartCancel")}
+                            </Button>
+                        ) : null}
+                    </div>
+                ) : null}
                 <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span className="min-w-0">
                         <span className="block font-medium">{t("host.schedule")}</span>

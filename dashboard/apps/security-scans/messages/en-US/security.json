@@ -68,7 +68,14 @@
             "12": "Every 12 hours",
             "24": "Every day",
             "168": "Every week"
-        }
+        },
+        "window": "Updates install each night around 04:00, the server's own time.",
+        "waiting": "{count, plural, =0 {Up to date.} one {# update waiting ({security} security).} other {# updates waiting ({security} security).}}",
+        "restartNeeded": "A restart is needed to finish them.",
+        "restartAt": "Restarts at {when}.",
+        "restart": "Restart at 04:30",
+        "restartCancel": "Cancel restart",
+        "offByHand": "Turned off by hand on {when}. Polaris leaves them off."
     },
     "images": {
         "hint": "Checks each app's running image for known vulnerabilities and lists its software.",
@@ -215,5 +222,15 @@
         "updateImage": "Run a newer version of this image, then scan again.",
         "updateDeps": "Update these dependencies in the repository, then deploy again.",
         "wait": "No fix is out yet. Scan again later to see if one has been released."
+    },
+    "updates": {
+        "armed": {
+            "title": "Automatic security updates are on for {server}",
+            "body": "Polaris turned them on. They install each night around 04:00; you can turn them off in Security scans."
+        },
+        "restart": {
+            "title": "{server} needs a restart",
+            "body": "Security updates are installed and need a restart to finish. Schedule it for 04:30 from Security scans."
+        }
     }
 }

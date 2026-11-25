@@ -51,7 +51,12 @@ describe("listServers", () => {
                 local: true,
                 everyHours: 6,
                 updates: "none",
-                distro: "debian"
+                distro: "debian",
+                pending: null,
+                securityPending: null,
+                reboot: "none",
+                offByHandAt: null,
+                rebootAt: null
             }
         ]);
         expect(page.next).not.toBeNull();

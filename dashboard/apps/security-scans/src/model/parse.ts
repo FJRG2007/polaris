@@ -268,16 +268,48 @@ export function auditArea(test: string): string {
 
 export type UpdatesState = "on" | "off" | "unsupported";
 
+export type RebootState = "none" | "required" | "scheduled";
+
 export interface UpdatesReport {
     readonly state: UpdatesState | null;
     readonly distro: string | null;
+    /** Packages waiting, and the security fixes among them; null when not read. */
+    readonly pending: number | null;
+    readonly securityPending: number | null;
+    /** Null when the script did not say (an older daemon's copy of it). */
+    readonly reboot: RebootState | null;
+    readonly rebootAt: Date | null;
+}
+
+function count(text: string, name: string): number | null {
+    const match = new RegExp(`${name}=(\\d{1,7})\\b`).exec(text);
+    return match ? Number(match[1]) : null;
 }
 
 export function parseUpdatesLog(text: string): UpdatesReport {
     const state = /POLARIS_UPDATES=(on|off|unsupported)/.exec(text)?.[1] as
         UpdatesState | undefined;
     const distro = /POLARIS_DISTRO id=([A-Za-z0-9._-]*)/.exec(text)?.[1];
-    return { state: state ?? null, distro: distro ? distro : null };
+    // systemd keeps a scheduled shutdown as microseconds since the epoch.
+    const usec = /POLARIS_REBOOT_AT=(\d{13,17})\b/.exec(text)?.[1];
+    const rebootAt = usec ? new Date(Math.floor(Number(usec) / 1000)) : null;
+    const said = /POLARIS_REBOOT=(required|scheduled|none|cancelled)/.exec(text)?.[1];
+    const pending = count(text, "POLARIS_PENDING");
+    const reboot: RebootState | null = rebootAt
+        ? "scheduled"
+        : said === "required" || said === "scheduled"
+          ? "required"
+          : said || pending !== null
+            ? "none"
+            : null;
+    return {
+        state: state ?? null,
+        distro: distro ? distro : null,
+        pending,
+        securityPending: count(text, "POLARIS_SECURITY"),
+        reboot,
+        rebootAt
+    };
 }
 
 /* -------------------------------------------------------------------------- */
