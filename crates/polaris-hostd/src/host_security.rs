@@ -89,7 +89,9 @@ pub fn valid_package(name: &str) -> bool {
     !bytes.is_empty()
         && bytes.len() <= 128
         && bytes[0].is_ascii_alphanumeric()
-        && bytes.iter().all(|b| b.is_ascii_alphanumeric() || b"+._-".contains(b))
+        && bytes
+            .iter()
+            .all(|b| b.is_ascii_alphanumeric() || b"+._-".contains(b))
 }
 
 /// A package version as dpkg and rpm write them (epoch, `~` and `:` included).
@@ -98,7 +100,9 @@ pub fn valid_version(version: &str) -> bool {
     !bytes.is_empty()
         && bytes.len() <= 128
         && bytes[0].is_ascii_alphanumeric()
-        && bytes.iter().all(|b| b.is_ascii_alphanumeric() || b".+~:_-".contains(b))
+        && bytes
+            .iter()
+            .all(|b| b.is_ascii_alphanumeric() || b".+~:_-".contains(b))
 }
 
 impl HostSecurityRequest {
@@ -124,7 +128,13 @@ impl HostSecurityRequest {
             (Some(version), true) if valid_version(version) => {}
             _ => return None,
         }
-        Some(self.package.iter().chain(self.version.iter()).cloned().collect())
+        Some(
+            self.package
+                .iter()
+                .chain(self.version.iter())
+                .cloned()
+                .collect(),
+        )
     }
 }
 
@@ -694,7 +704,9 @@ mod tests {
     }
 
     fn request(json: &str) -> Option<Vec<String>> {
-        serde_json::from_str::<HostSecurityRequest>(json).ok()?.arguments()
+        serde_json::from_str::<HostSecurityRequest>(json)
+            .ok()?
+            .arguments()
     }
 
     #[test]
@@ -707,7 +719,10 @@ mod tests {
             request(
                 r#"{"action":"package-rollback","package":"libssl3","version":"1:3.0.15-1~deb12u1"}"#
             ),
-            Some(vec!["libssl3".to_string(), "1:3.0.15-1~deb12u1".to_string()])
+            Some(vec![
+                "libssl3".to_string(),
+                "1:3.0.15-1~deb12u1".to_string()
+            ])
         );
         assert_eq!(request(r#"{"action":"updates-on"}"#), Some(vec![]));
         for bad in [
@@ -736,7 +751,10 @@ mod tests {
             HostAction::PackageRollback,
             &["libssl3".to_string(), "3.0.15-1".to_string()],
         );
-        let script = args.iter().position(|a| a == PACKAGE_ROLLBACK_SCRIPT).unwrap();
+        let script = args
+            .iter()
+            .position(|a| a == PACKAGE_ROLLBACK_SCRIPT)
+            .unwrap();
         assert_eq!(&args[script - 1], "-c");
         assert_eq!(&args[script + 1..], ["polaris", "libssl3", "3.0.15-1"]);
         for script in [
