@@ -36,7 +36,8 @@ export function messageGallery(
     openUrl: string
 ): ViewedImage[] {
     return message.attachments
-        .filter((file) => file.inline)
+        // A sealed picture not opened on this page yet has nothing to show.
+        .filter((file) => file.inline && attachmentImageUrl(file) !== "")
         .filter((file) => !(file.spoiler || coverAll) || attachmentImageUrl(file) === openUrl)
         .map((file) => ({
             url: attachmentImageUrl(file),

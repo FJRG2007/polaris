@@ -212,3 +212,19 @@ describe("the server's sealed send with files", () => {
         expect(state.sent[0]![2]).toEqual([]);
     });
 });
+
+describe("a sealed picture in the viewer", () => {
+    it("steps only onto sealed pictures this page opened", async () => {
+        const { messageGallery } = await import("@/app/(app)/chat/message-gallery");
+        const picture = { id: FILE_ID, name: "a.png", inline: true, spoiler: false, thumbhash: null, sealed: true };
+        const message = {
+            id: "m1",
+            forwardable: true,
+            attachments: [
+                { ...picture, openedUrl: "blob:opened" },
+                { ...picture, id: OTHER_ID }
+            ]
+        } as unknown as ChatMessageView;
+        expect(messageGallery(message, false, "blob:opened").map((image) => image.url)).toEqual(["blob:opened"]);
+    });
+});

@@ -221,6 +221,7 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                 parentId: body.parentId,
                 replyToId: body.replyToId,
                 ...(body.uploads ? { uploads: body.uploads } : {}),
+                ...(body.poll ? { poll: body.poll } : {}),
                 epoch: BigInt(body.epoch),
                 senderLeaf: body.senderLeaf,
                 ciphertext: bytes(body.ciphertext),

@@ -17,6 +17,7 @@ import { useComposerEmoji, type SpaceEmojiScope } from "./space-emoji";
 import { X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
+import { sendPoll } from "./send-poll";
 import * as outbox from "./outbox";
 import { withChanges } from "@/lib/chat/offline/outbox";
 import { unlockProofFor } from "./lock-session";
@@ -301,11 +302,10 @@ export function ThreadPanel({
                     // conversation is exactly where somebody asks the room to pick
                     // between the two things being argued about.
                     onPoll={async (draft: PollDraft) => {
-                        const result = await actions.createPollAction({
-                            channelId: root.channelId,
-                            ...draft,
-                            parentId: root.id
-                        });
+                        const result = await sendPoll(
+                            { channelId: root.channelId, ...draft, parentId: root.id },
+                            t("errors.pollNotSent")
+                        );
                         if (result.error) return { error: result.error };
                         await load();
                         onChanged();

@@ -21,6 +21,7 @@
  */
 
 import * as actions from "./actions";
+import { keepTexts } from "./opened-sealed";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, cn } from "@polaris/ui";
 import { useChatStream } from "./use-chat-stream";
@@ -83,10 +84,11 @@ export function PollCard({
                 if (frame.kind !== "posted" || !frame.channels.includes(message.channelId)) return;
                 if (voting.current || closed) return;
                 void actions.pollAction(message.id).then((result) => {
-                    if (result.poll && !voting.current) setShown(result.poll);
+                    // A sealed poll's answers come back without words: keep the ones its seal opened to.
+                    if (result.poll && !voting.current) setShown(keepTexts(result.poll, poll));
                 });
             },
-            [message.channelId, message.id, closed]
+            [message.channelId, message.id, closed, poll]
         )
     );
     const mayVote = canPost && !closed && !message.deleted;

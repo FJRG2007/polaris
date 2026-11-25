@@ -33,6 +33,7 @@
  * not deleted, not past their expiry, not another reader's ephemeral answer.
  */
 
+import * as core from "@polaris/core";
 import { prisma, Prisma } from "@polaris/db";
 import { can } from "@polaris/auth";
 import { claimUploads, UploadRefused } from "@/lib/chat/uploads";
@@ -58,6 +59,8 @@ export interface SealedSend {
     replyToId?: string | null;
     /** Sealed files staged for this message (`claimUploads(..., sealed)`); their keys are inside the seal. */
     uploads?: readonly string[];
+    /** A poll: its question and answers are inside the seal; the server keeps one empty answer row per answer, the rules and the votes. */
+    poll?: { options: number; multiple: boolean; hideResults: boolean; hours: number };
     epoch: bigint;
     senderLeaf: number;
     ciphertext: Uint8Array;
@@ -66,7 +69,7 @@ export interface SealedSend {
 
 /** Why a sealed message was not taken; the route answers it as a refusal. */
 export class SealedRefusal extends Error {
-    constructor(readonly reason: "unknownDevice" | "unknownGroup" | "futureEpoch" | "olderEpoch" | "staleRevision" | "notSealed" | "badSignature" | "filesRefused") {
+    constructor(readonly reason: "unknownDevice" | "unknownGroup" | "futureEpoch" | "olderEpoch" | "staleRevision" | "notSealed" | "badSignature" | "filesRefused" | "pollRefused") {
         super(`the sealed message was refused (${reason})`);
         this.name = "SealedRefusal";
     }
@@ -87,6 +90,8 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
     const signatureKey = new Uint8Array(device.signatureKey);
     if (!(await content.verifyMessageSignature(signatureKey, binding, input.ciphertext, input.signature))) throw new SealedRefusal("badSignature");
     const service = serviceKind(userId);
+    // A poll carries no files, and is asked by a person.
+    if (input.poll && (service || input.uploads?.length)) throw new SealedRefusal("pollRefused");
     if (service) {
         if (input.uploads?.length) throw new SealedRefusal("filesRefused");
         return postAsService(service, input, signatureKey);
@@ -102,7 +107,14 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
         { channelId: input.channelId, body: "", clientKey: input.clientKey, parentId: input.parentId ?? null },
         files,
         input.replyToId ? { messageId: input.replyToId, forwarded: false } : null,
-        null,
+        input.poll
+            ? {
+                  options: Array.from({ length: input.poll.options }, () => ""),
+                  multiple: input.poll.multiple,
+                  hideResults: input.poll.hideResults,
+                  closesAt: core.pollClosesAt(input.poll.hours)
+              }
+            : null,
         null,
         null,
         {

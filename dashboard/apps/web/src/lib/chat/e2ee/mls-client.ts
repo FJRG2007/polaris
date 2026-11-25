@@ -493,7 +493,14 @@ export class MlsDevice {
     async sendSealed(
         channelId: string,
         plaintext: Uint8Array,
-        options: { clientKey?: string; parentId?: string | null; replyToId?: string | null; uploads?: readonly string[] } = {}
+        options: {
+            clientKey?: string;
+            parentId?: string | null;
+            replyToId?: string | null;
+            uploads?: readonly string[];
+            /** A sealed poll: how many answers it has (their words are in the seal) and its rules. */
+            poll?: { options: number; multiple: boolean; hideResults: boolean; hours: number };
+        } = {}
     ): Promise<string> {
         this.requireGroup(channelId);
         await this.pull(channelId);
@@ -515,6 +522,7 @@ export class MlsDevice {
             parentId: options.parentId ?? null,
             replyToId: options.replyToId ?? null,
             ...(options.uploads?.length ? { uploads: [...options.uploads] } : {}),
+            ...(options.poll ? { poll: options.poll } : {}),
             epoch: epoch.toString(),
             senderLeaf: binding.senderLeaf,
             ciphertext: toText(ciphertext),

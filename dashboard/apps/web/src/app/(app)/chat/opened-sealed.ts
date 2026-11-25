@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
+import type { ChatPollView } from "@/lib/chat/polls";
 import * as sealedFiles from "@/lib/chat/e2ee/sealed-files";
 import { isInlineImage } from "@/lib/mime";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
@@ -46,11 +47,13 @@ export function withOpened(
         const content = opened(message.id, message.sealedEditedAt);
         if (!content) return message;
         changed = true;
-        if (!content.files || !message.attachments) return { ...message, body: content.body };
+        const poll = message.poll && content.poll ? openedPoll(message.poll, content.poll) : message.poll;
+        if (!content.files || !message.attachments) return { ...message, body: content.body, poll };
         const refs = new Map(content.files.map((ref) => [ref.id, ref]));
         return {
             ...message,
             body: content.body,
+            poll,
             attachments: message.attachments.map((file) => {
                 const ref = file.sealed ? refs.get(file.id) : undefined;
                 return ref ? openedFile(file, ref, fileUrl(ref.id)) : file;
@@ -58,6 +61,17 @@ export function withOpened(
         };
     });
     return changed ? out : messages;
+}
+
+/** A sealed poll's answers named from its seal, by position (the server's answer rows hold no words). */
+export function openedPoll(poll: ChatPollView, sealed: sealedChat.SealedPoll): ChatPollView {
+    return { ...poll, options: poll.options.map((option, at) => (option.text ? option : { ...option, text: sealed.options[at] ?? "" })) };
+}
+
+/** `fresh` with each answer's words taken from `drawn` where the server sent none (a sealed poll). */
+export function keepTexts(fresh: ChatPollView, drawn: ChatPollView): ChatPollView {
+    const words = new Map(drawn.options.map((option) => [option.id, option.text]));
+    return { ...fresh, options: fresh.options.map((option) => (option.text ? option : { ...option, text: words.get(option.id) ?? "" })) };
 }
 
 /** A sealed attachment drawn as what its seal says it is; `url` once its bytes opened on this page. */

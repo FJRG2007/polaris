@@ -61,11 +61,23 @@ export const sealedFileSchema = z
 
 export type SealedFileRef = z.infer<typeof sealedFileSchema>;
 
+/**
+ * A poll's answers, in the order the server keeps its answer rows (the
+ * question is the body). The server holds only how many there are, the rules
+ * and the votes, never their words.
+ */
+export const sealedPollSchema = z
+    .object({ options: z.array(z.string().trim().min(1).max(core.MAX_POLL_OPTION)).min(core.MIN_POLL_OPTIONS).max(core.MAX_POLL_OPTIONS) })
+    .strict();
+
+export type SealedPoll = z.infer<typeof sealedPollSchema>;
+
 const sealedContent = z.object({
     v: z.literal(SEALED_CONTENT_VERSION),
     body: core.chatSendSchema.shape.body,
     translation: core.chatSendSchema.shape.translation,
-    files: z.array(sealedFileSchema).min(1).max(core.CHAT_ATTACHMENT_COUNT_CEILING).optional()
+    files: z.array(sealedFileSchema).min(1).max(core.CHAT_ATTACHMENT_COUNT_CEILING).optional(),
+    poll: sealedPollSchema.optional()
 });
 
 /** What a sealed message carries inside its seal. */
@@ -75,8 +87,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
 export function encodeSealedContent(content: SealedContent): Uint8Array {
-    const { body, translation, files } = content;
-    return encoder.encode(JSON.stringify({ v: SEALED_CONTENT_VERSION, body, ...(translation ? { translation } : {}), ...(files?.length ? { files } : {}) }));
+    return encoder.encode(JSON.stringify({ v: SEALED_CONTENT_VERSION, ...contentOf(content) }));
 }
 
 /** The content of an opened message, or null when it is not one this version reads. */
@@ -84,8 +95,7 @@ export function decodeSealedContent(bytes: Uint8Array): SealedContent | null {
     try {
         const parsed = sealedContent.safeParse(JSON.parse(decoder.decode(bytes)));
         if (!parsed.success) return null;
-        const { body, translation, files } = parsed.data;
-        return { body, ...(translation ? { translation } : {}), ...(files?.length ? { files } : {}) };
+        return contentOf(parsed.data);
     } catch {
         return null;
     }
@@ -187,7 +197,12 @@ export function openedContent(id: string, editedAt?: string): SealedContent | nu
 
 /** The content to seal from a send or edit, with no empty field. */
 function contentOf(input: SealedContent): SealedContent {
-    return { body: input.body, ...(input.translation ? { translation: input.translation } : {}), ...(input.files?.length ? { files: input.files } : {}) };
+    return {
+        body: input.body,
+        ...(input.translation ? { translation: input.translation } : {}),
+        ...(input.files?.length ? { files: input.files } : {}),
+        ...(input.poll ? { poll: input.poll } : {})
+    };
 }
 
 export interface SealedSendInput extends SealedContent {
@@ -196,6 +211,8 @@ export interface SealedSendInput extends SealedContent {
     clientKey: string;
     parentId?: string | null;
     replyToId?: string | null;
+    /** With `poll`: the rules the server keeps beside its answer rows. */
+    pollRules?: { readonly multiple: boolean; readonly hideResults: boolean; readonly hours: number };
 }
 
 /** Seal and send one message; answers the stored message's id. */
@@ -207,7 +224,8 @@ export async function sendSealedMessage(input: SealedSendInput): Promise<string>
         clientKey: input.clientKey,
         parentId: input.parentId ?? null,
         replyToId: input.replyToId ?? null,
-        ...(content.files ? { uploads: content.files.map((file) => file.id) } : {})
+        ...(content.files ? { uploads: content.files.map((file) => file.id) } : {}),
+        ...(content.poll ? { poll: { options: content.poll.options.length, multiple: input.pollRules?.multiple ?? false, hideResults: input.pollRules?.hideResults ?? false, hours: input.pollRules?.hours ?? core.DEFAULT_POLL_HOURS } } : {})
     });
     keep(id, content);
     index(input.channelId, id, undefined, content);

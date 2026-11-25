@@ -19,6 +19,7 @@
  */
 
 import { useOpenedSealed } from "./opened-sealed";
+import { prefetchMedia } from "./media-download";
 import { rewritable } from "./rewritable";
 import { fittedSize, placeholderUrl } from "@/lib/chat/media-shape";
 import { VanishMark } from "./vanish-controls";
@@ -134,8 +135,8 @@ function SentFile({
     shielded?: boolean;
 }) {
     const t = useTranslations("chat");
-    // A sealed file is saved from what this page opened, never read in the viewer (it fetches the route, which holds the sealed blob).
-    const readable = file.sealed ? null : previewableAs(file.name, file.contentType);
+    // A sealed file is read and saved from what this page opened (the route holds only the sealed blob).
+    const readable = file.sealed && !file.openedUrl ? null : previewableAs(file.name, file.contentType);
     const chip =
         "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-start text-xs transition-colors hover:bg-card-hover";
 
@@ -187,7 +188,7 @@ function SentFile({
                 className={chip}
                 title={t("messageList.openNamed", { name: file.name })}
                 onClick={() =>
-                    onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at })
+                    onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at, ...(file.openedUrl ? { openedUrl: file.openedUrl } : {}) })
                 }
             >
                 {file.borrowed ? (
@@ -430,6 +431,9 @@ export function MessageList({
 }: MessageListProps) {
     // Sealed rows drawn with what this device opened them to (none while sealed chat is off).
     const messages = useOpenedSealed(listed);
+    // A sealed file's kind is known once its message opened here: the sealed blob
+    // is then kept ahead by the reader's media setting, as a plain file is.
+    useEffect(() => prefetchMedia(messages.filter((message) => message.sealed)), [messages]);
     // Every handler a row receives, held to one identity - see `useSteady`.
     const onOpenThread = useSteady(given.onOpenThread);
     const onReact = useSteady(given.onReact)!;

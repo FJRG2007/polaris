@@ -26,6 +26,7 @@ import { usePolarDrafts } from "./polar-draft";
 import { useAppCommands } from "./use-app-commands";
 import type { ViewOnceChoice } from "@/lib/chat/view-once-choice";
 import * as actions from "./actions";
+import { sendPoll } from "./send-poll";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { spokenWait } from "@/lib/chat/durations";
 import * as core from "@polaris/core";
@@ -2096,11 +2097,10 @@ export function ChannelView({
     const [locating, setLocating] = useState(false);
     const createPoll = async (draft: PollDraft): Promise<{ error?: string }> => {
         following.current = true;
-        const result = await actions.createPollAction({
-            channelId,
-            ...draft,
-            replyToId: replyingTo?.id ?? null
-        });
+        const result = await sendPoll(
+            { channelId, ...draft, replyToId: replyingTo?.id ?? null },
+            t("errors.pollNotSent")
+        );
         if (result.error) return { error: result.error };
         setReplyingTo(null);
         setCarried(null);
