@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { FONT_CLASSES } from "./fonts";
 import { readLocaleCookie } from "@/lib/i18n/cookie";
 import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
+import { resetNetworkStreak, useNetworkRetry } from "@/lib/network-retry";
 import {
     createTranslator,
     DEFAULT_LOCALE,
@@ -57,6 +58,11 @@ export default function GlobalError({
     reset: () => void;
 }) {
     const staleBuild = isStaleBuildError(error);
+    // A request that never reached the server is retried by itself first; the
+    // card below speaks only once that ran out, and then about the connection.
+    const retried = useNetworkRetry(error, reset);
+    const network = staleBuild ? "other" : retried;
+    const offline = network === "offline";
     const locale = useReaderLocale();
     // A language with only some of `common` reads English for the rest.
     const t = createTranslator(locale, mergeCatalog(enUS, COMMON[locale]) as typeof enUS, {
@@ -78,25 +84,30 @@ export default function GlobalError({
         <html lang="en" dir="ltr" className={FONT_CLASSES} suppressHydrationWarning>
             <body>
                 <div className="flex min-h-dvh items-center justify-center safe-p-6">
+                    {network === "retrying" ? null : (
                     <div className="flex max-w-md flex-col gap-4 rounded-lg border border-border bg-surface p-6">
                         <div className="flex flex-col gap-1">
                             <h1 className="text-sm font-medium">
                                 {staleBuild
                                     ? t("pages.globalError.updatedTitle")
-                                    : t("pages.globalError.brokeTitle")}
+                                    : offline
+                                      ? t("pages.globalError.offlineTitle")
+                                      : t("pages.globalError.brokeTitle")}
                             </h1>
                             <p className="text-sm text-muted-foreground">
                                 {staleBuild
                                     ? t("pages.globalError.updatedBody")
-                                    : t("pages.globalError.brokeBody")}
+                                    : offline
+                                      ? t("pages.globalError.offlineBody")
+                                      : t("pages.globalError.brokeBody")}
                             </p>
                         </div>
-                        {error.message && !staleBuild ? (
+                        {error.message && !staleBuild && !offline ? (
                             <p className="max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-md bg-muted p-3 font-mono text-xs text-muted-foreground">
                                 {error.message}
                             </p>
                         ) : null}
-                        {error.digest && !staleBuild ? (
+                        {error.digest && !staleBuild && !offline ? (
                             <p className="font-mono text-xs text-muted-foreground">
                                 {t("pages.globalError.reference", { digest: error.digest })}
                             </p>
@@ -113,7 +124,10 @@ export default function GlobalError({
                             {!staleBuild && (
                                 <button
                                     type="button"
-                                    onClick={reset}
+                                    onClick={() => {
+                                        resetNetworkStreak();
+                                        reset();
+                                    }}
                                     className="w-fit rounded-md px-4 py-2 text-sm font-medium hover:bg-muted"
                                 >
                                     {t("pages.globalError.tryAgain")}
@@ -121,6 +135,7 @@ export default function GlobalError({
                             )}
                         </div>
                     </div>
+                    )}
                 </div>
             </body>
         </html>

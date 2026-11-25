@@ -55,6 +55,8 @@
     },
     "pages": {
         "error": {
+            "offlineTitle": "Can't reach Polaris right now",
+            "offlineBody": "It'll retry as soon as the connection is back.",
             "updatedTitle": "Polaris was updated while this page was open",
             "brokeTitle": "This page stopped working",
             "updatedBody": "{surface, select, app {This window is still running the old build, and the server no longer answers it. Reloading picks up the new one; anything typed into the page is lost.} other {This tab is still running the old build, and the server no longer answers it. Reloading picks up the new one; anything typed into the page is lost.}}",
@@ -75,6 +77,8 @@
             "toOverview": "Go to the overview"
         },
         "globalError": {
+            "offlineTitle": "Can't reach Polaris right now",
+            "offlineBody": "It'll retry as soon as the connection is back.",
             "updatedTitle": "Polaris was updated while this page was open",
             "brokeTitle": "Polaris could not start this page",
             "updatedBody": "{surface, select, app {This window is still running the old build. Reload to pick up the new one.} other {This tab is still running the old build. Reload to pick up the new one.}}",
