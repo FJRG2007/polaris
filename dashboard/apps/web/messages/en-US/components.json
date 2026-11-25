@@ -1106,6 +1106,7 @@
             "named": "{app} on {name}",
             "signOutNamed": "Sign out {app} on {name}"
         },
+        "otherSessions": "Other sessions",
         "deviceGroup": {
             "unnamed": "Unnamed device",
             "expand": "Show the sessions on {device}",
