@@ -23,6 +23,7 @@ import { loadEnv } from "@polaris/config";
 import { getHostLanIp } from "@/lib/host-address";
 import { appBaseUrl } from "@/lib/domain-service";
 import { dashboardHosts } from "@/lib/domain-edge";
+import { currentLanHostname } from "@/lib/lan-hostname";
 import { challengeMessage } from "@polaris/core/instance-fallback";
 import { CredentialDecryptError, decryptSecret, encryptSecret } from "@polaris/storage";
 import {
@@ -197,16 +198,19 @@ function origin(value: string): string | null {
  * purpose - a client only sends its credential to an alternate over TLS.
  */
 export async function instanceAddresses(): Promise<string[]> {
-    const [app, hosts, lanIp] = await Promise.all([
+    const [app, hosts, lanIp, lanName] = await Promise.all([
         appBaseUrl().catch(() => null),
         dashboardHosts().catch(() => [] as string[]),
-        getHostLanIp().catch(() => null)
+        getHostLanIp().catch(() => null),
+        currentLanHostname().catch(() => null)
     ]);
     const mdns =
         process.env.POLARIS_MDNS_HOSTNAME || process.env.POLARIS_LOCAL_HOSTNAME || "polaris";
     const candidates = [
         ...(app ? [app] : []),
         ...hosts,
+        // On a public certificate, so the one a page on the public domain may ask.
+        ...(lanName ? [lanName] : []),
         `${mdns}.local`,
         "polaris.local",
         ...(lanIp ? [lanIp] : [])

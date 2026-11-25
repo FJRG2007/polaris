@@ -280,9 +280,20 @@ export function startWildcardCertRenewal(): void {
     if (started) return;
     started = true;
     const tick = (): void => {
-        void ensureWildcardCertificate().catch((error: unknown) =>
-            console.error("polaris: the wildcard certificate check failed:", error)
-        );
+        void ensureWildcardCertificate()
+            .catch((error: unknown) =>
+                console.error("polaris: the wildcard certificate check failed:", error)
+            )
+            // The LAN name is served by this certificate, so it follows each pass: the
+            // first wildcard switches it on, a lapsed one switches it off.
+            .then(async () => {
+                const [{ syncLanHostname }, { dashboardOrigin }] = await Promise.all([
+                    import("./lan-hostname"),
+                    import("./domain-edge")
+                ]);
+                await syncLanHostname(dashboardOrigin());
+            })
+            .catch(() => undefined);
     };
     setTimeout(tick, FIRST_PASS_MS).unref();
     setInterval(tick, CHECK_EVERY_MS).unref();

@@ -270,6 +270,11 @@ export async function syncDashboardRoute(): Promise<boolean> {
         await import("./tailscale/tailscale-service")
             .then((module) => module.syncTailscaleRoute())
             .catch(() => undefined);
+        // The LAN address's name under this domain rides on the same occasions, so a
+        // wildcard that arrives, or a domain that changes, reaches it without a step.
+        await import("./lan-hostname")
+            .then((module) => module.syncLanHostname(dashboardOrigin()))
+            .catch(() => undefined);
         // Its answer is this function's answer: a dashboard route written beside a
         // missing call route is an edge that serves every page and no call.
         return await syncCallServerRoute();
