@@ -15,7 +15,7 @@ vi.mock("@/components/i18n/i18n-provider", () => ({
 }));
 
 const { TerminalFindBar } = await import("@/app/(app)/apps/deploy/terminal-find-bar");
-const { isFindShortcut } = await import("@/app/(app)/apps/deploy/terminal-panel");
+const { isFindShortcut } = await import("@/app/(app)/apps/deploy/terminal-view");
 
 function fakeSearch() {
     let listener: ((results: { resultIndex: number; resultCount: number }) => void) | null = null;
