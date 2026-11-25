@@ -402,10 +402,10 @@ share of the work, not of the code.
 | 1 | **Real-browser run of the sealed flows.** The text flows passed end to end against a production build on 2026-11-24 (see the note under this table). Also passed in a browser (2026-11-24, round 18): the launcher's Chat search finding a sealed message by its words on the sender's and the reader's browser; a webhook posting over HTTP into a sealed group (204, stored sealed under the given name, opened by both members, `?wait=true` answered); two tabs of one browser sending in turn and at once, every message opened by the other side - which showed the tabs fighting over the device, now fixed ("Every tab of a browser shares its device"; the fix itself is unit-tested and not yet re-run in a browser). Not yet: the chat panel's own search, the "Polar in this chat" switch (the driver did not reach it through the info panel), Polar's Approve and Cancel (needs a provider). | Yes | ~65% |
 | 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). A page loaded before sealed chat was on is told to reload instead (`errors.sealedOnlyReload`, see "Sealed only"). A conversation the migration cut is sealed only before any browser has made its group (`conversationSealed` reads `ChatMigration`). Left: a sealed form for editing an old plain message in a sealed conversation. | Yes | ~85% |
 | 3 | **Message kinds that are still plain.** Built (2026-11-25): attachments, see "Sealed files"; polls, see "Sealed polls" (question and answers sealed; votes sealed with the tally in each browser, see "Sealed votes"; public or anonymous chosen at creation, see "Public and anonymous votes"). Left: voice notes recorded in a sealed conversation ride the sealed-file path (their length and shape are inside the seal) but are not verified in a browser; sealed reactions (proposal: "votos cifrados; recuento en el cliente"; votes done), scheduled messages, forum post titles, server-side translations, link cards, files sent to be seen once and files left in a Drive (refused in a sealed conversation, nothing sent in the clear). Until each has its sealed form a sealed conversation cannot send it. | Yes | ~52% (text, edits, replies, threads, Polar, webhooks, files - with the gallery, forum list and video stills - poll questions, answers and votes are sealed) |
-| 4 | **Default-on switch.** `chatE2eeEnabled()` reads `=== "1"`. Default-on has to be on with nothing set and keep an env kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md). | Yes | 0% (one line, last) |
+| 4 | **Default-on switch.** Built (2026-11-25): `chatE2eeEnabled()` is `chatE2eeFrom(env, CHAT_E2EE_DEFAULT_ON)` in `flag.ts` - `1` on, `0` off, anything else the default - so turning it on is changing `CHAT_E2EE_DEFAULT_ON` to `true` in a release, on with nothing set and `0` kept as the kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md); tested in `test/chat/e2ee/flag.test.ts`. Left: the flip itself (last), and a kill switch that does not lock anybody out of a conversation already sealed only (today `0` makes every sealed route answer 404). | Yes | ~40% |
 | 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback` for the 30-day rollback), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Left: the admin progress line (`migrationProgress()` exists, no screen yet), rollback (restore from `ChatMigrationRollback`), the purge after 30 days (decision 4), attachments/polls/system rows (row 3), members with no account key yet getting the legacy key later (needs `ORK` or a member device re-sealing it), a "history before [date]" label. | Yes (owner: every existing chat migrated) | ~45% |
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
-| 7 | **Key transparency** (proposal 4.6): `AccountKeyVerifier` has no log behind it, so a server could hand out a substitute account key. Safety numbers and key-change notices are not built. | Yes, for "government-grade" | 0% |
+| 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info. Left: `AccountKeyVerifier` still has no log behind it, so a server could hand out a substitute account key - the append-only key log with a signed root and inclusion and consistency checks in the browser; key-change notices in the conversation; the verified mark; scanning the other person's QR in the app. | Yes, for "government-grade" | ~15% |
 | 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody. Left: the screen for the instance limit (the `Setting` key is read, 7-90) and the organisation's own limit, the "new device added" notice on the account's other devices, a device list with revoke. | Yes, for post-compromise security | ~50% |
 | 9 | **Server features that read chat text**: whole-Polaris export/import and backups carry sealed rows but no keys; moderation reports, retention and compliance export (proposal 9), automations that read messages. Each needs its sealed answer or an explicit "not in sealed conversations". | Partly (export/import must round-trip) | ~10% |
 | 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. | No (documented limit) | ~40% |
@@ -438,6 +438,48 @@ missing at build time) ships sealed chat switched on but unable to open a
 device - every send stays "not sent yet" in the outbox, and nothing is sent in
 the clear instead. CI sets `POLARIS_CORE_RS_REQUIRED=1`, so a published image
 always carries it.
+
+## Safety numbers (built 2026-11-25)
+
+A one-to-one conversation's info has a "Safety number" row while sealed chat is
+on (`safety-number.tsx`, view `safety` of `conversation-info.tsx`): 60 digits in
+12 groups of 5, a QR of them (`polaris-safety-number:1:` followed by the
+digits) and a copy button, for the two people to compare in person or on a
+call. Nothing waits on it; it is for whoever does not want to take the server's
+word for whose key their browser seals to.
+
+- **Derivation** (`@polaris/chat-crypto/safety-number`): Signal's numeric
+  fingerprint (libsignal `rust/protocol/src/fingerprint.rs`; WhatsApp's
+  security code is the same construction). Per account: SHA-512 over a version,
+  the key, the account id and the key again, then 5,199 rounds of SHA-512 over
+  the previous digest and the key; the first 30 bytes as six big-endian 40-bit
+  numbers mod 100,000 are that account's 30 digits. The "key" is both public
+  halves of the account key (Ed25519 and X-Wing) under the package's canonical
+  length-prefixed encoding, so swapping either half changes the number; the
+  version is `0x0001`, never read as a Signal number; the two halves are ordered
+  by account id (proposal 4.6), so both sides agree without comparing digits.
+  Cross-checked against an independent Python implementation of the same steps;
+  a fixed vector in `test/safety-number.test.ts` keeps it stable across releases.
+- **Inputs**: this account's published keys (`/api/e2ee/keys` `state`) and the
+  other person's (`/api/e2ee/mls` `account-keys`, which answers only people who
+  reach the conversation) - deliberately what the server publishes, since that
+  is what a substituted key would show up in. `pairSafetyNumber()` in
+  `account-key-client.ts`; the person with no account key yet gets "has not
+  opened sealed chat yet", a failure a retry.
+- **Groups**: no number (each pair compares its own, proposal 4.6); a member's
+  number is reached from the one-to-one conversation with them.
+
+Prior art read for the rest of row 7: Signal safety numbers (above); WhatsApp
+Key Transparency, an auditable key directory (AKD, a Merkle-patricia tree of
+key versions with published epoch roots, 2023); CONIKS (Melara et al., USENIX
+Security 2015: per-user key histories in a signed Merkle prefix tree, clients
+monitoring their own entries and checking the server does not fork the tree);
+IETF KEYTRANS (draft-ietf-keytrans-architecture, -protocol). The next step
+follows them: an append-only log of account key versions (RFC 6962-style tree),
+a signed tree head, the browser checking inclusion of every key it seals to and
+consistency with the last head it saw, and each account's own devices
+monitoring its entries - which is what turns a substituted key from invisible
+into a failed check.
 
 ## Device hygiene (built 2026-11-25)
 
