@@ -12,6 +12,10 @@
  *   registration.
  * - Nothing runs on a timer except the clipboard history, on unless somebody
  *   turns it off (see `watchClipboard` for why it has to look).
+ * - A press only shows the window: what it searches (the index, the program
+ *   list) is refreshed once, shortly after it is put away (`refreshSoon`),
+ *   and its page is never throttled while hidden, so the first open after
+ *   hours idle draws as smoothly as the second.
  * - Its preload carries a handful of calls and no shared bundle.
  *
  * The window shows the dashboard's own search: it loads the instance's
@@ -40,7 +44,7 @@ import { runningPrograms } from "./game-detect";
 import { quickAnswer } from "@/shared/quick-answer";
 import type { LauncherStatus } from "@/shared/bridge";
 import { takeFocus } from "./window-front";
-import { installedApps, installedAppsRead, openListedApp } from "./launcher-apps";
+import { installedApps, installedAppsRead, listedApps, openListedApp } from "./launcher-apps";
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipEntry } from "@/shared/clipboard-history";
 import { DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator } from "@/shared/launcher-hotkey";
 import { conflictSentence, findLaunchers, likelyHolders, type FoundLauncher } from "@/shared/launcher-conflicts";
@@ -55,6 +59,9 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, power
 
 /** How long after start the hidden window is made, so it does not compete with the main window's first load. */
 export const WARM_DELAY_MS = 4_000;
+/** How long after the window is put away the index and the program list are
+ *  refreshed for the next open, so that work never runs on a press. */
+export const REFRESH_AFTER_HIDE_MS = 2_000;
 /** How long Polaris's index is used before an open asks for it again. */
 const INDEX_FRESH_MS = 60_000;
 /** The most rows of each kind, so the list stays one screen. */
@@ -80,6 +87,7 @@ export interface LauncherHost {
 let host: LauncherHost | null = null;
 let window: BrowserWindow | null = null;
 let warmTimer: NodeJS.Timeout | null = null;
+let refreshTimer: NodeJS.Timeout | null = null;
 /** Whether the window's page has drawn, so a press can show it straight away. */
 let ready = false;
 let release: (() => void) | null = null;
@@ -240,7 +248,7 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     const uses = usageScores();
     const pageKey = (page: { path: string; }) => `page:${page.path}`;
     const appKey = (app: { path: string; }) => `app:${app.path}`;
-    const addApp = (app: ReturnType<typeof installedApps>[number]) => {
+    const addApp = (app: ReturnType<typeof listedApps>[number]) => {
         add({ kind: "app", title: app.label, subtitle: app.launch && app.launch.kind !== "open" ? appSource(app.path) : "Application" }, () => void openListedApp(app.path), appKey(app));
         paths.set(String(rows.length - 1), app.icon ?? app.path);
     };
@@ -288,7 +296,7 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
                 commandKey(command)
             );
         }
-        for (const app of rankedMatches(query, installedApps().map((app) => ({ ...app, context: "" })), PER_KIND, appKey, uses)) addApp(app);
+        for (const app of rankedMatches(query, listedApps().map((app) => ({ ...app, context: "" })), PER_KIND, appKey, uses)) addApp(app);
         if (origin) {
             add({ kind: "polar", title: `Ask Polar "${query.slice(0, 120)}"`, subtitle: "Opens Polar with the question ready to send" }, () =>
                 host?.showPolaris(`/polar?new=1&prompt=${encodeURIComponent(query.slice(0, 4000))}`)
@@ -302,7 +310,7 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     } else if (!hostOnly) {
         // Nothing typed: what is used most and lately, as Raycast's root opens.
         if (origin) for (const page of byFrecency(PAGES, pageKey, uses).slice(0, 6)) addPage(page);
-        for (const app of byFrecency(installedApps(), appKey, uses).filter((app) => uses.has(appKey(app))).slice(0, 4)) addApp(app);
+        for (const app of byFrecency(listedApps(), appKey, uses).filter((app) => uses.has(appKey(app))).slice(0, 4)) addApp(app);
     }
     actions = next;
     appPaths = paths;
@@ -339,7 +347,27 @@ async function runSystemCommand(command: SystemCommand): Promise<void> {
 function hide(): void {
     if (!window || window.isDestroyed() || !window.isVisible()) return;
     window.hide();
+    // Put away by a lost focus the page did not see: it closes its panel, so
+    // the next open is a fresh one with the field focused.
+    window.webContents.send(LAUNCHER_CHANNELS.hidden);
+    refreshSoon();
     void upgradeOwnPanel(window);
+}
+
+/**
+ * Refresh what the next open searches - the index and, once stale, the
+ * program list - shortly after the window is put away, while nobody is looking
+ * at it, so a press only shows the window.
+ */
+function refreshSoon(): void {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        if (window && !window.isDestroyed() && window.isVisible()) return;
+        void refreshIndex();
+        installedApps();
+    }, REFRESH_AFTER_HIDE_MS);
+    refreshTimer.unref?.();
 }
 
 /**
@@ -445,7 +473,11 @@ function create(): BrowserWindow {
             nodeIntegration: false,
             webviewTag: false,
             navigateOnDragDrop: false,
-            spellcheck: false
+            spellcheck: false,
+            // Kept hidden for hours between presses: a throttled page would
+            // draw its first frames late and jerky on the next show, and run
+            // the panel's own close and open work only once shown.
+            backgroundThrottling: false
         }
     });
     made.setAlwaysOnTop(true, "pop-up-menu");
@@ -504,8 +536,10 @@ export function toggleLauncher(): void {
         hide();
         return;
     }
+    // The index is a quick request answered later; the program list is only
+    // read here when it never was (see `listedApps`), never refreshed on a press.
     void refreshIndex();
-    installedApps();
+    listedApps();
     // Pointed at another Polaris since the window was made: make it again for that one.
     const origin = host?.server() ?? null;
     if (window && !window.isDestroyed() && remote && remote !== origin) window.destroy();
@@ -810,5 +844,7 @@ export function stopLauncher(): void {
     clipTimer = null;
     if (warmTimer) clearTimeout(warmTimer);
     warmTimer = null;
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = null;
     if (window && !window.isDestroyed()) window.destroy();
 }

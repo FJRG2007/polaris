@@ -13,6 +13,7 @@ export const LAUNCHER_CHANNELS = {
     run: "launcher:run",
     hide: "launcher:hide",
     opened: "launcher:opened",
+    hidden: "launcher:hidden",
     clearClipboard: "launcher:clear-clipboard",
     open: "launcher:open",
     addons: "launcher:addons"
@@ -47,6 +48,8 @@ export interface PolarisLauncher {
     hide(): Promise<void>;
     clearClipboard(): Promise<void>;
     onOpened(listener: () => void): void;
+    /** The window was put away by main (it lost focus), not by the page. */
+    onHidden(listener: () => void): void;
     /** The device add-ons on this computer, as the main window's bridge answers them (the dashboard's palette only). */
     addons(): Promise<unknown>;
 }

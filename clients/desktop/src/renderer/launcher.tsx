@@ -15,6 +15,15 @@ import type { LauncherRow, LauncherRowKind, PolarisLauncher } from "@/shared/lau
 import { groupRows, searchTerms, stepActive } from "../../../../dashboard/packages/ui/src/search/search-match";
 import { AppWindow, Calculator, ClipboardList, Compass, Globe, Link, Power, Search, Sparkles, type LucideIcon } from "lucide-react";
 import { SearchGroup, SearchItem, SearchMessage, SearchOption, SearchSheet } from "../../../../dashboard/packages/ui/src/search/search-panel";
+import { KEY_GLYPHS, KeyHint, type HintKey } from "../../../../dashboard/packages/ui/src/shortcuts/key-cap";
+
+/** The footer's keys, drawn as caps as Raycast's footer draws them. */
+const MOVE_KEYS: readonly HintKey[] = [
+    { cap: KEY_GLYPHS.up, name: "Up arrow" },
+    { cap: KEY_GLYPHS.down, name: "Down arrow" }
+];
+const OPEN_KEYS: readonly HintKey[] = [{ cap: KEY_GLYPHS.enter, name: "Enter" }];
+const CLOSE_KEYS: readonly HintKey[] = [{ cap: "Esc", name: "Escape" }];
 
 declare global {
     interface Window {
@@ -128,7 +137,10 @@ function Launcher() {
             }
             footer={
                 <>
-                    <span>Up and down to move, Enter to open</span>
+                    <span className="flex min-w-0 items-center gap-3">
+                        <KeyHint keys={MOVE_KEYS} label="Move" />
+                        <KeyHint keys={OPEN_KEYS} label="Open" />
+                    </span>
                     {clips ? (
                         <button
                             type="button"
@@ -138,7 +150,7 @@ function Launcher() {
                             Clear clipboard history
                         </button>
                     ) : (
-                        <span>Esc to close</span>
+                        <KeyHint keys={CLOSE_KEYS} label="Close" />
                     )}
                 </>
             }

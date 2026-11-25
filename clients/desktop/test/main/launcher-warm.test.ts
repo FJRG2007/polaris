@@ -18,7 +18,7 @@ class FakeWindow extends EventEmitter {
         focus: vi.fn(),
         setWindowOpenHandler: vi.fn()
     });
-    constructor() {
+    constructor(readonly options: { webPreferences?: Record<string, unknown> } = {}) {
         super();
         windows.push(this);
     }
@@ -77,6 +77,7 @@ vi.mock("../../src/main/settings", () => ({
 vi.mock("../../src/main/call-hotkeys", () => ({ holdGlobalKey: vi.fn(() => () => undefined) }));
 vi.mock("../../src/main/launcher-apps", () => ({
     installedApps: vi.fn(() => []),
+    listedApps: vi.fn(() => []),
     installedAppsRead: vi.fn(() => Promise.resolve()),
     openListedApp: vi.fn(() => false)
 }));
@@ -84,6 +85,7 @@ vi.mock("../../src/main/game-detect", () => ({ runningPrograms: vi.fn(() => Prom
 vi.mock("../../src/main/open-external", () => ({ openExternal: vi.fn() }));
 
 const launcher = await import("../../src/main/launcher");
+const apps = await import("../../src/main/launcher-apps");
 
 /** The one window made, which every test here expects to exist. */
 function first(): FakeWindow {
@@ -157,5 +159,38 @@ describe("the launcher window", () => {
         expect(first().webContents.focus).toHaveBeenCalledTimes(2);
         first().emit("focus");
         expect(first().webContents.focus).toHaveBeenCalledTimes(3);
+    });
+
+    it("tells the page when it is put away by a lost focus, so the next open is fresh", async () => {
+        launcher.startLauncher({ server: () => null, showPolaris: vi.fn() });
+        await vi.advanceTimersByTimeAsync(launcher.WARM_DELAY_MS);
+        first().emit("ready-to-show");
+        launcher.toggleLauncher();
+        first().webContents.send.mockClear();
+        first().emit("blur");
+        expect(first().isVisible()).toBe(false);
+        expect(first().webContents.send).toHaveBeenCalledWith("launcher:hidden");
+        launcher.toggleLauncher();
+        expect(first().webContents.send).toHaveBeenLastCalledWith("launcher:opened");
+        expect(first().webContents.focus).toHaveBeenCalledTimes(2);
+    });
+
+    it("never reads the program list on a press, only after the window is put away", async () => {
+        launcher.startLauncher({ server: () => null, showPolaris: vi.fn() });
+        await vi.advanceTimersByTimeAsync(launcher.WARM_DELAY_MS);
+        first().emit("ready-to-show");
+        vi.mocked(apps.installedApps).mockClear();
+        launcher.toggleLauncher();
+        expect(apps.installedApps).not.toHaveBeenCalled();
+        launcher.toggleLauncher();
+        expect(apps.installedApps).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(launcher.REFRESH_AFTER_HIDE_MS);
+        expect(apps.installedApps).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps its hidden page unthrottled, so the first open after idle is not cold", async () => {
+        launcher.startLauncher({ server: () => null, showPolaris: vi.fn() });
+        await vi.advanceTimersByTimeAsync(launcher.WARM_DELAY_MS);
+        expect(first().options.webPreferences?.backgroundThrottling).toBe(false);
     });
 });

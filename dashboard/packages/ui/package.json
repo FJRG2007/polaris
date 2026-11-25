@@ -207,6 +207,10 @@
             "types": "./src/lib/ui-strings.tsx",
             "import": "./src/lib/ui-strings.tsx"
         },
+        "./key-cap": {
+            "types": "./src/shortcuts/key-cap.tsx",
+            "import": "./src/shortcuts/key-cap.tsx"
+        },
         "./search-panel": {
             "types": "./src/search/search-panel.tsx",
             "import": "./src/search/search-panel.tsx"

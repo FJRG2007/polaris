@@ -23,6 +23,7 @@ import * as core from "@polaris/core";
 import { MenuShortcut } from "../components/context-menu";
 import { useKeyNames } from "../lib/key-names";
 import { applePlatform, formatShortcut } from "../lib/shortcut";
+import { KeyCap } from "./key-cap";
 import {
     Fragment,
     useEffect,
@@ -246,19 +247,7 @@ function useApple(): boolean {
     );
 }
 
-/** One key cap, drawn the way the diagram editor's help draws one. */
-export function KeyCap({ children, className }: { children: ReactNode; className?: string }) {
-    return (
-        <kbd
-            className={cn(
-                "inline-flex min-w-6 items-center justify-center rounded-md bg-primary/15 px-2 py-1.5 font-sans text-[11px] font-medium leading-none text-foreground",
-                className
-            )}
-        >
-            {children}
-        </kbd>
-    );
-}
+export { KeyCap, KeyHint, KEY_GLYPHS, type HintKey } from "./key-cap";
 
 /** A binding, as key caps. */
 export function ShortcutKeys({ binding, className }: { binding: string; className?: string }) {

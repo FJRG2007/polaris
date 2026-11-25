@@ -31,6 +31,8 @@ import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 import { OPEN_SEARCH_EVENT, requestedQuery, requestedScope } from "@/lib/search/open-search";
 import {
+    KEY_GLYPHS,
+    KeyHint,
     SegmentedControl,
     applePlatform,
     cn,
@@ -60,7 +62,14 @@ import {
 } from "@/components/search-rows";
 import { useToast } from "@polaris/ui";
 import { groupRows, stepActive } from "@polaris/ui/search-match";
-import { SearchGroup, SearchMessage, SearchPalette, SearchSkeleton } from "@polaris/ui/search-palette";
+import {
+    SearchGroup,
+    SearchMessage,
+    SearchPalette,
+    SearchSheet,
+    SearchSkeleton,
+    type SearchPaletteProps
+} from "@polaris/ui/search-palette";
 import { useDisplayFormat } from "@/components/display-format";
 import {
     COMMAND_ENTRY_FIELDS,
@@ -99,6 +108,9 @@ const INDEX_TTL_MS = 60_000;
 const LOOKUP_TTL_MS = 30_000;
 /** The pause that turns typing into a query. */
 const LOOKUP_DEBOUNCE_MS = 220;
+/** How long a reopened panel waits before asking again for an index it already
+ *  shows, so the request and its answer land after the panel has appeared. */
+const INDEX_REVALIDATE_DELAY_MS = 400;
 /** Matches shown at once. Past this the query is the thing to narrow, not the list. */
 const MAX_RESULTS = 40;
 /** Earlier searches offered alongside live matches, so they lead without burying. */
@@ -107,6 +119,35 @@ const MAX_RECENT_SUGGESTIONS = 3;
 // Kept outside the component so opening the palette a second time paints from
 // what the first open already loaded.
 let indexCache: { at: number; resources: SearchResource[] } | null = null;
+/** A background refresh of that index is already on its way. */
+let indexRevalidating = false;
+
+/** Whether two indexes list the same things, so an unchanged answer redraws nothing. */
+function sameResources(a: SearchResource[], b: SearchResource[]): boolean {
+    return a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * The palette in a host's window (Polaris Desktop's Alt+Space): mounted only
+ * while open, with no dimmed page and no exit animation. A window hidden mid
+ * animation never finishes it, so a dialog closing there stayed mounted and the
+ * next open reused a field that was never focused again; and a shade inside a
+ * window over other programs only flashed its last frame on the next show.
+ */
+function HostPalette({ open, onOpenChange, title, ...panel }: SearchPaletteProps) {
+    useEffect(() => {
+        if (!open) return;
+        function onKeyDown(event: KeyboardEvent) {
+            if (event.key !== "Escape" || event.defaultPrevented) return;
+            event.preventDefault();
+            onOpenChange(false);
+        }
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [open, onOpenChange]);
+    if (!open) return null;
+    return <SearchSheet {...panel} title={title} dim={false} onClose={() => onOpenChange(false)} />;
+}
 
 /** Answers held per scope. Bounded because it outlives the panel: a session
  *  spent searching would otherwise keep every distinct query it ever ran, and
@@ -191,6 +232,9 @@ export function CommandPalette({
     const navLabel = useNavLabel();
     const [open, setOpen] = useState(Boolean(host));
     const [hostRows, setHostRows] = useState<HostRow[]>([]);
+    /** The host's rows for an empty field, which the next open starts from
+     *  instead of growing when they arrive again. */
+    const idleHostRowsRef = useRef<HostRow[]>([]);
     /** Each time a host brings the panel back up, which is a fresh open. */
     const [openings, setOpenings] = useState(0);
     /** The scope the panel is to open on, when whatever opened it asked for one. */
@@ -233,7 +277,32 @@ export function CommandPalette({
             setOpen(true);
             setOpenings((count) => count + 1);
         });
+        // Put away by the host itself (its window lost focus): closed here too,
+        // so the next open is a fresh one. A host too old to say leaves it open,
+        // and the open below still hands the field the keys.
+        host?.onHidden?.(() => {
+            setSecretCode(undefined);
+            setOpen(false);
+        });
     }, [host]);
+
+    // Each open in a host's window gives the field the keys once it has drawn:
+    // the window is shown and focused by the host, and the page cannot rely on
+    // a field mounted earlier, or on an autofocus that ran while it was hidden.
+    useEffect(() => {
+        if (!host || !open) return;
+        const focusField = () => {
+            const field = fieldRef.current;
+            if (field && document.activeElement !== field) field.focus({ preventScroll: true });
+        };
+        const frame = requestAnimationFrame(focusField);
+        // Activated later than it was shown (the foreground lock let go).
+        window.addEventListener("focus", focusField);
+        return () => {
+            cancelAnimationFrame(frame);
+            window.removeEventListener("focus", focusField);
+        };
+    }, [host, open, openings]);
 
     // Closed, by any route - Escape, a result, a clock command: the host
     // puts its window away.
@@ -284,8 +353,30 @@ export function CommandPalette({
     }, []);
 
     const loadResources = useCallback(() => {
-        if (indexCache && Date.now() - indexCache.at < INDEX_TTL_MS) {
-            setResources(indexCache.resources);
+        const cached = indexCache;
+        if (cached) {
+            // What was loaded before paints now, whatever its age.
+            setResources(cached.resources);
+            if (Date.now() - cached.at < INDEX_TTL_MS || indexRevalidating) return;
+            // Stale: asked again behind the panel, after it has appeared, and
+            // drawn only if it changed - no spinner and no jump for a list
+            // that is already on screen.
+            indexRevalidating = true;
+            setTimeout(() => {
+                void fetch("/api/search", { cache: "no-store" })
+                    .then((response) => (response.ok ? response.json() : null))
+                    .then((body: { resources?: SearchResource[] } | null) => {
+                        if (!body) return;
+                        const list = body.resources ?? [];
+                        const known = indexCache?.resources ?? [];
+                        indexCache = { at: Date.now(), resources: list };
+                        if (!sameResources(known, list)) setResources(list);
+                    })
+                    .catch(() => undefined)
+                    .finally(() => {
+                        indexRevalidating = false;
+                    });
+            }, INDEX_REVALIDATE_DELAY_MS);
             return;
         }
         setLoading(true);
@@ -439,15 +530,23 @@ export function CommandPalette({
     // What only the host can find (programs, the clipboard, the web), for the
     // same text, beside the palette's own rows. Never inside a command.
     useEffect(() => {
-        if (!host || !open || scope) {
+        if (!host || scope) {
             setHostRows([]);
+            return;
+        }
+        if (!open) {
+            // The next open starts from the rows it will be answered with.
+            setHostRows(idleHostRowsRef.current);
             return;
         }
         let live = true;
         void host
             .query(trimmed)
             .then((raw) => {
-                if (live) setHostRows(readHostRows(raw));
+                if (!live) return;
+                const found = readHostRows(raw);
+                if (!trimmed) idleHostRowsRef.current = found;
+                setHostRows(found);
             })
             .catch(() => {
                 if (live) setHostRows([]);
@@ -955,6 +1054,7 @@ export function CommandPalette({
     }
 
     const ScopeIcon = scope?.icon;
+    const Surface = host ? HostPalette : SearchPalette;
 
     return (
         <>
@@ -987,7 +1087,7 @@ export function CommandPalette({
             </button>
             )}
 
-            <SearchPalette
+            <Surface
                 open={open}
                 onOpenChange={onOpenChange}
                 title={t("search.label")}
@@ -1072,15 +1172,39 @@ export function CommandPalette({
                 }
                 footer={
                     <>
-                        <span className={cn(scope && "hidden sm:inline")}>
-                            {t("search.hintMove")}
+                        <span className={cn("flex min-w-0 items-center gap-3", scope && "hidden sm:flex")}>
+                            <KeyHint
+                                keys={[
+                                    { cap: KEY_GLYPHS.up, name: t("search.keyUp") },
+                                    { cap: KEY_GLYPHS.down, name: t("search.keyDown") }
+                                ]}
+                                label={t("search.hintMove")}
+                            />
+                            <KeyHint
+                                keys={[{ cap: KEY_GLYPHS.enter, name: t("search.keyEnter") }]}
+                                label={t("search.hintOpen")}
+                            />
                         </span>
-                        <span>
-                            {scope
-                                ? t("search.hintClear")
-                                : calculation !== null
-                                  ? t("search.hintCalculation")
-                                  : t("search.hintType")}
+                        <span className="flex min-w-0 items-center gap-3">
+                            {scope ? (
+                                <KeyHint
+                                    keys={[{ cap: KEY_GLYPHS.backspace, name: t("search.keyBackspace") }]}
+                                    label={t("search.hintClear")}
+                                />
+                            ) : calculation !== null ? (
+                                <KeyHint
+                                    keys={[
+                                        { cap: KEY_GLYPHS.enter, name: t("search.keyEnter") },
+                                        { cap: "Tab", name: t("search.keyTab") }
+                                    ]}
+                                    label={t("search.hintCalculation")}
+                                />
+                            ) : (
+                                <>
+                                    <KeyHint keys={[{ cap: "/", name: t("search.keySlash") }]} label={t("search.hintCommands")} />
+                                    <KeyHint keys={[{ cap: "@", name: t("search.keyAt") }]} label={t("search.hintPeople")} />
+                                </>
+                            )}
                         </span>
                     </>
                 }
@@ -1250,7 +1374,7 @@ export function CommandPalette({
                         running, and skeletons under real rows only made the
                         list jump. */}
                 </PlainNames>
-            </SearchPalette>
+            </Surface>
         </>
     );
 }

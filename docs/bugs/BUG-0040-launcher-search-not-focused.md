@@ -1,17 +1,21 @@
 ---
 id: BUG-0040
 title: After Alt+Space the launcher opens but typing does not go into its search
-status: regressed
+status: fixed-watching
 area: desktop
-location: clients/desktop/src/main/window-front.ts
+location: dashboard/apps/web/src/components/command-palette.tsx
 related:
+  - clients/desktop/src/main/window-front.ts
   - clients/desktop/src/main/launcher.ts
+  - clients/desktop/src/preload/launcher.ts
+  - dashboard/apps/web/src/app/(embed)/launcher/launcher-search.tsx
+  - dashboard/apps/web/test/search/palette-host-window.test.tsx
   - clients/desktop/test/main/window-front.test.ts
   - clients/desktop/test/main/launcher-warm.test.ts
   - docs/bugs/BUG-0041-launcher-slow-first-open.md
 reported: 2026-11-23
-fixed: 2026-11-23
-fix_commit: "fix(desktop): typing after Alt+Space goes into the launcher's search (1bdb6fa2d5)"
+fixed: 2026-11-25
+fix_commit: "fix(launcher): Alt+Space always types into the search, opens smoothly after idle, and no longer dims the screen"
 ---
 
 ## What was seen
@@ -37,14 +41,47 @@ step before left the window unfocused (electron/electron#2867); then
 `webContents.focus()`, as Flow Launcher focuses its query box. The window
 drops the app menu Windows gives every window, so Alt is not handed to a menu.
 
-## Regression (2026-11-25, cause not confirmed yet)
+## Cause of the regression (confirmed in code, 2026-11-25)
 
-Seen on a desktop at or after 0.1.111. Under investigation together with
-[BUG-0041](BUG-0041-launcher-slow-first-open.md), which happens on the same
-open.
+The window itself is still focused (`takeFocus()` is unchanged). The page it
+shows is the instance's `/launcher`, the dashboard's own `CommandPalette`, and
+that page never focused its field on an open: it relied on the field's
+`autoFocus` and the dialog's mount focus, which only run when the panel is
+mounted again. It stayed mounted:
+
+- Closed by Escape or by a result, the dialog starts its exit animation and
+  the page asks the desktop to hide the window at once. Radix keeps the
+  content mounted until `animationend`, which a hidden, throttled page does not
+  fire, so the next open reused the old field and nothing focused it.
+- Closed by clicking elsewhere, the desktop hid the window on `blur` without
+  telling the page, so the page still thought it was open; the next open
+  changed nothing on the page and nothing focused the field.
+
+## Fix (2026-11-25)
+
+- Page (ships with the dashboard): in a host's window the palette is drawn
+  with `SearchSheet`, mounted only while open, with no exit animation, so
+  every open mounts a fresh field. Each open also focuses the field once it
+  has drawn, and again when the window is activated later than it was shown.
+- Desktop (ships with the desktop): hiding on blur sends `launcher:hidden`
+  to the page (`onHidden` on the bridge), which closes the panel. The
+  launcher window is no longer throttled while hidden.
+- Both cope with the other being old: a desktop without `onHidden` still
+  gets the field focused on every open; an older page ignores the new message.
+
+## Verified
+
+- `palette-host-window.test.tsx`: the field is focused on reopen after
+  Escape, after the window was hidden by a lost focus, and with a desktop that
+  has no `onHidden`.
+- `launcher-warm.test.ts`: blur hides the window and sends `launcher:hidden`;
+  the next press shows it, sends `launcher:opened` and focuses the page.
+- Not verified on a real Windows desktop: Electron was not launched on the
+  development machine.
 
 ## If it happens again
 
 Note the desktop version (Settings), whether it fails every time or only on
-the first open after a while, and which app was in front when Alt+Space was
+the first open after a while, how the launcher was last closed (Escape, a
+result, clicking elsewhere), and which app was in front when Alt+Space was
 pressed.

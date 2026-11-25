@@ -13,6 +13,7 @@ import { join } from "node:path";
 export function searchSources(uiSrc) {
     return [
         join(uiSrc, "search", "search-panel.tsx"),
+        join(uiSrc, "shortcuts", "key-cap.tsx"),
         join(uiSrc, "components", "dialog-surface.ts"),
         join(uiSrc, "components", "input.tsx")
     ].map((file) => file.replaceAll("\\", "/"));

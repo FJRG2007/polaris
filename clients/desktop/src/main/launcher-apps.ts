@@ -8,10 +8,11 @@
  * entries). On macOS the `.app` bundles in the Applications folders.
  *
  * The listing is kept on disk, so the first open after a restart answers from
- * it instead of waiting on a read; it is read again on an open after
- * `FRESH_MS`, a short while after a shortcut appears or goes in a folder it
- * watches, and when the game watcher asks after `MAX_AGE_MS` - never on a
- * timer of its own and never on the press itself. Each is opened the way it
+ * it instead of waiting on a read; it is read again when the launcher is first
+ * warmed, as it is put away once the listing is older than `FRESH_MS`, a short
+ * while after a shortcut appears or goes in a folder it watches, and when the
+ * game watcher asks after `MAX_AGE_MS` - never on a timer of its own and never
+ * on a press, which only shows what was listed. Each is opened the way it
  * was listed - a shortcut through the shell as a double-click would, a game
  * through its store's own link or launcher - never with arguments the launcher
  * made up from typed text. A shortcut is read for its target without
@@ -315,6 +316,18 @@ function watchFolders(platform: NodeJS.Platform): void {
 export function installedApps(platform: NodeJS.Platform = process.platform): readonly InstalledApp[] {
     loadIndex();
     if (!cached || Date.now() - cached.at > FRESH_MS) refresh(platform);
+    return cached?.apps ?? [];
+}
+
+/**
+ * The installed apps as last listed, for a press and the rows it draws: never
+ * read again here, since reading spawns the system's slow listing
+ * (`Get-StartApps`) and on a press it competes with the window coming up.
+ * `installedApps` refreshes it as the launcher is put away. Only a launcher
+ * that has never listed anything starts the first listing.
+ */
+export function listedApps(platform: NodeJS.Platform = process.platform): readonly InstalledApp[] {
+    if (!started) return installedApps(platform);
     return cached?.apps ?? [];
 }
 
