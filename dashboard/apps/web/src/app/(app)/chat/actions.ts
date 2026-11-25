@@ -37,6 +37,7 @@ import * as polarMember from "@/lib/chat/polar-member";
 import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
 import { SEARCH_CANDIDATES } from "@/lib/chat/e2ee/sealed-search-index";
 import { DISCLOSURE_PATTERN } from "@/lib/chat/e2ee/sealed-report";
+import { REPORT_CONTEXT } from "@/lib/chat/report-context";
 import { channelGroupCandidates, grantChannelGroups } from "@/lib/chat/channel-groups";
 import { confirmAge } from "@/lib/chat/age-gate";
 import { MAX_REREAD } from "@/lib/chat/reread-limit";
@@ -1126,10 +1127,30 @@ export async function setGroupOptionsAction(
     return result.error ? { error: result.error } : {};
 }
 
+/**
+ * A whole-conversation report with the keys of the sealed messages it carries,
+ * by message id: as many as `REPORT_CONTEXT`, each a `messageDisclosure`.
+ */
+const sealedConversationReportSchema = core.chatConversationReportSchema.extend({
+    disclosures: z
+        .record(z.string().uuid(), z.string().regex(DISCLOSURE_PATTERN))
+        .refine((value) => Object.keys(value).length <= REPORT_CONTEXT)
+        .optional()
+});
+
+/** The sealed messages a report of this conversation would carry, so the browser can hand over their keys. */
+export async function conversationReportSealedAction(channelId: unknown): Promise<{ ids?: string[]; error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(channelId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notAllowedHere") };
+    const result = await guard(() => reports.conversationReportSealed(me, parsed.data));
+    return result.error ? { error: result.error } : { ids: result.value ?? [] };
+}
+
 /** Report a whole conversation. The service decides what travels with it. */
 export async function reportConversationAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
-    const parsed = core.chatConversationReportSchema.safeParse(input);
+    const parsed = sealedConversationReportSchema.safeParse(input);
     if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notAllowedHere") };
     const result = await guard(() => reports.reportConversation(me, parsed.data));
     return result.error ? { error: result.error } : {};

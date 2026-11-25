@@ -18,7 +18,8 @@ import { Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { BlockAfterReport } from "@/components/block-after-report";
-import { reportPersonAction } from "@/app/(app)/account/report-actions";
+import { personReportSealedAction, reportPersonAction } from "@/app/(app)/account/report-actions";
+import { discloseSealedMany, sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import {
     Button,
     Dialog,
@@ -56,8 +57,22 @@ export function ReportPersonDialog({
     async function send(): Promise<void> {
         setBusy(true);
         setError(null);
+        // Their sealed lines go with their own keys, so the moderators read them.
+        const disclosures =
+            channelId && sealedChatActive()
+                ? await personReportSealedAction({ subjectId: person.id, channelId })
+                      .then((answer) => discloseSealedMany(channelId, answer.ids))
+                      .catch(() => ({}))
+                : {};
         const result = await runAction(
-            () => reportPersonAction({ subjectId: person.id, reason, note, channelId }),
+            () =>
+                reportPersonAction({
+                    subjectId: person.id,
+                    reason,
+                    note,
+                    channelId,
+                    ...(Object.keys(disclosures).length ? { disclosures } : {})
+                }),
             setError
         );
         setBusy(false);

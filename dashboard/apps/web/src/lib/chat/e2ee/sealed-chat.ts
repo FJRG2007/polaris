@@ -295,6 +295,16 @@ export async function discloseSealed(channelId: string, messageId: string): Prom
     return mls.discloseSealed(channelId, messageId).catch(() => null);
 }
 
+/**
+ * The keys of these sealed messages for a report of their whole conversation,
+ * by id; one that does not open here is left out and goes with no words.
+ */
+export async function discloseSealedMany(channelId: string, messageIds: readonly string[]): Promise<Record<string, string>> {
+    if (!sealedChatActive() || !messageIds.length) return {};
+    const found = await Promise.all(messageIds.map(async (id) => [id, await discloseSealed(channelId, id)] as const));
+    return Object.fromEntries(found.filter((entry): entry is readonly [string, string] => entry[1] !== null));
+}
+
 export interface SealedEditInput extends SealedContent {
     channelId: string;
     messageId: string;

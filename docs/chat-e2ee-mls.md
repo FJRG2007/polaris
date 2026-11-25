@@ -407,10 +407,10 @@ share of the work, not of the code.
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
 | 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info; scanning the other person's QR in the app; the verified mark; the key-change line in the conversation (per browser, trust on first use). Left: `AccountKeyVerifier` still has no log behind it, so a server could hand out a substitute account key to somebody who never verifies - the append-only key log with a signed root and inclusion and consistency checks in the browser, and each account monitoring its own entries; key changes of group members (no number in a group). | Yes, for "government-grade" | ~30% |
 | 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody. Left: the screen for the instance limit (the `Setting` key is read, 7-90) and the organisation's own limit, the "new device added" notice on the account's other devices, a device list with revoke. | Yes, for post-compromise security | ~50% |
-| 9 | **Server features that read chat text**: built (2026-11-25): moderation reports of a sealed message, see "Sealed reports". Left: whole-Polaris export/import and backups carry sealed rows but no keys; a whole-conversation report's recent lines and a sealed report's files reach the queue without their words or bytes; retention and compliance export (proposal 9), automations that read messages. Each needs its sealed answer or an explicit "not in sealed conversations". | Partly (export/import must round-trip) | ~25% |
+| 9 | **Server features that read chat text**: built (2026-11-25): moderation reports of a sealed message with its files, and the sealed lines of a whole-conversation or person report, see "Sealed reports". Left: whole-Polaris export/import and backups carry sealed rows but no keys; retention and compliance export (proposal 9), automations that read messages. Each needs its sealed answer or an explicit "not in sealed conversations". | Partly (export/import must round-trip) | ~38% |
 | 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. | No (documented limit) | ~40% |
 | 11 | **Web code trust** (proposal 4.7): published hash of the crypto bundle, extension and desktop checking it, strict CSP and Trusted Types on message rendering. | No for default-on; yes for intelligence deployments | ~10% |
-| 12 | **Large channels**: built (2026-11-25): `reconcile` adds at most 100 newcomers per send (`ADD_BATCH`, one `claim-key-packages` call's worth); the roster's pages together could name more, which the claim refused, so every add in a channel past 1,000 leaves failed and was retried forever. The rest are added by later sends or join by their own external commit on open (decision 9). Left: steady-state commit size with a filled tree is unmeasured (phase 0); removals still go in one commit (bounded by the 1 MiB commit limit, ~12,000 members at 82 B each). | For big spaces | ~30% |
+| 12 | **Large channels**: built (2026-11-25): `reconcile` adds at most 100 newcomers per send (`ADD_BATCH`, one `claim-key-packages` call's worth); the roster's pages together could name more, which the claim refused, so every add in a channel past 1,000 leaves failed and was retried forever. The rest are added by later sends or join by their own external commit on open (decision 9). Removals go at most 100 per commit (`REMOVE_BATCH`), as many commits as it takes, all before anything is sealed: every removed leaf blanks its path and the committer then encrypts to each node left under a blank, so one commit taking out thousands could pass the 1 MiB commit limit and never land (tested: five leaving with a batch of two take three commits, and none of them opens what is sealed after). Left: steady-state commit size with a filled tree is unmeasured (phase 0). | For big spaces | ~38% |
 
 Rough overall to "on by default, every existing chat migrated, recoverable":
 about 44%. Text messaging between people on the web, with edits, Polar and
@@ -855,10 +855,32 @@ under the same greeting rule as a plain report.
 A disclosure that does not open the message is refused (`reportSealedUnreadable`,
 "reload and report again"). A report with none - an older client, a device
 that cannot open the message - is filed with no excerpt rather than refused, so
-reporting never stops working. Not yet sealed-aware: a report of a whole
-conversation carries its recent lines' excerpts empty when they are sealed, and
-a sealed report's files are copied as their sealed blobs (the file keys are in
-the opened content and are not kept).
+reporting never stops working.
+
+A report of a whole conversation carries its last five lines the reporter can
+read (`report-context.ts`). The sealed ones among them are handed over the same
+way, one disclosure each: the dialog asks which of those lines are sealed
+(`conversationReportSealedAction`, the same rows the report will take, behind
+the same access check), its device discloses each that opens here
+(`discloseSealedMany`), and the report goes with `disclosures`, by message id,
+five at most. `recentReadable` opens each with `openReported`; a line with no
+disclosure goes with no words, a disclosure that does not open its line refuses
+the report (`reportSealedUnreadable`), and a disclosure for a message that is
+not among those lines is never read. A report of a person from a conversation
+(`safety-queue.ts`, `personReportSealedAction`) carries their sealed lines the
+same way; a disclosure that does not open refuses it as "That account could not
+be reported."
+
+A reported sealed message's files: what opens with the disclosure names, per
+file, its key, digest, name, type, size and shape, and `copyOntoReport` writes
+those onto the report's file row (`ChatReportFile.sealedKey`, `sealedDigest`,
+migration `20281206000000_chat_report_sealed_files`, additive). The queue
+draws it by its real name and shape, and the moderator's route
+(`/api/chat/reports/[reportId]/files/[fileId]`) opens it whole with that key
+(`readReportFile`, `openFile`, no ranges) and checks the digest: bytes that do
+not open to it answer "gone", never as it. The key opens that one file and
+nothing else. A sealed file reported without a disclosure stays the sealed blob,
+drawn as "file"; a second press with one gives the rows their keys.
 
 ## Sealed only (built 2026-11-24)
 

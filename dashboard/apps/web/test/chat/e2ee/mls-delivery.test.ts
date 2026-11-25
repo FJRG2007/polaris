@@ -554,6 +554,48 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         expect(carol.groupOf(CHANNEL)).toEqual(alice.groupOf(CHANNEL));
     });
 
+    it("takes out a crowd that left in several small commits, all of them before the message is sealed", async () => {
+        const crowd = Array.from({ length: 5 }, (_, i) => `77777777-7777-4777-8777-${String(i).padStart(12, "0")}`);
+        const sizes: number[] = [];
+        const measured: MlsTransport = async (body) => {
+            if (body.op === "commit") sizes.push(Buffer.from(body.commit, "base64url").length);
+            return through(ALICE)(body);
+        };
+        const notes = new Map<string, string>();
+        const alice = await MlsDevice.open({
+            userId: ALICE,
+            device: "alice-laptop",
+            MlsMember,
+            store: new MemoryStore(),
+            transport: measured,
+            batch: { remove: 2 },
+            notes: { getItem: (k) => notes.get(k) ?? null, setItem: (k, v) => void notes.set(k, v) }
+        });
+        const others = await Promise.all(crowd.map((id, i) => open(id, `crowd-device-${i}`)));
+        for (const device of [alice, ...others]) await device.register();
+        for (const id of crowd) state.members.add(`${id}:${CHANNEL}`);
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, crowd);
+        for (const device of others) await device.sync(CHANNEL);
+
+        // The whole crowd leaves at once; a batch of two takes three commits.
+        for (const id of crowd) state.members.delete(`${id}:${CHANNEL}`);
+        sizes.length = 0;
+        const id = await alice.sendSealed(CHANNEL, new TextEncoder().encode("after the crowd left"));
+        expect(sizes).toHaveLength(3);
+        for (const size of sizes) expect(size).toBeLessThan(64 * 1024);
+        expect(alice.groupOf(CHANNEL)).not.toBeNull();
+
+        // None of them opens what was sealed after they left, even served the row.
+        for (const [i, device] of others.entries()) {
+            state.members.add(`${crowd[i]}:${CHANNEL}`);
+            await device.sync(CHANNEL);
+            expect(device.groupOf(CHANNEL)).toBeNull();
+            expect((await device.readSealed(CHANNEL, [id]))[0]!.opened).toBeNull();
+            state.members.delete(`${crowd[i]}:${CHANNEL}`);
+        }
+    });
+
     it("before sealing, takes out the devices of who left and adds the people who joined", async () => {
         const alice = await open(ALICE, "alice-laptop");
         const bob = await open(BOB, "bob-phone-1");

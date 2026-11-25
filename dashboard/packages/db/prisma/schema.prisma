@@ -11590,6 +11590,12 @@ model ChatReportFile {
     // Whether the bytes now belong to the report. False means they are still the
     // message's, and deleting the message is what changes it.
     held         Boolean @default(false)
+    // A sealed file the reporter opened for the moderators: the key and the
+    // SHA-256 its message's seal names for it, which open this one file and
+    // nothing else. Null for a plain file, and for a sealed one reported
+    // without them (it is drawn by name with nothing to open).
+    sealedKey    Bytes?
+    sealedDigest Bytes?
     createdAt    DateTime @default(now())
 
     report ChatReport @relation(fields: [reportId], references: [id], onDelete: Cascade)

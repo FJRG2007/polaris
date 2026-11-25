@@ -46,6 +46,9 @@ const deleted: string[][] = [];
 /** Where `holdFile` was asked to put things, and what it answered. */
 const held: { path: string; folder: string; name: string }[] = [];
 let holdWorks = true;
+/** What the store answers for a file, and the report file row `findFirst` finds. */
+let storedBytes = new Uint8Array([1, 2, 3]);
+let firstRow: Record<string, unknown> | null = null;
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -65,6 +68,7 @@ vi.mock("@polaris/db", () => ({
                     return true;
                 });
             },
+            findFirst: async () => firstRow,
             createMany: async ({ data }: { data: unknown[] }) => {
                 created.push(...data);
                 return { count: data.length };
@@ -88,7 +92,7 @@ vi.mock("@polaris/db", () => ({
 }));
 
 vi.mock("@/lib/chat/attachments", () => ({
-    readStored: async () => new Uint8Array([1, 2, 3]),
+    readStored: async () => storedBytes,
     discardEvidence: async () => undefined,
     holdFile: async (
         from: { connectionId: string | null; path: string },
@@ -123,6 +127,67 @@ beforeEach(() => {
     deleted.length = 0;
     held.length = 0;
     holdWorks = true;
+    storedBytes = new Uint8Array([1, 2, 3]);
+    firstRow = null;
+});
+
+describe("a sealed file the reporter opened", () => {
+    const sealedRef = async (id: string, clear: Uint8Array) => {
+        const { sealFile } = await import("@polaris/chat-crypto/file-content");
+        const { toText } = await import("@/lib/chat/e2ee/base64url");
+        const made = await sealFile(clear);
+        return {
+            sealed: made.sealed,
+            ref: { id, key: toText(made.key), sha256: toText(made.digest), name: "evidence.png", type: "image/png", size: clear.length, shape: { w: 4, h: 3, th: "AAAA" } }
+        };
+    };
+
+    it("is copied under the name, type and shape its seal names, with the key that opens it", async () => {
+        const clear = new TextEncoder().encode("the picture");
+        const { ref } = await sealedRef("a1", clear);
+        attachments = [{ ...attachment("a1", "polaris/chat/c1/one"), name: "file", contentType: "application/octet-stream", sealed: true } as AttachmentRow];
+        await files.copyOntoReport("r1", "m1", [ref]);
+        expect(created).toEqual([expect.objectContaining({ attachmentId: "a1", name: "evidence.png", contentType: "image/png", size: BigInt(clear.length), width: 4, height: 3, thumbhash: "AAAA" })]);
+        const row = created[0] as { sealedKey: Uint8Array; sealedDigest: Uint8Array };
+        expect(row.sealedKey).toHaveLength(32);
+        expect(row.sealedDigest).toHaveLength(32);
+    });
+
+    it("without its key is copied as the sealed blob it is, and a plain file never takes a key", async () => {
+        const { ref } = await sealedRef("a1", new Uint8Array([9]));
+        attachments = [
+            { ...attachment("a1", "polaris/chat/c1/one"), name: "file", contentType: "application/octet-stream", sealed: true } as AttachmentRow,
+            { ...attachment("a2", "polaris/chat/c1/two"), sealed: false } as AttachmentRow
+        ];
+        await files.copyOntoReport("r1", "m1", [{ ...ref, id: "a2" }]);
+        expect(created).toEqual([
+            expect.objectContaining({ attachmentId: "a1", name: "file" }),
+            expect.objectContaining({ attachmentId: "a2", name: "a2.png" })
+        ]);
+        for (const row of created) expect(row).not.toHaveProperty("sealedKey");
+    });
+
+    it("learns its key when it is reported again with one", async () => {
+        const { ref } = await sealedRef("a1", new Uint8Array([9]));
+        attachments = [{ ...attachment("a1", "polaris/chat/c1/one"), name: "file", sealed: true } as AttachmentRow];
+        reportFiles = [{ id: "f1", reportId: "r1", attachmentId: "a1", connectionId: null, path: "polaris/chat/c1/one", held: false, sealedKey: null } as ReportFileRow];
+        await files.copyOntoReport("r1", "m1", [ref]);
+        expect(updated).toEqual([{ id: "f1", data: expect.objectContaining({ name: "evidence.png", contentType: "image/png" }) }]);
+    });
+
+    it("is read back opened, and bytes that do not open to it are gone", async () => {
+        const clear = new TextEncoder().encode("the picture");
+        const { ref, sealed } = await sealedRef("a1", clear);
+        const { fromText } = await import("@/lib/chat/e2ee/base64url");
+        firstRow = { name: "evidence.png", contentType: "image/png", connectionId: null, path: "p", sealedKey: fromText(ref.key), sealedDigest: fromText(ref.sha256) };
+        storedBytes = sealed;
+        expect(await files.readReportFile("r1", "f1")).toEqual({ name: "evidence.png", contentType: "image/png", bytes: clear });
+        expect(await files.describeReportFile("r1", "f1")).toMatchObject({ sealed: true });
+        const tampered = new Uint8Array(sealed);
+        tampered[tampered.length - 1]! ^= 1;
+        storedBytes = tampered;
+        expect(await files.readReportFile("r1", "f1")).toBeNull();
+    });
 });
 
 describe("copying a message's files onto a report", () => {

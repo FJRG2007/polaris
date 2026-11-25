@@ -35,7 +35,8 @@ import { alertAdmins } from "@/lib/notifications/admins";
 import { ChatAccessError, ChatRuleError, requireChannel, type ChatActor } from "./access";
 import * as history from "./history-visibility";
 import * as sealedReport from "./e2ee/sealed-report";
-import { readReportContext, recentReadable, type ReportContextEntry } from "./report-context";
+import type { SealedFileRef } from "./e2ee/sealed-chat";
+import { readReportContext, recentReadable, recentSealed, type ReportContextEntry } from "./report-context";
 
 /** How much of a message is copied onto the report. Enough to triage without
  *  opening the conversation, short of copying the conversation. */
@@ -145,12 +146,14 @@ export async function reportMessage(
     // that cannot open it) it is filed with no excerpt rather than refused; a
     // disclosure that does not open it is refused, never filed as words.
     let said: string | null = message.body;
+    let sealedFiles: SealedFileRef[] = [];
     if (sealedReport.isSealedRow(message)) {
         said = null;
         if (input.disclosure) {
             const opened = await sealedReport.openReported(message, input.disclosure);
             if (!opened) throw new ChatRuleError({ key: "errors.reportSealedUnreadable" });
             said = sealedReport.reportedText(opened);
+            sealedFiles = opened.files ?? [];
         }
     }
 
@@ -195,7 +198,7 @@ export async function reportMessage(
         // Again rather than only on the first press: the same report is updated,
         // and the message may have been edited in between - a picture taken off,
         // another put on.
-        await copyOntoReport(existing.id, message.id);
+        await copyOntoReport(existing.id, message.id, sealedFiles);
         return { already: true };
     }
 
@@ -210,7 +213,7 @@ export async function reportMessage(
     });
     // Rows, not bytes. They point at the same stored files the message points
     // at, and only become the report's own if the message is ever deleted.
-    await copyOntoReport(made.id, message.id);
+    await copyOntoReport(made.id, message.id, sealedFiles);
 
     // And somebody is told. A report used to be filed in silence: the row
     // appeared under /admin/safety and the only way to learn of it was to go and
@@ -257,12 +260,12 @@ export async function reportMessage(
  */
 export async function reportConversation(
     actor: ChatActor,
-    input: core.ChatConversationReportInput
+    input: core.ChatConversationReportInput & { readonly disclosures?: Readonly<Record<string, string>> }
 ): Promise<{ already: boolean }> {
     // The same check that lets them read it, so an id somebody guessed is
     // answered the same as one that does not exist.
     await requireChannel(actor, input.channelId);
-    const context = await recentReadable(actor, input.channelId);
+    const context = await recentReadable(actor, input.channelId, null, input.disclosures);
     if (context.length === 0) throw new ChatRuleError({ key: "errors.reportNothingToSend" });
     const shape = { reason: input.reason, note: input.note, context };
     const existing = await prisma.chatReport.findFirst({
@@ -301,6 +304,15 @@ export async function reportConversation(
         }).catch(releaseQueueAnnouncement);
     }
     return { already: false };
+}
+
+/**
+ * The sealed messages a report of this conversation would carry, for the
+ * reporter's browser to hand over their keys. The same check as the report.
+ */
+export async function conversationReportSealed(actor: ChatActor, channelId: string): Promise<string[]> {
+    await requireChannel(actor, channelId);
+    return recentSealed(actor, channelId);
 }
 
 /**

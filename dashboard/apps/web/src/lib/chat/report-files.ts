@@ -26,7 +26,10 @@
  */
 
 import { prisma } from "@polaris/db";
+import { openFile } from "@polaris/chat-crypto/file-content";
 import { discardEvidence, holdFile, readStored } from "./attachments";
+import { fromText } from "./e2ee/base64url";
+import type { SealedFileRef } from "./e2ee/sealed-chat";
 
 /** One file, as the queue draws it. */
 export interface ChatReportFileView {
@@ -55,10 +58,15 @@ export interface ChatReportFileView {
  * second press is the same report and the message may have been edited in
  * between - a picture removed, another added.
  */
-export async function copyOntoReport(reportId: string, messageId: string): Promise<void> {
-    const files = await prisma.chatAttachment.findMany({
+export async function copyOntoReport(
+    reportId: string,
+    messageId: string,
+    sealed: readonly SealedFileRef[] = []
+): Promise<void> {
+    const stored = await prisma.chatAttachment.findMany({
         where: { messageId },
         select: {
+            sealed: true,
             id: true,
             name: true,
             size: true,
@@ -73,11 +81,41 @@ export async function copyOntoReport(reportId: string, messageId: string): Promi
         },
         orderBy: { createdAt: "asc" }
     });
-
+    // A sealed file is stored as "file", with no type: what it is, and the key
+    // that opens it, are in the message's seal, which the reporter opened.
+    const refs = new Map(sealed.map((ref) => [ref.id, ref]));
+    const files = stored.map(({ sealed: isSealed, ...file }) => {
+        const ref = isSealed ? refs.get(file.id) : undefined;
+        if (!ref) return { ...file, sealedKey: null, sealedDigest: null };
+        return {
+            ...file,
+            name: ref.name,
+            size: BigInt(ref.size),
+            contentType: ref.type,
+            durationMs: ref.durationMs ?? null,
+            waveform: ref.waveform ?? null,
+            width: ref.shape?.w ?? null,
+            height: ref.shape?.h ?? null,
+            thumbhash: ref.shape?.th ?? null,
+            sealedKey: new Uint8Array(fromText(ref.key)),
+            sealedDigest: new Uint8Array(fromText(ref.sha256))
+        };
+    });
     const already = await prisma.chatReportFile.findMany({
         where: { reportId },
-        select: { id: true, attachmentId: true, held: true }
+        select: { id: true, attachmentId: true, held: true, sealedKey: true }
     });
+    // Reported again with the keys a first press did not have: the rows it took
+    // then learn what they are.
+    for (const row of already) {
+        const file = files.find((candidate) => candidate.id === row.attachmentId);
+        if (row.sealedKey || !file?.sealedKey) continue;
+        const { name, size, contentType, durationMs, waveform, width, height, thumbhash, sealedKey, sealedDigest } = file;
+        await prisma.chatReportFile.update({
+            where: { id: row.id },
+            data: { name, size, contentType, durationMs, waveform, width, height, thumbhash, sealedKey, sealedDigest }
+        });
+    }
     const known = new Set(already.map((row) => row.attachmentId).filter(Boolean));
 
     const fresh = files.filter((file) => !known.has(file.id));
@@ -95,7 +133,8 @@ export async function copyOntoReport(reportId: string, messageId: string): Promi
                 waveform: file.waveform,
                 width: file.width,
                 height: file.height,
-                thumbhash: file.thumbhash
+                thumbhash: file.thumbhash,
+                ...(file.sealedKey ? { sealedKey: file.sealedKey, sealedDigest: file.sealedDigest } : {})
             }))
         });
     }
@@ -231,11 +270,15 @@ export async function describeReportFile(
     readonly contentType: string;
     readonly connectionId: string | null;
     readonly path: string;
+    readonly sealed: boolean;
 } | null> {
-    return prisma.chatReportFile.findFirst({
+    const row = await prisma.chatReportFile.findFirst({
         where: { id: fileId, reportId },
-        select: { name: true, contentType: true, connectionId: true, path: true }
+        select: { name: true, contentType: true, connectionId: true, path: true, sealedKey: true }
     });
+    if (!row) return null;
+    const { sealedKey, ...where } = row;
+    return { ...where, sealed: sealedKey !== null };
 }
 
 export async function readReportFile(
@@ -244,12 +287,17 @@ export async function readReportFile(
 ): Promise<{ name: string; contentType: string; bytes: Uint8Array } | null> {
     const row = await prisma.chatReportFile.findFirst({
         where: { id: fileId, reportId },
-        select: { name: true, contentType: true, connectionId: true, path: true }
+        select: { name: true, contentType: true, connectionId: true, path: true, sealedKey: true, sealedDigest: true }
     });
     if (!row) return null;
 
     const bytes = await readStored(row.connectionId, row.path, `reported file ${fileId}`);
-    return bytes ? { name: row.name, contentType: row.contentType, bytes } : null;
+    if (!bytes) return null;
+    if (!row.sealedKey || !row.sealedDigest) return { name: row.name, contentType: row.contentType, bytes };
+    // Opened with the key its seal named and checked against the digest it
+    // named: bytes that do not open to that file are gone, never served as it.
+    const opened = await openFile(new Uint8Array(row.sealedKey), bytes, new Uint8Array(row.sealedDigest)).catch(() => null);
+    return opened ? { name: row.name, contentType: row.contentType, bytes: opened } : null;
 }
 
 /**

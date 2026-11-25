@@ -70,6 +70,14 @@ const ROSTER_PAGE = 1_000;
  * never stalls on thousands of adds.
  */
 const ADD_BATCH = 100;
+/**
+ * Leaves one remove commit takes out at most. Every removed leaf blanks its
+ * path, and the committer then encrypts to each node left under a blank, so
+ * one commit removing thousands could pass the delivery service's 1 MiB commit
+ * limit and never land; past this the rest go in the commits after it, all of
+ * them before anything is sealed.
+ */
+const REMOVE_BATCH = 100;
 const ACCOUNT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** `${userId}/${device}`, as the delivery service addresses a device. */
 const DEVICE_ADDRESS = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[A-Za-z0-9_-]{8,64}$/;
@@ -262,6 +270,8 @@ export interface MlsDeviceOptions {
      * run, and a device with its account key locked loses them on restart.
      */
     historyKeys?: MlsHistoryKeyStore;
+    /** Changes per commit (`ADD_BATCH`, `REMOVE_BATCH` unless given): tests use small ones. */
+    batch?: { add?: number; remove?: number };
 }
 
 export class MlsDevice {
@@ -443,7 +453,7 @@ export class MlsDevice {
             await this.removeLeaves(channelId, (identity) => identity !== this.address && (retired.has(identity) || prefixes.some((prefix) => identity.startsWith(prefix))));
         }
         const present = new Set(this.rosterAccounts(this.requireGroup(channelId)));
-        const adding = [...joinable].filter((id) => !present.has(id) && !departed.has(id)).slice(0, ADD_BATCH);
+        const adding = [...joinable].filter((id) => !present.has(id) && !departed.has(id)).slice(0, this.options.batch?.add ?? ADD_BATCH);
         if (!adding.length) return;
         await this.addAccounts(channelId, adding).catch((caught: unknown) => {
             console.warn("polaris: people new to a sealed conversation could not be added to its group:", caught);
@@ -484,17 +494,37 @@ export class MlsDevice {
     }
 
     /**
-     * Commit the removal of the leaves whose identity `pick` selects, catching
-     * up and choosing again when another commit wins the epoch.
+     * Commit the removal of the leaves whose identity `pick` selects, at most
+     * `REMOVE_BATCH` per commit, until none is left. Returns them all.
+     * Leaves that keep coming back (rejoining as fast as they go) fail the
+     * caller once the commits it should have taken are spent, rather than
+     * stopping with one of them still in the group.
      */
     private async removeLeaves(channelId: string, pick: (identity: string) => boolean): Promise<string[]> {
+        const own = this.member.ownLeaf(this.requireGroup(channelId));
+        const picked = this.member.members(this.requireGroup(channelId)).filter((m) => m.leaf !== own && pick(decoder.decode(m.identity))).length;
+        const commits = Math.ceil(picked / (this.options.batch?.remove ?? REMOVE_BATCH)) + COMMIT_ATTEMPTS;
+        const removed = new Set<string>();
+        for (let round = 0; round < commits; round++) {
+            const batch = await this.removeBatch(channelId, pick);
+            if (!batch.length) return [...removed];
+            for (const identity of batch) removed.add(identity);
+        }
+        throw new MlsRequestError(409, "staleEpoch");
+    }
+
+    /**
+     * Commit the removal of up to one batch of the leaves `pick` selects,
+     * catching up and choosing again when another commit wins the epoch.
+     */
+    private async removeBatch(channelId: string, pick: (identity: string) => boolean): Promise<string[]> {
         for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt++) {
             const groupId = this.requireGroup(channelId);
             const own = this.member.ownLeaf(groupId);
             const leaves = this.member.members(groupId).flatMap((m) => {
                 const identity = decoder.decode(m.identity);
                 return m.leaf !== own && pick(identity) ? [{ leaf: m.leaf, identity }] : [];
-            });
+            }).slice(0, this.options.batch?.remove ?? REMOVE_BATCH);
             if (!leaves.length) return [];
             const epoch = this.member.epoch(groupId);
             const out = this.member.removeMembers(groupId, leaves.map((l) => l.leaf));

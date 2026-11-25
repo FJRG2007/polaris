@@ -20,7 +20,7 @@
  * should be talked into running something found inside them.
  */
 
-import { describeReportFile } from "@/lib/chat/report-files";
+import { describeReportFile, readReportFile } from "@/lib/chat/report-files";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { apiAdmin } from "@/lib/api-session";
 import { rangeHeaders, streamStored } from "@/lib/chat/streamed-file";
@@ -52,6 +52,23 @@ export async function GET(
     const asFile = new URL(request.url).searchParams.get("download") === "1";
     const shown =
         !asFile && (isInlineImage(file.contentType) || isPlayableMedia(file.contentType));
+    const headers = {
+        "Content-Type": shown ? file.contentType : "application/octet-stream",
+        "Cache-Control": CACHE,
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+        ...downloadTicketHeaders(request),
+        "Content-Disposition": `${shown ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`
+    };
+    // A sealed file the reporter opened for the moderators: opened here whole
+    // with its own key (docs/chat-e2ee-mls.md, "Sealed reports"), no ranges.
+    if (file.sealed) {
+        const opened = await readReportFile(reportId, fileId);
+        if (!opened) {
+            return Response.json({ error: (await readerWords("chat"))("errors.fileGone") }, { status: 410 });
+        }
+        return new Response(new Uint8Array(opened.bytes), { status: 200, headers });
+    }
     // Streamed rather than read whole. A report about a message carrying an
     // hour-long recording is a report an administrator has to be able to open, and
     // the bytes are the same bytes the conversation serves - see `streamStored`.

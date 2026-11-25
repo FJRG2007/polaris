@@ -17,8 +17,8 @@ import { useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { runAction } from "@/lib/run-action";
 import { BlockAfterReport } from "@/components/block-after-report";
-import { reportConversationAction, reportMessageAction } from "./actions";
-import { discloseSealed } from "@/lib/chat/e2ee/sealed-chat";
+import { conversationReportSealedAction, reportConversationAction, reportMessageAction } from "./actions";
+import { discloseSealed, discloseSealedMany, sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import type { ChatReportReason } from "@polaris/core";
 import {
     CHAT_REPORT_REASONS,
@@ -81,11 +81,19 @@ export function ReportDialog({
         setBusy(true);
         setError("");
         const disclosure = messageId && sealedIn ? await discloseSealed(sealedIn, messageId) : null;
+        // A whole conversation's sealed lines go with their own keys, so the
+        // moderators read them; one this browser cannot open goes without words.
+        const disclosures =
+            whole && channelId && sealedChatActive()
+                ? await conversationReportSealedAction(channelId)
+                      .then((answer) => discloseSealedMany(channelId, answer.ids ?? []))
+                      .catch(() => ({}))
+                : {};
         const result = await runAction(
             () =>
                 messageId
                     ? reportMessageAction({ messageId, reason, note, ...(disclosure ? { disclosure } : {}) })
-                    : reportConversationAction({ channelId, reason, note }),
+                    : reportConversationAction({ channelId, reason, note, ...(Object.keys(disclosures).length ? { disclosures } : {}) }),
             setError
         );
         setBusy(false);

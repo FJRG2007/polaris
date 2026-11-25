@@ -22,6 +22,7 @@ import { translatorFor } from "@/lib/i18n/translate";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { ChatRuleError } from "@/lib/chat/access";
 import { readReportContext, recentReadable, type ReportContextEntry } from "@/lib/chat/report-context";
 
 /** One case, as the queue draws it. */
@@ -154,7 +155,7 @@ export async function openLockdownCase(userId: string, note: string): Promise<vo
 /** Somebody reported a person. */
 export async function reportUser(
     reporterId: string,
-    input: core.UserReportInput
+    input: core.UserReportInput & { readonly disclosures?: Readonly<Record<string, string>> }
 ): Promise<{ error?: string }> {
     // i18n-ignore said in the reader's words by the report action
     if (input.subjectId === reporterId) return { error: "You cannot report yourself." };
@@ -170,9 +171,18 @@ export async function reportUser(
     // Reported from a conversation: their last messages there that the
     // reporter can read go with it. Nothing when the reporter cannot reach it,
     // so a report never carries what its reporter could not see.
-    const context = input.channelId
-        ? await recentReadable({ id: reporterId }, input.channelId, input.subjectId)
-        : [];
+    // Their sealed lines carry words only through the reporter's own key for
+    // each (`disclosures`); one that does not open its line refuses the report.
+    let context: ReportContextEntry[] = [];
+    try {
+        context = input.channelId
+            ? await recentReadable({ id: reporterId }, input.channelId, input.subjectId, input.disclosures)
+            : [];
+    } catch (caught) {
+        if (!(caught instanceof ChatRuleError)) throw caught;
+        // i18n-ignore said in the reader's words by the report action
+        return { error: "That account could not be reported." };
+    }
 
     // One open report per person per reporter. A second press is the same
     // report, and what it says is the newer of the two.
