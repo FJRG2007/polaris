@@ -67,3 +67,57 @@ describe("session image refresh", () => {
         );
     });
 });
+
+describe("the session machine image", () => {
+    const images = { machine: "ghcr.io/x/machine", fallback: "node:24" };
+
+    beforeEach(() => {
+        image.resetSessionImageRefresh();
+        vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    });
+
+    it("starts on the machine image without ever pulling it in front of the session", async () => {
+        const up = vi.fn(async () => undefined);
+        const pull = vi.fn(async () => undefined);
+        await image.upWithSessionImage(up, pull, images, () => 10);
+        await image.sessionImageRefreshing();
+        expect(up.mock.calls).toEqual([["ghcr.io/x/machine", "never"]]);
+        // The refresh behind it fetches the machine image, not the stock one.
+        expect(pull.mock.calls).toEqual([["ghcr.io/x/machine"]]);
+    });
+
+    it("falls back to the stock image when the box does not have it yet", async () => {
+        const up = vi.fn(async (name: string) => {
+            if (name === "ghcr.io/x/machine") throw new Error("No such image");
+        });
+        const pull = vi.fn(async () => undefined);
+        await image.upWithSessionImage(up, pull, images, () => 10);
+        await image.sessionImageRefreshing();
+        expect(up.mock.calls).toEqual([
+            ["ghcr.io/x/machine", "never"],
+            ["node:24", "missing"]
+        ]);
+        expect(pull).toHaveBeenCalledWith("ghcr.io/x/machine");
+    });
+
+    it("still starts the session when the registry has no machine image", async () => {
+        const up = vi.fn(async (name: string) => {
+            if (name === "ghcr.io/x/machine") throw new Error("No such image");
+        });
+        const pull = vi.fn(async () => {
+            throw new Error("manifest unknown");
+        });
+        await image.upWithSessionImage(up, pull, images, () => 10);
+        await image.sessionImageRefreshing();
+        expect(up).toHaveBeenLastCalledWith("node:24", "missing");
+    });
+
+    it("passes on a failure the stock image has too", async () => {
+        const up = vi.fn(async () => {
+            throw new Error("could not create network");
+        });
+        await expect(image.upWithSessionImage(up, vi.fn(async () => undefined), images, () => 10)).rejects.toThrow(
+            "could not create network"
+        );
+    });
+});

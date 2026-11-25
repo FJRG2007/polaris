@@ -66,6 +66,8 @@ import {
 } from "./session-hooks";
 import * as fork from "./session-fork";
 import * as memory from "./session-memory";
+import { gitIdentityFor } from "./session-git-identity-source";
+import type { GitIdentity, GitIdentityScope } from "./session-git-identity";
 import { skillsSyncScript } from "./session-skills";
 import { endContainerSession, type SaveOutcome } from "./session-work";
 import { clearSessionWaiting, noticeSessionEnded } from "./agent-notices";
@@ -206,6 +208,9 @@ interface Bootstrap {
     readonly cloneHeader: string;
     /** The credential helper script, or empty for a workspace. */
     readonly gitCredential: string;
+    /** Who the agent commits as, or null where Polaris knows nobody to name. */
+    readonly gitIdentity: GitIdentity | null;
+    readonly gitIdentityScope: GitIdentityScope;
     /** The repository's own setup script, encoded, or empty for none. */
     readonly repoSetup: string;
     /** Whether a failing setup script stops the session before the agent starts. */
@@ -490,6 +495,10 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // Not a token: a script that asks for one. The agent's environment holds
         // no GitHub credential at all.
         gitCredential: session.repoFullName ? gitCredentialScript(credential, token) : "",
+        // Resolved on every start, so a session made before this existed gets
+        // it the next time it starts.
+        gitIdentity: await gitIdentityFor(session.ownerId, session.repoFullName),
+        gitIdentityScope: session.place === "host" ? "missing" : session.sharedHome ? "repo" : "global",
         repoSetup: setup?.setupScript.trim() ? asFile(setup.setupScript) : "",
         repoSetupRequired: setup?.setupRequired ?? false,
         repoAgents: agentFiles,
@@ -918,6 +927,9 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_TOOLS_MCP: asFile(boot.toolsServer),
         POLARIS_BROWSER_MCP: boot.browserServer ? asFile(boot.browserServer) : "",
         POLARIS_GIT_CREDENTIAL: boot.gitCredential ? asFile(boot.gitCredential) : "",
+        POLARIS_GIT_NAME: boot.gitIdentity?.name ?? "",
+        POLARIS_GIT_EMAIL: boot.gitIdentity?.email ?? "",
+        POLARIS_GIT_SCOPE: boot.gitIdentityScope,
         POLARIS_REPO_SETUP: boot.repoSetup,
         POLARIS_REPO_SETUP_REQUIRED: boot.repoSetupRequired ? "yes" : "",
         POLARIS_REPO_AGENTS: boot.repoAgents,

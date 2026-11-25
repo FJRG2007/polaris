@@ -41,6 +41,7 @@ export function QuickPinInput({
         <CodeInput
             masked
             autoSubmit={length !== null}
+            boxes={length !== null}
             length={length ?? PIN_MAX}
             {...(length === null ? { placeholder: "" } : {})}
             {...props}

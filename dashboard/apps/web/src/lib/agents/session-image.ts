@@ -77,6 +77,45 @@ export async function upWithFreshImage(
         });
 }
 
+/**
+ * Bring a session up on the session machine image when the box has it, and on
+ * the stock image when it does not.
+ *
+ * `up(image, pullPolicy)` brings the container up on `image`. The machine image
+ * is tried with "never", so a box that has not pulled it yet fails at once
+ * rather than downloading a browser in front of the person who pressed send;
+ * that session starts on `fallback` exactly as every session did before, and
+ * the daily refresh - which now fetches the machine image - pulls it behind
+ * the session, so the next one is on it. A registry that does not have it yet
+ * (an install that updated before CI published it) is the same case: warned,
+ * and tried again on the next start.
+ *
+ * The work survives the switch: the home and the checkout are on the box (see
+ * `AGENT_HOME`, `SESSION_ROOT`), so a container recreated on the other image
+ * reopens on the same files.
+ */
+export async function upWithSessionImage(
+    up: (image: string, pullPolicy: ComposePullPolicy) => Promise<void>,
+    pull: (image: string) => Promise<void>,
+    images: { machine: string; fallback: string },
+    now: () => number = Date.now,
+    server: string = BOX
+): Promise<void> {
+    await upWithFreshImage(
+        async (pullPolicy) => {
+            try {
+                await up(images.machine, "never");
+            } catch (caught) {
+                console.warn("polaris: starting this session on the stock image, the session machine is not here yet:", caught);
+                await up(images.fallback, pullPolicy);
+            }
+        },
+        () => pull(images.machine),
+        now,
+        server
+    );
+}
+
 /** For tests: the refresh running now, if any. */
 export function sessionImageRefreshing(server: string = BOX): Promise<void> | null {
     return pulls.get(server)?.refreshing ?? null;

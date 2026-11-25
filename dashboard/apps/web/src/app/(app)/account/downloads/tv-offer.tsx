@@ -24,6 +24,7 @@ import { Tv } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
     Button,
+    CodeInput,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -407,19 +408,13 @@ function InstallSteps({
                         <label htmlFor="tv-code" className="text-sm font-medium">
                             {t("downloads.tv.dialog.code")}
                         </label>
-                        <Input
+                        <CodeInput
                             id="tv-code"
-                            inputMode="numeric"
-                            autoComplete="one-time-code"
-                            spellCheck={false}
-                            maxLength={6}
-                            placeholder="123456"
+                            length={6}
                             value={code}
                             disabled={!idle}
-                            onChange={(event) =>
-                                setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-                            }
-                            className="w-32 tabular-nums"
+                            onValueChange={setCode}
+                            className="max-w-72"
                         />
                     </div>
                 ) : null}

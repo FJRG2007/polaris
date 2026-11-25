@@ -49,6 +49,7 @@ on:
       - "dashboard/services/vpn/**"
       - "dashboard/services/vision/**"
       - "dashboard/services/face/**"
+      - "dashboard/services/agent-session/**"
       - "dashboard/package.json"
       - "dashboard/package-lock.json"
       - "crates/polaris-hostd/**"
@@ -137,6 +138,7 @@ jobs:
       matter: ${{ steps.filter.outputs.matter }}
       broker: ${{ steps.filter.outputs.broker }}
       dnsblock: ${{ steps.filter.outputs.dnsblock }}
+      session: ${{ steps.filter.outputs.session }}
       vpn: ${{ steps.filter.outputs.vpn }}
       vision: ${{ steps.filter.outputs.vision }}
       face: ${{ steps.filter.outputs.face }}
@@ -159,7 +161,7 @@ jobs:
           # What that version's image is built from, recorded on the image so the
           # tag is never moved to a build of other sources.
           echo "tunnel_inputs=$(python3 .github/scripts/tunnel-inputs.py HEAD)" >> "$GITHUB_OUTPUT"
-          all() { out web true; out extension true; out mdns true; out hostd true; out tunnel true; out updater true; out guard true; out hytale true; out relay true; out matter true; out broker true; out dnsblock true; out vpn true; out vision true; out face true; }
+          all() { out web true; out extension true; out mdns true; out hostd true; out tunnel true; out updater true; out guard true; out hytale true; out relay true; out matter true; out broker true; out dnsblock true; out session true; out vpn true; out vision true; out face true; }
           # Measured from the last run that published, not from the push before
           # this one. A run that failed its suites or was cancelled built nothing
           # that got tagged, so its changes are still unpublished - and measured
@@ -250,6 +252,8 @@ jobs:
           has '^dashboard/services/mqtt-broker/' && out broker true || out broker false
           # The network filter is Blocky plus an entrypoint; nothing else feeds it.
           has '^dashboard/services/dns-blocker/' && out dnsblock true || out dnsblock false
+          # The agent session machine is its Dockerfile and nothing else.
+          has '^dashboard/services/agent-session/' && out session true || out session false
           # The VPN is the pinned Headscale release plus an entrypoint.
           has '^dashboard/services/vpn/' && out vpn true || out vpn false
           # The worker bundles part of @polaris/core - the zone geometry, the
@@ -1013,6 +1017,43 @@ jobs:
           provenance: false
           sbom: false
 
+  # The machine agent sessions run on: Node with a browser, its libraries, the
+  # usual toolchains and sudo for the agent's own account. Into the dashboard's
+  # package under `latest-service-agent-session`, for the reason given on the
+  # dnsblock job. A box that has not pulled it yet starts sessions on the stock
+  # Node image and fetches this one behind them (lib/agents/session-image.ts).
+  session:
+    needs: changes
+    if: ${{ needs.changes.outputs.session == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
+          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
+          context: dashboard
+          file: dashboard/services/agent-session/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
+          # No attestation manifests, for the reason given on the relay job.
+          provenance: false
+          sbom: false
+
   # The VPN's control server: the pinned Headscale release with an entrypoint
   # that writes the configuration Polaris renders. Into the dashboard's package
   # under `latest-service-vpn`, for the reason given on the dnsblock job.
@@ -1150,7 +1191,7 @@ jobs:
   # the extension does run dashboard-ci, so this runs and tags nothing - every
   # step below is guarded on its own image's result, and all of them were skipped.
   tag:
-    needs: [changes, dashboard-ci, web, guard, hytale, relay, matter, broker, dnsblock, vpn, vision, face, tunnel-manifest]
+    needs: [changes, dashboard-ci, web, guard, hytale, relay, matter, broker, dnsblock, session, vpn, vision, face, tunnel-manifest]
     if: ${{ !cancelled() && (needs.dashboard-ci.result == 'success' || needs.dashboard-ci.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1236,6 +1277,10 @@ jobs:
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-dashboard:latest-service-dns-blocker \
             ghcr.io/fjrg2007/polaris-dashboard@${{ needs.dnsblock.outputs.digest }}
+      - name: Tag the agent session machine
+        if: ${{ env.PUBLISH == 'true' && needs.session.result == 'success' }}
+        run: |
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-dashboard:latest-service-agent-session             ghcr.io/fjrg2007/polaris-dashboard@${{ needs.session.outputs.digest }}
       - name: Tag the VPN
         if: ${{ env.PUBLISH == 'true' && needs.vpn.result == 'success' }}
         run: |

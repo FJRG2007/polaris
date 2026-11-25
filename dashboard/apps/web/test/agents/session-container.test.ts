@@ -11,7 +11,7 @@ vi.mock("@polaris/config", async (original) => ({
 }));
 vi.mock("@/lib/agents/session-capacity", () => ({ sessionLimits: async () => ({ cpus: 2, memoryMb: 2048 }) }));
 vi.mock("@/lib/agents/session-image", () => ({
-    upWithFreshImage: async (up: (policy: string) => Promise<void>) => up("missing")
+    upWithSessionImage: async (up: (image: string, policy: string) => Promise<void>) => up("node:24", "missing")
 }));
 vi.mock("@/lib/agents/session-ports", () => ({
     withContainerPorts: async (_host: string | null, work: (ports: unknown) => Promise<unknown>) =>
@@ -58,6 +58,23 @@ describe("the network a session's container joins", () => {
         refuse.network = true;
         await container.startContainer(target, {}, "true");
         expect(ups.map((up) => up.networks)).toEqual([[network.sessionNetwork(ID)], []]);
+    });
+});
+
+describe("what Claude Code is told about its machine", () => {
+    it("holds nothing the launch line would read as its own quoting", () => {
+        expect(commands.MACHINE_PROMPT).not.toMatch(/["`\$]/);
+    });
+
+    it("says it may install what it needs and never to narrate the sandbox", () => {
+        expect(commands.MACHINE_PROMPT).toContain("passwordless sudo");
+        expect(commands.MACHINE_PROMPT).toContain("CHROME_PATH");
+        expect(commands.MACHINE_PROMPT).toContain("--no-sandbox");
+        expect(commands.MACHINE_PROMPT).toMatch(/Do not describe the environment/);
+    });
+
+    it("is told only on the session machine image, which writes the marker", () => {
+        expect(commands.LAUNCH_SCRIPT).toContain(`if [ -f ${commands.MACHINE_MARKER} ]`);
     });
 });
 

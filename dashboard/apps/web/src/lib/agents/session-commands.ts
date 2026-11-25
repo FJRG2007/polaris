@@ -31,6 +31,7 @@ import { POLICY_PATHS } from "@/lib/polar/agents/cli-policies";
 import { STATE_DIR_MARK, TOOLS_NO_NODE_FILE, TOOLS_SERVER_FILE } from "./session-tools-mcp";
 import { BROWSER_SERVER_FILE } from "./session-browser-protocol";
 import { INSTALL_GH, PREINSTALL_GH } from "./session-gh";
+import { GH_PROMPT, GIT_IDENTITY_MARK, GIT_PROMPT, SET_GIT_IDENTITY } from "./session-git-identity";
 import { DELIVERABLES_DIR } from "./artifacts/artifact-files";
 import {
     FIRST_RUN_WORKDIR,
@@ -81,6 +82,21 @@ export const SIGNIN_ROWS = 30;
  * curl, and an image missing any of those turns into an apt-get on every session.
  */
 export const SESSION_IMAGE = "node:24";
+
+/**
+ * The machine a session runs on once the box has it: that same Node with a
+ * browser, its libraries, the usual toolchains and sudo already in it
+ * (`services/agent-session/Dockerfile`). Published by CI into the dashboard's
+ * own package, which is public, so a box pulls it with no sign-in.
+ *
+ * A box that has not pulled it yet starts on `SESSION_IMAGE` and fetches this
+ * one behind the session - see `upWithSessionImage` - so an install that just
+ * updated never waits on a download of the size of a browser.
+ */
+export const SESSION_MACHINE_IMAGE = "ghcr.io/fjrg2007/polaris-dashboard:latest-service-agent-session";
+
+/** Written by that image, so the boot knows it is on it. */
+export const MACHINE_MARKER = "/etc/polaris-agent-machine";
 
 /** The unprivileged account the agent runs as in that image, which ships it.
  *  Not root, because these tools refuse their skip-permissions flag as root -
@@ -908,6 +924,27 @@ export const DELIVERABLES_PROMPT =
     "every time it changes, shows it rendered beside the chat, and lets the person share it. " +
     "That folder is never committed.";
 
+/**
+ * What the agent is told about the machine it is on, where that is the session
+ * image (`MACHINE_MARKER`). The agent otherwise assumes the worst of an
+ * unfamiliar Linux box - no root, no browser - and spends its turns, and the
+ * person's attention, narrating workarounds for limits that are not there.
+ *
+ * Carried inside one double-quoted argument on the launch line, so it holds no
+ * double quote, dollar sign, backtick or backslash.
+ */
+export const MACHINE_PROMPT =
+    "This is your own Linux computer (Debian 12), and you use it the way a developer uses their own machine. " +
+    "You have passwordless sudo: install whatever you need (sudo apt-get update, then sudo apt-get install, " +
+    "or npm, pip, pipx, uv) without asking first. Your home directory and the working directory are kept " +
+    "for the whole session. Git, Node 24, Python 3, a C toolchain, jq, ripgrep and tmux are installed. " +
+    "A headless Chromium is installed at the path in CHROME_PATH, with every library Playwright and " +
+    "Puppeteer need, so screenshots and render checks work: run it with --headless --no-sandbox " +
+    "--disable-dev-shm-usage, and add --use-angle=swiftshader --enable-unsafe-swiftshader when a page " +
+    "uses WebGL or 3D. Do not describe the environment to the person (root, containers, sandboxes, " +
+    "temporary folders); if something truly cannot be done here, say what you cannot do in terms of " +
+    "their task.";
+
 export const PREVIEW_PROMPT =
     DELIVERABLES_PROMPT +
     " " +
@@ -1112,7 +1149,14 @@ export const LAUNCH_SCRIPT = [
     '  m="$(head -c 10 "$POLARIS_STATE_DIR/effort" 2>/dev/null || true)"',
     '  case "$m" in low|medium|high|xhigh|max) line="$line --effort $m" ;; esac',
     '  line="$line --settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\""',
-    `  if [ -n "\${POLARIS_PREVIEW_BASE:-}" ]; then line="$line --append-system-prompt \\"${PREVIEW_PROMPT}\\""; fi`,
+    // One argument for everything Polaris tells the agent: the machine it is
+    // on, where it is the session image, and the preview, where there is one.
+    '  ap=""',
+    `  if [ -f ${MACHINE_MARKER} ]; then ap="${MACHINE_PROMPT}"; fi`,
+    `  if [ -f "${GIT_IDENTITY_MARK}" ]; then ap="\${ap:+$ap }${GIT_PROMPT}"; fi`,
+    `  if [ -x "$POLARIS_STATE_DIR/bin/gh" ]; then ap="\${ap:+$ap }${GH_PROMPT}"; fi`,
+    `  if [ -n "\${POLARIS_PREVIEW_BASE:-}" ]; then ap="\${ap:+$ap }${PREVIEW_PROMPT}"; fi`,
+    '  if [ -n "$ap" ]; then line="$line --append-system-prompt \\"$ap\\""; fi',
     "fi",
     ...AGENT_POLICY_INSTALL,
     'if [ -n "$turn" ]; then :; elif [ -n "$id" ]; then echo "polaris: starting $POLARIS_AGENT_COMMAND on conversation $id"; else echo "polaris: starting $POLARIS_AGENT_COMMAND"; fi',
@@ -1691,6 +1735,7 @@ export const SESSION_SETUP = [
     "set -e",
     ...AGENT_ACCOUNT,
     ...PREPARE_WORKTREE,
+    ...SET_GIT_IDENTITY,
     ...AWAIT_PREINSTALL,
     ...INSTALL_ENIGMA,
     ...INSTALL_AGENT,

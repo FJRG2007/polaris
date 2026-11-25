@@ -86,6 +86,20 @@ export {
 } from "./components/bone-skeleton";
 export { Checkbox, type CheckboxProps } from "./components/checkbox";
 export {
+    CODE_LENGTH,
+    CodeInput,
+    codeDigits,
+    exampleCode,
+    isWholeCode,
+    justCompleted,
+    pasteInto,
+    settleSelection,
+    slotAt,
+    submitOwnForm,
+    type CodeInputProps,
+    type CodeSelection
+} from "./components/code-input";
+export {
     DateInput,
     type DateInputChange,
     type DateInputMode,
