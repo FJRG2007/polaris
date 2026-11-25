@@ -36,6 +36,7 @@ import * as follows from "@/lib/chat/follows";
 import * as polarMember from "@/lib/chat/polar-member";
 import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
 import { SEARCH_CANDIDATES } from "@/lib/chat/e2ee/sealed-search-index";
+import { DISCLOSURE_PATTERN } from "@/lib/chat/e2ee/sealed-report";
 import { channelGroupCandidates, grantChannelGroups } from "@/lib/chat/channel-groups";
 import { confirmAge } from "@/lib/chat/age-gate";
 import { MAX_REREAD } from "@/lib/chat/reread-limit";
@@ -1052,6 +1053,9 @@ export async function messageDeliveryAction(
     return result.value ? { delivery: result.value } : {};
 }
 
+/** A report, and for a sealed message the reader's disclosure of it (lib/chat/e2ee/sealed-report). */
+const sealedReportSchema = core.chatReportSchema.extend({ disclosure: z.string().regex(DISCLOSURE_PATTERN).optional() });
+
 /**
  * Report a message.
  *
@@ -1064,7 +1068,7 @@ export async function reportMessageAction(
     input: unknown
 ): Promise<{ already?: boolean; error?: string }> {
     const me = await actor();
-    const parsed = core.chatReportSchema.safeParse(input);
+    const parsed = sealedReportSchema.safeParse(input);
     if (!parsed.success) return { error: (await getTranslations("chat"))("errors.sayWhatIsWrong") };
     const result = await guard(() => reports.reportMessage(me, parsed.data));
     return result.error ? { error: result.error } : { already: result.value?.already };

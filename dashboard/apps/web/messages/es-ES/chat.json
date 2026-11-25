@@ -126,6 +126,7 @@
         "deleteWindowPassed": "Aquí los mensajes se pueden eliminar durante {window} después de enviarlos",
         "reportNothingToSend": "Aquí no hay mensajes que puedas ver, así que no hay nada que enviar con la denuncia.",
         "reportPleasantry": "Ese mensaje es un saludo, así que un moderador no tiene nada que decidir. Denuncia el mensaje que de verdad es el problema.",
+        "reportSealedUnreadable": "Ese mensaje no se pudo abrir aquí para los moderadores. Recarga la página y denúncialo de nuevo.",
         "roomMentionOwnerOnly": "Solo el propietario de este grupo puede usar @everyone y @here",
         "savedPicturesFull": "Puedes guardar {count} imágenes. Quita una primero.",
         "schedule": {

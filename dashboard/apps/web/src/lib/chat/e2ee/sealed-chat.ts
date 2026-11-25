@@ -284,6 +284,17 @@ export async function openSealed(channelId: string, refs: readonly SealedRef[]):
     return out;
 }
 
+/**
+ * What a report of this sealed message hands the moderators: its own key, which
+ * opens it and nothing else (docs/chat-e2ee-mls.md, "Sealed reports"). Null
+ * when sealed chat is off here or the message does not open on this device.
+ */
+export async function discloseSealed(channelId: string, messageId: string): Promise<string | null> {
+    if (!sealedChatActive()) return null;
+    const mls = await device();
+    return mls.discloseSealed(channelId, messageId).catch(() => null);
+}
+
 export interface SealedEditInput extends SealedContent {
     channelId: string;
     messageId: string;

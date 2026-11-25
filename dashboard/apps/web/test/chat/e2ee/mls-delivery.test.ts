@@ -529,6 +529,31 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         expect(await bob.readSealed(CHANNEL, [id])).toEqual([]);
     });
 
+    it("adds at most one claim's worth of newcomers per send, however many the roster answers", async () => {
+        // A large channel: the roster's pages together name more joinable accounts than one claim takes.
+        const many = Array.from({ length: 150 }, (_, i) => `66666666-6666-4666-8666-${String(i).padStart(12, "0")}`);
+        const claims: number[] = [];
+        const wide: MlsTransport = async (body) => {
+            if (body.op === "claim-key-packages") claims.push(body.userIds.length);
+            const answer = await through(ALICE)(body);
+            return body.op === "roster" ? { ...answer, joinable: [...(answer.joinable as string[]), ...many] } : answer;
+        };
+        const alice = await open(ALICE, "alice-laptop", undefined, undefined, wide);
+        const carol = await open(CAROL, "carol-desk-1");
+        for (const device of [alice, carol]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        state.members.add(`${CAROL}:${CHANNEL}`);
+        // Members of the conversation, with no device yet: the claim answers no packages for them.
+        for (const id of many) state.members.add(`${id}:${CHANNEL}`);
+
+        await alice.sendSealed(CHANNEL, new TextEncoder().encode("to a big room"));
+        expect(claims.length).toBeGreaterThan(0);
+        expect(Math.max(...claims)).toBeLessThanOrEqual(100);
+        // Carol was in the batch, so she reads it without having opened the conversation.
+        await carol.sync(CHANNEL);
+        expect(carol.groupOf(CHANNEL)).toEqual(alice.groupOf(CHANNEL));
+    });
+
     it("before sealing, takes out the devices of who left and adds the people who joined", async () => {
         const alice = await open(ALICE, "alice-laptop");
         const bob = await open(BOB, "bob-phone-1");
