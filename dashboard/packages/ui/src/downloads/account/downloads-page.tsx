@@ -56,7 +56,7 @@ export function DownloadsPage({
     tv?: ReactNode;
     /** Where the signed Firefox package is served, when the release has one. */
     signedFirefox?: Promise<string | null>;
-    /** The app this page runs in - its version and its updates - above the cards; nothing in a browser. */
+    /** The phone app this page runs in - its version and its updates - above the cards; nothing in a browser or the desktop app, whose own card says it. */
     thisDevice?: ReactNode;
 }) {
     const t = useTranslations("account");

@@ -2,7 +2,7 @@
 
 /**
  * Downloads while the host answers for the page: its heading and, inside the
- * app, the app's own version and updates - none of which wait on the host, so
+ * phone app, the app's own version and updates - none of which wait on the host, so
  * the restart into a downloaded update is there at once (offline too). Only the
  * cards, which list what the host's releases hold, are sketched.
  */
@@ -19,7 +19,7 @@ export default function Loading() {
                 <h1 className="text-[17px] font-semibold tracking-tight">{t("downloads.page.title")}</h1>
                 <p className="text-sm text-muted-foreground">{t("downloads.page.intro")}</p>
             </div>
-            <ThisDeviceApp />
+            <ThisDeviceApp desktop={false} />
             <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2" aria-busy="true">
                 <Skeleton className="h-64 w-full lg:col-span-2" />
                 <Skeleton className="h-64 w-full" />

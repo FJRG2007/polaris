@@ -38,7 +38,7 @@ vi.mock("next/navigation", () => ({
 const network = vi.hoisted(() => ({ online: true, recovered: 0 }));
 vi.mock("@enigmax/primitives/react/network", () => ({ useNetworkState: () => network }));
 
-const { AppSettingsView, forgetAppSettingsSnapshot } = await import(
+const { AppSettingsView, AppSettingsScreen, forgetAppSettingsSnapshot } = await import(
     "../../src/app/(app)/account/app/[category]/app-settings-view"
 );
 const { defaultAppSettings } = await import("../../src/components/this-app/app-settings-values");
@@ -389,6 +389,43 @@ describe("the app's settings screen", () => {
         });
         await act(async () => screen.getByRole("button", { name: "Restart now" }).click());
         expect(installUpdate).toHaveBeenCalled();
+    });
+
+    it("heads General with the app's version and its check, once", async () => {
+        install({ ...fakeBridge(), version: "0.1.109", checkForUpdates: vi.fn(async () => ({ kind: "current" })) });
+        render(
+            <MessagesWrapper>
+                <AppSettingsScreen category="general" />
+            </MessagesWrapper>
+        );
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(screen.getAllByText("Polaris 0.1.109")).toHaveLength(1);
+        expect(screen.getAllByRole("button", { name: "Check for updates" })).toHaveLength(1);
+    });
+
+    it("leaves the version off the other categories", async () => {
+        install({ ...fakeBridge(), version: "0.1.109", checkForUpdates: vi.fn() });
+        render(
+            <MessagesWrapper>
+                <AppSettingsScreen category="window" />
+            </MessagesWrapper>
+        );
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(screen.queryByText("Polaris 0.1.109")).toBeNull();
+    });
+
+    it("draws nothing on Downloads inside the desktop app, whose own card names the version", () => {
+        install({ ...fakeBridge(), version: "0.1.109", checkForUpdates: vi.fn() });
+        const { container } = render(
+            <MessagesWrapper>
+                <ThisDeviceApp desktop={false} />
+            </MessagesWrapper>
+        );
+        expect(container.textContent).toBe("");
     });
 
     it("draws nothing for the app on Downloads in a browser", () => {
