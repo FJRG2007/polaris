@@ -20,7 +20,6 @@
  * its member list - and who is in it with a device but holds no leaf.
  */
 
-import { prisma } from "@polaris/db";
 import { chatE2eeEnabled } from "./flag";
 import { NextResponse } from "next/server";
 import * as delivery from "./mls-delivery";
@@ -66,9 +65,9 @@ async function allReach(channelId: string, userIds: Iterable<string>): Promise<b
 /** The account half of a `${userId}/${device}` address (the schema fixes its shape). */
 const accountOf = (address: string) => address.slice(0, address.indexOf("/"));
 
+/** The device is the session's own and known; its use keeps it from counting as inactive. */
 async function ownDevice(userId: string, device: string): Promise<boolean> {
-    const row = await prisma.mlsDevice.findUnique({ where: { userId_device: { userId, device } }, select: { userId: true } });
-    return Boolean(row);
+    return delivery.touchDevice(userId, device);
 }
 
 const REFUSED = { error: "refused" } as const;
@@ -120,6 +119,10 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
         await delivery.publishKeyPackages(userId, body.device, body.ciphersuite, body.keyPackages.map(bytes), body.lastResort);
         return json({ ok: true });
     }
+    if (body.op === "retire-device") {
+        await delivery.retireDevice(userId, body.device);
+        return json({ ok: true });
+    }
     // Every other op is about one conversation the account has to reach.
     if (!(await channelAccess({ id: userId }, body.channelId))) return json(REFUSED, 403);
     switch (body.op) {
@@ -160,9 +163,16 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
             const others = [...named].filter((id) => id !== userId && !audience.has(id)).slice(0, JOINABLE_PAGE);
             const reach = await Promise.all(others.map((id) => channelAccess({ id }, body.channelId)));
             const candidates = [...audience].filter((id) => id !== userId && !named.has(id));
+            // Devices are answered only for the accounts named here or the caller's own, so the
+            // call says nothing about the devices of anybody outside the caller's group.
+            const devices = body.devices.filter((address) => {
+                const account = address.slice(0, address.indexOf("/"));
+                return account === userId || named.has(account);
+            });
             return json({
                 departed: others.filter((_, i) => !reach[i]),
-                joinable: await delivery.accountsWithKeyPackages(candidates, body.ciphersuite, JOINABLE_PAGE)
+                joinable: await delivery.accountsWithKeyPackages(candidates, body.ciphersuite, JOINABLE_PAGE),
+                retired: await delivery.retiredDevices(devices, await delivery.inactiveCutoff())
             });
         }
         case "group": {

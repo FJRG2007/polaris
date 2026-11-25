@@ -107,6 +107,7 @@ export function memoryPrisma(state: MemoryTablesState) {
         mlsStoreEntry: table("mlsStoreEntry", ["device", "key"]),
         chatServiceMember: table("chatServiceMember", ["channelId", "service"]),
         user: table("user", ["id"]),
+        setting: table("setting", ["key"]),
         // All or nothing, one at a time (Postgres's row lock on the group does
         // the same for two commits): run on the live tables, put the copy back
         // on a throw.

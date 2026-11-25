@@ -390,9 +390,6 @@ What is built on top of it:
   address, ops in-process through `answerMls`; a service's sealed message is
   stored with no author under Polar's or the webhook's name). Polar answering,
   a webhook posting and the member list's switch are built too (see below).
-- Sign-out deletes the browser's MLS device, but its leaf stays in each group
-  until another member removes it (`reconcile` removes only the leaves of
-  accounts that left, not a signed-out device of an account still in it).
 
 ## Turning it on: what is missing (2026-11-24)
 
@@ -409,7 +406,7 @@ share of the work, not of the code.
 | 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback` for the 30-day rollback), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Left: the admin progress line (`migrationProgress()` exists, no screen yet), rollback (restore from `ChatMigrationRollback`), the purge after 30 days (decision 4), attachments/polls/system rows (row 3), members with no account key yet getting the legacy key later (needs `ORK` or a member device re-sealing it), a "history before [date]" label. | Yes (owner: every existing chat migrated) | ~45% |
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
 | 7 | **Key transparency** (proposal 4.6): `AccountKeyVerifier` has no log behind it, so a server could hand out a substitute account key. Safety numbers and key-change notices are not built. | Yes, for "government-grade" | 0% |
-| 8 | **Device hygiene**: a signed-out browser's leaf stays in each group until someone removes it; inactive-device removal (decision 7) and the "new device added" notice are not built. | Yes, for post-compromise security | ~10% |
+| 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody. Left: the screen for the instance limit (the `Setting` key is read, 7-90) and the organisation's own limit, the "new device added" notice on the account's other devices, a device list with revoke. | Yes, for post-compromise security | ~50% |
 | 9 | **Server features that read chat text**: whole-Polaris export/import and backups carry sealed rows but no keys; moderation reports, retention and compliance export (proposal 9), automations that read messages. Each needs its sealed answer or an explicit "not in sealed conversations". | Partly (export/import must round-trip) | ~10% |
 | 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. | No (documented limit) | ~40% |
 | 11 | **Web code trust** (proposal 4.7): published hash of the crypto bundle, extension and desktop checking it, strict CSP and Trusted Types on message rendering. | No for default-on; yes for intelligence deployments | ~10% |
@@ -441,6 +438,58 @@ missing at build time) ships sealed chat switched on but unable to open a
 device - every send stays "not sent yet" in the outbox, and nothing is sent in
 the clear instead. CI sets `POLARIS_CORE_RS_REQUIRED=1`, so a published image
 always carries it.
+
+## Device hygiene (built 2026-11-25)
+
+A leaf that nobody uses any more is a key that still receives everything said
+in the group: a browser signed out (its store deleted, the leaf left behind), a
+lost laptop, a device last opened months ago. Removing those leaves is what
+gives MLS its post-compromise security in practice: a leaf that never
+updates keeps the keys it had when it was last seen. WhatsApp logs a linked
+device out after 30 days unused and Signal unlinks an inactive one (the proposal
+cites 45 days); Matrix keeps a device until it is signed out. Decision 7 of the
+proposal: 30 days by default, 7 to 90 adjustable.
+
+- **Retired devices.** A device is retired when its record is gone (signed out,
+  or never known) or its `lastSeenAt` is older than the limit
+  (`retiredDevices`, `inactiveCutoff`, `mls-delivery.ts`). The limit is
+  `INACTIVE_DEVICE_DAYS` (30) unless the `Setting` key
+  `chat.e2ee.inactiveDeviceDays` holds another, clamped to 7-90, so it works on
+  every install with nothing set.
+- **Sign-out retires the browser's device** while the session still stands
+  (`retireBrowserDevice` in `mls-browser.ts`, called by `signOut` before the
+  sign-out request; op `retire-device`): the server deletes the device and its
+  key packages. It waits at most 3 seconds and never fails the sign-out; a
+  device it did not reach is retired by the limit instead. "Sign out of all"
+  and a session ended from another device are covered by the limit only.
+- **Use keeps a device in.** Registering sets `lastSeenAt`; every op a device
+  makes as itself (`events`, `commit`, `application` - a send reads the log first) moves it at most
+  once an hour (`touchDevice`), so a tab left open for weeks stays in.
+- **Members take the leaves out.** `roster` takes the device addresses of the
+  group's leaves (`devices`, at most 1,000 per call; older callers send none)
+  and answers `retired`, only for the accounts the call names or the caller's
+  own, so it says nothing about anybody outside the caller's group.
+  `reconcile` - run before every sealed send - removes retired leaves in the
+  same commit as the devices of accounts that left, the account's own other
+  browsers included. A member the server runs (Polar, a webhook) is never
+  retired for being quiet: its device lives on the server and registers each
+  time it acts.
+- **Nobody adds a retired device.** `claim-key-packages` skips a device past
+  the limit and deletes its key packages; it publishes fresh ones when back.
+- **Coming back needs nothing.** A retired device that opens again registers,
+  and rejoins each conversation by its own external commit when it opens it
+  (the account still reaches it); the past comes from its account's history
+  keys, so no history is lost.
+- **What the server can do with it.** A server lying in `retired` can only
+  make members remove a live device, which then rejoins by itself: a denial
+  of service it could cause anyway by withholding messages. It cannot add a
+  device this way.
+
+Tests: `mls-delivery.test.ts` (the route's `retired` answer, the limit and its
+clamp, the hourly touch, claims skipping a stale device; against the real MLS
+binding, a send that removes a signed-out phone and an unseen PC in one commit,
+the remaining phone still reading, the removed PC reading its removal, and the
+PC rejoining), `retire-browser-device.test.ts`.
 
 ## Sealed files (built 2026-11-25)
 

@@ -120,7 +120,16 @@ export const mlsBody = z.discriminatedUnion("op", [
     // Every member's public account key, a page at a time: the committer seals each epoch's history key to all of them.
     z.object({ op: z.literal("member-account-keys"), channelId, after: z.string().uuid().optional() }),
     // The accounts holding a leaf in the caller's copy of the group: which have left, and who is in but has no leaf.
-    z.object({ op: z.literal("roster"), channelId, accounts: z.array(z.string().uuid()).min(1).max(1000), ciphersuite }),
+    // `devices`: the leaves of those accounts other than the caller's own (older callers sent none): which are retired.
+    z.object({
+        op: z.literal("roster"),
+        channelId,
+        accounts: z.array(z.string().uuid()).min(1).max(1000),
+        devices: z.array(deviceAddressText).max(1000).default([]),
+        ciphersuite
+    }),
+    // The session's own device leaves: its account signed out of this browser.
+    z.object({ op: z.literal("retire-device"), device: deviceId }),
     z.object({ op: z.literal("group"), channelId }),
     z.object({ op: z.literal("create-group"), channelId, groupId: base64Url(16, 256), ciphersuite, groupInfo: mlsBytes }),
     z.object({

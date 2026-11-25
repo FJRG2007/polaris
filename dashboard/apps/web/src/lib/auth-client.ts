@@ -10,6 +10,7 @@
  */
 
 import { createAuthClient } from "better-auth/react";
+import { currentAccount } from "@/lib/account-marker";
 import { leaveAccount } from "@/lib/account-switch";
 import { passkeyClient } from "@better-auth/passkey/client";
 import { signOutAccountAction } from "@/app/device-account-actions";
@@ -40,6 +41,9 @@ export const { signIn, signUp, useSession } = authClient;
 export async function signOut(): Promise<string | null> {
     let refused: string | undefined;
     try {
+        // The chat MLS device leaves the conversations' groups while the session can still say so.
+        const account = currentAccount();
+        if (account) await import("@/lib/chat/e2ee/mls-browser").then((mls) => mls.retireBrowserDevice(account)).catch(() => undefined);
         refused = (await signOutAccountAction()).error;
     } finally {
         if (!refused) await leaveAccount("/oauth/login", "this");
