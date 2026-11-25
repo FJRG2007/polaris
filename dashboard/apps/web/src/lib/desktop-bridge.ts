@@ -272,6 +272,11 @@ export interface PolarisDesktop {
      *  (true). Absent from an older app, whose page falls back to the window's
      *  focus to tell (`lib/idle.ts`). */
     onWindowShown?(listener: (shown: boolean) => void): () => void;
+    /** Take the paths the app's search and notices open in this window, so they
+     *  move through this page's router and a call on it stays up. Without it the
+     *  app loads the address over the page. Absent from an older app, which
+     *  always loads it. Answers the way to stop. */
+    onNavigate?(listener: (path: string) => void): () => void;
     /** Hold a call's mute and deafen keys system-wide, so they work with
      *  another program in front; null lets them go. Answers which controls the
      *  system gave - a key another program holds is not taken, and the page

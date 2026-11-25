@@ -59,6 +59,7 @@ import * as settings from "./settings";
 import { cancelRelaunch, holdCall, loadRelaunch, markRelaunch, relaunched } from "./relaunch";
 import { savedServers, serverAddress, setSavedServers, setServerAddress } from "./settings";
 import { backIndex, isDashboardPage, serverPath } from "./navigation";
+import { openInPage } from "./page-router";
 import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, warmLocalSheet, type LocalSheet } from "./windows";
 import { app, autoUpdater, BrowserWindow, dialog, net, powerMonitor, screen, session, type WebContents } from "electron";
 import { describeNetError, describeOfflinePage, errorText, finishedLoad, isCertificateError, netErrorCode, RECONNECTS_WORDS } from "./reachability";
@@ -166,7 +167,8 @@ function showPolaris(path?: string): void {
     }
     const url = (path && serverPath(path, origin)) || null;
     if (main && !main.isDestroyed()) {
-        if (url) void main.loadURL(url);
+        // Through the page's own router when it takes paths, so a call on it stays up.
+        if (url) openInPage(main.webContents, url, origin);
         if (main.isMinimized()) main.restore();
         main.show();
         main.focus();
@@ -611,7 +613,7 @@ async function openSettings(place: SettingsPlace = "general"): Promise<void> {
     page.show();
     page.focus();
     if (route.kind === "page") page.webContents.send(CHANNELS.appSettingsOpen, place);
-    else void page.loadURL(`${origin}${route.path}`);
+    else openInPage(page.webContents, `${origin}${route.path}`, origin);
 }
 
 /** The hosts window, and why it opened in place of the host's screen: with the
@@ -652,7 +654,7 @@ async function openOnHost(path: string): Promise<HostPageOutcome> {
     if (page.isMinimized()) page.restore();
     page.show();
     page.focus();
-    void page.loadURL(`${origin}${path}`);
+    openInPage(page.webContents, `${origin}${path}`, origin);
     return "opened";
 }
 

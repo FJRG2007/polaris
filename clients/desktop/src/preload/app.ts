@@ -93,6 +93,17 @@ const bridge: PolarisDesktop = {
             ipcRenderer.removeListener(CHANNELS.windowShown, heard);
         };
     },
+    onNavigate: (listener) => {
+        const heard = (_event: unknown, path: unknown) => {
+            if (typeof path === "string") listener(path);
+        };
+        ipcRenderer.on(CHANNELS.navigate, heard);
+        void ipcRenderer.invoke(CHANNELS.navigateReady, true);
+        return () => {
+            ipcRenderer.removeListener(CHANNELS.navigate, heard);
+            void ipcRenderer.invoke(CHANNELS.navigateReady, false);
+        };
+    },
     setCallHotkeys: (input) => ipcRenderer.invoke(CHANNELS.callHotkeys, input),
     onCallHotkey: (listener) => {
         const heard = (_event: unknown, which: CallHotkey) => listener(which);

@@ -13,7 +13,8 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
-import { bindRouter } from "@/lib/keep-call";
+import { desktopBridge } from "@/lib/desktop-bridge";
+import { bindRouter, navigateInApp } from "@/lib/keep-call";
 import { CallBar, CallProvider } from "@/app/(app)/chat/call-session";
 import { DesktopSharePickerHost } from "@/app/(app)/chat/desktop-share-picker";
 
@@ -31,6 +32,9 @@ export function CallHolder({
     // outside React (`navigateInApp`): a client navigation keeps the call.
     const router = useRouter();
     useEffect(() => bindRouter((href) => router.push(href)), [router]);
+    // The desktop app's search and notices open their paths through the same
+    // router, rather than loading the address over the page and the call on it.
+    useEffect(() => desktopBridge()?.onNavigate?.((path) => navigateInApp(path)), []);
     if (!hasChat) return <>{children}</>;
 
     // The room being looked at, in either of the two shapes one has: a

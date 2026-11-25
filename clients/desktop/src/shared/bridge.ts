@@ -152,6 +152,11 @@ export interface PolarisDesktop {
      *  which keeps the page's visibility "visible" while minimized; this is how
      *  it knows nobody can see it. Answers the way to stop. */
     onWindowShown(listener: (shown: boolean) => void): () => void;
+    /** Take the paths the app's search, notices and links open in this window,
+     *  so they move through the page's own router and a call on it stays up.
+     *  Until a page takes them the app loads the address over it. Answers the
+     *  way to stop. */
+    onNavigate(listener: (path: string) => void): () => void;
     /** Hold a call's mute and deafen keys system-wide, so they work with
      *  another program in front; null lets them go. Says which controls the
      *  system gave, so the page keeps listening itself for any it did not. */
@@ -810,6 +815,8 @@ export const CHANNELS = {
     openOutside: "desktop:open-outside",
     linkNotice: "desktop:link-notice",
     windowShown: "desktop:window-shown",
+    navigate: "desktop:navigate",
+    navigateReady: "desktop:navigate-ready",
     callHotkeys: "desktop:call-hotkeys",
     callHotkey: "desktop:call-hotkey",
     voiceState: "desktop:voice-state",

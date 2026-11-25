@@ -92,6 +92,7 @@ import {
 } from "electron";
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
 import { recordPageReport } from "./perf-watch";
+import { openInPage, setRouterListening } from "./page-router";
 import { clearClipboardHistory, followClipboardKeep, launcherStatus, recordLauncherKey, setLauncherBinding } from "./launcher";
 import { APP_SETTING_FEATURES, appKeyPressSchema, appOverlayGameChangeSchema, readAppSettingChange, type AppSettingChange } from "@polaris/core/app-settings";
 import { bindingFromPress } from "@/shared/launcher-hotkey";
@@ -330,7 +331,8 @@ export function registerIpc(host: IpcHost): void {
                     if (window.isMinimized()) window.restore();
                     window.show();
                     window.focus();
-                    if (url) void window.loadURL(url);
+                    // A notice's page, through the page's router so a call stays up.
+                    if (url && origin) openInPage(window.webContents, url, origin);
                 } else {
                     host.showPolaris(href);
                 }
@@ -710,6 +712,15 @@ export function registerIpc(host: IpcHost): void {
                 if (details?.isMainFrame && !details.isSameDocument) host.holdCall(sender.id, "", null);
             });
         }
+        return true;
+    });
+
+    // The page says its router takes the paths opened in this window, or no
+    // longer does (`page-router`). Forgotten when the page is replaced.
+    ipcMain.handle(CHANNELS.navigateReady, (event, ...args: unknown[]): boolean => {
+        const on = z.tuple([z.boolean()]).safeParse(args);
+        if (!fromPolaris(event) || !on.success) return false;
+        setRouterListening(event.sender, on.data[0]);
         return true;
     });
 
