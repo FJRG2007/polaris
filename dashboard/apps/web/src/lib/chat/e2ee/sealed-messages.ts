@@ -60,7 +60,7 @@ export interface SealedSend {
     /** Sealed files staged for this message (`claimUploads(..., sealed)`); their keys are inside the seal. */
     uploads?: readonly string[];
     /** A poll: its question and answers are inside the seal; the server keeps one empty answer row per answer, the rules and the votes. */
-    poll?: { options: number; multiple: boolean; hideResults: boolean; hours: number };
+    poll?: { options: number; multiple: boolean; hideResults: boolean; anonymous: boolean; hours: number };
     epoch: bigint;
     senderLeaf: number;
     ciphertext: Uint8Array;
@@ -112,6 +112,7 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
                   options: Array.from({ length: input.poll.options }, () => ""),
                   multiple: input.poll.multiple,
                   hideResults: input.poll.hideResults,
+                  anonymous: input.poll.anonymous,
                   closesAt: core.pollClosesAt(input.poll.hours)
               }
             : null,

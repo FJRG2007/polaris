@@ -404,7 +404,7 @@ share of the work, not of the code.
 | --- | --- | --- | --- |
 | 1 | **Real-browser run of the sealed flows.** The text flows passed end to end against a production build on 2026-11-24 (see the note under this table). Also passed in a browser (2026-11-24, round 18): the launcher's Chat search finding a sealed message by its words on the sender's and the reader's browser; a webhook posting over HTTP into a sealed group (204, stored sealed under the given name, opened by both members, `?wait=true` answered); two tabs of one browser sending in turn and at once, every message opened by the other side - which showed the tabs fighting over the device, now fixed ("Every tab of a browser shares its device"; the fix itself is unit-tested and not yet re-run in a browser). Not yet: the chat panel's own search, the "Polar in this chat" switch (the driver did not reach it through the info panel), Polar's Approve and Cancel (needs a provider). | Yes | ~65% |
 | 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). A page loaded before sealed chat was on is told to reload instead (`errors.sealedOnlyReload`, see "Sealed only"). A conversation the migration cut is sealed only before any browser has made its group (`conversationSealed` reads `ChatMigration`). Left: a sealed form for editing an old plain message in a sealed conversation. | Yes | ~85% |
-| 3 | **Message kinds that are still plain.** Built (2026-11-25): attachments, see "Sealed files"; polls, see "Sealed polls" (question and answers sealed; votes are still server-side rows, like reactions). Left: voice notes recorded in a sealed conversation ride the sealed-file path (their length and shape are inside the seal) but are not verified in a browser; sealed votes with a tally in the browser (proposal: "votos cifrados; recuento en el cliente", together with reactions), scheduled messages, forum post titles, server-side translations, link cards, files sent to be seen once and files left in a Drive (refused in a sealed conversation, nothing sent in the clear). Until each has its sealed form a sealed conversation cannot send it. | Yes | ~46% (text, edits, replies, threads, Polar, webhooks, files - with the gallery, forum list and video stills - poll questions and answers are sealed) |
+| 3 | **Message kinds that are still plain.** Built (2026-11-25): attachments, see "Sealed files"; polls, see "Sealed polls" (question and answers sealed; votes are still server-side rows, like reactions; public or anonymous chosen at creation, see "Public and anonymous votes"). Left: voice notes recorded in a sealed conversation ride the sealed-file path (their length and shape are inside the seal) but are not verified in a browser; sealed votes with a tally in the browser (proposal: "votos cifrados; recuento en el cliente", together with reactions), scheduled messages, forum post titles, server-side translations, link cards, files sent to be seen once and files left in a Drive (refused in a sealed conversation, nothing sent in the clear). Until each has its sealed form a sealed conversation cannot send it. | Yes | ~46% (text, edits, replies, threads, Polar, webhooks, files - with the gallery, forum list and video stills - poll questions and answers are sealed) |
 | 4 | **Default-on switch.** `chatE2eeEnabled()` reads `=== "1"`. Default-on has to be on with nothing set and keep an env kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md). | Yes | 0% (one line, last) |
 | 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback` for the 30-day rollback), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Left: the admin progress line (`migrationProgress()` exists, no screen yet), rollback (restore from `ChatMigrationRollback`), the purge after 30 days (decision 4), attachments/polls/system rows (row 3), members with no account key yet getting the legacy key later (needs `ORK` or a member device re-sealing it), a "history before [date]" label. | Yes (owner: every existing chat migrated) | ~45% |
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
@@ -497,7 +497,7 @@ Verified: unit tests (`packages/chat-crypto/test/file-content.test.ts`,
 With sealed chat on, the poll dialog (`send-poll.ts`) seals the question as the
 body and the answers as `poll.options` (`sealedPollSchema`, 2-10 answers of
 up to 100 characters) and sends them with `send-sealed`, which carries only
-`poll: { options: <count>, multiple, hideResults, hours }`. The server
+`poll: { options: <count>, multiple, hideResults, anonymous, hours }`. The server
 (`sealed-messages.sendSealed`) writes the usual `ChatPoll` with one answer row
 per answer and no words in it; a poll from Polar or a webhook, or one with
 files, is refused (`pollRefused`). Readers name the answers from the seal by
@@ -510,8 +510,40 @@ who picked which answer position (the vote rows, which the tallies and the
 "hidden until closed" rule are computed from). Sealing the votes themselves,
 with the count made in each browser, is left with reactions.
 
-Verified: unit tests (`apps/web/test/chat/e2ee/sealed-polls.test.ts`). Not run
-in a browser yet.
+### Public and anonymous votes (built 2026-11-25)
+
+Every poll, plain or sealed, is asked either anonymous or public, and the
+choice cannot be changed afterwards (`ChatPoll.anonymous`, migration
+`20281202000000_chat_poll_anonymous`). This follows Telegram, whose polls are
+anonymous or public and fixed at creation, with a "view votes" list on a public
+one; Discord's polls always show who voted, and Slack has no poll of its own
+(apps such as Polly offer both modes).
+
+- Anonymous is the default in the dialog and in the schema
+  (`chatPollCreateSchema.anonymous`, and the sealed `poll.anonymous` a tab
+  from before the choice omits), and every poll asked before the choice existed
+  was migrated as anonymous: those votes were cast with nobody able to see them.
+- An anonymous poll only ever shows counts. `readPollVoters`
+  (`lib/chat/polls.ts`, `pollVotersAction`) refuses it for everybody, the asker
+  and moderators included (`errors.pollAnonymous`); no export, notification or
+  live frame names a voter (the "posted" frame carries no actor).
+- A public poll gets "See votes" on the card once its counts show: who picked
+  each answer, up to `MAX_POLL_VOTERS_LISTED` per answer with "and N more". A
+  poll that hides its results keeps the list back until it closes
+  (`errors.pollVotersHidden`).
+- One vote per person and changing your vote work the same in both modes.
+- Meeting chat polls are answered by seats, half of them guests, and stay
+  count-only; the dialog does not offer the choice inside a call.
+
+What the server still holds for an anonymous poll: the vote rows (who picked
+which answer, or answer position in a sealed conversation), which one vote per
+person and changing your vote are enforced from. No screen or API reads them
+back as names; the database itself, and so a database backup, still has them
+until sealed votes exist.
+
+Verified: unit tests (`apps/web/test/chat/e2ee/sealed-polls.test.ts`,
+`test/chat/polls.test.ts`, `poll-card.test.tsx`, `poll-dialog.test.tsx`). Not
+run in a browser yet.
 
 ## Migration of existing chats (built 2026-11-25)
 

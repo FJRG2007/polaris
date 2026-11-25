@@ -707,14 +707,14 @@ export async function createPollAction(input: unknown): Promise<{ id?: string; e
                 (await getTranslations("chat"))("errors.pollNotSent")
         };
 
-    const { channelId, question, options, multiple, hideResults, hours } = parsed.data;
+    const { channelId, question, options, multiple, hideResults, anonymous, hours } = parsed.data;
     const result = await guard(() =>
         messages.send(
             me,
             { channelId, body: question, parentId: parsed.data.parentId ?? null },
             [],
             parsed.data.replyToId ? { messageId: parsed.data.replyToId, forwarded: false } : null,
-            { options, multiple, hideResults, closesAt: core.pollClosesAt(hours) }
+            { options, multiple, hideResults, anonymous, closesAt: core.pollClosesAt(hours) }
         )
     );
     return result.error ? { error: result.error } : { id: result.value };
@@ -747,6 +747,17 @@ export async function pollAction(
     const me = await actor();
     const result = await guard(() => polls.readPoll(me, messageId));
     return result.error ? { error: result.error } : { poll: result.value ?? null };
+}
+
+/** Who picked each answer of a public poll. Refused for an anonymous one. */
+export async function pollVotersAction(
+    messageId: unknown
+): Promise<{ answers?: readonly polls.ChatPollVotersView[]; error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(messageId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.pollGone") };
+    const result = await guard(() => polls.readPollVoters(me, parsed.data));
+    return result.error ? { error: result.error } : { answers: result.value };
 }
 
 /** Close a poll early. Whoever asked it, and whoever moderates the room. */

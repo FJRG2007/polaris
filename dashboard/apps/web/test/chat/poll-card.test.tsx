@@ -34,8 +34,18 @@ vi.mock("@/app/(app)/chat/actions", () => ({
         ended.push(messageId);
         return {};
     },
-    pollAction: async () => ({ poll: null })
+    pollAction: async () => ({ poll: null }),
+    pollVotersAction: async (messageId: string) => {
+        listed.push(messageId);
+        return {
+            answers: [
+                { optionId: "o1", voters: [{ id: "u-ada", name: "Ada Lovelace" }], more: 0 },
+                { optionId: "o2", voters: [], more: 0 }
+            ]
+        };
+    }
 }));
+const listed: string[] = [];
 
 // The live wire is a device-wide connection. Nothing here is testing it, and a
 // card that opened one would be a test holding a socket.
@@ -45,6 +55,7 @@ function poll(over: Partial<ChatPollView> = {}): ChatPollView {
     return {
         multiple: false,
         hideResults: false,
+        anonymous: true,
         closed: false,
         closesAt: null,
         endedEarly: false,
@@ -212,5 +223,34 @@ describe("ending it", () => {
         expect(ended).toEqual(["m1"]);
         expect(screen.getByText("Poll closed")).toBeDefined();
         expect(screen.getByText("Closed early")).toBeDefined();
+    });
+});
+
+describe("public and anonymous votes", () => {
+    it("says an anonymous poll is anonymous and offers no list of voters", () => {
+        card(poll({ anonymous: true, voters: 2, options: [
+            { id: "o1", text: "Pizza", votes: 2, mine: false },
+            { id: "o2", text: "Sushi", votes: 0, mine: false }
+        ] }));
+        expect(screen.getByText("Anonymous")).toBeDefined();
+        expect(screen.queryByRole("button", { name: "See votes" })).toBeNull();
+    });
+
+    it("keeps the list back while a hidden public poll runs", () => {
+        card(poll({ anonymous: false, hideResults: true, results: false, voters: 2 }));
+        expect(screen.getByText("Public")).toBeDefined();
+        expect(screen.queryByRole("button", { name: "See votes" })).toBeNull();
+    });
+
+    it("lists who picked each answer of a public poll", async () => {
+        const user = userEvent.setup();
+        card(poll({ anonymous: false, voters: 1, options: [
+            { id: "o1", text: "Pizza", votes: 1, mine: false },
+            { id: "o2", text: "Sushi", votes: 0, mine: false }
+        ] }));
+        await user.click(screen.getByRole("button", { name: "See votes" }));
+        expect(listed).toEqual(["m1"]);
+        expect(await screen.findByText("Ada Lovelace")).toBeDefined();
+        expect(screen.getByText("Nobody picked this")).toBeDefined();
     });
 });

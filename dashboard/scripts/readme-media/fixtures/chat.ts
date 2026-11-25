@@ -661,6 +661,7 @@ export function generalConversation(ctx: SceneContext): ChatMessageView[] {
                 poll: {
                     multiple: false,
                     hideResults: false,
+                    anonymous: true,
                     closed: false,
                     closesAt: new Date(ctx.now + 26 * 60 * 60_000).toISOString(),
                     endedEarly: false,

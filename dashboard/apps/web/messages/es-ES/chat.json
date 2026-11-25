@@ -307,7 +307,9 @@
             "tooMany": "Este canal ya tiene el máximo de seguidores.",
             "notPublishable": "Solo se publica un mensaje del propio canal con texto.",
             "filesNotPublished": "Aún no se pueden publicar mensajes con archivos."
-        }
+        },
+        "pollAnonymous": "Los votos de esa encuesta son anónimos",
+        "pollVotersHidden": "Quién eligió qué se verá cuando cierre"
     },
     "media": {
         "refused": {
@@ -1097,7 +1099,11 @@
         "question": "Pregunta",
         "answers": "Respuestas",
         "answerN": "Respuesta {n}",
-        "removeAnswerN": "Quitar respuesta {n}"
+        "removeAnswerN": "Quitar respuesta {n}",
+        "anonymousVotes": "Votos anónimos",
+        "onlyTheCountsAreShown": "Solo se ven los recuentos, nunca quién eligió qué. No se puede cambiar después.",
+        "everybodySeesWhoPicked": "Todos aquí pueden ver quién eligió cada respuesta. No se puede cambiar después.",
+        "keepTheVotesAnonymous": "Votos anónimos"
     },
     "clip": {
         "recordAClip": "Grabar un clip",
@@ -1621,7 +1627,18 @@
         "closing": "Cerrando...",
         "endPoll": "Cerrar",
         "votes": "{count, plural, one {1 voto} other {{count} votos}}",
-        "closes": "Se cierra <time></time>"
+        "closes": "Se cierra <time></time>",
+        "anonymous": "Anónima",
+        "public": "Pública",
+        "anonymousHint": "Solo se ven los recuentos, nunca quién eligió qué",
+        "publicHint": "Todos aquí pueden ver quién eligió cada respuesta",
+        "seeVotes": "Ver votos",
+        "whoVoted": "Quién votó",
+        "whoVotedDescription": "Esta encuesta es pública, así que todos aquí pueden ver esto.",
+        "nobodyPickedThis": "Nadie la eligió",
+        "andMore": "{count, plural, one {y 1 más} other {y {count} más}}",
+        "votersNotLoaded": "Los votos no se cargaron.",
+        "tryAgain": "Reintentar"
     },
     "newSpace": {
         "newSpace": "Otro espacio",

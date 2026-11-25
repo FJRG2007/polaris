@@ -87,6 +87,7 @@ describe("a poll that is ready", () => {
                 options: ["Pizza", "Sushi"],
                 multiple: false,
                 hideResults: false,
+                anonymous: true,
                 hours: 24
             }
         ]);
@@ -113,6 +114,20 @@ describe("a poll that is ready", () => {
 
         expect(made[0]?.multiple).toBe(true);
         expect(made[0]?.hideResults).toBe(true);
+    });
+
+    it("asks anonymously unless the asker makes the votes public", async () => {
+        const user = userEvent.setup();
+        dialog();
+        await fill(user);
+        const anonymous = screen.getByRole("switch", { name: /Keep the votes anonymous/i });
+        expect(anonymous.getAttribute("aria-checked")).toBe("true");
+        expect(screen.getByText(/Only the counts are shown/)).toBeDefined();
+        await user.click(anonymous);
+        expect(screen.getByText(/Everybody here can see who picked/)).toBeDefined();
+        await user.click(create());
+
+        expect(made[0]?.anonymous).toBe(false);
     });
 });
 

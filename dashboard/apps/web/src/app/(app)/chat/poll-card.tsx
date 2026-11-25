@@ -29,7 +29,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatPollView } from "@/lib/chat/polls";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
-import { BarChart3, Check, CircleSlash, Loader2 } from "lucide-react";
+import { PollVotersDialog } from "./poll-voters-dialog";
+import { BarChart3, Check, CircleSlash, EyeOff, Loader2, Users } from "lucide-react";
 
 export function PollCard({
     message,
@@ -59,9 +60,13 @@ export function PollCard({
     const [shown, setShown] = useState<ChatPollView>(poll);
     const [busy, setBusy] = useState(false);
     const [ending, setEnding] = useState(false);
+    const [listing, setListing] = useState(false);
     useEffect(() => setShown(poll), [poll]);
 
     const closed = shown.closed;
+    // Only a poll that says it is public is drawn as one: a card cached by a
+    // build from before the choice carries no flag, and those are anonymous.
+    const open = shown.anonymous === false;
 
     /**
      * Somebody else voted.
@@ -228,7 +233,20 @@ export function PollCard({
                         <span>{t("pollCard.resultsShowWhenItCloses")}</span>
                     </>
                 )}
+                <span aria-hidden="true">-</span>
+                <span
+                    className="inline-flex items-center gap-1"
+                    title={open ? t("pollCard.publicHint") : t("pollCard.anonymousHint")}
+                >
+                    {open ? <Users className="size-3 shrink-0" /> : <EyeOff className="size-3 shrink-0" />}
+                    {open ? t("pollCard.public") : t("pollCard.anonymous")}
+                </span>
                 {busy && <Loader2 className="size-3 animate-spin" aria-label={t("pollCard.savingYourVote")} />}
+                {open && shown.results && shown.voters > 0 && (
+                    <Button size="xs" variant="ghost" onClick={() => setListing(true)}>
+                        {t("pollCard.seeVotes")}
+                    </Button>
+                )}
                 {canEnd && !closed && (
                     <Button
                         size="xs"
@@ -242,6 +260,7 @@ export function PollCard({
                     </Button>
                 )}
             </div>
+            {listing && <PollVotersDialog messageId={message.id} poll={shown} onOpenChange={setListing} />}
         </div>
     );
 }

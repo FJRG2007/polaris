@@ -499,7 +499,7 @@ export class MlsDevice {
             replyToId?: string | null;
             uploads?: readonly string[];
             /** A sealed poll: how many answers it has (their words are in the seal) and its rules. */
-            poll?: { options: number; multiple: boolean; hideResults: boolean; hours: number };
+            poll?: { options: number; multiple: boolean; hideResults: boolean; anonymous: boolean; hours: number };
         } = {}
     ): Promise<string> {
         this.requireGroup(channelId);

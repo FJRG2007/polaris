@@ -96,8 +96,8 @@ describe("the server's sealed poll", () => {
     });
 
     it("stores one wordless answer row per answer, with the rules", async () => {
-        expect(await sendSealed("u1", input({ poll: { options: 3, multiple: true, hideResults: true, hours: 0 } }))).toBe("m1");
-        expect(state.sent[0]![4]).toEqual({ options: ["", "", ""], multiple: true, hideResults: true, closesAt: null });
+        expect(await sendSealed("u1", input({ poll: { options: 3, multiple: true, hideResults: true, anonymous: false, hours: 0 } }))).toBe("m1");
+        expect(state.sent[0]![4]).toEqual({ options: ["", "", ""], multiple: true, hideResults: true, anonymous: false, closesAt: null });
         expect(state.sent[0]![1]).toMatchObject({ body: "" });
     });
 
@@ -116,5 +116,10 @@ describe("the server's sealed poll", () => {
         expect(mlsBody.safeParse(body({ options: 11, multiple: false, hideResults: false, hours: 24 })).success).toBe(false);
         expect(mlsBody.safeParse(body({ options: 2, multiple: false, hideResults: false, hours: 5 })).success).toBe(false);
         expect(mlsBody.safeParse(body({ options: 2, multiple: false, hideResults: false, hours: 24, words: ["a"] })).success).toBe(false);
+        // A tab from before the choice says nothing about it: anonymous, which publishes nothing.
+        const older = mlsBody.safeParse(body({ options: 2, multiple: false, hideResults: false, hours: 24 }));
+        expect(older.success && "poll" in older.data ? older.data.poll?.anonymous : null).toBe(true);
+        const open = mlsBody.safeParse(body({ options: 2, multiple: false, hideResults: false, anonymous: false, hours: 24 }));
+        expect(open.success && "poll" in open.data ? open.data.poll?.anonymous : null).toBe(false);
     });
 });

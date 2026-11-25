@@ -44,6 +44,9 @@ export interface ChatPollView {
     readonly multiple: boolean;
     /** Whether the tallies are kept back until it closes. */
     readonly hideResults: boolean;
+    /** Whether who picked what is never shown, to anybody. When false the card
+     *  offers the list of who picked each answer, once the counts are showing. */
+    readonly anonymous: boolean;
     /** Whether it is over, worked out now rather than read off a flag some job
      *  was supposed to have written. */
     readonly closed: boolean;
@@ -104,6 +107,7 @@ export async function pollsFor(
             messageId: true,
             multiple: true,
             hideResults: true,
+            anonymous: true,
             closesAt: true,
             closedAt: true,
             options: {
@@ -143,6 +147,7 @@ export async function pollsFor(
         found.set(poll.messageId, {
             multiple: poll.multiple,
             hideResults: poll.hideResults,
+            anonymous: poll.anonymous,
             closed,
             closesAt: poll.closesAt?.toISOString() ?? null,
             endedEarly: poll.closedAt !== null,
@@ -189,6 +194,78 @@ export async function readPoll(
     await history.requireReadable(actor, message.channelId, messageId);
     if (message.deletedAt) return null;
     return (await pollsFor(actor.id, [messageId])).get(messageId) ?? null;
+}
+
+/** Who picked one answer of a public poll. */
+export interface ChatPollVotersView {
+    readonly optionId: string;
+    readonly voters: readonly { readonly id: string; readonly name: string }[];
+    /** How many picked it past the ones listed. */
+    readonly more: number;
+}
+
+/**
+ * Who picked what, for a poll that was asked in public.
+ *
+ * Refused outright for an anonymous poll - for the person who asked it and for
+ * whoever moderates the room alike - so there is no path from a screen, an
+ * action or an export to an anonymous voter's answer. Refused as well while a
+ * poll that hides its results is still running: the names under each answer
+ * are the results, only spelled out.
+ *
+ * The access checks are the ones reading the poll asks, in the same order: the
+ * message id must not be a way around the check that drew the conversation.
+ */
+export async function readPollVoters(
+    actor: { id: string },
+    messageId: string,
+    now: Date = new Date()
+): Promise<readonly ChatPollVotersView[]> {
+    const message = await prisma.chatMessage.findUnique({
+        where: { id: messageId },
+        select: {
+            channelId: true,
+            deletedAt: true,
+            poll: {
+                select: {
+                    hideResults: true,
+                    anonymous: true,
+                    closesAt: true,
+                    closedAt: true,
+                    options: { orderBy: { position: "asc" }, select: { id: true } }
+                }
+            }
+        }
+    });
+    if (!message?.poll) throw new ChatAccessError({ key: "errors.pollGone" });
+    await requireChannel(actor, message.channelId);
+    await history.requireReadable(actor, message.channelId, messageId);
+    if (message.deletedAt) throw new ChatRuleError({ key: "errors.pollDeleted" });
+    if (message.poll.anonymous) throw new ChatRuleError({ key: "errors.pollAnonymous" });
+    if (!core.pollResultsVisible(message.poll, now)) {
+        throw new ChatRuleError({ key: "errors.pollVotersHidden" });
+    }
+
+    // One bounded read per answer, at most ten, rather than every vote of a
+    // poll asked in a room of thousands.
+    return Promise.all(
+        message.poll.options.map(async (option) => {
+            const [rows, total] = await Promise.all([
+                prisma.chatPollVote.findMany({
+                    where: { optionId: option.id },
+                    orderBy: { createdAt: "asc" },
+                    take: core.MAX_POLL_VOTERS_LISTED,
+                    select: { user: { select: { id: true, name: true } } }
+                }),
+                prisma.chatPollVote.count({ where: { optionId: option.id } })
+            ]);
+            return {
+                optionId: option.id,
+                voters: rows.map((row) => ({ id: row.user.id, name: row.user.name ?? "" })),
+                more: Math.max(0, total - rows.length)
+            };
+        })
+    );
 }
 
 /**

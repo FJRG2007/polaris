@@ -157,6 +157,8 @@ export const mlsBody = z.discriminatedUnion("op", [
                 options: z.number().int().min(core.MIN_POLL_OPTIONS).max(core.MAX_POLL_OPTIONS),
                 multiple: z.boolean(),
                 hideResults: z.boolean(),
+                // Absent from a tab still on the build before the choice: anonymous, which publishes nothing.
+                anonymous: z.boolean().default(true),
                 hours: core.chatPollCreateSchema.shape.hours
             })
             .strict()

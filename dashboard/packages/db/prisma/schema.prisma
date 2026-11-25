@@ -11635,6 +11635,12 @@ model ChatPoll {
     // running total is one where the first few votes decide the rest, which is
     // exactly what a room asking something contentious wants to avoid.
     hideResults Boolean   @default(false)
+    // Whether who picked what stays unknown to everybody, the person who asked
+    // it and the admins included: only the counts are ever shown. Chosen when it
+    // is asked and never changed after, since a vote cast in secret must not
+    // become a public one. True by default, and for every poll asked before the
+    // choice existed - those votes were cast with nobody able to see them.
+    anonymous   Boolean   @default(true)
     // When it runs out on its own, or null for one that only a person ends.
     // Whether it is over is worked out on read from these two, the same way a
     // mute that expires is: nothing has to be running for a poll to close on

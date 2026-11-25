@@ -2067,6 +2067,7 @@ export function Composer({
                     // A call is the clock its own questions run on, so the
                     // dialog does not offer a second one.
                     timed={!inCall}
+                    anonymity={!inCall}
                     busy={pollBusy}
                     error={pollError || undefined}
                     onOpenChange={(next) => !next && setPolling(false)}

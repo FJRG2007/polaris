@@ -721,6 +721,8 @@ async function sendUnguarded(
         readonly options: readonly string[];
         readonly multiple: boolean;
         readonly hideResults: boolean;
+        /** Absent means anonymous, the choice that publishes nothing. */
+        readonly anonymous?: boolean;
         readonly closesAt: Date | null;
     } | null = null,
     /**
@@ -878,6 +880,7 @@ async function sendUnguarded(
                               create: {
                                   multiple: poll.multiple,
                                   hideResults: poll.hideResults,
+                                  anonymous: poll.anonymous ?? true,
                                   closesAt: poll.closesAt,
                                   options: {
                                       createMany: {

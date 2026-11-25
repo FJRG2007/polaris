@@ -13,7 +13,7 @@ export async function sendPoll(input: core.ChatPollCreateInput, notSent: string)
     if (!sealedChat.sealedChatActive()) return actions.createPollAction(input);
     const parsed = core.chatPollCreateSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? notSent };
-    const { channelId, question, options, multiple, hideResults, hours } = parsed.data;
+    const { channelId, question, options, multiple, hideResults, anonymous, hours } = parsed.data;
     try {
         const id = await sealedChat.sendSealedMessage({
             channelId,
@@ -22,7 +22,7 @@ export async function sendPoll(input: core.ChatPollCreateInput, notSent: string)
             parentId: parsed.data.parentId ?? null,
             replyToId: parsed.data.replyToId ?? null,
             poll: { options },
-            pollRules: { multiple, hideResults, hours }
+            pollRules: { multiple, hideResults, anonymous, hours }
         });
         return { id };
     } catch (caught) {

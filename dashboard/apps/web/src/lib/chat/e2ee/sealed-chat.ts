@@ -212,7 +212,7 @@ export interface SealedSendInput extends SealedContent {
     parentId?: string | null;
     replyToId?: string | null;
     /** With `poll`: the rules the server keeps beside its answer rows. */
-    pollRules?: { readonly multiple: boolean; readonly hideResults: boolean; readonly hours: number };
+    pollRules?: { readonly multiple: boolean; readonly hideResults: boolean; readonly anonymous: boolean; readonly hours: number };
 }
 
 /** Seal and send one message; answers the stored message's id. */
@@ -225,7 +225,7 @@ export async function sendSealedMessage(input: SealedSendInput): Promise<string>
         parentId: input.parentId ?? null,
         replyToId: input.replyToId ?? null,
         ...(content.files ? { uploads: content.files.map((file) => file.id) } : {}),
-        ...(content.poll ? { poll: { options: content.poll.options.length, multiple: input.pollRules?.multiple ?? false, hideResults: input.pollRules?.hideResults ?? false, hours: input.pollRules?.hours ?? core.DEFAULT_POLL_HOURS } } : {})
+        ...(content.poll ? { poll: { options: content.poll.options.length, multiple: input.pollRules?.multiple ?? false, hideResults: input.pollRules?.hideResults ?? false, anonymous: input.pollRules?.anonymous ?? true, hours: input.pollRules?.hours ?? core.DEFAULT_POLL_HOURS } } : {})
     });
     keep(id, content);
     index(input.channelId, id, undefined, content);
