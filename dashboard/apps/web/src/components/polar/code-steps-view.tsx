@@ -25,12 +25,13 @@ import {
     XCircle
 } from "lucide-react";
 import * as steps from "@/lib/polar/code-steps";
+import { CopyButton } from "@/components/copy-button";
 import type { PolarCodeEntry } from "@/lib/polar/code";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { changeCodeSteps } from "@/components/polar/polar-display";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
-import { CodeLine, CodeView, JsonView, isValidJson } from "@/components/json-view";
+import { CodeLine, JsonView, isValidJson } from "@/components/json-view";
 
 type Translate = NamespaceTranslator<"polar">;
 
@@ -55,9 +56,7 @@ export function stepLine(t: Translate, step: steps.CodeToolStep, view: steps.Cod
     const running = step.state === "running";
     switch (step.kind) {
         case "command": {
-            // An ACP agent's title is the command in backticks.
-            const command = input || step.name.replace(/^`|`$/g, "");
-            const shown = command.split("\n", 1)[0]!.slice(0, 80);
+            const shown = steps.stepCommand(step).split("\n", 1)[0]!.slice(0, 80);
             if (view === "detailed" && shown)
                 return t(running ? "code.step.runningCommand" : "code.step.ranCommand", { command: shown });
             return t(running ? "code.step.runningAny" : "code.step.ranAny");
@@ -81,6 +80,55 @@ export function stepLine(t: Translate, step: steps.CodeToolStep, view: steps.Cod
     }
 }
 
+/** What a step card's line shows beside its words: the command it ran, or the
+ *  file it touched. */
+export type StepDetail = { readonly code: string } | { readonly file: string; readonly path: string } | null;
+
+/** A path a step was called with, when its input is one. */
+function pathOf(step: steps.CodeToolStep): string {
+    const input = step.input.trim();
+    return (step.kind === "read" || step.kind === "edit") && input && !input.startsWith("{") && !/\s/.test(input)
+        ? input
+        : "";
+}
+
+/**
+ * A step card's line: a short verb with the command or the file beside it.
+ * The command shows there only while the card is closed in the developer's
+ * view - opened, the card shows it whole, so it is never said twice. Pure.
+ */
+export function stepHead(
+    t: Translate,
+    step: steps.CodeToolStep,
+    view: steps.CodeStepView,
+    open: boolean
+): { label: string; detail: StepDetail } {
+    const running = step.state === "running";
+    if (step.kind === "command") {
+        const command = steps.stepCommand(step);
+        if (view === "detailed" && !open && command) {
+            return {
+                label: t(running ? "code.step.runningVerb" : "code.step.ranVerb"),
+                detail: { code: command.split("\n", 1)[0]! }
+            };
+        }
+        return { label: stepLine(t, step, "compact"), detail: null };
+    }
+    const path = pathOf(step);
+    if (path) {
+        const verb =
+            step.kind === "read"
+                ? running
+                    ? "code.step.readingVerb"
+                    : "code.step.readVerb"
+                : running
+                  ? "code.step.editingVerb"
+                  : "code.step.editedVerb";
+        return { label: t(verb), detail: { file: steps.baseName(path), path } };
+    }
+    return { label: stepLine(t, step, view), detail: null };
+}
+
 /** "12 steps: 4 commands, 3 edits" for a finished turn's folded line. */
 export function stepsSummary(t: Translate, entries: readonly PolarCodeEntry[]): string {
     const tools = entries.flatMap((entry) => (entry.step ? [entry.step] : []));
@@ -96,9 +144,10 @@ export function stepsSummary(t: Translate, entries: readonly PolarCodeEntry[]): 
 function StateMark({ state }: { state: steps.CodeStepState }) {
     const t = useTranslations("polar");
     const label = t(`code.stepState.${state}`);
-    if (state === "running") return <ThinkingOrb state="solving" size={20} decorative />;
     const icon =
-        state === "done" ? (
+        state === "running" ? (
+            <ThinkingOrb state="solving" size={20} decorative />
+        ) : state === "done" ? (
             <CheckCircle2 className="h-3.5 w-3.5 text-success-ink" aria-hidden />
         ) : state === "failed" ? (
             <XCircle className="h-3.5 w-3.5 text-danger-ink" aria-hidden />
@@ -113,16 +162,43 @@ function StateMark({ state }: { state: steps.CodeStepState }) {
     );
 }
 
+/** The command a step ran, whole: painted as shell, wrapped rather than cut,
+ *  and copyable. */
+function CommandBlock({ command }: { command: string }) {
+    const t = useTranslations("polar");
+    return (
+        <div className="group relative flex min-w-0 items-start gap-2 rounded bg-muted/50 py-1.5 pe-8 ps-2 text-[11px] leading-relaxed">
+            <span className="shrink-0 select-none font-mono text-foreground-subtle" aria-hidden>
+                $
+            </span>
+            <div className="max-h-40 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+                <CodeLine value={command} language="bash" className="block whitespace-pre-wrap break-all" />
+            </div>
+            <CopyButton
+                value={command}
+                label={t("code.step.command")}
+                className="absolute end-1 top-1 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+            />
+        </div>
+    );
+}
+
 function StepInput({ step }: { step: steps.CodeToolStep }) {
     const t = useTranslations("polar");
+    if (step.kind === "command") {
+        const command = steps.stepCommand(step);
+        return command ? <CommandBlock command={command} /> : null;
+    }
     const input = step.input.trim();
     if (!input) return null;
-    if (step.kind === "command")
-        return <CodeView value={input} language="bash" className="max-h-40" label={t("code.step.command")} />;
     if (input.startsWith("{") && isValidJson(input))
         return <JsonView value={input} className="max-h-40" label={t("elements.parameters")} />;
+    // The file's name is on the step's line; its whole path is said here only
+    // when there is more of it than the name.
+    const path = pathOf(step);
+    if (path && steps.baseName(path) === path) return null;
     return (
-        <p className="min-w-0 break-all rounded-md border border-border bg-muted/40 px-2 py-1">
+        <p className="min-w-0 break-all rounded bg-muted/50 px-2 py-1.5">
             <CodeLine value={input} language="plaintext" className="text-[11px]" />
         </p>
     );
@@ -131,10 +207,10 @@ function StepInput({ step }: { step: steps.CodeToolStep }) {
 function StepOutput({ step }: { step: steps.CodeToolStep }) {
     const t = useTranslations("polar");
     const [all, setAll] = useState(false);
-    const output = step.output.trimEnd();
+    const output = steps.stepOutputText(step.output);
     if (!output) {
         return step.state === "running" ? null : (
-            <p className="text-[11px] text-foreground-subtle">{t("code.step.noOutput")}</p>
+            <p className="px-2 text-[11px] text-foreground-subtle">{t("code.step.noOutput")}</p>
         );
     }
     const lines = output.split("\n");
@@ -143,9 +219,10 @@ function StepOutput({ step }: { step: steps.CodeToolStep }) {
         <div className="flex min-w-0 flex-col gap-1">
             {/* Logs have no grammar: plain text, as `CodeView` says. */}
             <pre
+                aria-label={t("code.step.output")}
                 className={cn(
-                    "min-w-0 overflow-x-auto overscroll-contain whitespace-pre-wrap break-words rounded p-2 font-mono text-[11px]",
-                    step.state === "failed" ? "bg-danger-soft text-danger-ink" : "bg-muted text-muted-foreground"
+                    "max-h-96 min-w-0 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded px-2 py-1.5 font-mono text-[11px] leading-relaxed",
+                    step.state === "failed" ? "bg-danger-soft text-danger-ink" : "bg-muted/50 text-muted-foreground"
                 )}
             >
                 {clipped ? lines.slice(0, OUTPUT_LINES).join("\n") : output}
@@ -170,26 +247,40 @@ export function CodeStepCard({ step, view }: { step: steps.CodeToolStep; view: s
     const [open, setOpen] = useState(view === "detailed");
     // Expand all / collapse all wins over a click made before it.
     useEffect(() => setOpen(view === "detailed"), [view]);
-    const line = stepLine(t, step, view);
+    const { label, detail } = stepHead(t, step, view, open);
+    // A line cut short by the width says itself whole on hover.
+    const whole = detail === null ? label : "code" in detail ? `${label} ${detail.code}` : `${label} ${detail.path}`;
     return (
         <li className="min-w-0 list-none">
-            <div className={cn("min-w-0 rounded-md", open && "border border-border bg-card")}>
+            <div className={cn("min-w-0 rounded-md border", open ? "border-border bg-background" : "border-transparent")}>
                 <button
                     type="button"
                     aria-expanded={open}
                     aria-controls={id}
                     onClick={() => setOpen(!open)}
+                    title={whole}
                     className={cn(
-                        "flex w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-start hover:text-foreground",
+                        "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-start hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:min-h-11",
                         open && "text-foreground"
                     )}
                 >
                     {ICONS[step.kind]}
-                    <span className="min-w-0 flex-1 truncate" title={line}>
-                        {line}
+                    <span className={cn("min-w-0 truncate", detail === null ? "flex-1" : "max-w-[45%] shrink-0")}>
+                        {label}
                     </span>
+                    {detail === null ? null : "code" in detail ? (
+                        <span className="min-w-0 flex-1 truncate text-[11px]">
+                            <CodeLine value={detail.code} language="bash" />
+                        </span>
+                    ) : (
+                        <span className="flex min-w-0 flex-1">
+                            <span className="min-w-0 truncate rounded bg-muted px-1.5 font-mono text-[11px] text-foreground">
+                                {detail.file}
+                            </span>
+                        </span>
+                    )}
                     {step.ms !== null && step.state !== "running" ? (
-                        <span className="shrink-0 tabular-nums text-foreground-subtle">
+                        <span className="shrink-0 text-[11px] tabular-nums text-foreground-subtle">
                             {t("code.step.took", { seconds: Math.max(0.1, Math.round(step.ms / 100) / 10) })}
                         </span>
                     ) : null}

@@ -2023,7 +2023,14 @@
             "showLess": "Show less",
             "expandAll": "Expand steps",
             "collapseAll": "Collapse steps",
-            "offer": "How should the agent's steps show? You can change it any time."
+            "offer": "How should the agent's steps show? You can change it any time.",
+            "ranVerb": "Ran",
+            "runningVerb": "Running",
+            "readVerb": "Read",
+            "readingVerb": "Reading",
+            "editedVerb": "Edited",
+            "editingVerb": "Editing",
+            "output": "Output"
         },
         "menu": "Session actions"
     },

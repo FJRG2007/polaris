@@ -2023,7 +2023,14 @@
             "showLess": "Ver menos",
             "expandAll": "Abrir pasos",
             "collapseAll": "Plegar pasos",
-            "offer": "¿Cómo quieres ver los pasos del agente? Puedes cambiarlo cuando quieras."
+            "offer": "¿Cómo quieres ver los pasos del agente? Puedes cambiarlo cuando quieras.",
+            "ranVerb": "Ejecutó",
+            "runningVerb": "Ejecutando",
+            "readVerb": "Leyó",
+            "readingVerb": "Leyendo",
+            "editedVerb": "Editó",
+            "editingVerb": "Editando",
+            "output": "Salida"
         },
         "menu": "Más acciones"
     },

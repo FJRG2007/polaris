@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { codeToolSteps, stepCounts, stepKindOf } from "@/lib/polar/code-steps";
+import { codeToolSteps, stepCommand, stepCounts, stepKindOf, stepOutputText } from "@/lib/polar/code-steps";
 import { AcpNormalizer } from "@/lib/agents/acp/normalize";
 import { stepEvents } from "@/lib/agents/acp/session-driver";
 
@@ -96,5 +96,53 @@ describe("ACP tool calls", () => {
             rawOutput: "exit 1"
         });
         expect(stepEvents(rows, normalizer).map((event) => event.kind)).toEqual(["tool.start", "tool.failed"]);
+    });
+});
+
+describe("stepOutputText", () => {
+    it("drops the Markdown fence an agent wraps a command's output in", () => {
+        expect(stepOutputText("```console\nv1.48.0\n/opt/google\n```")).toBe("v1.48.0\n/opt/google");
+        expect(stepOutputText("```\r\nok\r\n```\r\n")).toBe("ok");
+        expect(stepOutputText("~~~text\nok\n~~~")).toBe("ok");
+    });
+
+    it("keeps a fence's own lines when the output is a fence inside a fence", () => {
+        expect(stepOutputText("````md\n```js\nx\n```\n````")).toBe("```js\nx\n```");
+    });
+
+    it("drops the opening line of a fence cut short by the stored length", () => {
+        expect(stepOutputText("```console\nline 1\nline 2")).toBe("line 1\nline 2");
+    });
+
+    it("reads an empty fence as nothing", () => {
+        expect(stepOutputText("```console\n```")).toBe("");
+        expect(stepOutputText("```console")).toBe("");
+    });
+
+    it("leaves output alone when a fence only shows up further down", () => {
+        expect(stepOutputText("Done.\n```js\nx\n```")).toBe("Done.\n```js\nx\n```");
+        expect(stepOutputText("  plain log  \n")).toBe("plain log");
+    });
+});
+
+describe("a call titled with its own command", () => {
+    const step = (subject: string, body: string) =>
+        codeToolSteps([row("1", "tool", subject, "a", body, "00")], true)[0]!.step;
+
+    it("is a command, whether the title is bare, quoted or cut short", () => {
+        const command = "which chromium 2>&1 | head; ls /opt";
+        expect(step(command, command).kind).toBe("command");
+        expect(step(`\`${command}\``, command).kind).toBe("command");
+        expect(step("node --check public/a.js && cat x...", "node --check public/a.js && cat x | wc -l").kind).toBe("command");
+    });
+
+    it("is not one when the title is a bare path or a tool's own name", () => {
+        expect(step("src/plan.ts", "src/plan.ts").kind).toBe("other");
+        expect(step("mcp__thing", '{"a":1}').kind).toBe("other");
+    });
+
+    it("names the command from the input, else from the title without backticks", () => {
+        expect(stepCommand({ name: "`npm test`", input: "" })).toBe("npm test");
+        expect(stepCommand({ name: "Bash", input: " npm run build " })).toBe("npm run build");
     });
 });

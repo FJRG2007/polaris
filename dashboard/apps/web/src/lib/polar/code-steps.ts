@@ -64,6 +64,46 @@ export function baseName(path: string): string {
     return clean.split(/[\\/]/).at(-1) ?? clean;
 }
 
+/** An agent's title for a shell call without the backticks some put round it. */
+function unquoted(title: string): string {
+    return title.trim().replace(/^`+|`+$/g, "").trim();
+}
+
+/**
+ * Whether a call the name did not place is a shell command: some agents title
+ * one with the command itself, bare ("ls -la | head"), and store that same
+ * command as its input. A bare path titled as itself is not one.
+ */
+function titledByItsCommand(name: string, input: string): boolean {
+    const title = unquoted(name).replace(/(\u2026|\.\.\.)$/, "");
+    const command = input.trim();
+    return title.length > 0 && command.startsWith(title) && /[\s|;&<>$]/.test(command);
+}
+
+/** The command a shell step ran: its input, else the agent's title for it. */
+export function stepCommand(step: Pick<CodeToolStep, "name" | "input">): string {
+    return step.input.trim() || unquoted(step.name);
+}
+
+/**
+ * A result as the log it is: some agents wrap a command's output in a
+ * Markdown fence ("```console" ... "```"), which is markup, not output. A
+ * fence cut short by the stored length has no closing line; its opening line
+ * goes all the same. Output that only contains a fence further down is left
+ * as it is.
+ */
+export function stepOutputText(output: string): string {
+    const text = output.replace(/\r\n/g, "\n").trim();
+    const open = /^(`{3,}|~{3,})[\w+.-]*[ \t]*(\n|$)/.exec(text);
+    if (!open) return text;
+    const body = text.slice(open[0].length);
+    const fence = open[1]!;
+    if (body.trim() === fence || body.trim() === "") return "";
+    const close = body.lastIndexOf(`\n${fence}`);
+    if (close !== -1 && body.slice(close + 1 + fence.length).trim() === "") return body.slice(0, close).trimEnd();
+    return body.trimEnd();
+}
+
 interface StoredRow {
     readonly id: string;
     readonly kind: string;
@@ -94,7 +134,7 @@ export function codeToolSteps(
             at: row.at,
             step: {
                 name: row.subject,
-                kind: stepKindOf(row.subject),
+                kind: kindOf(row.subject, row.body),
                 input: row.body,
                 output: result?.body ?? "",
                 state: result ? (result.subject === "error" ? "failed" : "done") : live ? "running" : "ended",
@@ -103,6 +143,11 @@ export function codeToolSteps(
         });
     }
     return steps;
+}
+
+function kindOf(name: string, input: string): CodeStepKind {
+    const kind = stepKindOf(name);
+    return kind === "other" && titledByItsCommand(name, input) ? "command" : kind;
 }
 
 /** How many steps of each kind, in the order the summary names them. */
