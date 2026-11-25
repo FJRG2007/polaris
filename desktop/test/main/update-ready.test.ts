@@ -5,8 +5,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { RESTART_BEFORE_OPENING_MS } from "@/main/update-first";
-import { UpdateReadyState } from "@/main/update-ready";
+import { RESTART_BEFORE_OPENING_MS, UpdateReadyState } from "@/main/update-ready";
 import { readUpdateReady, updateReadySchema } from "@/shared/update-ready";
 
 describe("UpdateReadyState", () => {

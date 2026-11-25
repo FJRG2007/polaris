@@ -36,7 +36,7 @@ import {
     type WebPreferences
 } from "electron";
 
-export type WindowKind = "polaris" | "connect" | "api-key" | "push" | "tv" | "overlay" | "voice-widget" | "updating";
+export type WindowKind = "polaris" | "connect" | "api-key" | "push" | "tv" | "overlay" | "voice-widget";
 
 const kinds = new Map<number, WindowKind>();
 
@@ -80,22 +80,6 @@ function titleBar(): BrowserWindowConstructorOptions {
     return {
         titleBarStyle: "hidden",
         titleBarOverlay: { color: colors.background, symbolColor: colors.symbol, height: overlayHeight(1) }
-    };
-}
-
-/** A fixed window whose page is all there is: no title bar, the system's close
- *  button over the page's own ground. */
-function splashChrome(): BrowserWindowConstructorOptions {
-    const fixed = { resizable: false, maximizable: false, fullscreenable: false };
-    if (process.platform === "darwin") return { ...fixed, titleBarStyle: "hiddenInset" };
-    return {
-        ...fixed,
-        titleBarStyle: "hidden",
-        titleBarOverlay: {
-            color: ground(),
-            symbolColor: defaultTitleBarColors(nativeTheme.shouldUseDarkColors).symbol,
-            height: 32
-        }
     };
 }
 
@@ -442,8 +426,7 @@ export function openLocalWindow(
             minHeight: 320,
             parent: options.parent,
             modal: false,
-            webPreferences: localPreferences(),
-            ...(kind === "updating" ? splashChrome() : {})
+            webPreferences: localPreferences()
         })
     );
     register(window.webContents, kind);

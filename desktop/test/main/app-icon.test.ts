@@ -172,7 +172,7 @@ describe("the app's own pages", () => {
 
     it("dress every Polaris mark they draw in the window's season", () => {
         const pages = readdirSync(renderer).filter((name) => name.endsWith(".html") && readFileSync(join(renderer, name), "utf8").includes('src="mark.svg"'));
-        expect(pages.length).toBeGreaterThan(1);
+        expect(pages).toContain("connect.html");
         for (const page of pages) {
             const script = readFileSync(join(renderer, page.replace(/\.html$/, ".ts")), "utf8");
             expect(script, page).toMatch(/dressMark\(window\.polarisLocal\.season\)/);

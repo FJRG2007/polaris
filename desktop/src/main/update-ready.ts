@@ -15,12 +15,15 @@
 
 import type { Outcome } from "@/shared/bridge";
 import { readUpdateReady, type UpdateReady } from "@/shared/update-ready";
-import { RESTART_BEFORE_OPENING_MS } from "./update-first";
 
 export interface FoundUpdate {
     readonly version: string;
     readonly restart?: () => void;
 }
+
+/** How long a restart has to end this process before another press may ask
+ *  again. */
+export const RESTART_BEFORE_OPENING_MS = 30_000;
 
 export class UpdateReadyState {
     private ready: { readonly state: NonNullable<UpdateReady>; readonly restart: () => void; } | null = null;
