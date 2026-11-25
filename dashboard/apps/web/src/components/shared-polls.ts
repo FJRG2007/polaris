@@ -92,6 +92,13 @@ export const namespaceMessages = (names: string[], signal?: AbortSignal) =>
         signal
     );
 
+export const rescueMessages = (names: string[], keys: string[], signal?: AbortSignal) =>
+    readPoll<Answer<typeof namespaceActionsModule.rescueMessagesAction>>(
+        "/api/i18n/rescue",
+        { names: names.join(","), keys: keys.join(",") },
+        signal
+    );
+
 export const subjectBreakdown = (
     input: Parameters<typeof breakdownActionsModule.subjectBreakdownAction>[0],
     signal?: AbortSignal

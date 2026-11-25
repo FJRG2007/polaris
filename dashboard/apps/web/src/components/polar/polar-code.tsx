@@ -57,6 +57,7 @@ import { Work } from "@/components/polar/elements/work";
 import { Shimmer } from "@/components/polar/elements/shimmer";
 import { BusyVerb } from "@/components/polar/elements/busy-verb";
 import { CodeBootLine } from "@/components/polar/polar-code-boot";
+import { ClientMessages } from "@/components/i18n/client-namespaces";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
@@ -2137,7 +2138,9 @@ function CodeThread({
             {memoryOpen && thread.view.repoFullName ? (
                 <div className="flex min-w-0 items-start gap-2 rounded-lg border border-border px-3 py-2">
                     <div className="min-w-0 flex-1">
-                        <RepoMemorySection repoFullName={thread.view.repoFullName} />
+                        <ClientMessages namespaces={["agents"]} fallback={null}>
+                            <RepoMemorySection repoFullName={thread.view.repoFullName} />
+                        </ClientMessages>
                     </div>
                     <Button
                         type="button"
@@ -2253,21 +2256,27 @@ function CodeThread({
                 picker={
                     liveSource || liveMode || liveEffort || liveAccount || liveSurface || liveSwitch ? (
                         <>
+                            {/* Both dialogs speak the Agents app's words, which the
+                                shell does not hand to Polar (BUG-0037). */}
                             {liveSwitch ? (
-                                <CodeAgentSwitch
-                                    sessionId={sessionId}
-                                    disabled={busy}
-                                    onSwitched={onOpen}
-                                    onError={setError}
-                                />
+                                <ClientMessages namespaces={["agents"]} fallback={null}>
+                                    <CodeAgentSwitch
+                                        sessionId={sessionId}
+                                        disabled={busy}
+                                        onSwitched={onOpen}
+                                        onError={setError}
+                                    />
+                                </ClientMessages>
                             ) : null}
                             {liveAccount ? (
-                                <CodeAccountSwitch
-                                    sessionId={sessionId}
-                                    disabled={busy}
-                                    onSwitched={read}
-                                    onError={setError}
-                                />
+                                <ClientMessages namespaces={["agents"]} fallback={null}>
+                                    <CodeAccountSwitch
+                                        sessionId={sessionId}
+                                        disabled={busy}
+                                        onSwitched={read}
+                                        onError={setError}
+                                    />
+                                </ClientMessages>
                             ) : null}
                             {liveSource ? (
                                 <CodeModelPicker
@@ -2461,7 +2470,9 @@ function CodeThread({
                                 <ThinkingOrb state="breathing" size={20} decorative />
                                 <Shimmer>
                                     {thread.session.state === "starting" && thread.canManage ? (
-                                        <CodeBootLine sessionId={sessionId} fallback={t("code.quiet")} />
+                                        <ClientMessages namespaces={["agents"]} fallback={t("code.quiet")}>
+                                            <CodeBootLine sessionId={sessionId} fallback={t("code.quiet")} />
+                                        </ClientMessages>
                                     ) : (
                                         t("code.quiet")
                                     )}
