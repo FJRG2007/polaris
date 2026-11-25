@@ -365,6 +365,9 @@ export async function reopensParentConversation(session: SessionView): Promise<b
 }
 
 async function bootstrapFor(session: SessionView, token: string): Promise<Bootstrap> {
+    // Started first and read last: it may wait on GitHub for the display name,
+    // which must not add to every start on top of the reads below.
+    const gitIdentity = gitIdentityFor(session.ownerId, session.repoFullName).catch(() => null);
     // A workspace checks nothing out, so it needs no installation and asks for
     // no token. Refusing to start one because an organization has not connected
     // GitHub would be refusing over a repository nobody named.
@@ -497,7 +500,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         gitCredential: session.repoFullName ? gitCredentialScript(credential, token) : "",
         // Resolved on every start, so a session made before this existed gets
         // it the next time it starts.
-        gitIdentity: await gitIdentityFor(session.ownerId, session.repoFullName),
+        gitIdentity: await gitIdentity,
         gitIdentityScope: session.place === "host" ? "missing" : session.sharedHome ? "repo" : "global",
         repoSetup: setup?.setupScript.trim() ? asFile(setup.setupScript) : "",
         repoSetupRequired: setup?.setupRequired ?? false,

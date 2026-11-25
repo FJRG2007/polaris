@@ -110,7 +110,17 @@ export async function upWithSessionImage(
                 await up(images.fallback, pullPolicy);
             }
         },
-        () => pull(images.machine),
+        // While the machine image cannot be had, the stock image is the one in
+        // use, so it is the one kept fresh; the failure is passed on so the
+        // machine image is tried again on the next start.
+        async () => {
+            try {
+                await pull(images.machine);
+            } catch (caught) {
+                await pull(images.fallback).catch(() => undefined);
+                throw caught;
+            }
+        },
         now,
         server
     );
