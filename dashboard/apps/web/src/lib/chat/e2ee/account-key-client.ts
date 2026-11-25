@@ -26,6 +26,7 @@ import * as passkeyLock from "@polaris/chat-crypto/passkey-lock";
 import { LOCK_ENVELOPE_BYTES } from "@polaris/chat-crypto/locks";
 import * as passwordLock from "@polaris/chat-crypto/password-lock";
 import * as safety from "@polaris/chat-crypto/safety-number";
+import * as peerKeys from "@/lib/chat/e2ee/peer-keys";
 import * as passwordWorker from "@/lib/chat/e2ee/password-worker-client";
 import { platformSealedStore } from "@polaris/chat-crypto/platform-store";
 import { platformKeyWrap } from "@/lib/chat/e2ee/platform-key-wrap";
@@ -110,7 +111,8 @@ export function publishedKeyVerifier(): account.AccountKeyVerifier {
 
 /** A conversation's safety number with one other person, or why there is none. */
 export type PairSafety =
-    | { readonly kind: "ready"; readonly digits: string }
+    /** `ownId` and `peerFingerprint` are what the browser's key memory (`peer-keys.ts`) is keyed on. */
+    | { readonly kind: "ready"; readonly digits: string; readonly ownId: string; readonly peerFingerprint: string }
     /** The other person has no account key yet: nothing has been sealed to them. */
     | { readonly kind: "no-key" }
     | { readonly kind: "unavailable" };
@@ -119,28 +121,24 @@ export type PairSafety =
  * The safety number (design 4.6) between this account and `peerId`, from the
  * keys the server publishes for both - which is the point: compared with the
  * one on the other person's screen, a key the server substituted on either
- * side shows as a different number.
+ * side shows as a different number. The peer's key is recorded in this
+ * browser's key memory on the way, so a change shows in the conversation.
  */
 export async function pairSafetyNumber(channelId: string, peerId: string): Promise<PairSafety> {
     const state = await keyState();
     const mine = state ? publishedOf(state) : null;
     if (!state || !mine) return { kind: "unavailable" };
     try {
-        const response = await fetch("/api/e2ee/mls", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            credentials: "same-origin",
-            body: JSON.stringify({ op: "account-keys", channelId, userIds: [peerId] })
-        });
-        if (!response.ok) return { kind: "unavailable" };
-        const answer = (await response.json()) as { accountKeys?: { userId: string; signPublicKey: string; hpkePublicKey: string }[] };
-        const theirs = answer.accountKeys?.find((found) => found.userId === peerId);
-        if (!theirs) return { kind: "no-key" };
+        const theirs = await peerKeys.fetchPeerKeys(channelId, peerId);
+        if (!theirs) return { kind: "unavailable" };
+        if (theirs === "none") return { kind: "no-key" };
         const digits = await safety.safetyNumber(
             { userId: state.userId, keys: mine },
             { userId: peerId, keys: { signPublicKey: fromText(theirs.signPublicKey), hpkePublicKey: fromText(theirs.hpkePublicKey) } }
         );
-        return { kind: "ready", digits };
+        const peerFingerprint = await peerKeys.keyFingerprint(theirs.signPublicKey, theirs.hpkePublicKey);
+        peerKeys.updateBook(state.userId, (book) => peerKeys.observePeer(book, peerId, peerFingerprint, Date.now()));
+        return { kind: "ready", digits, ownId: state.userId, peerFingerprint };
     } catch {
         return { kind: "unavailable" };
     }

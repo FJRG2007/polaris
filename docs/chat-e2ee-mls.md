@@ -405,7 +405,7 @@ share of the work, not of the code.
 | 4 | **Default-on switch.** Built (2026-11-25): `chatE2eeEnabled()` is `chatE2eeFrom(env, CHAT_E2EE_DEFAULT_ON)` in `flag.ts` - `1` on, `0` off, anything else the default - so turning it on is changing `CHAT_E2EE_DEFAULT_ON` to `true` in a release, on with nothing set and `0` kept as the kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md); tested in `test/chat/e2ee/flag.test.ts`. Left: the flip itself (last), and a kill switch that does not lock anybody out of a conversation already sealed only (today `0` makes every sealed route answer 404). | Yes | ~40% |
 | 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback`), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Built 2026-11-25 (round 26, see "Rollback, purge and late members"): the admin line (Management > Security), the per-conversation rollback from `ChatMigrationRollback` and "Seal it again", the purge after 30 days (decision 4), and members whose account key came after the cut getting the legacy key from a member's browser (`legacy-key-gaps`). Left: attachments/polls/system rows (row 3), a "history before [date]" label, members nobody holding the key ever meets again (needs `ORK`, row 6). Not verified: the admin line and rollback in a browser and against a real PostgreSQL. | Yes (owner: every existing chat migrated) | ~65% |
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
-| 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info. Left: `AccountKeyVerifier` still has no log behind it, so a server could hand out a substitute account key - the append-only key log with a signed root and inclusion and consistency checks in the browser; key-change notices in the conversation; the verified mark; scanning the other person's QR in the app. | Yes, for "government-grade" | ~15% |
+| 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info; scanning the other person's QR in the app; the verified mark; the key-change line in the conversation (per browser, trust on first use). Left: `AccountKeyVerifier` still has no log behind it, so a server could hand out a substitute account key to somebody who never verifies - the append-only key log with a signed root and inclusion and consistency checks in the browser, and each account monitoring its own entries; key changes of group members (no number in a group). | Yes, for "government-grade" | ~30% |
 | 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody. Left: the screen for the instance limit (the `Setting` key is read, 7-90) and the organisation's own limit, the "new device added" notice on the account's other devices, a device list with revoke. | Yes, for post-compromise security | ~50% |
 | 9 | **Server features that read chat text**: whole-Polaris export/import and backups carry sealed rows but no keys; moderation reports, retention and compliance export (proposal 9), automations that read messages. Each needs its sealed answer or an explicit "not in sealed conversations". | Partly (export/import must round-trip) | ~10% |
 | 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. | No (documented limit) | ~40% |
@@ -468,6 +468,32 @@ word for whose key their browser seals to.
   opened sealed chat yet", a failure a retry.
 - **Groups**: no number (each pair compares its own, proposal 4.6); a member's
   number is reached from the one-to-one conversation with them.
+
+### Key changes and the verified mark (built 2026-11-25)
+
+- **Memory** (`lib/chat/e2ee/peer-keys.ts`): per browser and signed-in
+  account, in `localStorage`, the SHA-256 of the other person's published keys
+  as last seen, whether it changed, and the safety number verified with them.
+  Trust on first use, as Signal and WhatsApp: the first key is remembered
+  silently; a different one later is a change, and it takes away a
+  verification (a verification only lands on the key it was made against).
+  At most 2,000 people, the least recently seen dropped first. Storage that
+  is blocked means no line and no mark, never a refused message.
+- **The line** (`key-change-bar.tsx`, above the box of a one-to-one sealed
+  conversation): the key is checked once each time the conversation opens,
+  after the first frame (one `account-keys` call); a change shows "Your safety
+  number with X changed" with Verify (the safety number in a dialog) and
+  Dismiss. Opening the safety number records the key too.
+- **Verifying**: "Scan their code" reads the other screen's QR with the
+  camera, a pasted screenshot or a picture (the vault's scanner, now
+  `components/qr-scan-dialog.tsx`), and marks the person verified when it
+  carries exactly this pair's digits; a different number says so. "Mark as
+  verified" is for digits compared by voice. The mark is the digits, so a
+  later change of either account key takes it away; it shows in the safety
+  view and as "Verified" on the info row.
+- **Not covered**: the memory is per browser (Signal syncs verification across
+  linked devices; ours does not yet), and groups show no line (each pair
+  compares in their one-to-one conversation).
 
 Prior art read for the rest of row 7: Signal safety numbers (above); WhatsApp
 Key Transparency, an auditable key directory (AKD, a Merkle-patricia tree of
