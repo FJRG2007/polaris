@@ -55,6 +55,7 @@ export function nextLine(
     if (step === "none") return null;
     if (step === "wait") return t("next.wait");
     if (focus.subject === "deps") return t("next.updateDeps");
+    if (focus.subject === "host") return t("next.updateHost");
     if (focus.subject === "appImage") return t("next.updateApp", { app: focus.name });
     if (focus.source === "polaris") return t("next.updatePolaris");
     return t("next.updateImage");
@@ -177,7 +178,9 @@ export function FocusCard({
                         targetId: focus.targetId,
                         applicationId: focus.applicationId
                     })
-              : null;
+              : focus.kind === "packages"
+                ? () => actions.packagesAction({ targetId: focus.targetId })
+                : null;
     const rescan = queue
         ? async () => {
               const result = await queue();

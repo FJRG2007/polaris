@@ -108,7 +108,16 @@ export async function listPosts(
     const where: Prisma.ChatForumPostWhereInput = {
         channelId: input.channelId,
         root: { deletedAt: null, AND: [history.sinceClause(floor, actor.id)] },
-        ...(input.query ? { title: { contains: input.query, mode: "insensitive" } } : {}),
+        // A sealed post's title is in its seal: it comes back with every search, and the
+        // reader's browser keeps the ones whose title or words hold what was typed.
+        ...(input.query
+            ? {
+                  OR: [
+                      { title: { contains: input.query, mode: "insensitive" } },
+                      { title: "", root: { e2eeCiphertext: { not: null } } }
+                  ]
+              }
+            : {}),
         ...(input.tagId ? { tagIds: { has: input.tagId } } : {})
     };
     const field = input.sort === "created" ? "createdAt" : "lastActivityAt";
@@ -156,9 +165,13 @@ export async function listPosts(
 export async function updatePost(actor: ChatActor, input: core.ChatForumPostUpdateInput): Promise<void> {
     const post = await prisma.chatForumPost.findUnique({
         where: { id: input.postId },
-        select: { channelId: true, root: { select: { authorId: true } } }
+        select: { channelId: true, title: true, root: { select: { authorId: true, e2eeCiphertext: true } } }
     });
     if (!post) throw new ChatAccessError({ key: "errors.forum.postGone" });
+    // A sealed post's title is in the seal of its first message: it changes by editing that message.
+    if (input.title !== undefined && post.root.e2eeCiphertext !== null && post.title === "") {
+        throw new ChatRuleError({ key: "errors.sealedOnly" });
+    }
     const access = await requireForum(actor, post.channelId);
     if (post.root.authorId !== actor.id && !(await mayManage(actor, access.spaceId))) {
         throw new ChatAccessError({ key: "errors.forum.notYours" });

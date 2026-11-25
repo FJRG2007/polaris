@@ -128,7 +128,8 @@ describe("automatic updates output", () => {
             securityPending: null,
             // An older daemon's script says nothing about restarts: unknown, not "none".
             reboot: null,
-            rebootAt: null
+            rebootAt: null,
+            held: null
         });
         expect(
             parse.parseUpdatesLog("POLARIS_DISTRO id=\nPOLARIS_UPDATES=unsupported")
@@ -168,6 +169,63 @@ describe("automatic updates output", () => {
         for (const script of Object.values(specs.UPDATES_SCRIPTS)) {
             expect(/[\u0000-\u001f\u007f]/.test(script)).toBe(false);
         }
+    });
+});
+
+describe("held packages", () => {
+    it("lists what a status read says is held, and nothing when it did not say", () => {
+        const read = parse.parseUpdatesLog(
+            "POLARIS_UPDATES=on\nPOLARIS_HOLDS\nPOLARIS_HELD=openssl\nPOLARIS_HELD=libc6\nPOLARIS_HELD=openssl\nPOLARIS_HELD=$(id)\n"
+        );
+        expect(read.held).toEqual(["openssl", "libc6"]);
+        expect(parse.parseUpdatesLog("POLARIS_UPDATES=on\nPOLARIS_HOLDS\n").held).toEqual([]);
+        expect(parse.parseUpdatesLog("POLARIS_UPDATES=on\n").held).toBeNull();
+    });
+
+    it("reads a package's versions, and a missing one", () => {
+        expect(
+            parse.parsePackageVersions(
+                "POLARIS_DISTRO id=debian\nPOLARIS_INSTALLED=3.0.15-1~deb12u1\nPOLARIS_KEPT=yes\nPOLARIS_VERSION=3.0.15-1~deb12u1\nPOLARIS_VERSION=3.0.14-1~deb12u2\n"
+            )
+        ).toEqual({
+            state: "ok",
+            installed: "3.0.15-1~deb12u1",
+            held: true,
+            versions: ["3.0.15-1~deb12u1", "3.0.14-1~deb12u2"]
+        });
+        expect(parse.parsePackageVersions("POLARIS_PACKAGE=missing")?.state).toBe("missing");
+        expect(parse.parsePackageVersions("garbage")).toBeNull();
+        expect(parse.parseHoldLog("POLARIS_HOLD=held")).toBe("held");
+        expect(parse.parseRollbackLog("POLARIS_ROLLBACK=unavailable")).toBe("unavailable");
+        expect(parse.parseRollbackLog("")).toBeNull();
+    });
+
+    it("passes the package as the script's own words, never inside it", () => {
+        const args = specs.hostArgv("package-rollback", ["libssl3", "1:3.0.15-1"]);
+        expect(args.slice(-3)).toEqual(["polaris", "libssl3", "1:3.0.15-1"]);
+        expect(args.at(-4)).toBe(specs.UPDATES_SCRIPTS["package-rollback"]);
+        expect(specs.hostArgv("package-hold").at(-1)).toBe(specs.UPDATES_SCRIPTS["package-hold"]);
+        // A rollback never removes another package to make room.
+        expect(specs.UPDATES_SCRIPTS["package-rollback"]).toContain("--no-remove");
+    });
+
+    it("accepts the names the daemon accepts and nothing that reads as an option or code", () => {
+        for (const ok of ["openssl", "libstdc++6", "python3.11", "NetworkManager", "perl_x"]) {
+            expect(schemas.packageName.safeParse(ok).success).toBe(true);
+        }
+        for (const bad of ["", "-y", "a b", "a;reboot", "$(id)", "a\nb", "a".repeat(129)]) {
+            expect(schemas.packageName.safeParse(bad).success).toBe(false);
+        }
+        expect(schemas.packageVersion.safeParse("1:3.0.15-1~deb12u1").success).toBe(true);
+        expect(schemas.packageVersion.safeParse("-1").success).toBe(false);
+        expect(
+            schemas.rollbackInput.safeParse({
+                targetId: "00000000-0000-4000-8000-000000000000",
+                package: "openssl",
+                version: "1.0",
+                extra: 1
+            }).success
+        ).toBe(false);
     });
 });
 
@@ -414,11 +472,49 @@ describe("one-off specs", () => {
             new URL("../../../../../../crates/polaris-hostd/src/host_security.rs", import.meta.url),
             "utf8"
         );
-        for (const script of [specs.AUDIT_SCRIPT, ...Object.values(specs.UPDATES_SCRIPTS)]) {
+        for (const script of [
+            specs.AUDIT_SCRIPT,
+            specs.PACKAGES_SCRIPT,
+            ...Object.values(specs.UPDATES_SCRIPTS)
+        ]) {
             expect(rust).toContain(`r#"${script}"#`);
         }
         expect(rust).toContain(`"${specs.TOOLS_IMAGE}"`);
         expect(rust).toContain(`"${specs.HOST_CONTAINER}"`);
+    });
+});
+
+describe("host packages", () => {
+    const VOLUME = "polaris-secscan-image-0123abcd";
+
+    it("copies the package database read-only, with no network, into the volume", () => {
+        const argv = specs.packagesArgv(VOLUME);
+        expect(argv.list).toContain("/:/host:ro");
+        expect(argv.list).not.toContain("--privileged");
+        const network = argv.list.indexOf("--network");
+        expect(argv.list[network + 1]).toBe("none");
+        expect(argv.list.at(-1)).toBe(specs.PACKAGES_SCRIPT);
+        expect(argv.write).toContain(`${VOLUME}:/in`);
+        expect(argv.write).not.toContain("/:/host:ro");
+        expect(() => specs.packagesArgv("other")).toThrow();
+    });
+
+    it("reads the copied root as a directory with the image scanner", () => {
+        const spec = specs.hostVulnSpec(VOLUME);
+        const service = spec.services[0]!;
+        expect(service.image).toBe(specs.VULN_IMAGE);
+        expect(service.command?.[0]).toBe("dir:/in/root");
+        expect(() => specs.hostVulnSpec("x")).toThrow();
+    });
+
+    it("applies security updates with the tool the automatic ones use", () => {
+        const fix = specs.UPDATES_SCRIPTS["packages-fix"];
+        expect(fix).toContain("unattended-upgrade");
+        expect(fix).toContain("dnf upgrade --security -y");
+        expect(specs.hostArgv("packages-fix")).toContain("--privileged");
+        expect(parse.parseFixLog("POLARIS_DISTRO id=debian\nPOLARIS_FIX=done")).toBe("done");
+        expect(parse.parseFixLog("POLARIS_FIX=unavailable")).toBe("unavailable");
+        expect(parse.parseFixLog("nothing")).toBeNull();
     });
 });
 

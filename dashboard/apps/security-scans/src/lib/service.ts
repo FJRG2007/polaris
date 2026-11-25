@@ -23,6 +23,7 @@ import { host } from "@polaris/app-host";
 import { securityTFor } from "./i18n";
 import {
     exportImage,
+    exportPackages,
     listContainers,
     listExports,
     portsFor,
@@ -37,7 +38,7 @@ import {
 const zip = promisify(gzip);
 const unzip = promisify(gunzip);
 
-export type ScanKind = "malware" | "files" | "audit" | "image" | "deps";
+export type ScanKind = "malware" | "files" | "audit" | "image" | "deps" | "packages";
 
 const MAX_FINDINGS = 500;
 const HISTORY_MS = 90 * 24 * 60 * 60_000;
@@ -243,7 +244,8 @@ export async function listServers(request: {
                 t.securitySetting?.updatesChoice === "off"
                     ? (t.securitySetting.updatesChosenAt?.toISOString() ?? null)
                     : null,
-            rebootAt: t.securitySetting?.rebootAt?.toISOString() ?? null
+            rebootAt: t.securitySetting?.rebootAt?.toISOString() ?? null,
+            held: t.securitySetting?.heldPackages ?? []
         })),
         next: targets.length > request.limit && last ? encodeCursor(last.name, last.id) : null
     };
@@ -337,7 +339,7 @@ export async function scanFindings(scanId: string) {
     });
 }
 
-const VULN_KINDS = ["image", "deps"];
+const VULN_KINDS = ["image", "deps", "packages"];
 
 /**
  * Scans that are not of Polaris's own images on the machine it runs on:
@@ -414,7 +416,7 @@ export async function focusScan(scanId: string | null) {
         targetId: scan.targetId,
         serverName: scan.target.name,
         serverLocal: scan.target.kind === "local",
-        kind: scan.kind as "image" | "deps",
+        kind: scan.kind as "image" | "deps" | "packages",
         subject: subjects.subjectKind({ kind: scan.kind, input }),
         name: subjects.subjectName(
             { label: scan.label, input },
@@ -804,7 +806,9 @@ async function execute(scanId: string): Promise<void> {
                     ? await runAudit(scan.target)
                     : scan.kind === "deps"
                       ? await runDeps(scan.target, scan.id)
-                      : await runImage(scan.target, input, scan.id);
+                      : scan.kind === "packages"
+                        ? await runPackages(scan.target, input, scan.id)
+                        : await runImage(scan.target, input, scan.id);
         await prisma.$transaction([
             prisma.securityFinding.createMany({
                 data: result.findings.slice(0, MAX_FINDINGS).map((finding, position) => ({
@@ -1129,6 +1133,128 @@ async function runImage(
     };
 }
 
+/** A host package scan is stored and announced under its server's name. */
+async function queuePackageScan(
+    targetId: string,
+    input: Record<string, unknown>,
+    userId: string | null
+): Promise<string> {
+    const target = await prisma.deployTarget.findUnique({
+        where: { id: targetId },
+        select: { name: true }
+    });
+    if (!target) throw new ScanFailure("notFound");
+    return enqueue(targetId, "packages", target.name, input, userId);
+}
+
+/**
+ * The host's own installed packages: their database is copied into a
+ * short-lived volume and the matcher reads it as it reads an image. A fixable
+ * critical or high finding is fixed on the spot with the distribution's own
+ * security updates - unless a person turned automatic updates off, which
+ * Polaris respects; then the screen offers the fix as a button with that
+ * reason. A scan the fix queued checks the result and never fixes again, so
+ * one that cannot help never loops.
+ */
+async function runPackages(
+    target: ScanTarget,
+    input: Record<string, unknown>,
+    scanId: string
+): Promise<ScanResult> {
+    const volume = specs.exportVolumeName(scanId);
+    const ports = await portsFor(target);
+    let vuln: { exitCode: number; log: string };
+    try {
+        await exportPackages(target, volume);
+        vuln = await runOneShot(ports, specs.hostVulnSpec(volume));
+    } finally {
+        await removeExport(target, volume).catch((caught) =>
+            console.error(`polaris: security scan ${scanId} left its export volume:`, caught)
+        );
+    }
+    const report = vulnReport(scanId, vuln);
+    const serious = report.items.filter(
+        (item) => (item.severity === "critical" || item.severity === "high") && item.fixedIn
+    ).length;
+    let fix: parse.FixState | "off" | null = null;
+    if (serious > 0 && input.after !== "fix") {
+        const setting = await prisma.securitySetting.findUnique({
+            where: { targetId: target.id },
+            select: { updatesChoice: true }
+        });
+        fix =
+            setting?.updatesChoice === "off"
+                ? "off"
+                : await applySecurityFixes(target).catch(() => "failed" as const);
+    }
+    return {
+        findings: report.items.map((item) => ({
+            severity: item.severity,
+            title: item.id,
+            location: `${item.packageName} ${item.version}`.trim(),
+            fixedIn: item.fixedIn,
+            url: item.url
+        })),
+        // A fix that went through is checked by the next scan before anyone is told.
+        alerts: fix === "done" ? undefined : report.alerting,
+        summary: { ...report.counts, total: report.total, serious, fix }
+    };
+}
+
+/** Apply the pending security updates now and queue the scan that checks them. */
+async function applySecurityFixes(target: ScanTarget): Promise<parse.FixState | null> {
+    const { output } = await runHostAction(target, "packages-fix");
+    const fix = parse.parseFixLog(output);
+    if (fix === "done") {
+        // The waiting count is read again on the next updates pass.
+        await prisma.securitySetting
+            .updateMany({ where: { targetId: target.id }, data: { updatesAt: null } })
+            .catch(() => undefined);
+        await queuePackageScan(target.id, { after: "fix" }, null);
+    }
+    return fix;
+}
+
+/** Queue a check of the host's own packages. */
+export async function queuePackages(targetId: string, userId: string | null): Promise<string> {
+    return queuePackageScan(targetId, {}, userId);
+}
+
+/** A person's "apply the security updates" on a finished host package scan:
+ *  answers what the host said, and queues the check when it went through. */
+export async function fixPackages(scanId: string): Promise<parse.FixState | null> {
+    const scan = await prisma.securityScan.findFirst({
+        where: { id: scanId, kind: "packages" },
+        select: { target: { select: TARGET_SELECT } }
+    });
+    if (!scan) throw new ScanFailure("notFound");
+    return applySecurityFixes(scan.target);
+}
+
+/** How often a server's own packages are checked with no schedule set. */
+const PACKAGES_RESCAN_MS = 24 * 60 * 60_000;
+let packagesCheckedAt = 0;
+
+/**
+ * Queue a package check for servers whose own packages nobody checked in the
+ * last day: Polaris keeps the machines it manages patched, so this needs no
+ * schedule. A few servers per pass; the queue runs one scan per server.
+ */
+async function planPackages(now: Date): Promise<void> {
+    if (now.getTime() - packagesCheckedAt < NEW_IMAGES_EVERY_MS) return;
+    packagesCheckedAt = now.getTime();
+    const since = new Date(now.getTime() - PACKAGES_RESCAN_MS);
+    const due = await prisma.deployTarget.findMany({
+        where: { securityScans: { none: { kind: "packages", createdAt: { gte: since } } } },
+        select: { id: true },
+        orderBy: { id: "asc" },
+        take: 3
+    });
+    for (const target of due) {
+        await queuePackageScan(target.id, {}, null).catch(() => undefined);
+    }
+}
+
 /**
  * A deployed commit's dependencies, Dependabot-style: the lockfiles the deploy
  * copied out of its clone (see the dashboard's lib/security/lockfiles.ts) are
@@ -1293,7 +1419,8 @@ function waitingData(report: parse.UpdatesReport) {
                   reboot: report.reboot,
                   rebootAt: report.rebootAt,
                   ...(report.reboot === "none" ? { rebootNotifiedAt: null } : {})
-              })
+              }),
+        ...(report.held === null ? {} : { heldPackages: [...report.held] })
     };
 }
 
@@ -1303,6 +1430,44 @@ export async function scheduleRestart(targetId: string, schedule: boolean) {
     const target = await targetRow(targetId);
     const { output } = await runHostAction(target, schedule ? "reboot-schedule" : "reboot-cancel");
     if (!/POLARIS_REBOOT=/.test(output)) throw new ScanFailure("updatesFailed");
+    return automaticUpdates(targetId);
+}
+
+/** A package's installed version, whether it is held, and the versions the
+ *  host's package manager still offers for it. */
+export async function packageVersions(targetId: string, name: string) {
+    const target = await targetRow(targetId);
+    const { output } = await runHostAction(target, "package-versions", { package: name });
+    const report = parse.parsePackageVersions(output);
+    if (!report) throw new ScanFailure("updatesFailed");
+    if (report.state === "missing") throw new ScanFailure("packageMissing");
+    if (report.state === "unsupported") throw new ScanFailure("fixUnsupported");
+    return report;
+}
+
+/** Keep a package where it is - the automatic updates and Polaris's own fixes
+ *  skip it - or let it go again. Answers the host's state after. */
+export async function holdPackage(targetId: string, name: string, hold: boolean) {
+    const target = await targetRow(targetId);
+    const { output } = await runHostAction(target, hold ? "package-hold" : "package-unhold", {
+        package: name
+    });
+    const state = parse.parseHoldLog(output);
+    if (state === "missing") throw new ScanFailure("packageMissing");
+    if (state === "unsupported") throw new ScanFailure("fixUnsupported");
+    if (state !== (hold ? "held" : "released")) throw new ScanFailure("holdFailed");
+    return automaticUpdates(targetId);
+}
+
+/** Put a package back on a version the package manager still offers, and keep
+ *  it there, for when an update broke something. */
+export async function rollbackPackage(targetId: string, name: string, version: string) {
+    const target = await targetRow(targetId);
+    const { output } = await runHostAction(target, "package-rollback", { package: name, version });
+    const state = parse.parseRollbackLog(output);
+    if (state === "unavailable") throw new ScanFailure("versionGone");
+    if (state === "unsupported") throw new ScanFailure("fixUnsupported");
+    if (state !== "done") throw new ScanFailure("rollbackFailed");
     return automaticUpdates(targetId);
 }
 
@@ -1618,11 +1783,11 @@ const SWEEP_EVERY_MS = 60 * 60_000;
  * are listed before the running scans are read; see `staleExports`.
  */
 async function sweepExports(now: Date): Promise<void> {
-    // Only a server an image scan ran on can hold an export. Every Polaris has
-    // this job, so a server nobody scanned is never dialled for one.
+    // Only a server an image or package scan ran on can hold an export. Every
+    // Polaris has this job, so a server nobody scanned is never dialled for one.
     const scanned = await prisma.securityScan.groupBy({
         by: ["targetId"],
-        where: { kind: "image" },
+        where: { kind: { in: ["image", "packages"] } },
         orderBy: { targetId: "asc" },
         take: 100
     });
@@ -1670,6 +1835,9 @@ export async function tick(): Promise<void> {
         console.error("polaris: security scans could not plan updates:", caught)
     );
     await planNewImages(now);
+    await planPackages(now).catch((caught) =>
+        console.error("polaris: security scans could not plan package checks:", caught)
+    );
     await planServerImages(now).catch((caught) =>
         console.error("polaris: security scans could not plan server images:", caught)
     );

@@ -75,6 +75,8 @@ export interface FilesMessage {
     readonly notSent: string;
     /** Called once every file is up, right before the message itself is posted. */
     readonly beforePost?: () => void;
+    /** A new post in a sealed forum: its title goes inside the seal, its tags beside it. */
+    readonly forum?: { readonly title: string; readonly tagIds: readonly string[] };
 }
 
 /**
@@ -310,6 +312,7 @@ async function sendSealedWithFiles(message: FilesMessage): Promise<"sent" | Excl
             parentId: fields.parentId ?? null,
             replyToId: fields.replyToId ?? null,
             ...(message.translation ? { translation: message.translation } : {}),
+            ...(message.forum ? { title: message.forum.title, forumTags: message.forum.tagIds } : {}),
             files: refs
         });
         track?.onPosted?.(id);

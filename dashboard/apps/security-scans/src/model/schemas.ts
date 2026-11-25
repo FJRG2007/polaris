@@ -95,6 +95,23 @@ export const quarantineInput = z.object({ quarantineId: id, op: z.enum(["restore
 export const updatesInput = z.object({ targetId: id, enabled: z.boolean() });
 export const restartInput = z.object({ targetId: id, schedule: z.boolean() });
 
+/** A package name as dpkg and rpm write them; the host daemon checks the same. */
+export const packageName = z
+    .string()
+    .trim()
+    .max(128)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9+._-]*$/);
+/** A package version as dpkg and rpm write them (epoch, `~` and `:` included). */
+export const packageVersion = z
+    .string()
+    .trim()
+    .max(128)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9.+~:_-]*$/);
+
+export const packageInput = z.object({ targetId: id, package: packageName }).strict();
+export const holdInput = packageInput.extend({ hold: z.boolean() }).strict();
+export const rollbackInput = packageInput.extend({ version: packageVersion }).strict();
+
 /** How often a server is scanned by itself; 0 is never. */
 export const SCHEDULE_HOURS = [0, 6, 12, 24, 168] as const;
 

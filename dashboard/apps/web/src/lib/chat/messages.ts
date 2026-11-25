@@ -843,8 +843,9 @@ async function sendUnguarded(
     // A forum is a list of posts: everything said in it opens a post or
     // answers inside one.
     if (forumPost) {
-        const contentTypes = attachments.map((file) => file.contentType);
-        await checkForumPost(input.channelId, access.kind, input.parentId, forumPost, contentTypes);
+        // A sealed file's type is inside the seal: the sender's browser held it to the media rule.
+        const contentTypes = sealed ? [] : attachments.map((file) => file.contentType);
+        await checkForumPost(input.channelId, access.kind, input.parentId, forumPost, contentTypes, sealed ? attachments.length : 0);
     } else if (core.isForumKind(access.kind) && !input.parentId) {
         throw new ChatRuleError({ key: "errors.forum.postsOnly" });
     }

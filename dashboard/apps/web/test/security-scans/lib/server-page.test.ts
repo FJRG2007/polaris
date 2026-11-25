@@ -56,7 +56,8 @@ describe("listServers", () => {
                 securityPending: null,
                 reboot: "none",
                 offByHandAt: null,
-                rebootAt: null
+                rebootAt: null,
+                held: []
             }
         ]);
         expect(page.next).not.toBeNull();

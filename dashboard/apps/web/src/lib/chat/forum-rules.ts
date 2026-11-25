@@ -16,11 +16,13 @@ export async function checkForumPost(
     kind: string,
     parentId: string | null | undefined,
     post: core.ChatForumPostFields,
-    contentTypes: readonly string[] = []
+    contentTypes: readonly string[] = [],
+    /** Sealed files the post carries: their types are inside the seal, so one stands in for a picture or video. */
+    sealedFiles = 0
 ): Promise<void> {
     if (!core.isForumKind(kind)) throw new ChatRuleError({ key: "errors.forum.notAForum" });
     if (parentId) throw new ChatRuleError({ key: "errors.forum.postInThread" });
-    if (core.isMediaKind(kind) && !contentTypes.some(core.isPostMedia)) {
+    if (core.isMediaKind(kind) && sealedFiles === 0 && !contentTypes.some(core.isPostMedia)) {
         throw new ChatRuleError({ key: "errors.forum.mediaRequired" });
     }
     const tagIds = [...new Set(post.tagIds)];

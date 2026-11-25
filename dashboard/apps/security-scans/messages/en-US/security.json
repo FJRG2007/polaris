@@ -160,7 +160,13 @@
         "noRoom": "Not enough free disk on the server to check this image. Free some space, then try again.",
         "scannerFailed": "The vulnerability scanner stopped with an error. Try again.",
         "reportUnreadable": "The scanner's report could not be read. Update Polaris from Settings, then scan again.",
-        "sidecarRefused": "It could not be turned off. Try again from its own page."
+        "sidecarRefused": "It could not be turned off. Try again from its own page.",
+        "fixFailed": "The security updates could not be applied. Try again later.",
+        "fixUnsupported": "This server's distribution has no supported updates tool.",
+        "packageMissing": "That package is not installed on this server.",
+        "holdFailed": "The package manager refused the change. Try again later.",
+        "versionGone": "That version is no longer offered for this server. Pick another one.",
+        "rollbackFailed": "The package could not move to that version. Try another one."
     },
     "alerts": {
         "title": "{count, plural, one {A new serious vulnerability in {app}} other {# new serious vulnerabilities in {app}}}",
@@ -192,7 +198,8 @@
         "kind": {
             "appImage": "App image",
             "image": "Image",
-            "deps": "Dependencies"
+            "deps": "Dependencies",
+            "host": "This server's packages"
         },
         "openApp": "Open app",
         "rescan": "Scan again",
@@ -221,7 +228,8 @@
         "updatePolaris": "Update Polaris from Settings, then scan again.",
         "updateImage": "Run a newer version of this image, then scan again.",
         "updateDeps": "Update these dependencies in the repository, then deploy again.",
-        "wait": "No fix is out yet. Scan again later to see if one has been released."
+        "wait": "No fix is out yet. Scan again later to see if one has been released.",
+        "updateHost": "Apply the security updates on the server, then check again."
     },
     "updates": {
         "armed": {
@@ -232,5 +240,41 @@
             "title": "{server} needs a restart",
             "body": "Security updates are installed and need a restart to finish. Schedule it for 04:30 from Security scans."
         }
+    },
+    "packages": {
+        "run": "Check packages",
+        "label": "Installed packages",
+        "apply": "Apply security updates",
+        "applyHint": "Installs the distribution's security updates on this server now. Held packages stay as they are.",
+        "applied": "Security updates applied. Checking again.",
+        "fix": {
+            "done": "Security updates applied; checking again.",
+            "failed": "Applying the security updates failed.",
+            "unavailable": "The updates tool is missing; turn automatic updates on to install it.",
+            "unsupported": "This distribution has no supported updates tool.",
+            "off": "Automatic updates are off, so nothing was installed."
+        }
+    },
+    "held": {
+        "title": "Held packages",
+        "hint": "Held packages stay on their version. Automatic updates skip them.",
+        "none": "No package is held.",
+        "release": "Release",
+        "manage": "Hold or roll back",
+        "dialogTitle": "Hold or roll back a package",
+        "dialogHint": "For when an update broke something: keep a package where it is, or move it to a version the server still offers.",
+        "name": "Package",
+        "namePlaceholder": "openssl",
+        "nameInvalid": "Letters, digits and + . _ - only, starting with a letter or digit.",
+        "lookUp": "Look up",
+        "installed": "Installed: {version}",
+        "isHeld": "Held",
+        "hold": "Hold this version",
+        "versions": "Versions offered",
+        "noVersions": "The server offers no other version of this package.",
+        "use": "Use and hold",
+        "close": "Close",
+        "done": "Held packages updated.",
+        "moved": "{package} is on {version} and held there."
     }
 }

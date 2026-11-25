@@ -76,7 +76,7 @@ export function subjectName(
     return (appId ? apps.get(appId)?.name : undefined) ?? scan.label;
 }
 
-export type SubjectKind = "appImage" | "image" | "deps";
+export type SubjectKind = "appImage" | "image" | "deps" | "host";
 
 /** Which kind of thing a vulnerability scan looked at. */
 export function subjectKind(scan: {
@@ -84,6 +84,7 @@ export function subjectKind(scan: {
     readonly input: Readonly<Record<string, unknown>>;
 }): SubjectKind {
     if (scan.kind === "deps") return "deps";
+    if (scan.kind === "packages") return "host";
     return applicationIdOf(scan.input) ? "appImage" : "image";
 }
 

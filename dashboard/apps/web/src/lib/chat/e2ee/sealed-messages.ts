@@ -61,6 +61,8 @@ export interface SealedSend {
     uploads?: readonly string[];
     /** A poll: its question and answers are inside the seal; the server keeps one empty answer row per answer, the rules and the votes. */
     poll?: { options: number; multiple: boolean; hideResults: boolean; anonymous: boolean; hours: number };
+    /** A new forum post: its title is inside the seal; the server keeps the post row with no title, and its tags. */
+    forum?: { tagIds: readonly string[] };
     epoch: bigint;
     senderLeaf: number;
     ciphertext: Uint8Array;
@@ -69,7 +71,7 @@ export interface SealedSend {
 
 /** Why a sealed message was not taken; the route answers it as a refusal. */
 export class SealedRefusal extends Error {
-    constructor(readonly reason: "unknownDevice" | "unknownGroup" | "futureEpoch" | "olderEpoch" | "staleRevision" | "notSealed" | "badSignature" | "filesRefused" | "pollRefused") {
+    constructor(readonly reason: "unknownDevice" | "unknownGroup" | "futureEpoch" | "olderEpoch" | "staleRevision" | "notSealed" | "badSignature" | "filesRefused" | "pollRefused" | "forumRefused") {
         super(`the sealed message was refused (${reason})`);
         this.name = "SealedRefusal";
     }
@@ -92,6 +94,8 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
     const service = serviceKind(userId);
     // A poll carries no files, and is asked by a person.
     if (input.poll && (service || input.uploads?.length)) throw new SealedRefusal("pollRefused");
+    // A forum post is opened by a person, and is not a poll.
+    if (input.forum && (service || input.poll)) throw new SealedRefusal("forumRefused");
     if (service) {
         if (input.uploads?.length) throw new SealedRefusal("filesRefused");
         return postAsService(service, input, signatureKey);
@@ -117,7 +121,8 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
               }
             : null,
         null,
-        null,
+        // The title is in the seal: the row keeps none, and the forum's list names it in each reader's browser.
+        input.forum ? { title: "", tagIds: [...input.forum.tagIds] } : null,
         {
             e2eeCiphertext: owned(input.ciphertext),
             e2eeEpoch: input.epoch,

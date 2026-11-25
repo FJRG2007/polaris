@@ -77,7 +77,9 @@ const sealedContent = z.object({
     body: core.chatSendSchema.shape.body,
     translation: core.chatSendSchema.shape.translation,
     files: z.array(sealedFileSchema).min(1).max(core.CHAT_ATTACHMENT_COUNT_CEILING).optional(),
-    poll: sealedPollSchema.optional()
+    poll: sealedPollSchema.optional(),
+    /** A forum post's title, on the message that opens it. */
+    title: core.chatForumPostFieldsSchema.shape.title.optional()
 });
 
 /** What a sealed message carries inside its seal. */
@@ -155,9 +157,11 @@ function searchIndex(): Promise<SealedSearchIndex> {
 
 /** Keep an opened message searchable on this device; a failure costs only the search. */
 function index(channelId: string, id: string, editedAt: string | undefined, content: SealedContent | null): void {
-    if (!content?.body) return;
+    // A forum post is found by its title as well as its words.
+    const words = content?.title ? `${content.title}\n\n${content.body}` : content?.body;
+    if (!words) return;
     searchIndex()
-        .then((kept) => kept.record({ id, channelId, ...(editedAt ? { editedAt } : {}), body: content.body }))
+        .then((kept) => kept.record({ id, channelId, ...(editedAt ? { editedAt } : {}), body: words }))
         .catch((caught: unknown) => console.warn("polaris: an opened message could not be kept searchable here:", caught));
 }
 
@@ -201,7 +205,8 @@ function contentOf(input: SealedContent): SealedContent {
         body: input.body,
         ...(input.translation ? { translation: input.translation } : {}),
         ...(input.files?.length ? { files: input.files } : {}),
-        ...(input.poll ? { poll: input.poll } : {})
+        ...(input.poll ? { poll: input.poll } : {}),
+        ...(input.title ? { title: input.title } : {})
     };
 }
 
@@ -213,6 +218,8 @@ export interface SealedSendInput extends SealedContent {
     replyToId?: string | null;
     /** With `poll`: the rules the server keeps beside its answer rows. */
     pollRules?: { readonly multiple: boolean; readonly hideResults: boolean; readonly anonymous: boolean; readonly hours: number };
+    /** With `title`: the new forum post's tags, which the server keeps beside the post. */
+    forumTags?: readonly string[];
 }
 
 /** Seal and send one message; answers the stored message's id. */
@@ -225,7 +232,8 @@ export async function sendSealedMessage(input: SealedSendInput): Promise<string>
         parentId: input.parentId ?? null,
         replyToId: input.replyToId ?? null,
         ...(content.files ? { uploads: content.files.map((file) => file.id) } : {}),
-        ...(content.poll ? { poll: { options: content.poll.options.length, multiple: input.pollRules?.multiple ?? false, hideResults: input.pollRules?.hideResults ?? false, anonymous: input.pollRules?.anonymous ?? true, hours: input.pollRules?.hours ?? core.DEFAULT_POLL_HOURS } } : {})
+        ...(content.poll ? { poll: { options: content.poll.options.length, multiple: input.pollRules?.multiple ?? false, hideResults: input.pollRules?.hideResults ?? false, anonymous: input.pollRules?.anonymous ?? true, hours: input.pollRules?.hours ?? core.DEFAULT_POLL_HOURS } } : {}),
+        ...(content.title ? { forum: { tagIds: input.forumTags ?? [] } } : {})
     });
     keep(id, content);
     index(input.channelId, id, undefined, content);
@@ -291,8 +299,8 @@ export interface SealedEditInput extends SealedContent {
 export async function editSealedMessage(input: SealedEditInput): Promise<string> {
     const shown = versionKey(input.messageId, input.editedAt);
     const before = opened.get(shown);
-    // An edit rewrites the words; the files the message carries stay, with their keys.
-    const content = contentOf({ ...input, files: input.files ?? before?.files });
+    // An edit rewrites the words; the files the message carries stay, with their keys, and a forum post keeps its title.
+    const content = contentOf({ ...input, files: input.files ?? before?.files, title: input.title ?? before?.title });
     keep(shown, content);
     try {
         const mls = await device();

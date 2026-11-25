@@ -18,7 +18,8 @@ const state = {
     findManyArgs: null as Record<string, unknown> | null,
     rows: [] as { id: string; root: { id: string } }[],
     updated: null as Record<string, unknown> | null,
-    transactions: 0
+    transactions: 0,
+    sealedTitle: false
 };
 
 function reset(): void {
@@ -33,7 +34,8 @@ function reset(): void {
         findManyArgs: null,
         rows: [],
         updated: null,
-        transactions: 0
+        transactions: 0,
+        sealedTitle: false
     });
 }
 
@@ -104,7 +106,11 @@ vi.mock("@polaris/db", () => ({
                     lastActivityAt: new Date(0)
                 }));
             },
-            findUnique: async () => ({ channelId: "forum-1", root: { authorId: state.postAuthor } }),
+            findUnique: async () => ({
+                channelId: "forum-1",
+                title: state.sealedTitle ? "" : "t",
+                root: { authorId: state.postAuthor, e2eeCiphertext: state.sealedTitle ? new Uint8Array(1) : null }
+            }),
             update: async ({ data }: { data: Record<string, unknown> }) => {
                 state.updated = data;
             }
@@ -174,6 +180,15 @@ describe("a new forum post", () => {
         ).resolves.toBeUndefined();
     });
 
+    it("takes a sealed file in a media channel, whose type only the seal knows", async () => {
+        await expect(
+            checkForumPost(channelId, "media", null, { title: "", tagIds: [] }, [], 1)
+        ).resolves.toBeUndefined();
+        await expect(checkForumPost(channelId, "media", null, { title: "", tagIds: [] }, [], 0)).rejects.toThrow(
+            "errors.forum.mediaRequired"
+        );
+    });
+
     it("refuses a tag from somewhere else", async () => {
         await expect(
             checkForumPost(channelId, "forum", null, { title: "a", tagIds: [tag] })
@@ -198,7 +213,11 @@ describe("the list of posts", () => {
         expect(state.findManyArgs).toMatchObject({
             where: {
                 channelId,
-                title: { contains: "crash", mode: "insensitive" },
+                // A sealed post's title is in its seal: it comes back for the browser to search.
+                OR: [
+                    { title: { contains: "crash", mode: "insensitive" } },
+                    { title: "", root: { e2eeCiphertext: { not: null } } }
+                ],
                 tagIds: { has: tag }
             },
             orderBy: [{ lastActivityAt: "desc" }, { id: "desc" }],
@@ -277,6 +296,17 @@ describe("changing a post", () => {
         state.admin = true;
         await forum.updatePost(ada, { postId: crypto.randomUUID(), title: "x" });
         expect(state.updated).toEqual({ title: "x" });
+    });
+
+    it("changes a sealed post's title only by editing its first message, and its tags as any", async () => {
+        state.sealedTitle = true;
+        await expect(forum.updatePost(ada, { postId: crypto.randomUUID(), title: "x" })).rejects.toThrow(
+            "errors.sealedOnly"
+        );
+        expect(state.updated).toBeNull();
+        state.knownTags = 1;
+        await forum.updatePost(ada, { postId: crypto.randomUUID(), tagIds: [tag] });
+        expect(state.updated).toEqual({ tagIds: [tag] });
     });
 
     it("keeps the required tag on an edit", async () => {

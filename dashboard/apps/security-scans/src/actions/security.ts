@@ -82,6 +82,27 @@ export async function auditAction(input: unknown) {
     );
 }
 
+/** Check the server's own installed packages for known vulnerabilities. */
+export async function packagesAction(input: unknown) {
+    const user = await requireSecurityUser();
+    const parsed = schemas.targetInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => (await service()).queuePackages(parsed.data.targetId, user.id));
+}
+
+/** Apply the security updates a host package scan found, now. */
+export async function fixPackagesAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.scanInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => {
+        const fix = await (await service()).fixPackages(parsed.data.scanId);
+        if (fix === "unsupported") throw new ScanFailure("fixUnsupported");
+        if (fix !== "done") throw new ScanFailure("fixFailed");
+        return fix;
+    });
+}
+
 export async function scanImageAction(input: unknown) {
     const user = await requireSecurityUser();
     const parsed = schemas.imageInput.safeParse(input);
@@ -176,6 +197,37 @@ export async function restartAction(input: unknown) {
     if (!parsed.success) return { ok: false, error: "invalid" } as const;
     return run(async () =>
         (await service()).scheduleRestart(parsed.data.targetId, parsed.data.schedule)
+    );
+}
+
+export async function packageVersionsAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.packageInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () =>
+        (await service()).packageVersions(parsed.data.targetId, parsed.data.package)
+    );
+}
+
+export async function holdPackageAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.holdInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () =>
+        (await service()).holdPackage(parsed.data.targetId, parsed.data.package, parsed.data.hold)
+    );
+}
+
+export async function rollbackPackageAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.rollbackInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () =>
+        (await service()).rollbackPackage(
+            parsed.data.targetId,
+            parsed.data.package,
+            parsed.data.version
+        )
     );
 }
 
