@@ -95,6 +95,8 @@ export function memoryPrisma(state: MemoryTablesState) {
         mlsDevice: table("mlsDevice", ["userId", "device"]),
         mlsKeyPackage: table("mlsKeyPackage", []),
         mlsGroup: table("mlsGroup", ["channelId"]),
+        // Read by `conversationSealed` (a conversation the migration cut is sealed only).
+        chatMigration: table("chatMigration", ["channelId"]),
         mlsGroupEvent: table("mlsGroupEvent", []),
         chatHistoryKey: table("chatHistoryKey", ["channelId", "epoch", "recipient"]),
         chatAccountKey: table("chatAccountKey", ["userId"]),
