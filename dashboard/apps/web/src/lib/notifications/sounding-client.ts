@@ -48,6 +48,18 @@ export function noteSounder(data: string): void {
     }
 }
 
+/**
+ * A fresher answer to which kind of client makes the sounds than the stream's
+ * last frame, from a response the client was waiting on anyway (the words of a
+ * message, see `chat/actions`). The frame comes every few seconds; somebody who
+ * has just switched from the app to a browser should not hear the app chime for
+ * the message that arrived in between. Only a kind replaces it: a server that
+ * knew of no client - another instance, say - has nothing to correct it with.
+ */
+export function noteSounderKind(kind: LiveClientKind | null | undefined): void {
+    if (kind === "desktop" || kind === "browser") sounder = kind;
+}
+
 /** Whether `mine` should leave the sounds to the kind the server elected. */
 export function yieldsTo(mine: LiveClientKind, elected: LiveClientKind | null): boolean {
     return elected !== null && elected !== mine;

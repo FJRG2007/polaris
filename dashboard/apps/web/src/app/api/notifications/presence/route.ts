@@ -27,6 +27,10 @@ const presenceSchema = z.object({
     /** What the tab has open inside that path (an agent session), as the link
      *  its alerts carry. Anything that does not name a known subject is dropped. */
     subject: z.string().min(1).max(512).startsWith("/").nullish(),
+    /** The desktop app or a browser. Picks which of the account's clients makes
+     *  the sounds (`live-clients`); optional, since a page loaded before it
+     *  existed does not send it. Anything else is treated as not said. */
+    client: z.enum(["desktop", "browser"]).nullish().catch(null),
     /** False when the tab went to the background or is closing. */
     viewing: z.boolean()
 });
@@ -49,8 +53,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     const parsed = presenceSchema.safeParse(body);
     if (!parsed.success) return accepted();
 
-    const { viewerId, path, subject, viewing } = parsed.data;
-    if (viewing) recordPresence(session.id, viewerId, path, Date.now(), subject ?? null);
+    const { viewerId, path, subject, client, viewing } = parsed.data;
+    if (viewing)
+        recordPresence(session.id, viewerId, path, Date.now(), subject ?? null, client ?? null);
     else dropPresence(session.id, viewerId);
     return accepted();
 }

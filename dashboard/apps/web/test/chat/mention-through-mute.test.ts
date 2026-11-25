@@ -113,7 +113,10 @@ vi.mock("@/lib/chat/chat-lock", () => ({
     redactAlert: <T>(toast: T) => toast,
     lockedFor: async () => new Set()
 }));
-vi.mock("@/lib/notifications/presence", () => ({ onlineUserIds: () => new Set([READER]) }));
+vi.mock("@/lib/notifications/presence", () => ({
+    onlineUserIds: () => new Set([READER]),
+    isViewingWhere: () => false
+}));
 vi.mock("@/lib/notification-service", () => ({
     createNotification: async (input: { userId: string }) => {
         state.notified.push(input.userId);

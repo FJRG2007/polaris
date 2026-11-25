@@ -85,6 +85,7 @@ import type { ChatChannelView, ChatElsewhere, ChatMemberView } from "@/lib/chat/
 import { requirePostable, searchForConversation, selfMatching } from "@/lib/chat/access";
 import { mayChangeChatPicture } from "@/lib/chat/picture-access";
 import { MAX_AVATAR_BYTES, sniffImageMime, storeAvatar } from "@/lib/avatar-service";
+import { chimingKind, type LiveClientKind } from "@/lib/notifications/live-clients";
 
 const CHAT_PATH = "/chat";
 
@@ -819,11 +820,19 @@ export async function linkPreviewAction(
  * would bury the four things in it that mattered.
  */
 export async function messageToastsAction(
-    channelIds: string[]
-): Promise<{ toasts: MessageToast[] }> {
+    channelIds: string[],
+    lookup?: boolean
+): Promise<{ toasts: MessageToast[]; sounder: LiveClientKind | null }> {
     const me = await actor();
     const asked = Array.isArray(channelIds) ? channelIds.map(String) : [];
-    return { toasts: await messageToasts(me, asked) };
+    // A lookup is for a notice already drawn (answering it, marking it read),
+    // and finds its message even in a conversation open somewhere right now.
+    if (lookup === true)
+        return { toasts: await messageToasts(me, asked, { includeViewed: true }), sounder: null };
+    // Which kind of client makes the sound, as of now rather than as of the
+    // stream's last frame: the person may have switched windows in between, and
+    // the answer rides a request the client was making anyway.
+    return { toasts: await messageToasts(me, asked), sounder: chimingKind(me.id) };
 }
 
 /** Whether the GIF and sticker tabs have anything behind them. */

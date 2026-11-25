@@ -22,6 +22,7 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { attending } from "@/components/use-attention";
+import { desktopBridge } from "@/lib/desktop-bridge";
 
 const ENDPOINT = "/api/notifications/presence";
 
@@ -71,8 +72,11 @@ export function PresenceReporter() {
 
     useEffect(() => {
         const id = viewerId.current;
+        // Which kind of client this is, so the sounds go to the window in front
+        // of the person rather than always to the app (`live-clients`).
+        const client = desktopBridge() ? "desktop" : "browser";
         const payload = (viewing: boolean): string =>
-            JSON.stringify({ viewerId: id, path: pathname, subject: showing, viewing });
+            JSON.stringify({ viewerId: id, path: pathname, subject: showing, client, viewing });
 
         function report(viewing: boolean): void {
             void fetch(ENDPOINT, {
