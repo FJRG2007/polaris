@@ -53,7 +53,7 @@ import {
     verifyQuickPin
 } from "@polaris/auth";
 import { readerWords } from "@/lib/i18n/reader-words";
-import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
+import { sealedChatServed } from "@/lib/chat/e2ee/flag";
 import { qrKeyOfferSchema, qrKeyTransferSchema, type QrKeyTransfer } from "@polaris/core";
 
 /** How many codes one address may open before it is asked to slow down. Loose
@@ -184,7 +184,7 @@ export async function redeemSignInCode(deviceCode: string): Promise<QrSignInStat
 export async function redeemSignInCodeWithKeys(
     deviceCode: string
 ): Promise<{ status: QrSignInStatus; keys: QrKeyDelivery | null }> {
-    return redeem(deviceCode, chatE2eeEnabled());
+    return redeem(deviceCode, sealedChatServed());
 }
 
 async function redeem(
@@ -215,7 +215,7 @@ async function redeem(
 
 /** The offer column for a code being opened, when the flag is on and it parses. */
 function keyOfferData(keyOffer: unknown): { e2eeOffer?: Buffer } {
-    if (!chatE2eeEnabled() || keyOffer === undefined) return {};
+    if (!sealedChatServed() || keyOffer === undefined) return {};
     const parsed = qrKeyOfferSchema.safeParse(keyOffer);
     return parsed.success ? { e2eeOffer: Buffer.from(parsed.data, "base64url") } : {};
 }
@@ -250,7 +250,7 @@ export async function describeSignInCode(userCode: string, userId: string): Prom
             requestUserAgentBrands: true,
             requestUserAgentPlatform: true,
             requestHost: true,
-            ...(chatE2eeEnabled() ? { e2eeOffer: true } : {})
+            ...(sealedChatServed() ? { e2eeOffer: true } : {})
         }
     });
     if (!row || row.status !== "pending" || row.expiresAt <= new Date()) return null;
@@ -274,7 +274,7 @@ export async function describeSignInCode(userCode: string, userId: string): Prom
 }
 
 function keyOfferOf(row: { e2eeOffer?: Uint8Array | null }): { keyOffer?: string } {
-    if (!chatE2eeEnabled() || !row.e2eeOffer) return {};
+    if (!sealedChatServed() || !row.e2eeOffer) return {};
     return { keyOffer: Buffer.from(row.e2eeOffer).toString("base64url") };
 }
 
@@ -453,7 +453,7 @@ async function storeKeyTransfer(
     keyTransfer: unknown,
     request: QrSignInRequest
 ): Promise<void> {
-    if (!chatE2eeEnabled() || keyTransfer === undefined || !request.keyOffer) return;
+    if (!sealedChatServed() || keyTransfer === undefined || !request.keyOffer) return;
     const parsed = qrKeyTransferSchema.safeParse(keyTransfer);
     if (!parsed.success || parsed.data.approverDeviceId !== bySessionId) return;
     await prisma.deviceCode.update({

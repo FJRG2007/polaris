@@ -8,7 +8,7 @@ import * as core from "@polaris/core";
 import { getSettings } from "@/lib/setting-store";
 import { PUBLIC_KEY } from "@/lib/profile-service";
 import { LINK_PREVIEWS_KEY } from "@/lib/chat/link-preview-policy";
-import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
+import { sealedChatServed } from "@/lib/chat/e2ee/flag";
 import { INACTIVE_DEVICE_DAYS_SETTING, inactiveDaysFrom } from "@/lib/chat/e2ee/mls-delivery";
 import { isLockValue, privacyDefaultKey, privacyLockKey } from "@/lib/privacy-service";
 import { DISCOVERY_POLICY_KEY, readDiscoveryPolicy, type DiscoveryPolicy } from "@/lib/discovery-policy";
@@ -38,7 +38,7 @@ export async function readPrivacy(): Promise<PrivacyData> {
     return {
         publicProfiles: stored.get(PUBLIC_KEY) === "true",
         linkPreviews: stored.get(LINK_PREVIEWS_KEY) !== "off",
-        sealedDeviceDays: chatE2eeEnabled() ? inactiveDaysFrom(stored.get(INACTIVE_DEVICE_DAYS_SETTING)) : null,
+        sealedDeviceDays: sealedChatServed() ? inactiveDaysFrom(stored.get(INACTIVE_DEVICE_DAYS_SETTING)) : null,
         defaults: Object.fromEntries(
             core.PRIVACY_FIELDS.map((field) => [
                 field,

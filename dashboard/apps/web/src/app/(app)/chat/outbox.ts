@@ -155,7 +155,7 @@ export function postMessage(input: {
  * With sealed chat off it is `sendAction` itself.
  */
 export async function sendNow(entry: Sendable): Promise<{ id?: string; error?: string }> {
-    if (!sealedChat.sealedChatActive())
+    if (!(await sealedChat.sealsSendsIn(entry.channelId)))
         return postMessage({
             channelId: entry.channelId,
             body: entry.body,
@@ -175,7 +175,14 @@ export async function sendNow(entry: Sendable): Promise<{ id?: string; error?: s
  */
 export async function deliver(entry: Sendable): Promise<OutboxSendResult> {
     if (entry.sealed && !sealedChat.sealedChatActive()) return "held";
-    if (sealedChat.sealedChatActive()) {
+    let seals: boolean;
+    try {
+        seals = await sealedChat.sealsSendsIn(entry.channelId);
+    } catch (caught) {
+        console.warn("polaris: a sealed message was not sent yet:", caught);
+        return "unreachable";
+    }
+    if (seals) {
         try {
             const id = await sealedChat.sendSealedMessage({
                 channelId: entry.channelId,

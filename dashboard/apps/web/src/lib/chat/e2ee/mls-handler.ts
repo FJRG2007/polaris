@@ -1,6 +1,6 @@
 /**
  * `/api/e2ee/mls`, as a plain function over a Request so the tests drive what
- * the route serves. 404 while `chatE2eeEnabled()` is off: nothing about it
+ * the route serves. 404 while sealed chat is off (`sealedChatServed()`): nothing about it
  * exists then.
  *
  * Authorization, on every op: a session; a device is only ever the session's
@@ -20,10 +20,11 @@
  * its member list - and who is in it with a device but holds no leaf.
  */
 
-import { chatE2eeEnabled } from "./flag";
+import { chatE2eeEnabled, sealedChatServed } from "./flag";
 import { NextResponse } from "next/server";
 import * as delivery from "./mls-delivery";
 import * as sealed from "./sealed-messages";
+import { conversationSealed } from "./sealed-conversation";
 import { backgroundUser } from "@/lib/session";
 import { mlsBody, type MlsBody } from "./schemas";
 import { LEGACY_EPOCH } from "./mls-history-keys";
@@ -74,7 +75,7 @@ async function ownDevice(userId: string, device: string): Promise<boolean> {
 const REFUSED = { error: "refused" } as const;
 
 export async function handleMls(request: Request): Promise<Response> {
-    if (!chatE2eeEnabled()) return json({ error: "Not found" }, 404);
+    if (!sealedChatServed()) return json({ error: "Not found" }, 404);
     const user = await backgroundUser();
     // i18n-ignore: a status body no screen shows
     if (!user) return json({ error: "Unauthorized" }, 401);
@@ -92,7 +93,7 @@ export async function handleMls(request: Request): Promise<Response> {
  * route makes still holds - `channelAccess` answers a service account too.
  */
 export async function answerMls(userId: string, body: MlsBody): Promise<Response> {
-    if (!chatE2eeEnabled()) return json({ error: "Not found" }, 404);
+    if (!sealedChatServed()) return json({ error: "Not found" }, 404);
     try {
         return await run(userId, body);
     } catch (caught) {
@@ -186,6 +187,8 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
         case "group": {
             const group = await delivery.groupState(body.channelId);
             return json({
+                // Sealed with no group yet (the migration cut it): a send into it is sealed, also while held.
+                sealed: group ? true : await conversationSealed(body.channelId),
                 group: group && {
                     groupId: text(group.groupId),
                     ciphersuite: group.ciphersuite,
@@ -195,6 +198,8 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
             });
         }
         case "create-group":
+            // Held (the kill switch): nothing new becomes sealed - only a conversation sealed already gets its group.
+            if (!chatE2eeEnabled() && !(await conversationSealed(body.channelId))) return json({ error: "held" }, 409);
             await delivery.createGroup(body.channelId, bytes(body.groupId), body.ciphersuite, bytes(body.groupInfo));
             return json({ ok: true });
         case "commit": {

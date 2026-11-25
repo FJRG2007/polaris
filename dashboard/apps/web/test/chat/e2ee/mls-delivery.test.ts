@@ -97,13 +97,36 @@ beforeEach(() => {
 
 describe("/api/e2ee/mls", () => {
     it("does not exist with the flag off, and needs a session and JSON", async () => {
-        process.env.POLARIS_INTERNAL_CHAT_E2EE = "0";
+        delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
         expect((await call({ op: "group", channelId: CHANNEL })).status).toBe(404);
         process.env.POLARIS_INTERNAL_CHAT_E2EE = "1";
         expect((await call({ op: "group", channelId: CHANNEL }, null)).status).toBe(401);
         expect((await call({ op: "group", channelId: "not-a-uuid" })).status).toBe(400);
         const plain = await handleMls(new Request("http://x", { method: "POST", headers: { "content-type": "text/plain" }, body: "{}" }));
         expect(plain.status).toBe(400);
+    });
+
+    it("held by the kill switch: no new group, and a sealed conversation keeps every op", async () => {
+        await device(ALICE, "alice-laptop");
+        process.env.POLARIS_INTERNAL_CHAT_E2EE = "0";
+        expect((await call({ op: "group", channelId: CHANNEL })).body).toEqual({ sealed: false, group: null });
+        const refused = await call({ op: "create-group", channelId: CHANNEL, groupId: blob(1, 16), ciphersuite: 0x004f, groupInfo: blob(2) });
+        expect(refused).toEqual({ status: 409, body: { error: "held" } });
+        process.env.POLARIS_INTERNAL_CHAT_E2EE = "1";
+        expect((await call({ op: "create-group", channelId: CHANNEL, groupId: blob(1, 16), ciphersuite: 0x004f, groupInfo: blob(2) })).status).toBe(200);
+        process.env.POLARIS_INTERNAL_CHAT_E2EE = "0";
+        const group = await call({ op: "group", channelId: CHANNEL });
+        expect(group.status).toBe(200);
+        expect(group.body).toMatchObject({ sealed: true, group: { epoch: "0" } });
+        expect((await call({ op: "events", channelId: CHANNEL, device: "alice-laptop", after: "0" })).status).toBe(200);
+    });
+
+    it("held: a conversation the migration cut still gets its group", async () => {
+        await device(ALICE, "alice-laptop");
+        state.tables.chatMigration = [{ channelId: CHANNEL, state: "cut" }];
+        process.env.POLARIS_INTERNAL_CHAT_E2EE = "0";
+        expect((await call({ op: "group", channelId: CHANNEL })).body).toEqual({ sealed: true, group: null });
+        expect((await call({ op: "create-group", channelId: CHANNEL, groupId: blob(1, 16), ciphersuite: 0x004f, groupInfo: blob(2) })).status).toBe(200);
     });
 
     it("orders commits by epoch: the second commit for the same epoch is refused, not forked", async () => {

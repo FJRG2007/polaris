@@ -84,7 +84,7 @@ export async function sendForumPost(input: {
     readonly tagIds: readonly string[];
     readonly files?: readonly File[];
 }): Promise<{ id?: string; error?: string }> {
-    if (sealedChat.sealedChatActive()) return sendSealedPost(input);
+    if (await sealedChat.sealsSendsIn(input.channelId)) return sendSealedPost(input);
     const form = new FormData();
     form.set("body", input.body);
     form.set("forumTitle", input.title);

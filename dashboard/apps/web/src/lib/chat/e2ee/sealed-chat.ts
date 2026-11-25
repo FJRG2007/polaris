@@ -104,6 +104,10 @@ export function decodeSealedContent(bytes: Uint8Array): SealedContent | null {
 }
 
 let viewer: string | null = null;
+/** The kill switch is set (`chatE2eeState()` is `held`): only a conversation sealed already takes sealed sends. */
+let held = false;
+/** While held, which conversations are sealed already; nothing new becomes sealed then, so an answer stays true. */
+const sealedAlready = new Map<string, boolean>();
 let opening: Promise<MlsDevice> | null = null;
 let indexing: Promise<SealedSearchIndex> | null = null;
 /** Message id (and last edit) -> its opened content, or null when it did not open here. */
@@ -116,9 +120,17 @@ const versionKey = (id: string, editedAt?: string): string => (editedAt ? `${id}
 const refKey = (ref: SealedRef): string => (typeof ref === "string" ? ref : versionKey(ref.id, ref.editedAt));
 const refId = (ref: SealedRef): string => (typeof ref === "string" ? ref : ref.id);
 
-/** Sealed chat for this account, or off (`null`). Called by the chat provider. */
-export function configureSealedChat(viewerId: string | null): void {
+/**
+ * Sealed chat for this account, or off (`null`). Called by the chat provider,
+ * which also says whether it is held; a caller that does not say keeps it.
+ */
+export function configureSealedChat(viewerId: string | null, options?: { readonly held?: boolean }): void {
+    if (options?.held !== undefined && options.held !== held) {
+        held = options.held;
+        sealedAlready.clear();
+    }
     if (viewer === viewerId) return;
+    sealedAlready.clear();
     viewer = viewerId;
     opening = null;
     void indexing?.then((index) => index.close()).catch(() => undefined);
@@ -128,6 +140,23 @@ export function configureSealedChat(viewerId: string | null): void {
 
 export function sealedChatActive(): boolean {
     return viewer !== null;
+}
+
+/**
+ * Whether a new message, poll, file or post sent into `channelId` is sealed:
+ * every one while sealed chat is on; while it is held, only in a conversation
+ * that is sealed already (any other one sends as it always did - the server
+ * refuses a plain write into a sealed one either way). Throws when that cannot
+ * be told, so the caller sends later rather than in the clear.
+ */
+export async function sealsSendsIn(channelId: string): Promise<boolean> {
+    if (viewer === null) return false;
+    if (!held) return true;
+    const known = sealedAlready.get(channelId);
+    if (known !== undefined) return known;
+    const answer = await (await device()).sealedAlready(channelId);
+    if (viewer !== null) sealedAlready.set(channelId, answer);
+    return answer;
 }
 
 function device(): Promise<MlsDevice> {

@@ -14,7 +14,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { setDiscoveryPolicy } from "@/lib/people-search";
 import { setProfilesPublic } from "@/lib/profile-service";
 import { LINK_PREVIEWS_KEY, setInstancePreviews } from "@/lib/chat/link-preview-policy";
-import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
+import { sealedChatServed } from "@/lib/chat/e2ee/flag";
 import { setSetting } from "@/lib/setting-store";
 import { INACTIVE_DEVICE_DAYS, INACTIVE_DEVICE_DAYS_SETTING } from "@/lib/chat/e2ee/mls-delivery";
 import { DISCOVERY_POLICY_KEY, discoveryPolicySchema } from "@/lib/discovery-policy";
@@ -113,7 +113,7 @@ export async function setLinkPreviewsAction(allowed: unknown): Promise<{ error?:
 export async function setSealedDeviceDaysAction(days: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.number().int().min(INACTIVE_DEVICE_DAYS.min).max(INACTIVE_DEVICE_DAYS.max).safeParse(days);
-    if (!parsed.success || !chatE2eeEnabled()) {
+    if (!parsed.success || !sealedChatServed()) {
         return { error: (await getTranslations("admin"))("privacy.errors.checkSettings") };
     }
     await setSetting(INACTIVE_DEVICE_DAYS_SETTING, String(parsed.data));

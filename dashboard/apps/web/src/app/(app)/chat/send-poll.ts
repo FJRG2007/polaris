@@ -10,7 +10,7 @@ import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import * as actions from "./actions";
 
 export async function sendPoll(input: core.ChatPollCreateInput, notSent: string): Promise<{ id?: string; error?: string }> {
-    if (!sealedChat.sealedChatActive()) return actions.createPollAction(input);
+    if (!(await sealedChat.sealsSendsIn(input.channelId))) return actions.createPollAction(input);
     const parsed = core.chatPollCreateSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? notSent };
     const { channelId, question, options, multiple, hideResults, anonymous, hours } = parsed.data;

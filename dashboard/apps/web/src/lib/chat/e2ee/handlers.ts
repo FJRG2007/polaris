@@ -8,7 +8,7 @@
  * signed-in account's own rows.
  *
  * Both answer 404 while their switch is off (`passwordLockEnabled()` for the
- * password lock, `chatE2eeEnabled()` for the passkey locks) - nothing about
+ * password lock, `sealedChatServed()` for the passkey locks) - nothing about
  * them exists then - with one exception that keeps the kill switch from ever
  * locking anybody out: an account already on OPAQUE (a verified record for its
  * current password) keeps signing in, proving and setting its password over
@@ -20,7 +20,7 @@
 
 import { auth } from "@/lib/auth";
 import * as keys from "./account-keys";
-import { chatE2eeEnabled, passwordLockEnabled } from "./flag";
+import { passwordLockEnabled, sealedChatServed } from "./flag";
 import { NextResponse } from "next/server";
 import * as opaque from "./opaque-service";
 import { backgroundUser, passwordGateSession } from "@/lib/session";
@@ -237,12 +237,12 @@ async function handleGatedProof(request: Request, switchedOn: boolean): Promise<
  * lock's own.
  */
 function opEnabled(op: KeysBody["op"], onOpaque: boolean): boolean {
-    if (op === "put-passkey-lock" || op === "delete-passkey-lock") return chatE2eeEnabled();
-    return passwordLockEnabled() || chatE2eeEnabled() || onOpaque;
+    if (op === "put-passkey-lock" || op === "delete-passkey-lock") return sealedChatServed();
+    return passwordLockEnabled() || sealedChatServed() || onOpaque;
 }
 
 export async function handleKeys(request: Request): Promise<Response> {
-    const switchedOn = passwordLockEnabled() || chatE2eeEnabled();
+    const switchedOn = passwordLockEnabled() || sealedChatServed();
     const user = await backgroundUser();
     // With every switch off, the route exists only for an account already on
     // OPAQUE (its password may live nowhere else); the rest get the 404 as before.

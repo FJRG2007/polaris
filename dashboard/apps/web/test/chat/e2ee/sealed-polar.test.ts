@@ -139,7 +139,7 @@ beforeEach(() => {
 
 describe("Polar in a sealed conversation, before anything is opened", () => {
     it("does nothing while sealed chat is off", async () => {
-        process.env.POLARIS_INTERNAL_CHAT_E2EE = "0";
+        delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
         expect(await answerSealedPolar({ ...QUESTION, messageId: crypto.randomUUID() })).toBeNull();
         expect(state.tables.mlsStoreEntry ?? []).toEqual([]);
     });

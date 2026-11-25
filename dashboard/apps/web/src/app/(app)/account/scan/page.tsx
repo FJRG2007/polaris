@@ -24,7 +24,7 @@ import { requireUser } from "@/lib/session";
 import { ScanHistory } from "./scan-history";
 import { getUserSecurity } from "@polaris/auth";
 import { qrUserCodeField } from "@polaris/core";
-import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
+import { sealedChatServed } from "@/lib/chat/e2ee/flag";
 import { describeSignInCode, listQrSignInAnswers } from "@/lib/qr-sign-in-service";
 
 export const dynamic = "force-dynamic";
@@ -63,7 +63,7 @@ export default async function ScanPage({
                 scanned={raw !== null}
                 hasPin={security.hasPin}
                 pinLength={security.pinLength}
-                keyDeviceId={chatE2eeEnabled() && request?.keyOffer ? user.sessionId : null}
+                keyDeviceId={sealedChatServed() && request?.keyOffer ? user.sessionId : null}
             />
             {/* Every code this account has answered, under the thing that answers
                 them. A code allowed by mistake is noticed here or not at all: the

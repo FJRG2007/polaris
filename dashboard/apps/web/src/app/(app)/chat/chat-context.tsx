@@ -228,6 +228,7 @@ export function ChatProvider({
     orgName,
     may,
     sealed = false,
+    sealedHeld = false,
     children
 }: {
     viewerId: string;
@@ -237,6 +238,8 @@ export function ChatProvider({
     may: ChatAllowances;
     /** Sealed chat is on (docs/chat-e2ee-mls.md); off, every send and read is the plain one. */
     sealed?: boolean;
+    /** Held by the kill switch ("The kill switch"): sealed conversations keep sealing, no other one starts. */
+    sealedHeld?: boolean;
     children: ReactNode;
 }) {
     const router = useRouter();
@@ -270,9 +273,9 @@ export function ChatProvider({
     const keptLists = useRef<KeptLists | null>(null);
     // Before the outbox flusher's effect, which may send at once.
     useEffect(() => {
-        configureSealedChat(sealed ? viewerId : null);
+        configureSealedChat(sealed ? viewerId : null, { held: sealedHeld });
         return () => configureSealedChat(null);
-    }, [sealed, viewerId]);
+    }, [sealed, sealedHeld, viewerId]);
     useOutboxFlusher(viewerId);
     /** The server has answered, so a late read of the device's copy is moot. */
     const answered = useRef(false);

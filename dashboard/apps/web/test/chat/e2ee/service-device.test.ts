@@ -90,7 +90,7 @@ beforeEach(() => {
 
 describe("a service device with the flag off", () => {
     it("refuses before it loads anything", async () => {
-        process.env.POLARIS_INTERNAL_CHAT_E2EE = "0";
+        delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
         await expect(withServiceDevice("polar", CHANNEL, async () => "ran")).rejects.toThrow(/off/);
         expect(state.tables.mlsStoreEntry ?? []).toEqual([]);
     });

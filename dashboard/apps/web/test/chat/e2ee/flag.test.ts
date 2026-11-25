@@ -46,3 +46,23 @@ describe("chatE2eeFrom, the default-on shape", () => {
         }
     });
 });
+
+describe("chatE2eeState, the kill switch", () => {
+    it("holds with 0 rather than switching off, whatever the default", () => {
+        expect(flag.chatE2eeStateFrom("0", true)).toBe("held");
+        expect(flag.chatE2eeStateFrom(" 0\n", false)).toBe("held");
+        process.env.POLARIS_INTERNAL_CHAT_E2EE = "0";
+        expect(flag.chatE2eeState()).toBe("held");
+        expect(flag.sealedChatServed()).toBe(true);
+        expect(flag.chatE2eeEnabled()).toBe(false);
+    });
+
+    it("is on with 1 or the default on, and off only when unset with the default off", () => {
+        expect(flag.chatE2eeStateFrom("1", false)).toBe("on");
+        expect(flag.chatE2eeStateFrom(undefined, true)).toBe("on");
+        expect(flag.chatE2eeStateFrom(undefined, false)).toBe("off");
+        expect(flag.chatE2eeStateFrom("yes", false)).toBe("off");
+        delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
+        expect(flag.sealedChatServed()).toBe(false);
+    });
+});

@@ -29,6 +29,7 @@ const refKey = (ref: Ref) => (typeof ref === "string" ? ref : ref.editedAt ? `${
 
 vi.mock("@/lib/chat/e2ee/sealed-chat", () => ({
     sealedChatActive: () => sealed.active,
+    sealsSendsIn: async () => sealed.active,
     openedContent: (id: string, editedAt?: string) => sealed.opened.get(refKey({ id, editedAt })),
     openSealed: async (channelId: string, refs: readonly Ref[]) => {
         const ids = refs.map(refKey);

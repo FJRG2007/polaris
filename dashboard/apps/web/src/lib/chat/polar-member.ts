@@ -14,7 +14,7 @@
 
 import { prisma } from "@polaris/db";
 import { publishChatChange } from "./live";
-import { chatE2eeEnabled } from "./e2ee/flag";
+import { sealedChatServed } from "./e2ee/flag";
 import { addPolar, polarAdded, removePolar } from "./service-members";
 import { ChatAccessError, invitesAllowed, requireChannel, type ChatActor } from "./access";
 
@@ -51,7 +51,7 @@ export async function setPolarMember(actor: ChatActor, channelId: string, on: bo
         await joinSealedGroup(channelId);
     } else {
         await removePolar(channelId);
-        if (chatE2eeEnabled()) {
+        if (sealedChatServed()) {
             const { forgetServiceDevice } = await import("./e2ee/service-device");
             await forgetServiceDevice("polar", channelId);
         }

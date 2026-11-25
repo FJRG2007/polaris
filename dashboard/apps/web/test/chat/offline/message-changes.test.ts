@@ -22,6 +22,7 @@ const editSealedMessage = vi.fn();
 let sealedOn = false;
 vi.mock("@/lib/chat/e2ee/sealed-chat", () => ({
     sealedChatActive: () => sealedOn,
+    sealsSendsIn: async () => sealedOn,
     editSealedMessage: (input: unknown) => editSealedMessage(input),
     sendSealedMessage: async () => "",
     sealedSendFailure: () => "unreachable"

@@ -19,7 +19,7 @@ import { ChatShell } from "./chat-shell";
 import { Messages } from "@/components/i18n/messages";
 import { requirePermission } from "@/lib/session";
 import { resolveScope } from "@/lib/workspace-scope";
-import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
+import { chatE2eeState } from "@/lib/chat/e2ee/flag";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,8 @@ export default async function ChatLayout({ children }: { children: ReactNode }) 
                 viewerId={user.id}
                 viewerName={user.name}
                 may={{ spaces, groups, attach, call, meetings }}
-                sealed={chatE2eeEnabled()}
+                sealed={chatE2eeState() !== "off"}
+                sealedHeld={chatE2eeState() === "held"}
                 orgId={scope.org?.id ?? null}
                 orgName={scope.org?.name ?? null}
             >

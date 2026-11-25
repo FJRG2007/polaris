@@ -90,7 +90,7 @@ export interface FilesMessage {
  */
 export async function sendWithFiles(message: FilesMessage): Promise<"sent" | Exclude<SendOutcome, void>> {
     // A page that seals sends every file sealed, never in the clear instead.
-    if (sealedChat.sealedChatActive()) return sendSealedWithFiles(message);
+    if (await sealedChat.sealsSendsIn(message.channelId)) return sendSealedWithFiles(message);
     const { channelId, body, files, track, report, notUploaded } = message;
     const spoilers = message.spoilers ?? [];
     const sounds = message.sounds ?? [];

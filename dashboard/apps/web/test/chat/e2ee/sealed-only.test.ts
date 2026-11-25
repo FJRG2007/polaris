@@ -71,8 +71,15 @@ describe("sealed only", () => {
         await expect(refusalForPage(false, () => refusePlainIfSealed(PLAIN))).resolves.toBeUndefined();
     });
 
-    it("refuses nothing while sealed chat is off", async () => {
+    it("keeps refusing plain writes into a sealed conversation while held, and takes them elsewhere", async () => {
         process.env.POLARIS_INTERNAL_CHAT_E2EE = "0";
+        expect(await conversationSealed(SEALED)).toBe(true);
+        await expect(refusePlainIfSealed(SEALED)).rejects.toBeInstanceOf(ChatRuleError);
+        expect(await conversationSealed(PLAIN)).toBe(false);
+    });
+
+    it("refuses nothing while sealed chat is off", async () => {
+        delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
         expect(await conversationSealed(SEALED)).toBe(false);
         await expect(refusePlainIfSealed(SEALED)).resolves.toBeUndefined();
     });

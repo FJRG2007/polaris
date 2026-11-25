@@ -15,13 +15,13 @@
  *   its ratchet, so the device is opened only under a lease on its address
  *   (`withLease`), and one process runs its work one at a time.
  *
- * Nothing here runs while `chatE2eeEnabled()` is off: `answerMls` answers 404,
+ * Nothing here runs while `sealedChatServed()` is off: `answerMls` answers 404,
  * and `withServiceDevice` refuses before it loads anything.
  *
  * Server-only.
  */
 
-import { chatE2eeEnabled } from "./flag";
+import { sealedChatServed } from "./flag";
 import type { MlsBody } from "./schemas";
 import { answerMls } from "./mls-handler";
 import { withLease } from "@/lib/cron/lease";
@@ -174,7 +174,7 @@ export interface ServiceDeviceOptions {
  * belongs before or after it, outside the lease.
  */
 export async function withServiceDevice<T>(kind: ServiceKind, owner: string, work: (device: MlsDevice) => Promise<T>, options: ServiceDeviceOptions = {}): Promise<T> {
-    if (!chatE2eeEnabled()) throw new Error("sealed chat is off on this instance");
+    if (!sealedChatServed()) throw new Error("sealed chat is off on this instance");
     const { userId, device, address } = serviceAddress(kind, owner);
     return queued(address, () => run(userId, device, address, work, options));
 }

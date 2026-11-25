@@ -337,6 +337,17 @@ export class MlsDevice {
         await this.commitAndSend({ op: "publish-key-packages", device: this.options.device, ciphersuite: this.ciphersuite as 0x004f, keyPackages, lastResort: false });
     }
 
+    /**
+     * Whether the conversation is sealed already: this device is in its group,
+     * or the server has one or the migration sealed it. What a page asks while
+     * sealed chat is held, where only a sealed conversation takes sealed sends.
+     */
+    async sealedAlready(channelId: string): Promise<boolean> {
+        if (this.groupOf(channelId)) return true;
+        const answer = await this.send({ op: "group", channelId });
+        return Boolean(answer.group) || answer.sealed === true;
+    }
+
     /** Whether this device is in the conversation's group (as far as it has read). */
     hasGroup(channelId: string): boolean {
         return this.groupOf(channelId) !== null;

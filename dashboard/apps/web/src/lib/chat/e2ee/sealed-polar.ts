@@ -13,13 +13,13 @@
  * approval (`polar-calls.ts`); "Approve" and "Cancel" seal what follows over
  * the offer from the same device (`approveSealedPolar`, `cancelSealedPolar`).
  *
- * Nothing here runs while `chatE2eeEnabled()` is off, nor where Polar is not
+ * Nothing here runs while `sealedChatServed()` is off, nor where Polar is not
  * a member: its device reaches only conversations it was added to.
  *
  * Server-only.
  */
 
-import { chatE2eeEnabled } from "./flag";
+import { sealedChatServed } from "./flag";
 import * as polar from "@/lib/chat/polar-mention";
 import { withServiceDevice } from "./service-device";
 import { polarAdded } from "@/lib/chat/service-members";
@@ -75,7 +75,7 @@ function sealedReply(question: SealedQuestion): polar.SealedReply {
 
 /** Answer a sealed message if it asks Polar: the id of Polar's answer, or null when it did not ask. */
 export async function answerSealedPolar(question: SealedQuestion): Promise<string | null> {
-    if (!chatE2eeEnabled() || !(await polarAdded(question.channelId))) return null;
+    if (!sealedChatServed() || !(await polarAdded(question.channelId))) return null;
     const body = (await openAsPolar(question.channelId, [question.messageId])).get(question.messageId);
     if (!body) return null;
     const replied = polarMentioned(body) ? false : await polar.repliesToPolar(question.channelId, question.replyToId);
@@ -90,7 +90,7 @@ export async function answerSealedPolar(question: SealedQuestion): Promise<strin
  * from before it was added), so the press is answered as gone.
  */
 export async function retrySealedPolar(question: SealedQuestion, answerId: string): Promise<string | null> {
-    if (!chatE2eeEnabled() || !(await polarAdded(question.channelId))) return null;
+    if (!sealedChatServed() || !(await polarAdded(question.channelId))) return null;
     const body = (await openAsPolar(question.channelId, [question.messageId])).get(question.messageId);
     if (!body) return null;
     return polar.answerPolarMention({ ...question, body }, answerId, [], sealedReply(question));
@@ -113,7 +113,7 @@ export async function approveSealedPolar(
     answerId: string,
     run: () => Promise<readonly DoneCall[] | null>
 ): Promise<boolean> {
-    if (!chatE2eeEnabled() || !(await polarAdded(question.channelId))) return false;
+    if (!sealedChatServed() || !(await polarAdded(question.channelId))) return false;
     const body = (await openAsPolar(question.channelId, [question.messageId])).get(question.messageId);
     if (!body) return false;
     const done = await run();
@@ -129,7 +129,7 @@ export async function approveSealedPolar(
  * runs either way.
  */
 export async function cancelSealedPolar(channelId: string, answerId: string, text: string): Promise<void> {
-    if (chatE2eeEnabled() && (await polarAdded(channelId))) {
+    if (sealedChatServed() && (await polarAdded(channelId))) {
         await withServiceDevice("polar", channelId, async (device) => {
             await device.ensureGroup(channelId);
             await device.editSealed(channelId, answerId, encodeSealedContent({ body: text }));
