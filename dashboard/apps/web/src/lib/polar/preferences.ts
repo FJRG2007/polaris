@@ -50,6 +50,7 @@ const SELECTED = {
     showContextBar: true,
     autoCompact: true,
     reopenLastChat: true,
+    codeSuggestions: true,
     transcriptionModel: true,
     sessionEngine: true,
     codeTheme: true,

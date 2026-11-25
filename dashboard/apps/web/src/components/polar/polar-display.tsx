@@ -213,8 +213,9 @@ export async function changePolarDisplay(key: PolarDisplayKey, value: boolean): 
 }
 
 /** The suggestion switch lives with the helper model (`polar-helper-settings.tsx`),
- *  and which chat opens with "When Polar opens" (`polar-open-settings.tsx`). */
-type DisplayRow = Exclude<PolarDisplayKey, "suggestions" | "reopenLastChat">;
+ *  which chat opens with "When Polar opens" (`polar-open-settings.tsx`), and
+ *  Code's suggestion sits with Code steps. */
+type DisplayRow = Exclude<PolarDisplayKey, "suggestions" | "reopenLastChat" | "codeSuggestions">;
 
 const ROWS: readonly {
     key: DisplayRow;
@@ -279,6 +280,7 @@ function CodeStepsSettings() {
     const t = useTranslations("polar");
     const toast = useToast();
     const view = useCodeSteps() ?? "compact";
+    const display = usePolarDisplay();
     return (
         <section className="flex flex-col gap-2">
             <div className="min-w-0">
@@ -302,6 +304,21 @@ function CodeStepsSettings() {
                         value: name,
                         label: t(`settings.codeSteps.names.${name}`)
                     }))}
+                />
+            </div>
+            <div className="flex min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2">
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm text-foreground">{t("settings.codeSuggestions.label")}</p>
+                    <p className="text-xs text-muted-foreground">{t("settings.codeSuggestions.hint")}</p>
+                </div>
+                <Switch
+                    checked={display.codeSuggestions}
+                    aria-label={t("settings.codeSuggestions.label")}
+                    onChange={(value) =>
+                        void changePolarDisplay("codeSuggestions", value).then((saved) =>
+                            saved ? undefined : toast.show({ title: t("settings.codeSuggestions.failed") })
+                        )
+                    }
                 />
             </div>
         </section>

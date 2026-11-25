@@ -1189,6 +1189,11 @@
                 "compact": "En palabras",
                 "detailed": "Con código y salida"
             }
+        },
+        "codeSuggestions": {
+            "label": "Sugerir el siguiente mensaje",
+            "hint": "Tras cada turno, el cuadro vacío muestra un mensaje que podrías enviar. Tab o un toque lo usa.",
+            "failed": "No se pudo guardar el ajuste de sugerencias. Inténtalo de nuevo."
         }
     },
     "temporary": {

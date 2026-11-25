@@ -18225,6 +18225,9 @@ model PolarPreference {
     // detailed (cards open), from apps/web/src/lib/polar/code-steps.ts. Null
     // is not chosen yet, read as compact.
     codeSteps      String?
+    // Whether a Code session suggests the next message after each turn
+    // (apps/web/src/lib/polar/code-suggestion.ts).
+    codeSuggestions Boolean @default(true)
     updatedAt      DateTime @updatedAt
 }
 

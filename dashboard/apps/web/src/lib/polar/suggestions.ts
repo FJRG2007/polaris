@@ -138,9 +138,28 @@ async function suggest(
     messages: readonly UIMessage[],
     helper: Promise<PolarHelper | null>
 ): Promise<string | null> {
-    const answer = messages.at(-1);
     const asked = textOf([...messages].reverse().find((message) => message.role === "user"));
-    const answered = textOf(answer);
+    return writeSuggestion(userId, threadId, asked, textOf(messages.at(-1)), helper);
+}
+
+/** The end of a text, as much of it as the model reads. */
+function excerpt(text: string): string {
+    const trimmed = text.trim();
+    return trimmed.length > EXCERPT_MAX ? trimmed.slice(-EXCERPT_MAX) : trimmed;
+}
+
+/**
+ * One suggestion for the exchange `asked` -> `answered`, written by the helper
+ * model within its spending ceiling (`helperMaySpend`), or null. `threadId` is
+ * the chat the usage is recorded against; a Code session has none.
+ */
+async function writeSuggestion(
+    userId: string,
+    threadId: string | null,
+    asked: string,
+    answered: string,
+    helper: Promise<PolarHelper | null>
+): Promise<string | null> {
     if (!asked || !answered) return null;
     const model = await helper;
     if (!model || !(await helperMaySpend(userId, model))) return null;
@@ -220,4 +239,43 @@ export async function settledPolarSuggestion(
     ]);
     clearTimeout(timer);
     return settled;
+}
+
+/**
+ * The suggested next message after a Code session's turn, written by the same
+ * helper model as Chat's when the agent's tool did not predict one itself
+ * (`code-suggestion.ts`). Asked for once the turn has ended, never while it
+ * runs; the first ask writes it and every later ask for the same answer -
+ * another tab, a re-render - waits on that one job, so a turn costs at most
+ * one small call. `helper` is resolved only when a call is made.
+ */
+export async function codePolarSuggestion(
+    userId: string,
+    sessionId: string,
+    answerId: string,
+    exchange: { asked: string; answered: string },
+    helper: () => Promise<PolarHelper | null>,
+    now = Date.now()
+): Promise<string | null> {
+    const key = `code:${sessionId}`;
+    const entry = kept.get(key);
+    const fresh =
+        entry && entry.userId === userId && entry.answerId === answerId && now - entry.at <= KEEP_MS;
+    if (!fresh) {
+        sweep(now);
+        const job = writeSuggestion(
+            userId,
+            null,
+            excerpt(exchange.asked),
+            excerpt(exchange.answered),
+            helper()
+        ).catch((error) => {
+            console.warn(
+                `polar: could not suggest a next message: ${error instanceof Error ? error.message : String(error)}`
+            );
+            return null;
+        });
+        kept.set(key, { userId, answerId, at: now, job });
+    }
+    return settledPolarSuggestion(userId, key, answerId, now);
 }

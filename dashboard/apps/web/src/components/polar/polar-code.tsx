@@ -106,6 +106,7 @@ import { CodeVoiceCall, type VoiceWatch } from "@/components/polar/code-voice-ca
 import type { RealtimeLink } from "@/lib/polar/realtime-link";
 import { parseVoiceDelegation } from "@/lib/polar/voice-handoff";
 import { useCodeSlash } from "@/components/polar/polar-code-slash";
+import { useCodeSuggestion } from "@/components/polar/code-suggestion";
 import * as codeCommands from "@/lib/polar/code-commands";
 import * as goals from "@/lib/polar/goals";
 import { goalStateKey, PolarGoalBar } from "@/components/polar/polar-goal";
@@ -1620,6 +1621,15 @@ function CodeThread({
         enigma: enigma.code,
         onCommand: (command, rest) => runCommand(command, rest)
     });
+    // The suggested next message after a turn (`code-suggestion.tsx`).
+    const suggestion = useCodeSuggestion({
+        sessionId,
+        thread,
+        value: reply,
+        onAccept: setReply,
+        inputId,
+        enabled: call === null
+    });
 
     const read = useCallback(() => {
         readPoll<PolarCodeThread | null>("/api/polar/code/thread", { sessionId }, signal())
@@ -2216,7 +2226,12 @@ function CodeThread({
             <div className="relative">
             {slash.list}
             <PolarComposer
-                textareaProps={slash.textareaProps}
+                textareaProps={{
+                    ...slash.textareaProps,
+                    onKeyDown: suggestion.onKeyDown(slash.textareaProps.onKeyDown),
+                    "aria-describedby": suggestion.describedBy
+                }}
+                beforeInput={suggestion.beforeInput}
                 kit={voiceKit}
                 inCall={call !== null}
                 notice={parts.notice}
@@ -2225,7 +2240,7 @@ function CodeThread({
                 label={t("code.reply")}
                 value={reply}
                 onValueChange={setReply}
-                placeholder={t("code.reply")}
+                placeholder={suggestion.placeholder(t("code.reply"))}
                 disabled={busy}
                 maxLength={PROMPT_MAX}
                 onSubmit={send}

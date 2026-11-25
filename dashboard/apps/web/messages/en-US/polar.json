@@ -1189,6 +1189,11 @@
                 "compact": "In plain words",
                 "detailed": "With code and output"
             }
+        },
+        "codeSuggestions": {
+            "label": "Suggest the next message",
+            "hint": "After each turn, a message you might send next appears in the empty box. Tab or a tap uses it.",
+            "failed": "Could not save the suggestion setting. Try again."
         }
     },
     "temporary": {

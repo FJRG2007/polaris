@@ -3,7 +3,8 @@
  * answer, the context bar above the composer, and whether a turn that would
  * fill the model's window compacts the chat first, and whether a suggested
  * next message follows each answer, and whether opening Polar brings back
- * the last chat. Every one but the last is on until the person turns it off,
+ * the last chat, and whether a Code session suggests the next message after
+ * each turn. Every one but "reopen the last chat" is on until the person turns it off,
  * and the defaults live here so an install whose database has no row yet
  * behaves the same. Client-safe.
  */
@@ -21,7 +22,8 @@ export const POLAR_DISPLAY_KEYS = [
     "showContextBar",
     "autoCompact",
     "suggestions",
-    "reopenLastChat"
+    "reopenLastChat",
+    "codeSuggestions"
 ] as const;
 
 export type PolarDisplayKey = (typeof POLAR_DISPLAY_KEYS)[number];
@@ -34,7 +36,8 @@ export const POLAR_DISPLAY_DEFAULTS: PolarDisplay = {
     showContextBar: true,
     autoCompact: true,
     suggestions: true,
-    reopenLastChat: false
+    reopenLastChat: false,
+    codeSuggestions: true
 };
 
 /** A stored or cached value read whole: anything missing or not a boolean
@@ -93,6 +96,8 @@ export const polarPreferencesPatchSchema = z
         showContextBar: z.boolean().optional(),
         autoCompact: z.boolean().optional(),
         reopenLastChat: z.boolean().optional(),
+        /** Whether Code suggests the next message after a turn (`code-suggestion.ts`). */
+        codeSuggestions: z.boolean().optional(),
         /** The mic menu's model, `provider/model`; null goes back to the default. */
         transcriptionModel: transcriptionChoiceSchema.nullable().optional(),
         /** The engine Code sessions run on; null is Automatic. */

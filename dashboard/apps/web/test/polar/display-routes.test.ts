@@ -93,7 +93,8 @@ describe("chat display settings", () => {
             writingSkills: [],
             sessionEngine: null,
             codeTheme: "polaris",
-            codeSteps: null
+            codeSteps: null,
+            codeSuggestions: true
         });
     });
 
@@ -113,7 +114,8 @@ describe("chat display settings", () => {
             writingSkills: ["Tone"],
             sessionEngine: "opencode",
             codeTheme: "nord",
-            codeSteps: null
+            codeSteps: null,
+            codeSuggestions: false
         };
         expect(await (await preferences.GET()).json()).toEqual(state.preference);
     });
