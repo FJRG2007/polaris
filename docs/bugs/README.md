@@ -50,3 +50,5 @@ Security findings are not kept here; they live in
 | BUG-0037 | Screens show translation keys instead of their words | Dashboard | Fixed, watching | dashboard/apps/web/test/i18n/client-namespaces.test.ts | 2026-11-25 |
 | BUG-0038 | Every page of the public domain is shown as "Not secure" although its certificate is valid | Dashboard | Fixed, watching | dashboard/apps/web/src/lib/local-address.ts | 2026-11-25 |
 | BUG-0039 | After an update, Polaris desktop says the page's code was changed | Integrity | Fixed, watching | dashboard/packages/core/src/integrity-guard.ts | 2026-11-25 |
+| BUG-0040 | After Alt+Space the launcher opens but typing does not go into its search | Desktop | Regressed | clients/desktop/src/main/window-front.ts | 2026-11-23 |
+| BUG-0041 | The launcher's first open after hours unused is jerky, and its dimmed backdrop behaves oddly | Desktop | Open | clients/desktop/src/main/launcher.ts | 2026-11-25 |
