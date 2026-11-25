@@ -438,6 +438,10 @@
             "label": "A server's security updates",
             "description": "Polaris turned automatic security updates on for a server, or a server needs a restart to finish them."
         },
+        "securityFirewall": {
+            "label": "A server without a firewall",
+            "description": "A server has no firewall on, and the review of what turning it on would close waits on you."
+        },
         "placesAlert": {
             "label": "An alert you wrote went off",
             "description": "Something one of your alerts asked about happened."

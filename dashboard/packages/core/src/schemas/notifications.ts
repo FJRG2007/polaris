@@ -456,6 +456,14 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "security.firewall",
+        group: "security",
+        label: "A server without a firewall",
+        description: "A server has no firewall on, and the review of what turning it on would close waits on you.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "account.signin",
         group: "security",
         label: "Sign-in waiting for approval",

@@ -57,7 +57,10 @@ describe("listServers", () => {
                 reboot: "none",
                 offByHandAt: null,
                 rebootAt: null,
-                held: []
+                held: [],
+                firewall: "unknown",
+                firewallClosing: null,
+                firewallOffByHandAt: null
             }
         ]);
         expect(page.next).not.toBeNull();

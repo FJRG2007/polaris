@@ -54,6 +54,22 @@ pub const PACKAGE_UNHOLD_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "
 
 pub const PACKAGE_ROLLBACK_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; apt-cache madison "$1" 2>/dev/null | awk -F'|' '{gsub(/ /, "", $2); if ($2 != "" && !seen[$2]++) print "POLARIS_VERSION=" $2}' | grep -qxF "POLARIS_VERSION=$2" || { echo POLARIS_ROLLBACK=unavailable; exit 0; }; if nice -n 10 apt-get install -y -qq --no-remove --allow-downgrades -o Dpkg::Options::=--force-confold "$1=$2" >/dev/null 2>&1; then apt-mark hold "$1" >/dev/null 2>&1; echo POLARIS_ROLLBACK=done; else echo POLARIS_ROLLBACK=failed; fi; elif command -v dnf >/dev/null 2>&1; then dnf -q --showduplicates list "$1" 2>/dev/null | awk 'NF == 3 && !seen[$2]++ {print "POLARIS_VERSION=" $2}' | grep -qxF "POLARIS_VERSION=$2" || { echo POLARIS_ROLLBACK=unavailable; exit 0; }; if nice -n 10 dnf downgrade -y -q "$1-$2" >/dev/null 2>&1; then { dnf -q versionlock list >/dev/null 2>&1 || nice -n 10 dnf install -y -q 'dnf-command(versionlock)' >/dev/null 2>&1; }; dnf -q versionlock add "$1" >/dev/null 2>&1; echo POLARIS_ROLLBACK=done; else echo POLARIS_ROLLBACK=failed; fi; else echo POLARIS_ROLLBACK=unsupported; fi; true"#;
 
+/// The host firewall: nftables table `inet polaris_host`, input only, default deny.
+/// Status reads what listens and what the containers publish; apply loads a
+/// rule set built from the ports it is given (plus every SSH listener it finds
+/// itself) behind a 120 s systemd timer that undoes it, and only confirm - a
+/// second, fresh call carrying the same apply id - keeps it and makes it the one
+/// loaded at boot. The boot unit is Debian's own nftables.service ordering. An
+/// active ufw or firewalld is turned off in favour of it, and back on when the
+/// change rolls back before anything was confirmed or the firewall is turned off.
+pub const FIREWALL_STATUS_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; D=/var/lib/polaris-firewall; if command -v nft >/dev/null 2>&1; then echo POLARIS_NFT=yes; nft list table inet polaris_router >/dev/null 2>&1 && echo POLARIS_ROUTER=yes; if nft list table inet polaris_host >/dev/null 2>&1; then if [ -f $D/pending ]; then echo POLARIS_FIREWALL=armed; else echo POLARIS_FIREWALL=on; fi; else echo POLARIS_FIREWALL=off; fi; else echo POLARIS_NFT=no; echo POLARIS_FIREWALL=off; fi; [ -f $D/allowed ] && sed 's/^/POLARIS_ALLOWED=/' $D/allowed; [ -f $D/replaced ] && echo "POLARIS_REPLACED=$(cat $D/replaced)"; if command -v ufw >/dev/null 2>&1 && grep -qs '^ENABLED=yes' /etc/ufw/ufw.conf; then echo POLARIS_OTHER=ufw; elif systemctl is-active --quiet firewalld 2>/dev/null; then echo POLARIS_OTHER=firewalld; fi; ip -o addr show 2>/dev/null | awk '{sub(/\/.*/, "", $4); print "POLARIS_ADDR=" $2 " " $4}'; command -v wg >/dev/null 2>&1 && wg show all listen-port 2>/dev/null | awk '{print "POLARIS_WG=" $2}'; command -v docker >/dev/null 2>&1 && docker ps -aq 2>/dev/null | head -n 500 | xargs -r docker inspect --format '{{.Name}}{{range $p, $b := .HostConfig.PortBindings}}{{range $b}} {{$p}}={{.HostPort}}{{end}}{{end}}' 2>/dev/null | sed 's/^\//POLARIS_BOUND=/'; ss -Htulnp 2>/dev/null | head -n 500 | while read -r p s q1 q2 l r u; do port=${l##*:}; n=$(echo "$u" | sed -n 's/^users:(("\([^"]*\)".*/\1/p'); pid=$(echo "$u" | sed -n 's/^users:(("[^"]*",pid=\([0-9]*\).*/\1/p'); c=-; if [ -n "$pid" ]; then id=$(grep -oE '(docker|libpod)[-/][0-9a-f]{64}' /proc/$pid/cgroup 2>/dev/null | head -n 1 | grep -oE '[0-9a-f]{64}'); [ -n "$id" ] && c=$(docker inspect --format '{{.Name}}' "$id" 2>/dev/null | tr -d '/'); [ -n "$c" ] || c=-; fi; [ "$n" = systemd ] && n=$(systemctl list-sockets --no-legend 2>/dev/null | awk -v p="$port" '$1 ~ (":" p "$") {print $2; exit}'); echo "POLARIS_LISTEN=$p $port ${l%:*} ${n:--} $c"; done; true"#;
+
+pub const FIREWALL_APPLY_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; D=/var/lib/polaris-firewall; id=$1; shift; if ! command -v nft >/dev/null 2>&1; then if command -v apt-get >/dev/null 2>&1; then DEBIAN_FRONTEND=noninteractive nice -n 10 apt-get install -y -qq nftables >/dev/null 2>&1; elif command -v dnf >/dev/null 2>&1; then nice -n 10 dnf install -y -q nftables >/dev/null 2>&1; fi; fi; command -v nft >/dev/null 2>&1 || { echo POLARIS_FIREWALL=unavailable; exit 0; }; nft list table inet polaris_router >/dev/null 2>&1 && { echo POLARIS_FIREWALL=router; exit 0; }; mkdir -p $D && chmod 700 $D || { echo POLARIS_FIREWALL=failed; exit 0; }; for p in $(ss -Htlnp 2>/dev/null | grep '"sshd"' | awk '{for (i = 1; i <= NF; i++) if ($i ~ /:[0-9]+$/) {n = split($i, a, ":"); print a[n]; break}}') $(systemctl list-sockets --no-legend 2>/dev/null | awk '$2 == "ssh.socket" || $2 == "sshd.socket" {n = split($1, a, ":"); print a[n]}'); do set -- "$@" "tcp:$p"; done; printf '%s\n' "$@" | sort -u > $D/next.ports; T=$(sed -n 's/^tcp://p' $D/next.ports | sort -un | paste -sd, -); U=$(sed -n 's/^udp://p' $D/next.ports | sort -un | paste -sd, -); { printf '%s\n' 'table inet polaris_host {}' 'delete table inet polaris_host' 'table inet polaris_host {' 'chain input {' 'type filter hook input priority filter; policy drop;' 'ct state established,related accept' 'ct state invalid drop' 'iifname "lo" accept'; for i in docker br- veth virbr cni flannel kube tailscale zt wg tun tap podman lxcbr lxdbr vboxnet vmnet; do printf 'iifname "%s*" accept\n' "$i"; done; printf '%s\n' 'meta l4proto { icmp, ipv6-icmp } accept' 'udp sport 547 udp dport 546 accept' 'udp sport 67 udp dport 68 accept'; [ -n "$T" ] && printf 'tcp dport { %s } accept\n' "$T"; [ -n "$U" ] && printf 'udp dport { %s } accept\n' "$U"; printf '%s\n' '}' '}'; } > $D/next.nft; nft -c -f $D/next.nft >/dev/null 2>&1 || { echo POLARIS_FIREWALL=invalid; exit 0; }; printf '%s\n' '#!/bin/sh' 'D=/var/lib/polaris-firewall' 'nft delete table inet polaris_host 2>/dev/null' '[ -s $D/good.nft ] && nft -f $D/good.nft' 'if [ -f $D/replaced ] && [ ! -s $D/good.nft ]; then case $(cat $D/replaced) in ufw) ufw --force enable >/dev/null 2>&1 ;; firewalld) systemctl enable --now firewalld >/dev/null 2>&1 ;; esac; rm -f $D/replaced; fi' 'rm -f $D/pending' 'echo rolled-back > $D/ending' > $D/rollback.sh; printf '%s\n' '#!/bin/sh' 'D=/var/lib/polaris-firewall' 'if [ -f $D/pending ]; then /bin/sh $D/rollback.sh; elif [ -s $D/good.nft ]; then nft -f $D/good.nft; fi' > $D/boot.sh; printf '%s\n' '[Unit]' 'Description=Polaris host firewall' 'Wants=network-pre.target' 'Before=network-pre.target shutdown.target' 'Conflicts=shutdown.target' 'DefaultDependencies=no' 'RequiresMountsFor=/var/lib/polaris-firewall' '[Service]' 'Type=oneshot' 'RemainAfterExit=yes' 'ExecStart=/bin/sh /var/lib/polaris-firewall/boot.sh' '[Install]' 'WantedBy=sysinit.target' > /etc/systemd/system/polaris-firewall.service; systemctl daemon-reload >/dev/null 2>&1; systemctl enable polaris-firewall.service >/dev/null 2>&1; systemctl stop polaris-firewall-rollback.timer polaris-firewall-rollback.service >/dev/null 2>&1; systemctl reset-failed polaris-firewall-rollback.service >/dev/null 2>&1; rm -f $D/ending; echo "$id" > $D/pending; systemd-run --quiet --unit=polaris-firewall-rollback --timer-property=AccuracySec=1s --on-active=120 /bin/sh $D/rollback.sh >/dev/null 2>&1 || { rm -f $D/pending; echo POLARIS_FIREWALL=failed; exit 0; }; if command -v ufw >/dev/null 2>&1 && grep -qs '^ENABLED=yes' /etc/ufw/ufw.conf; then ufw disable >/dev/null 2>&1 && echo ufw > $D/replaced; elif systemctl is-active --quiet firewalld 2>/dev/null; then systemctl disable --now firewalld >/dev/null 2>&1 && echo firewalld > $D/replaced; fi; if nft -f $D/next.nft >/dev/null 2>&1; then echo POLARIS_FIREWALL=armed; else systemctl stop polaris-firewall-rollback.timer >/dev/null 2>&1; /bin/sh $D/rollback.sh; echo POLARIS_FIREWALL=failed; fi"#;
+
+pub const FIREWALL_CONFIRM_SCRIPT: &str = r#"D=/var/lib/polaris-firewall; systemctl stop polaris-firewall-rollback.timer >/dev/null 2>&1; n=0; while systemctl is-active --quiet polaris-firewall-rollback.service 2>/dev/null && [ $n -lt 30 ]; do sleep 1; n=$((n + 1)); done; if [ -f $D/pending ] && [ "$(cat $D/pending)" = "$1" ] && nft list table inet polaris_host >/dev/null 2>&1; then cp $D/next.nft $D/good.nft && cp $D/next.ports $D/allowed && rm -f $D/pending && echo POLARIS_FIREWALL=confirmed; elif [ -f $D/ending ]; then echo POLARIS_FIREWALL=rolled-back; else echo POLARIS_FIREWALL=unknown; fi; true"#;
+
+pub const FIREWALL_OFF_SCRIPT: &str = r#"D=/var/lib/polaris-firewall; systemctl stop polaris-firewall-rollback.timer polaris-firewall-rollback.service >/dev/null 2>&1; nft delete table inet polaris_host >/dev/null 2>&1; systemctl disable polaris-firewall.service >/dev/null 2>&1; rm -f /etc/systemd/system/polaris-firewall.service; systemctl daemon-reload >/dev/null 2>&1; case $(cat $D/replaced 2>/dev/null) in ufw) ufw --force enable >/dev/null 2>&1 ;; firewalld) systemctl enable --now firewalld >/dev/null 2>&1 ;; esac; rm -rf $D; echo POLARIS_FIREWALL=off"#;
+
 #[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum HostAction {
@@ -68,6 +84,10 @@ pub enum HostAction {
     PackageHold,
     PackageUnhold,
     PackageRollback,
+    FirewallStatus,
+    FirewallApply,
+    FirewallConfirm,
+    FirewallOff,
 }
 
 #[derive(Deserialize, Debug)]
@@ -80,6 +100,41 @@ pub struct HostSecurityRequest {
     /// The version a rollback goes to; refused on every other action.
     #[serde(default)]
     pub version: Option<String>,
+    /// The id a firewall change is applied and then confirmed under.
+    #[serde(default)]
+    pub apply: Option<String>,
+    /// The ports a firewall change leaves open, as `tcp:N` or `udp:N`.
+    #[serde(default)]
+    pub ports: Option<Vec<String>>,
+}
+
+/// Most ports one firewall change may name.
+pub const MAX_FIREWALL_PORTS: usize = 512;
+
+/// A firewall change's id: a UUID's alphabet, so it is one word with no sign.
+pub fn valid_apply_id(id: &str) -> bool {
+    let bytes = id.as_bytes();
+    (8..=64).contains(&bytes.len())
+        && bytes[0].is_ascii_hexdigit()
+        && bytes.iter().all(|b| b.is_ascii_hexdigit() || *b == b'-')
+}
+
+/// One port to leave open: `tcp:` or `udp:` and a number from 1 to 65535
+/// written with no leading zero.
+pub fn valid_port_word(word: &str) -> bool {
+    let Some(number) = word
+        .strip_prefix("tcp:")
+        .or_else(|| word.strip_prefix("udp:"))
+    else {
+        return false;
+    };
+    !number.is_empty()
+        && number.len() <= 5
+        && !number.starts_with('0')
+        && number.bytes().all(|b| b.is_ascii_digit())
+        && number
+            .parse::<u32>()
+            .is_ok_and(|n| (1..=65535).contains(&n))
 }
 
 /// A package name as dpkg and rpm write them: letters, digits and `+._-`,
@@ -118,6 +173,24 @@ impl HostSecurityRequest {
                 | HostAction::PackageRollback
         );
         let takes_version = self.action == HostAction::PackageRollback;
+        let takes_apply = matches!(
+            self.action,
+            HostAction::FirewallApply | HostAction::FirewallConfirm
+        );
+        let takes_ports = self.action == HostAction::FirewallApply;
+        match (&self.apply, takes_apply) {
+            (None, false) => {}
+            (Some(id), true) if valid_apply_id(id) => {}
+            _ => return None,
+        }
+        match (&self.ports, takes_ports) {
+            (None, false) => {}
+            (Some(ports), true)
+                if !ports.is_empty()
+                    && ports.len() <= MAX_FIREWALL_PORTS
+                    && ports.iter().all(|p| valid_port_word(p)) => {}
+            _ => return None,
+        }
         match (&self.package, takes_package) {
             (None, false) => {}
             (Some(name), true) if valid_package(name) => {}
@@ -132,6 +205,8 @@ impl HostSecurityRequest {
             self.package
                 .iter()
                 .chain(self.version.iter())
+                .chain(self.apply.iter())
+                .chain(self.ports.iter().flatten())
                 .cloned()
                 .collect(),
         )
@@ -174,6 +249,10 @@ pub fn argv(action: HostAction, arguments: &[String]) -> Vec<String> {
                 HostAction::PackageHold => PACKAGE_HOLD_SCRIPT,
                 HostAction::PackageUnhold => PACKAGE_UNHOLD_SCRIPT,
                 HostAction::PackageRollback => PACKAGE_ROLLBACK_SCRIPT,
+                HostAction::FirewallStatus => FIREWALL_STATUS_SCRIPT,
+                HostAction::FirewallApply => FIREWALL_APPLY_SCRIPT,
+                HostAction::FirewallConfirm => FIREWALL_CONFIRM_SCRIPT,
+                HostAction::FirewallOff => FIREWALL_OFF_SCRIPT,
                 _ => UPDATES_OFF_SCRIPT,
             };
             args.extend([
@@ -698,6 +777,10 @@ mod tests {
             PACKAGE_HOLD_SCRIPT,
             PACKAGE_UNHOLD_SCRIPT,
             PACKAGE_ROLLBACK_SCRIPT,
+            FIREWALL_STATUS_SCRIPT,
+            FIREWALL_APPLY_SCRIPT,
+            FIREWALL_CONFIRM_SCRIPT,
+            FIREWALL_OFF_SCRIPT,
         ] {
             assert!(!script.bytes().any(|b| b < 0x20 || b == 0x7f));
         }
@@ -768,5 +851,121 @@ mod tests {
             let shell: String = script.split('\'').step_by(2).collect();
             assert!(!shell.contains(" $1") && !shell.contains(" $2"));
         }
+    }
+
+    #[test]
+    fn firewall_actions_take_an_apply_id_and_well_formed_ports_only() {
+        let id = "0f8c2a4e-1b2c-4d5e-8f90-123456789abc";
+        assert_eq!(request(r#"{"action":"firewall-status"}"#), Some(vec![]));
+        assert_eq!(request(r#"{"action":"firewall-off"}"#), Some(vec![]));
+        assert_eq!(
+            request(&format!(
+                r#"{{"action":"firewall-apply","apply":"{id}","ports":["tcp:22","udp:7882"]}}"#
+            )),
+            Some(vec![
+                id.to_string(),
+                "tcp:22".to_string(),
+                "udp:7882".to_string()
+            ])
+        );
+        assert_eq!(
+            request(&format!(
+                r#"{{"action":"firewall-confirm","apply":"{id}"}}"#
+            )),
+            Some(vec![id.to_string()])
+        );
+        // An apply needs both, a confirm only the id, and nothing else takes either.
+        assert_eq!(
+            request(&format!(r#"{{"action":"firewall-apply","apply":"{id}"}}"#)),
+            None
+        );
+        assert_eq!(
+            request(r#"{"action":"firewall-apply","ports":["tcp:22"]}"#),
+            None
+        );
+        assert_eq!(
+            request(&format!(
+                r#"{{"action":"firewall-apply","apply":"{id}","ports":[]}}"#
+            )),
+            None
+        );
+        assert_eq!(
+            request(&format!(
+                r#"{{"action":"firewall-confirm","apply":"{id}","ports":["tcp:22"]}}"#
+            )),
+            None
+        );
+        assert_eq!(
+            request(&format!(r#"{{"action":"updates-on","apply":"{id}"}}"#)),
+            None
+        );
+        assert_eq!(
+            request(r#"{"action":"firewall-status","ports":["tcp:22"]}"#),
+            None
+        );
+        for bad in ["-rf", "x; reboot", "0f8c2a4e 1b2c", "short", ""] {
+            assert_eq!(
+                request(&format!(
+                    r#"{{"action":"firewall-confirm","apply":"{bad}"}}"#
+                )),
+                None,
+                "{bad}"
+            );
+        }
+        for bad in [
+            "tcp:0",
+            "tcp:65536",
+            "tcp:022",
+            "sctp:22",
+            "tcp:22;",
+            "tcp:",
+            "udp:-1",
+            "tcp:2 2",
+        ] {
+            assert_eq!(
+                request(&format!(
+                    r#"{{"action":"firewall-apply","apply":"{id}","ports":["{bad}"]}}"#
+                )),
+                None,
+                "{bad}"
+            );
+        }
+        let many: Vec<String> = (1..=MAX_FIREWALL_PORTS + 1)
+            .map(|n| format!(r#""tcp:{n}""#))
+            .collect();
+        assert_eq!(
+            request(&format!(
+                r#"{{"action":"firewall-apply","apply":"{id}","ports":[{}]}}"#,
+                many.join(",")
+            )),
+            None
+        );
+    }
+
+    #[test]
+    fn firewall_runs_in_the_host_root_and_never_loads_a_change_before_its_undo_is_armed() {
+        let args = argv(
+            HostAction::FirewallApply,
+            &["abcdef12".to_string(), "tcp:22".to_string()],
+        );
+        assert!(args.contains(&"--privileged".to_string()));
+        assert!(args.contains(&FIREWALL_APPLY_SCRIPT.to_string()));
+        assert_eq!(&args[args.len() - 3..], ["polaris", "abcdef12", "tcp:22"]);
+        let arm = FIREWALL_APPLY_SCRIPT
+            .find("systemd-run --quiet --unit=polaris-firewall-rollback")
+            .unwrap();
+        let load = FIREWALL_APPLY_SCRIPT
+            .rfind("if nft -f $D/next.nft")
+            .unwrap();
+        let replace = FIREWALL_APPLY_SCRIPT.find("ufw disable").unwrap();
+        assert!(arm < replace && replace < load);
+        // Only a confirm makes a change the one loaded at boot.
+        assert!(
+            !FIREWALL_APPLY_SCRIPT.contains("$D/good.nft &&")
+                && !FIREWALL_APPLY_SCRIPT.contains("cp $D/next.nft")
+        );
+        assert!(FIREWALL_CONFIRM_SCRIPT.contains("cp $D/next.nft $D/good.nft"));
+        // The router's own table is never stacked on.
+        assert!(FIREWALL_APPLY_SCRIPT.contains("nft list table inet polaris_router"));
     }
 }

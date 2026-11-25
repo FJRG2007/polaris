@@ -17031,6 +17031,22 @@ model SecuritySetting {
     // Packages kept where they are (apt-mark hold / dnf versionlock), as the
     // last status read listed them.
     heldPackages String[]  @default([])
+    // The host firewall as last read or set: on | armed | off | router | unknown.
+    firewall          String    @default("unknown")
+    firewallAt        DateTime?
+    // What a person last chose ("on" | "off"); null means nobody did. Polaris
+    // never turns the firewall on by itself: only a person who saw what would
+    // close does.
+    firewallChoice    String?
+    firewallChosenAt  DateTime?
+    // Ports a person chose to keep open although Polaris does not run them.
+    firewallKeep      String[]  @default([])
+    // What the firewall leaves open, and how many listeners a change would
+    // close, as last read.
+    firewallOpen      String[]  @default([])
+    firewallClosing   Int?
+    // The owner was told the firewall waits on them; cleared once it is on.
+    firewallNotifiedAt DateTime?
     updatedAt   DateTime  @updatedAt
 
     target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)

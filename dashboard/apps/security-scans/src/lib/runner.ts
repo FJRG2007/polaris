@@ -110,15 +110,79 @@ async function localDaemon(): Promise<HostdClient> {
     throw new ScanFailure((await client.configured()) ? "lost" : "noDaemon");
 }
 
+/** The words a host action takes: a package action's package and version, a
+ *  firewall change's id and the ports it leaves open. */
+export interface HostWords {
+    readonly package?: string;
+    readonly version?: string;
+    readonly apply?: string;
+    readonly ports?: readonly string[];
+}
+
+/** The words in the order the script reads them, as the daemon passes them. */
+export function wordsOf(words: HostWords | null): string[] {
+    if (!words) return [];
+    return [
+        ...(words.package ? [words.package] : []),
+        ...(words.version ? [words.version] : []),
+        ...(words.apply ? [words.apply] : []),
+        ...(words.ports ?? [])
+    ];
+}
+
 /** Run a host action on a server: the local daemon's fixed endpoint, or the
- *  same `docker run` over SSH as an argument list quoted word by word. */
+ *  same `docker run` over SSH as an argument list quoted word by word. Every
+ *  call over SSH is a connection of its own, which is what lets a firewall
+ *  change be confirmed only by reaching the server again. */
 export async function runHostAction(
     target: ScanTarget,
     action: HostAction,
-    words: { package: string; version?: string } | null = null
+    words: HostWords | null = null
+): Promise<{ exitCode: number; output: string }> {
+    // A firewall change owns the server until it is confirmed or undone: anything
+    // else started meanwhile would hold the daemon the confirmation needs.
+    if (firewallHeld.has(target.id)) throw new ScanFailure("busy");
+    running.set(target.id, (running.get(target.id) ?? 0) + 1);
+    try {
+        return await hostActionNow(target, action, words);
+    } finally {
+        const left = (running.get(target.id) ?? 1) - 1;
+        if (left > 0) running.set(target.id, left);
+        else running.delete(target.id);
+    }
+}
+
+/** Host actions running per server, from this process. */
+const running = new Map<string, number>();
+/** Servers a firewall change is being applied to and confirmed on. */
+const firewallHeld = new Set<string>();
+
+/** Run `work` with the server to itself: refused while any other host action
+ *  runs there, and every other one refused until it ends. Inside it, host
+ *  actions go through `hostActionNow`. */
+export async function withFirewallHold<T>(target: ScanTarget, work: () => Promise<T>): Promise<T> {
+    if (firewallHeld.has(target.id) || running.has(target.id)) throw new ScanFailure("busy");
+    firewallHeld.add(target.id);
+    try {
+        return await work();
+    } finally {
+        firewallHeld.delete(target.id);
+    }
+}
+
+/** A host action with no bookkeeping; `runHostAction` unless the server is held. */
+export async function hostActionNow(
+    target: ScanTarget,
+    action: HostAction,
+    words: HostWords | null = null
 ): Promise<{ exitCode: number; output: string }> {
     if (target.kind === "local" || !target.hostId) {
-        const result = await (await localDaemon()).hostSecurity(action, words ?? {});
+        const result = await (await localDaemon()).hostSecurity(action, {
+            ...(words?.package ? { package: words.package } : {}),
+            ...(words?.version ? { version: words.version } : {}),
+            ...(words?.apply ? { apply: words.apply } : {}),
+            ...(words?.ports ? { ports: [...words.ports] } : {})
+        });
         if (result === null) throw new ScanFailure("daemonOutdated");
         if (result === "busy" || result === "timeout") throw new ScanFailure(result);
         return result;
@@ -134,9 +198,7 @@ export async function runHostAction(
     try {
         const parts: Buffer[] = [];
         let size = 0;
-        const result = await execCommand(client, quoteArgv(
-                hostArgv(action, words ? [words.package, ...(words.version ? [words.version] : [])] : [])
-            ), {
+        const result = await execCommand(client, quoteArgv(hostArgv(action, wordsOf(words))), {
             onStdout: (chunk) => {
                 if (size >= MAX_LOG) return;
                 size += chunk.length;

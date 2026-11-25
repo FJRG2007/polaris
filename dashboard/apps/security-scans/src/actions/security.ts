@@ -231,6 +231,33 @@ export async function rollbackPackageAction(input: unknown) {
     );
 }
 
+const firewall = () => import("../lib/firewall-service");
+
+/** The server's firewall, and what turning it on would leave open and close. */
+export async function firewallAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.firewallInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => (await firewall()).readFirewall(parsed.data.targetId));
+}
+
+/** Turn it on (or bring it in step), keeping open the ports the person chose. */
+export async function applyFirewallAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.firewallApplyInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () =>
+        (await firewall()).applyFirewall(parsed.data.targetId, parsed.data.keep)
+    );
+}
+
+export async function firewallOffAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.firewallInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => (await firewall()).firewallOff(parsed.data.targetId));
+}
+
 export async function scheduleAction(input: unknown) {
     await requireSecurityUser();
     const parsed = schemas.scheduleInput.safeParse(input);

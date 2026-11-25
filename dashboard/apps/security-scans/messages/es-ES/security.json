@@ -166,7 +166,12 @@
         "packageMissing": "Ese paquete no está instalado en este servidor.",
         "holdFailed": "El gestor de paquetes rechazó el cambio. Inténtalo más tarde.",
         "versionGone": "Esa versión ya no se ofrece para este servidor. Elige otra.",
-        "rollbackFailed": "El paquete no pudo pasar a esa versión. Prueba con otra."
+        "rollbackFailed": "El paquete no pudo pasar a esa versión. Prueba con otra.",
+        "firewallFailed": "No se pudo leer ni cambiar el cortafuegos de este servidor.",
+        "firewallRouter": "Este servidor es el router de la red; su cortafuegos se gestiona en la app Router.",
+        "firewallUnavailable": "El sistema de este servidor no tiene un cortafuegos que Polaris pueda gestionar.",
+        "firewallRolledBack": "El servidor deshizo el cambio porque Polaris no pudo alcanzarlo después. No quedó nada cerrado.",
+        "firewallUnconfirmed": "Polaris no pudo confirmar el cambio a tiempo, así que el servidor lo deshace solo en menos de dos minutos."
     },
     "alerts": {
         "title": "{count, plural, one {Una vulnerabilidad grave nueva en {app}} other {# vulnerabilidades graves nuevas en {app}}}",
@@ -276,5 +281,54 @@
         "close": "Cerrar",
         "done": "Paquetes retenidos al día.",
         "moved": "{package} está en {version} y retenido."
+    },
+    "firewall": {
+        "title": "Cortafuegos",
+        "on": "Activo",
+        "hint": {
+            "on": "Desde fuera solo se llega a lo que usan Polaris y tus apps.",
+            "armed": "Se está comprobando un cambio. El servidor lo deshace solo si Polaris no vuelve a alcanzarlo.",
+            "router": "Este servidor es el router de la red; lo protege el cortafuegos de la app Router.",
+            "off": "No hay cortafuegos. Cualquier puerto que escuche aquí es accesible desde fuera.",
+            "offCount": "{count, plural, one {No hay cortafuegos. # puerto que Polaris no gestiona está abierto a cualquiera.} other {No hay cortafuegos. # puertos que Polaris no gestiona están abiertos a cualquiera.}}",
+            "offByHand": "Desactivado a mano el {when}. Polaris lo deja desactivado.",
+            "unknown": "Aún sin leer."
+        },
+        "review": "Revisar",
+        "turnOn": "Activar",
+        "turnOff": "Desactivar",
+        "apply": "Aplicar",
+        "cancel": "Cancelar",
+        "dialogTitle": "Activar el cortafuegos",
+        "dialogHint": "Se cierra todo lo que no figure como abierto. Si después Polaris no alcanza el servidor, este deshace el cambio solo en menos de dos minutos.",
+        "closes": "Se cierra",
+        "closesNone": "No escucha nada más, así que no se cierra nada.",
+        "open": "Sigue abierto",
+        "keep": "Mantener",
+        "keepPort": "Mantener {port} abierto",
+        "notPolaris": "{process} - no lo gestiona Polaris",
+        "notPolarisUnknown": "No lo gestiona Polaris",
+        "replaces": {
+            "ufw": "UFW está activo aquí. El cortafuegos de Polaris ocupa su lugar y UFW vuelve si desactivas este.",
+            "firewalld": "firewalld está activo aquí. El cortafuegos de Polaris ocupa su lugar y firewalld vuelve si desactivas este."
+        },
+        "applying": "Aplicando y comprobando que Polaris sigue alcanzando el servidor. Tarda hasta dos minutos.",
+        "done": "Cortafuegos activo.",
+        "offDone": "Cortafuegos desactivado.",
+        "reason": {
+            "ssh": "Acceso (SSH)",
+            "web": "Webs y Polaris",
+            "calls": "Llamadas",
+            "discovery": "Detección local",
+            "vpn": "VPN",
+            "container": "App",
+            "kept": "Mantenido"
+        },
+        "notify": {
+            "review": {
+                "title": "{server} no tiene cortafuegos",
+                "body": "Cualquier puerto que escuche en {server} es accesible desde fuera. Revisa qué cerraría activar el cortafuegos."
+            }
+        }
     }
 }

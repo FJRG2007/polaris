@@ -21,6 +21,7 @@ import { Readable } from "node:stream";
 import { decodeLockfiles, dependencyContext, shortHash } from "@polaris/deploy";
 import { host } from "@polaris/app-host";
 import { securityTFor } from "./i18n";
+import { planFirewalls } from "./firewall-service";
 import {
     exportImage,
     exportPackages,
@@ -245,7 +246,13 @@ export async function listServers(request: {
                     ? (t.securitySetting.updatesChosenAt?.toISOString() ?? null)
                     : null,
             rebootAt: t.securitySetting?.rebootAt?.toISOString() ?? null,
-            held: t.securitySetting?.heldPackages ?? []
+            held: t.securitySetting?.heldPackages ?? [],
+            firewall: t.securitySetting?.firewall ?? "unknown",
+            firewallClosing: t.securitySetting?.firewallClosing ?? null,
+            firewallOffByHandAt:
+                t.securitySetting?.firewallChoice === "off"
+                    ? (t.securitySetting.firewallChosenAt?.toISOString() ?? null)
+                    : null
         })),
         next: targets.length > request.limit && last ? encodeCursor(last.name, last.id) : null
     };
@@ -1840,6 +1847,9 @@ export async function tick(): Promise<void> {
     );
     await planServerImages(now).catch((caught) =>
         console.error("polaris: security scans could not plan server images:", caught)
+    );
+    await planFirewalls(now).catch((caught) =>
+        console.error("polaris: security scans could not plan host firewalls:", caught)
     );
     await drain();
     await prune(now);

@@ -264,8 +264,12 @@ export class HostdClient {
             | "package-versions"
             | "package-hold"
             | "package-unhold"
-            | "package-rollback",
-        target: { package?: string; version?: string } = {}
+            | "package-rollback"
+            | "firewall-status"
+            | "firewall-apply"
+            | "firewall-confirm"
+            | "firewall-off",
+        target: { package?: string; version?: string; apply?: string; ports?: string[] } = {}
     ): Promise<{ exitCode: number; output: string } | "busy" | "timeout" | null> {
         const response = await this.call(
             "POST",
@@ -275,7 +279,9 @@ export class HostdClient {
         if (response.status === 404) return null;
         if (
             response.status === 400 &&
-            (action.startsWith("reboot-") || action.startsWith("package"))
+            (action.startsWith("reboot-") ||
+                action.startsWith("package") ||
+                action.startsWith("firewall-"))
         )
             return null;
         if (response.status === 409) return "busy";

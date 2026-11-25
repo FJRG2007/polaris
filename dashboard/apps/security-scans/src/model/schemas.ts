@@ -112,6 +112,17 @@ export const packageInput = z.object({ targetId: id, package: packageName }).str
 export const holdInput = packageInput.extend({ hold: z.boolean() }).strict();
 export const rollbackInput = packageInput.extend({ version: packageVersion }).strict();
 
+/** One port as the daemon takes it, `tcp:22`. */
+export const portWord = z
+    .string()
+    .trim()
+    .regex(/^(tcp|udp):[1-9][0-9]{0,4}$/)
+    .refine((word) => Number(word.split(":")[1]) <= 65535);
+export const firewallInput = z.object({ targetId: id }).strict();
+export const firewallApplyInput = z
+    .object({ targetId: id, keep: z.array(portWord).max(256) })
+    .strict();
+
 /** How often a server is scanned by itself; 0 is never. */
 export const SCHEDULE_HOURS = [0, 6, 12, 24, 168] as const;
 

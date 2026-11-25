@@ -166,7 +166,12 @@
         "packageMissing": "That package is not installed on this server.",
         "holdFailed": "The package manager refused the change. Try again later.",
         "versionGone": "That version is no longer offered for this server. Pick another one.",
-        "rollbackFailed": "The package could not move to that version. Try another one."
+        "rollbackFailed": "The package could not move to that version. Try another one.",
+        "firewallFailed": "The firewall could not be read or changed on this server.",
+        "firewallRouter": "This server is the network's router; its firewall is managed in the Router app.",
+        "firewallUnavailable": "This server's system has no firewall Polaris can manage.",
+        "firewallRolledBack": "The server undid the change because Polaris could not reach it afterwards. Nothing was left closed.",
+        "firewallUnconfirmed": "Polaris could not confirm the change in time, so the server undoes it by itself within two minutes."
     },
     "alerts": {
         "title": "{count, plural, one {A new serious vulnerability in {app}} other {# new serious vulnerabilities in {app}}}",
@@ -276,5 +281,54 @@
         "close": "Close",
         "done": "Held packages updated.",
         "moved": "{package} is on {version} and held there."
+    },
+    "firewall": {
+        "title": "Firewall",
+        "on": "Active",
+        "hint": {
+            "on": "Only what Polaris and your apps use is reachable from outside.",
+            "armed": "A change is being checked. The server undoes it by itself if Polaris cannot reach it again.",
+            "router": "This server is the network's router; the Router app's firewall protects it.",
+            "off": "No firewall is on. Every port listening here can be reached from outside.",
+            "offCount": "{count, plural, one {No firewall is on. # port Polaris does not run is open to anyone.} other {No firewall is on. # ports Polaris does not run are open to anyone.}}",
+            "offByHand": "Turned off by hand on {when}. Polaris leaves it off.",
+            "unknown": "Not read yet."
+        },
+        "review": "Review",
+        "turnOn": "Turn on",
+        "turnOff": "Turn off",
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "dialogTitle": "Turn on the firewall",
+        "dialogHint": "Everything not listed as staying open is closed. If Polaris cannot reach the server afterwards, the server undoes the change by itself within two minutes.",
+        "closes": "Closes",
+        "closesNone": "Nothing else is listening, so nothing closes.",
+        "open": "Stays open",
+        "keep": "Keep open",
+        "keepPort": "Keep {port} open",
+        "notPolaris": "{process} - not run by Polaris",
+        "notPolarisUnknown": "Not run by Polaris",
+        "replaces": {
+            "ufw": "UFW is on here. Polaris's firewall takes its place, and UFW comes back if you turn this one off.",
+            "firewalld": "firewalld is on here. Polaris's firewall takes its place, and firewalld comes back if you turn this one off."
+        },
+        "applying": "Applying and checking that Polaris still reaches the server. This takes up to two minutes.",
+        "done": "Firewall on.",
+        "offDone": "Firewall off.",
+        "reason": {
+            "ssh": "Sign-in (SSH)",
+            "web": "Websites and Polaris",
+            "calls": "Calls",
+            "discovery": "Local discovery",
+            "vpn": "VPN",
+            "container": "App",
+            "kept": "Kept open"
+        },
+        "notify": {
+            "review": {
+                "title": "{server} has no firewall",
+                "body": "Every port listening on {server} can be reached from outside. Review what turning the firewall on would close."
+            }
+        }
     }
 }

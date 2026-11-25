@@ -13,6 +13,7 @@ import { hostUi } from "@polaris/app-host/client";
 import { securityCatalogs } from "../../messages";
 import { FindingsTable } from "./findings-table";
 import { ImagesPanel } from "./images-panel";
+import { FirewallPanel } from "./firewall-panel";
 import { FocusCard, verdictLine } from "./focus-card";
 import * as schemas from "../model/schemas";
 import * as subjects from "../model/subjects";
@@ -858,6 +859,14 @@ function HostPanel({
     const [pending, setPending] = useState(false);
     const [waiting, setWaiting] = useState(() => waitingOf(server));
     const [offByHandAt, setOffByHandAt] = useState(server?.offByHandAt ?? null);
+    const firewallSummary = useMemo(
+        () => ({
+            firewall: server?.firewall ?? "unknown",
+            firewallClosing: server?.firewallClosing ?? null,
+            firewallOffByHandAt: server?.firewallOffByHandAt ?? null
+        }),
+        [server]
+    );
     useEffect(() => {
         setUpdates(server?.updates ?? "unknown");
         setEvery(server?.everyHours ?? 0);
@@ -989,6 +998,12 @@ function HostPanel({
                         ) : null}
                     </div>
                 ) : null}
+                <FirewallPanel
+                    t={t}
+                    targetId={targetId}
+                    summary={firewallSummary}
+                    submit={submit}
+                />
                 {updates === "unsupported" ? null : (
                     <HeldPackages
                         t={t}

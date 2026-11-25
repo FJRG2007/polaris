@@ -438,6 +438,10 @@
             "label": "Actualizaciones de servidor",
             "description": "Polaris activó las actualizaciones de seguridad automáticas de un servidor, o un servidor necesita reiniciarse para terminarlas."
         },
+        "securityFirewall": {
+            "label": "Servidor sin cortafuegos",
+            "description": "Un servidor no tiene cortafuegos y la revisión de lo que cerraría activarlo te espera."
+        },
         "placesAlert": {
             "label": "Ha saltado una alerta tuya",
             "description": "Ha pasado algo de lo que preguntaba una de tus alertas."
