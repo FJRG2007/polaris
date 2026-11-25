@@ -148,7 +148,10 @@
         "stageNamed": "Para qué es {name}",
         "promote": "Promover",
         "promoteNamed": "Promover {name}",
-        "promoteNeedsTwo": "Añade otro entorno al que promover"
+        "promoteNeedsTwo": "Añade otro entorno al que promover",
+        "sync": "Sincronizar con otro",
+        "syncNamed": "Sincronizar {name}",
+        "syncNeedsTwo": "Requiere otro entorno donde desplegar"
     },
     "sections": {
         "title": "Ajustes del proyecto",
@@ -472,5 +475,79 @@
         "cancel": "Cancelar",
         "save": "Guardar",
         "runsFailed": "Error al leer las ejecuciones"
+    },
+    "sync": {
+        "title": "Sincronizar {name}",
+        "direction": "Sentido",
+        "pull": "Traer de",
+        "push": "Enviar a",
+        "pullHint": "Los cambios hechos en {from} se traen a {to}.",
+        "pushHint": "Los cambios hechos en {from} se envían a {to}.",
+        "loadFailed": "No se pudo leer qué cambiaría.",
+        "shared": "Variables compartidas y red",
+        "cannotDeploy": "No puedes desplegar en ese entorno, así que no puedes sincronizarlo.",
+        "pickSomething": "Elige al menos un cambio.",
+        "inSync": "{to} ya coincide con {from}. No hay nada que sincronizar.",
+        "selectAll": "Todos",
+        "selectNone": "Ninguno",
+        "status": {
+            "new": "Nuevo",
+            "edited": "Editado",
+            "removed": "Quitado"
+        },
+        "refusals": {
+            "needsCreate": "No puedes añadir servicios aquí.",
+            "needsDelete": "No puedes quitar servicios aquí.",
+            "needsConfigure": "No puedes cambiar cómo se construyen y ejecutan los servicios aquí.",
+            "needsVariables": "No puedes editar variables aquí.",
+            "needsSourceVariables": "No puedes leer las variables del entorno de origen.",
+            "needsVolumes": "No puedes gestionar volúmenes aquí.",
+            "needsSettings": "No puedes cambiar los ajustes de este proyecto."
+        },
+        "keptVolumes": "Se quedan como están, con sus datos: {names}.",
+        "notCopied": "Los dominios nunca se copian. Un volumen nuevo empieza vacío y ningún dato pasa de un entorno a otro.",
+        "deployNow": "Desplegar ahora los servicios cambiados",
+        "deployNowHint": "Cada servicio cambiado se vuelve a desplegar cuando los cambios están dentro.",
+        "stageHint": "Los cambios esperan en el conjunto de cambios hasta que alguien los despliegue.",
+        "partly": "Algunos cambios no entraron. El resto sí; vuelve a intentarlo para terminar:",
+        "apply": "{count, plural, one {Aplicar # cambio} other {Aplicar # cambios}}",
+        "stage": "{count, plural, one {Preparar # cambio} other {Preparar # cambios}}",
+        "lines": {
+            "add": "Añadir este servicio",
+            "addDetail": "Con sus ajustes, {variables, plural, one {# variable} other {# variables}} y {volumes, plural, one {# volumen vacío} other {# volúmenes vacíos}}",
+            "remove": "Quitar este servicio",
+            "removeDetail": "Pasa al conjunto de cambios para revisarlo. Sus volúmenes conservan los datos.",
+            "fromTo": "{from} -> {to}",
+            "unset": "sin valor",
+            "volume": "Volumen {name}",
+            "volumeAdded": "Nuevo y vacío, montado en {path}",
+            "network": "Red privada",
+            "hidden": "valor oculto"
+        },
+        "fields": {
+            "source": "Origen",
+            "build": "Construcción e inicio",
+            "healthcheck": "Comprobación",
+            "deployBranch": "Rama",
+            "autoDeploy": "Despliegue auto",
+            "waitForCi": "Esperar la CI",
+            "commitFilter": "Filtrar commits",
+            "watchPaths": "Rutas vigiladas",
+            "replicas": "Réplicas",
+            "resources": "Recursos",
+            "restart": "Reinicio",
+            "privateNetwork": "Red privada",
+            "variableGroups": "Grupos de variables"
+        },
+        "networkModes": {
+            "shared": "Red compartida",
+            "environment": "Red propia",
+            "links": "Solo enlazados"
+        },
+        "changes": {
+            "added": "Añadida",
+            "changed": "Cambiada",
+            "removed": "Quitada"
+        }
     }
 }

@@ -85,6 +85,7 @@ import {
     addSessionMessage,
     finishSession,
     forkSource,
+    sessionVendorId,
     markSessionStarted,
     failureDetail,
     readableFailure,
@@ -165,6 +166,9 @@ interface Bootstrap {
     readonly agentHeadless: string;
     /** The parent's transcript a fork reopens, or empty. See `forkTranscript`. */
     readonly agentFork: string;
+    /** The conversation a session started again reopens (`--resume <id>`), or
+     *  empty: only a session whose agent already reported one has it. */
+    readonly agentResumeId: string;
     /** The arguments that load the activity hook the first run wrote, added by
      *  the launch script unless the boot found the build refuses them. Empty
      *  where nothing was written. See `AgentCli.hookArgs`. */
@@ -364,7 +368,21 @@ export async function reopensParentConversation(session: SessionView): Promise<b
     return (await forkTranscriptFor(session, session.cli)) !== "";
 }
 
+/**
+ * The conversation a session started again reopens on its new machine, or
+ * empty. A session only has one once its agent reported it, so a first start
+ * (and a fork, which is a new record) never resumes anything; one whose agent
+ * changed since would be handed an id another tool never wrote.
+ */
+async function resumeIdFor(session: SessionView, cli: string): Promise<string> {
+    if (core.agentResumeStyle(cli) === "" || cli !== session.cli) return "";
+    return (await sessionVendorId(session.id)) ?? "";
+}
+
 async function bootstrapFor(session: SessionView, token: string): Promise<Bootstrap> {
+    // Started first and read last: it may wait on GitHub for the display name,
+    // which must not add to every start on top of the reads below.
+    const gitIdentity = gitIdentityFor(session.ownerId, session.repoFullName).catch(() => null);
     // A workspace checks nothing out, so it needs no installation and asks for
     // no token. Refusing to start one because an organization has not connected
     // GitHub would be refusing over a repository nobody named.
@@ -399,6 +417,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         agentResume: core.agentResumeStyle(agent.cli.id),
         agentHeadless: headless,
         agentFork: await forkTranscriptFor(session, agent.cli.id),
+        agentResumeId: await resumeIdFor(session, agent.cli.id),
         // The extension or agent that reports this session's activity, for a
         // tool that only loads one it is pointed at. Only where the first run
         // wrote it: on somebody's own server it was never written, and a
@@ -497,7 +516,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         gitCredential: session.repoFullName ? gitCredentialScript(credential, token) : "",
         // Resolved on every start, so a session made before this existed gets
         // it the next time it starts.
-        gitIdentity: await gitIdentityFor(session.ownerId, session.repoFullName),
+        gitIdentity: await gitIdentity,
         gitIdentityScope: session.place === "host" ? "missing" : session.sharedHome ? "repo" : "global",
         repoSetup: setup?.setupScript.trim() ? asFile(setup.setupScript) : "",
         repoSetupRequired: setup?.setupRequired ?? false,
@@ -908,6 +927,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_RESUME: boot.agentResume,
         POLARIS_AGENT_HEADLESS: boot.agentHeadless,
         POLARIS_AGENT_FORK: boot.agentFork,
+        POLARIS_AGENT_RESUME_ID: boot.agentResumeId,
         POLARIS_AGENT_HOOK_ARGS: boot.agentHookArgs,
         POLARIS_AGENT_HOOK_PROBE: boot.agentHookProbe,
         // Base64 like every other file here; the boot writes it to the path
@@ -1482,9 +1502,12 @@ export async function deliverFirstPrompt(
 export async function deliverHandoff(
     session: SessionView,
     note: string,
-    file: { path: string; text: string }
+    file: { path: string; text: string },
+    /** The note without the file, sent when the file could not be written. */
+    bare: string = note
 ): Promise<void> {
     try {
+        let sent = note;
         if (!(await waitForAgent(session.id))) {
             throw new Error("its agent never opened a terminal to type into");
         }
@@ -1501,8 +1524,9 @@ export async function deliverHandoff(
                 "system",
                 "Polaris could not write the earlier conversation into this session. The agent was given a summary of it."
             ).catch(() => undefined);
+            sent = bare;
         }
-        await promptSession(session.id, note);
+        await promptSession(session.id, sent);
     } catch (error) {
         await addSessionMessage(
             session.id,
@@ -2016,7 +2040,13 @@ export async function sweepSilentSessions(
 ): Promise<number> {
     const now = new Date();
     const quietSince = (cutoff: Date) => [
-        { OR: [{ lastEventAt: { lt: cutoff } }, { lastEventAt: null, createdAt: { lt: cutoff } }] },
+        {
+            OR: [
+                { lastEventAt: { lt: cutoff } },
+                { lastEventAt: null, startedAt: { lt: cutoff } },
+                { lastEventAt: null, startedAt: null, createdAt: { lt: cutoff } }
+            ]
+        },
         { OR: [{ lastAliveAt: null }, { lastAliveAt: { lt: cutoff } }] },
         { OR: [{ lastProbedAt: null }, { lastProbedAt: { lt: cutoff } }] }
     ];
@@ -2038,6 +2068,7 @@ export async function sweepSilentSessions(
             hostId: true,
             containerId: true,
             lastEventAt: true,
+            startedAt: true,
             createdAt: true
         },
         orderBy: { lastProbedAt: { sort: "asc", nulls: "first" } },
@@ -2055,7 +2086,8 @@ export async function sweepSilentSessions(
         // checkout, so the session is reopened on it rather than failed.
         if (probe === "dead" && session.place === "host" && (await reopenOnHost(session.id)))
             probe = "alive";
-        const heard = session.lastEventAt ?? session.createdAt;
+        // A reopened session counts from its new start, not the day it was made.
+        const heard = session.lastEventAt ?? session.startedAt ?? session.createdAt;
         const silentFor = now.getTime() - heard.getTime();
         const early = session.place === "host" && silentFor <= maxSilentMs;
         const verdict = early ? "keep" : core.sweepVerdict(probe, silentFor, maxSilentMs);

@@ -75,7 +75,9 @@ function toView(row: {
                 ? payload.wipe
                     ? "The data in it is destroyed."
                     : "The volume is detached and removed."
-                : null
+                : row.kind === "environment.sync"
+                  ? `${payload.items?.length ?? 0} changes from ${payload.sourceName ?? "another environment"}`
+                  : null
     };
 }
 
@@ -154,8 +156,23 @@ export async function discardAllStagedChanges(environmentId: string): Promise<vo
     await prisma.stagedChange.deleteMany({ where: { environmentId } });
 }
 
+/** How a parked change that needs the person deploying it is carried out:
+ *  a sync is applied with what that person may do, checked again now. */
+export interface ApplyHandlers {
+    readonly sync?: (change: StagedChangeView) => Promise<void>;
+}
+
 /** Carry out one parked change against the real infrastructure. */
-async function applyOne(change: StagedChangeView, ownerId: string): Promise<void> {
+async function applyOne(
+    change: StagedChangeView,
+    ownerId: string,
+    handlers: ApplyHandlers
+): Promise<void> {
+    if (change.kind === "environment.sync") {
+        if (!handlers.sync) throw new Error(`Unsupported staged change: ${change.kind}`);
+        await handlers.sync(change);
+        return;
+    }
     if (change.kind === "service.delete") {
         await recycleBin.binApplication(change.targetId, ownerId, ownerId);
         return;
@@ -179,7 +196,8 @@ async function applyOne(change: StagedChangeView, ownerId: string): Promise<void
  */
 export async function applyStagedChanges(
     environmentId: string,
-    ownerId: string
+    ownerId: string,
+    handlers: ApplyHandlers = {}
 ): Promise<ApplyResult> {
     const changes = await listStagedChanges(environmentId);
     const failures: ApplyResult["failures"] = [];
@@ -192,7 +210,7 @@ export async function applyStagedChanges(
 
     for (const change of ordered) {
         try {
-            await applyOne(change, ownerId);
+            await applyOne(change, ownerId, handlers);
             await prisma.stagedChange.deleteMany({ where: { id: change.id } });
             applied += 1;
         } catch (caught) {
@@ -214,7 +232,8 @@ export async function applyStagedChanges(
 }
 
 function rank(kind: StagedChangeKind): number {
-    return kind === "volume.delete" ? 0 : 1;
+    // A sync before the removals already parked, so they go after what it adds.
+    return kind === "volume.delete" ? 0 : kind === "environment.sync" ? 1 : 2;
 }
 
 /** Drop staged changes whose target no longer exists, whatever removed it. */
@@ -225,7 +244,12 @@ export async function prunePhantomChanges(environmentId: string): Promise<void> 
     });
     for (const row of rows) {
         const exists =
-            row.targetType === "application"
+            row.targetType === "environment"
+                ? await prisma.environment.findUnique({
+                      where: { id: row.targetId },
+                      select: { id: true }
+                  })
+                : row.targetType === "application"
                 ? await prisma.application.findUnique({
                       where: { id: row.targetId },
                       select: { id: true }

@@ -15,7 +15,7 @@ export type TranscriptFormat = (typeof TRANSCRIPT_FORMATS)[number];
 
 export interface TranscriptEntry {
     readonly at: string;
-    readonly type: "message" | "event";
+    readonly type: "message" | "event" | "tool";
     readonly role: string;
     readonly text: string;
     readonly detail: string;
@@ -60,7 +60,7 @@ export function transcriptMarkdown(
     lines.push(`- ${names.started}: ${session.createdAt}`, "");
     let inSteps = false;
     for (const entry of entries) {
-        if (entry.type === "event") {
+        if (entry.type !== "message") {
             if (!inSteps) lines.push(`**${names.steps}**`, "");
             inSteps = true;
             const detail = entry.detail ? `: ${entry.detail.replace(/\s+/g, " ")}` : "";

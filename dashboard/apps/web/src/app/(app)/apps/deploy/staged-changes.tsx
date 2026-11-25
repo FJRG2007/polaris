@@ -16,10 +16,10 @@
 
 import { useRouter } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { STAGED_CHANGE_LABELS } from "@polaris/core";
 import type { ShellEnvironment } from "./project-shell";
 import type { StagedChangeView } from "@/lib/deploy-staged-changes";
 import {
+    ArrowLeftRight,
     Database,
     HardDrive,
     Layers,
@@ -99,7 +99,17 @@ export function StagedChangesProvider({
     return <StagedChangesContext.Provider value={value}>{children}</StagedChangesContext.Provider>;
 }
 
+/** Each kind's label key; a sync is the one that adds rather than removes. */
+const KIND_LABELS = {
+    "service.delete": "serviceDelete",
+    "database.delete": "databaseDelete",
+    "volume.delete": "volumeDelete",
+    "environment.sync": "environmentSync"
+} as const satisfies Record<StagedChangeView["kind"], string>;
+
 function ChangeIcon({ targetType }: { targetType: string }) {
+    if (targetType === "environment")
+        return <ArrowLeftRight className="size-4 shrink-0 text-muted-foreground" />;
     if (targetType === "volume")
         return <HardDrive className="size-4 shrink-0 text-muted-foreground" />;
     if (targetType === "database")
@@ -222,6 +232,15 @@ export function StagedChangesBanner({
                                     (entry) => entry.id === change.environmentId
                                 );
                                 const foreign = change.environmentId !== environmentId;
+                                const sync = change.kind === "environment.sync";
+                                const detail = sync
+                                    ? t("staged.syncDetail", {
+                                          count: change.payload.items?.length ?? 0,
+                                          source: change.payload.sourceName ?? ""
+                                      })
+                                    : change.kind === "volume.delete"
+                                      ? t(change.payload.wipe ? "staged.volumeWipe" : "staged.volumeDetach")
+                                      : change.detail;
                                 return (
                                     <li
                                         key={change.id}
@@ -231,16 +250,17 @@ export function StagedChangesBanner({
                                             <ChangeIcon targetType={change.targetType} />
                                             <div className="min-w-0">
                                                 <p className="truncate text-sm">
-                                                    <span className="text-danger">
-                                                        {STAGED_CHANGE_LABELS[change.kind] ??
-                                                            change.kind}
+                                                    <span className={sync ? "text-primary" : "text-danger"}>
+                                                        {KIND_LABELS[change.kind]
+                                                            ? t(`staged.kinds.${KIND_LABELS[change.kind]}`)
+                                                            : change.kind}
                                                     </span>{" "}
                                                     <span className="font-medium">
                                                         {change.targetName}
                                                     </span>
                                                 </p>
                                                 <p className="truncate text-xs text-muted-foreground">
-                                                    {[environment?.name, change.detail]
+                                                    {[environment?.name, detail]
                                                         .filter(Boolean)
                                                         .join(" - ")}
                                                 </p>
@@ -256,7 +276,9 @@ export function StagedChangesBanner({
                                                 type="button"
                                                 onClick={() => discard(change.id)}
                                                 disabled={pending}
-                                                aria-label={t("staged.discardNamed", { name: change.targetName })}
+                                                aria-label={t(sync ? "staged.discardSync" : "staged.discardNamed", {
+                                                    name: change.targetName
+                                                })}
                                                 title={t("staged.discard")}
                                                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                             >

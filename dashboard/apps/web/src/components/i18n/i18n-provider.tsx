@@ -20,7 +20,9 @@ import type { Namespace, NamespaceTranslator } from "@/lib/i18n/types";
 import { readLocaleCookie, writeLocaleCookie } from "@/lib/i18n/cookie";
 import { DirectionProvider, UiStringsProvider, type UiStrings } from "@polaris/ui";
 import { I18nContext } from "@polaris/ui/i18n";
-import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { SHOWS_KEYS, withFallback } from "@/lib/i18n/fallback";
+import { reportMissing, rescuedCatalog, rescueVersion, subscribeRescue } from "./message-rescue";
 import { setActionFailureText } from "@/lib/run-action";
 import { useRouterSettled } from "@/components/use-router-settled";
 import {
@@ -196,19 +198,40 @@ export function useLocale(): Locale {
  *     <h1>{t("preferences.title")}</h1>
  *
  * The namespace has to have been provided above - by the root layout
- * (`common`), the app frame (`nav`) or a `<Messages>` around the screen. A key
- * that is not there is drawn as the key and reported, which the catalog tests
- * turn into a failed build before anybody sees it.
+ * (`common`), the app frame (`nav`) or a `<Messages>` around the screen. In
+ * development and the tests a key that is not there is drawn as the key and
+ * logged - a namespace nobody handed down loudly, once - and the catalog tests
+ * (test/i18n) fail the build on it. A production build never draws a key: it
+ * asks the server for what it lacks, draws nothing until that arrives, and the
+ * server logs each miss once (BUG-0037, message-rescue.ts).
  */
 export function useTranslations<N extends Namespace>(namespace: N): NamespaceTranslator<N> {
     const state = useContext(I18nContext);
-    return useMemo(
-        () =>
-            createTranslator(state?.locale ?? DEFAULT_LOCALE, state?.messages[namespace], {
-                namespace,
-                client: state?.client
-            }) as unknown as NamespaceTranslator<N>,
-        [state, namespace]
+    const rescue = useSyncExternalStore(subscribeRescue, rescueVersion, rescueVersion);
+    const held = state?.messages[namespace];
+    if (SHOWS_KEYS && state && held === undefined) warnUnhanded(namespace);
+    return useMemo(() => {
+        const locale = state?.locale ?? DEFAULT_LOCALE;
+        const options = { namespace, client: state?.client };
+        const own = createTranslator(locale, held, options);
+        if (SHOWS_KEYS) return own as unknown as NamespaceTranslator<N>;
+        const kept = rescuedCatalog(locale, namespace);
+        const fallback = kept ? createTranslator(locale, kept, options) : undefined;
+        return withFallback(own, fallback, (key) =>
+            reportMissing(locale, namespace, key)
+        ) as unknown as NamespaceTranslator<N>;
+        // `rescue` changes when a missing namespace arrives.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state, held, namespace, rescue]);
+}
+
+const warned = new Set<string>();
+
+function warnUnhanded(namespace: string): void {
+    if (warned.has(namespace)) return;
+    warned.add(namespace);
+    console.error(
+        `[i18n] useTranslations(${JSON.stringify(namespace)}) on a screen nobody handed "${namespace}" to: every key will be drawn as itself. Hand it down with Messages or ClientMessages.`
     );
 }
 

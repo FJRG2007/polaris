@@ -63,9 +63,12 @@ vi.mock("@/lib/two-factor-policy", async () => {
         isStricter: () => false
     };
 });
-vi.mock("@polaris/core", async () => {
+vi.mock("@polaris/core", async (importOriginal) => {
     const { z } = await import("zod");
-    return { twoFactorPreferencesSchema: z.object({ methods: z.array(z.string()), preferred: z.string() }) };
+    return {
+        ...(await importOriginal<Record<string, unknown>>()),
+        twoFactorPreferencesSchema: z.object({ methods: z.array(z.string()), preferred: z.string() })
+    };
 });
 vi.mock("@/lib/auth-cookies", () => ({
     forwardAuthCookies: async (headers: Headers) => {

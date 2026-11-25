@@ -20,6 +20,12 @@
  *   messages that name them or the room - the standing preference beside the
  *   mute, which is the whole of what a toast, a sound and a desktop notice
  *   obey;
+ * - never a conversation the reader has open and in front of them, in any
+ *   window of any device - the browser showing it silences the desktop app
+ *   behind it, and the other way round. Asked of the presence registry
+ *   (`notifications/presence`), which only holds tabs that are visible and
+ *   focused; the windows cannot ask each other, since the app and a browser
+ *   share no storage;
  * - never somebody they have blocked, which is the same rule as the mute and a
  *   stronger one: a mute silences a room, and this silences a person in every
  *   room at once;
@@ -40,6 +46,8 @@ import { reachableChannelIds, type ChatActor } from "./access";
 import { isInlineImage, isPlayableMedia } from "./attachments";
 import { mentionsReader, muteStates, notifyLevels, readerTeams, repliesToReader } from "./notify";
 import * as history from "./history-visibility";
+import { showsConversation } from "./message-alert";
+import { isViewingWhere } from "@/lib/notifications/presence";
 
 /** How much of a message the toast carries. A line, like every other
  *  notification anywhere. */
@@ -222,11 +230,25 @@ export function previewOf(files: readonly ToastFile[]): MessageToastMedia | null
  */
 export async function messageToasts(
     actor: ChatActor,
-    channelIds: readonly string[]
+    channelIds: readonly string[],
+    options: {
+        /** Keep a conversation the reader is viewing. For looking up what a
+         *  notice already on screen announced, not for announcing anything. */
+        readonly includeViewed?: boolean;
+    } = {}
 ): Promise<MessageToast[]> {
     const reachable = await reachableChannelIds(actor);
+    const now = Date.now();
     const asked = [...new Set(channelIds)]
         .filter((id) => reachable.has(id))
+        // Open in front of the reader somewhere: the line is on a screen they
+        // are looking at, so no window chimes or raises a notice for it. Read
+        // from memory, a handful of entries per account, before any query.
+        .filter(
+            (id) =>
+                options.includeViewed === true ||
+                !isViewingWhere(actor.id, (path) => showsConversation(path, id), now)
+        )
         .slice(0, MOST_CHANNELS);
     if (asked.length === 0) return [];
 

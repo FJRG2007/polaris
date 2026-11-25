@@ -34,7 +34,30 @@ vi.mock("@/app/(app)/chat/actions", () => ({
         ended.push(messageId);
         return {};
     },
-    pollAction: async () => ({ poll: null })
+    pollAction: async () => ({ poll: null }),
+    pollVotersAction: async (messageId: string) => {
+        listed.push(messageId);
+        return {
+            answers: [
+                { optionId: "o1", voters: [{ id: "u-ada", name: "Ada Lovelace" }], more: 0 },
+                { optionId: "o2", voters: [], more: 0 }
+            ]
+        };
+    }
+}));
+const listed: string[] = [];
+
+let sealedOn = false;
+const ballotsCast: { messageId: string; optionIds: readonly string[] }[] = [];
+vi.mock("@/lib/chat/e2ee/sealed-chat", () => ({ sealedChatActive: () => sealedOn }));
+vi.mock("@/app/(app)/chat/sealed-votes", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/app/(app)/chat/sealed-votes")>()),
+    // Bob's sealed ballot for Sushi, already cast.
+    loadBallots: async () => [{ picks: [1], mine: false, voter: { id: "u-bob", name: "Bob" } }],
+    castSealedVote: async (_channelId: string, messageId: string, _poll: unknown, optionIds: readonly string[]) => {
+        ballotsCast.push({ messageId, optionIds });
+        return refuse ? { error: refuse } : {};
+    }
 }));
 
 // The live wire is a device-wide connection. Nothing here is testing it, and a
@@ -45,6 +68,7 @@ function poll(over: Partial<ChatPollView> = {}): ChatPollView {
     return {
         multiple: false,
         hideResults: false,
+        anonymous: true,
         closed: false,
         closesAt: null,
         endedEarly: false,
@@ -81,6 +105,8 @@ afterEach(() => {
     sent.length = 0;
     ended.length = 0;
     refuse = null;
+    sealedOn = false;
+    ballotsCast.length = 0;
 });
 
 describe("pressing an answer", () => {
@@ -212,5 +238,65 @@ describe("ending it", () => {
         expect(ended).toEqual(["m1"]);
         expect(screen.getByText("Poll closed")).toBeDefined();
         expect(screen.getByText("Closed early")).toBeDefined();
+    });
+});
+
+describe("public and anonymous votes", () => {
+    it("says an anonymous poll is anonymous and offers no list of voters", () => {
+        card(poll({ anonymous: true, voters: 2, options: [
+            { id: "o1", text: "Pizza", votes: 2, mine: false },
+            { id: "o2", text: "Sushi", votes: 0, mine: false }
+        ] }));
+        expect(screen.getByText("Anonymous")).toBeDefined();
+        expect(screen.queryByRole("button", { name: "See votes" })).toBeNull();
+    });
+
+    it("keeps the list back while a hidden public poll runs", () => {
+        card(poll({ anonymous: false, hideResults: true, results: false, voters: 2 }));
+        expect(screen.getByText("Public")).toBeDefined();
+        expect(screen.queryByRole("button", { name: "See votes" })).toBeNull();
+    });
+
+    it("lists who picked each answer of a public poll", async () => {
+        const user = userEvent.setup();
+        card(poll({ anonymous: false, voters: 1, options: [
+            { id: "o1", text: "Pizza", votes: 1, mine: false },
+            { id: "o2", text: "Sushi", votes: 0, mine: false }
+        ] }));
+        await user.click(screen.getByRole("button", { name: "See votes" }));
+        expect(listed).toEqual(["m1"]);
+        expect(await screen.findByText("Ada Lovelace")).toBeDefined();
+        expect(screen.getByText("Nobody picked this")).toBeDefined();
+    });
+});
+
+describe("a sealed poll", () => {
+    it("counts the ballots this browser opened and votes with a sealed ballot, never in the clear", async () => {
+        sealedOn = true;
+        const user = userEvent.setup();
+        card(poll({ sealedVotes: true, voters: 1 }));
+        expect(await screen.findByText(/100% \(1\)/)).toBeDefined();
+        await user.click(screen.getByRole("button", { name: /Pizza/ }));
+
+        expect(sent).toEqual([]);
+        expect(ballotsCast).toEqual([{ messageId: "m1", optionIds: ["o1"] }]);
+        expect(screen.getByRole("button", { name: /Pizza/ }).getAttribute("aria-pressed")).toBe("true");
+        expect(screen.getByText("2 votes")).toBeDefined();
+    });
+
+    it("puts the bars back when the ballot is refused", async () => {
+        sealedOn = true;
+        refuse = "That poll has closed";
+        const user = userEvent.setup();
+        card(poll({ sealedVotes: true, voters: 1 }));
+        await screen.findByText(/100% \(1\)/);
+        await user.click(screen.getByRole("button", { name: /Pizza/ }));
+        expect(screen.getByRole("button", { name: /Pizza/ }).getAttribute("aria-pressed")).toBe("false");
+        expect(screen.getByText("1 vote")).toBeDefined();
+    });
+
+    it("cannot be voted on from a page without sealed chat", () => {
+        card(poll({ sealedVotes: true }));
+        expect(screen.getByRole("button", { name: /Pizza/ }).hasAttribute("disabled")).toBe(true);
     });
 });

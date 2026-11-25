@@ -18,6 +18,25 @@ import * as core from "@polaris/core";
 /** Opens every note. */
 export const HANDOFF_PREFIX = "<polaris-handoff";
 
+/** The one line a thread shows when an agent would not reopen its own
+ *  conversation and was given a summary instead (translated in `words.ts`). */
+export const RESUME_REFUSED_NOTICE =
+    "The agent could not reopen this conversation, so it was given a summary of it.";
+
+const HANDOFF_BLOCK = /^\s*<polaris-handoff[^>]*>[\s\S]*?<\/polaris-handoff>\s*/;
+
+/**
+ * A message as the thread shows it: a handoff note Polaris put in front of a
+ * prompt is Polaris's own and never shown, whether it is the whole row (an
+ * older session's carried conversation) or the head of a typed prompt. An
+ * unclosed note - clipped somewhere - is dropped whole.
+ */
+export function withoutHandoff(body: string): string {
+    if (!body.trimStart().startsWith(HANDOFF_PREFIX)) return body;
+    const stripped = body.replace(HANDOFF_BLOCK, "");
+    return stripped === body ? "" : stripped;
+}
+
 /**
  * The note's length cap. A note is the new agent's first prompt, which the
  * start schema holds to 20 000 characters, and is typed into a terminal; AO

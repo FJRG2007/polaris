@@ -16,6 +16,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { getSetting } from "@/lib/setting-store";
+import { POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID } from "@/lib/chat/service-ids";
 
 export const MAX_KEY_PACKAGES_PER_DEVICE = 100;
 export const MAX_CLAIM_USERS = 100;
@@ -51,6 +53,77 @@ export async function registerDevice(userId: string, device: string, signatureKe
         create: { userId, device, signatureKey: Buffer.from(signatureKey), e2eeVersion, lastSeenAt: now },
         update: { signatureKey: Buffer.from(signatureKey), e2eeVersion, lastSeenAt: now }
     });
+}
+
+/**
+ * Days a device may go unseen before it counts as retired (decision 7 of
+ * docs/chat-e2ee-proposal.md: 30 by default, 7 to 90): its leaves leave each
+ * group at the next member's send and it is handed out to nobody new. It comes
+ * back on its own the next time it opens - it registers again and rejoins each
+ * conversation by an external commit, reading the past from its account's
+ * history keys. WhatsApp logs a linked device out after 30 days unused, Signal
+ * after 30 (the proposal cites 45); Matrix keeps devices until signed out.
+ */
+export const INACTIVE_DEVICE_DAYS = { fallback: 30, min: 7, max: 90 } as const;
+export const INACTIVE_DEVICE_DAYS_SETTING = "chat.e2ee.inactiveDeviceDays";
+
+/** The instance's limit, from `Setting` when an administrator set one, clamped to 7-90. */
+export async function inactiveDeviceDays(): Promise<number> {
+    const stored = Number.parseInt((await getSetting(INACTIVE_DEVICE_DAYS_SETTING).catch(() => null)) ?? "", 10);
+    if (!Number.isFinite(stored)) return INACTIVE_DEVICE_DAYS.fallback;
+    return Math.min(INACTIVE_DEVICE_DAYS.max, Math.max(INACTIVE_DEVICE_DAYS.min, stored));
+}
+
+/** The moment before which a device last seen counts as retired. */
+export async function inactiveCutoff(now = Date.now()): Promise<Date> {
+    return new Date(now - (await inactiveDeviceDays()) * 86_400_000);
+}
+
+/** A device's `lastSeenAt` moves at most this often from its ordinary traffic. */
+const SEEN_EVERY_MS = 60 * 60_000;
+
+/**
+ * Note that the device is in use (any op it makes): one write an hour at most,
+ * so a tab open for weeks never counts as inactive. False when the device is
+ * unknown - never registered, or retired since.
+ */
+export async function touchDevice(userId: string, device: string, now = new Date()): Promise<boolean> {
+    const row = await prisma.mlsDevice.findUnique({ where: { userId_device: { userId, device } }, select: { lastSeenAt: true } });
+    if (!row) return false;
+    if (now.getTime() - row.lastSeenAt.getTime() >= SEEN_EVERY_MS)
+        await prisma.mlsDevice.updateMany({ where: { userId, device }, data: { lastSeenAt: now } });
+    return true;
+}
+
+/**
+ * Retire a device: the browser signed its account out. Its record and every
+ * key package go, so nobody adds it again, and every group drops its leaf at
+ * the next member's send (`retiredDevices`). Idempotent.
+ */
+export async function retireDevice(userId: string, device: string): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+        await tx.mlsKeyPackage.deleteMany({ where: { userId, device } });
+        await tx.mlsDevice.deleteMany({ where: { userId, device } });
+    });
+}
+
+/**
+ * Of these device addresses (leaves of a group), the ones no longer in use:
+ * retired, never known, or unseen since `cutoff`. A member the server runs
+ * (Polar, a webhook) is never one: its device lives on the server and registers
+ * each time it acts, so a quiet month says nothing about a lost device.
+ */
+export async function retiredDevices(addresses: readonly string[], cutoff: Date): Promise<string[]> {
+    const services = new Set([POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID]);
+    const wanted = [...new Set(addresses)].filter((address) => !services.has(address.slice(0, address.indexOf("/"))));
+    if (!wanted.length) return [];
+    const parsed = wanted.map((address) => ({ address, userId: address.slice(0, address.indexOf("/")), device: address.slice(address.indexOf("/") + 1) }));
+    const rows = await prisma.mlsDevice.findMany({
+        where: { userId: { in: [...new Set(parsed.map((p) => p.userId))] }, device: { in: parsed.map((p) => p.device) } },
+        select: { userId: true, device: true, lastSeenAt: true }
+    });
+    const live = new Set(rows.filter((r) => r.lastSeenAt >= cutoff).map((r) => deviceAddress(r.userId, r.device)));
+    return parsed.filter((p) => !live.has(p.address)).map((p) => p.address);
 }
 
 /** How many one-use key packages of this device are still unclaimed, so it tops them up only when low. */
@@ -91,7 +164,12 @@ export async function claimKeyPackages(
     ciphersuite: number
 ): Promise<{ address: string; keyPackage: Uint8Array }[]> {
     const users = [...new Set(userIds)].slice(0, MAX_CLAIM_USERS);
-    const devices = await prisma.mlsDevice.findMany({ where: { userId: { in: users } }, select: { userId: true, device: true } });
+    const cutoff = await inactiveCutoff();
+    const known = await prisma.mlsDevice.findMany({ where: { userId: { in: users } }, select: { userId: true, device: true, lastSeenAt: true } });
+    // A device unseen past the limit is added to nothing new, and its packages go (it publishes fresh ones when it is back).
+    const stale = known.filter((d) => d.lastSeenAt < cutoff);
+    for (const { userId, device } of stale) await prisma.mlsKeyPackage.deleteMany({ where: { userId, device } });
+    const devices = known.filter((d) => d.lastSeenAt >= cutoff);
     const out: { address: string; keyPackage: Uint8Array }[] = [];
     for (const { userId, device } of devices) {
         for (let attempt = 0; attempt < 3; attempt++) {

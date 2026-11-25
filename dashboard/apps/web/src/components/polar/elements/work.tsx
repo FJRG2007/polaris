@@ -7,11 +7,14 @@
  * runs, the line names the current step; once it ends, it says how long the
  * work took and how many tools it used, and opens into the full timeline.
  *
- * Whether a message's timeline is open is remembered for this tab only.
+ * Whether a message's timeline is open is remembered for this tab only, unless
+ * the caller lets it follow the turn (`follow`): then it is open while the turn
+ * runs and as the caller's default says after, and a click overrides that
+ * until either changes.
  */
 
 import { cn } from "@polaris/ui";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { ChevronDown, Layers, XCircle } from "lucide-react";
 import { Shimmer } from "@/components/polar/elements/shimmer";
 import { BusyVerb } from "@/components/polar/elements/busy-verb";
@@ -47,6 +50,7 @@ export function Work({
     failed,
     seconds,
     summary: said,
+    follow,
     children,
     className
 }: {
@@ -63,15 +67,23 @@ export function Work({
     seconds: number | null;
     /** The folded line in the caller's words, for work that is not tool calls. */
     summary?: string;
+    /** Open while the turn runs, and then as this says (folded when false). */
+    follow?: { open: boolean };
     children: ReactNode;
     className?: string;
 }) {
     const t = useTranslations("polar");
     const id = useId();
-    const [open, setOpen] = useState(() => readOpen(messageId));
+    const auto = follow ? streaming || follow.open : null;
+    const [chosen, setChosen] = useState<boolean | null>(() => (follow ? null : readOpen(messageId)));
+    // A new default (the turn ended, every step expanded) wins over a click.
+    useEffect(() => {
+        if (auto !== null) setChosen(null);
+    }, [auto]);
+    const open = chosen ?? auto ?? false;
     const toggle = () => {
-        writeOpen(messageId, !open);
-        setOpen(!open);
+        if (!follow) writeOpen(messageId, !open);
+        setChosen(!open);
     };
     const summary =
         said ??

@@ -2407,6 +2407,16 @@ async function appRuntime(applicationId: string, ownerId: string) {
 }
 
 /**
+ * The container an app runs as, when it runs on this box - the one the host
+ * daemon (and so the terminal sidecar) reaches. Null for one on a registered
+ * server, which only the SSH ports reach.
+ */
+export async function localRuntimeContainer(applicationId: string, ownerId: string): Promise<string | null> {
+    const { container, target } = await appRuntime(applicationId, ownerId);
+    return target.kind === "local" || !target.hostId ? container : null;
+}
+
+/**
  * HTTP access logs for an app, parsed from its container's stdout. Most web
  * servers (nginx, Apache, and framework loggers) already emit one access line per
  * request there, so this needs no proxy or extra wiring; an app that does not log

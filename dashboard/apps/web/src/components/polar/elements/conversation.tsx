@@ -8,7 +8,8 @@
  * LICENSE beside this file. Changed: Tailwind 3 and Polaris tokens, and the
  * stick-to-bottom behaviour written here (a scroll listener and a
  * ResizeObserver) rather than taken from `use-stick-to-bottom`, so the panel
- * adds no dependency for one effect.
+ * adds no dependency for one effect. As there, only the person's own scroll up
+ * (a wheel, touch, key or press) leaves the end.
  */
 
 import { ArrowDown } from "lucide-react";
@@ -22,7 +23,9 @@ import {
     useRef,
     useState,
     type HTMLAttributes,
-    type ReactNode
+    type KeyboardEvent,
+    type ReactNode,
+    type WheelEvent
 } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -45,38 +48,84 @@ function useConversation(): ConversationState {
 
 export type ConversationProps = HTMLAttributes<HTMLDivElement>;
 
+/** How long after a wheel, touch, key or press a scroll up is still the
+ *  person's own, in milliseconds. */
+const INTENT_MS = 1000;
+
+/** Keys that move a scroller up. */
+const UP_KEYS = new Set(["ArrowUp", "PageUp", "Home"]);
+
 export function Conversation({ className, children, ...props }: ConversationProps) {
     const scroller = useRef<HTMLDivElement | null>(null);
     const stuck = useRef(true);
+    // Where the box was last seen or put, and when the person last reached
+    // for it: a scroll up with neither is the browser's, not theirs.
+    const lastTop = useRef(0);
+    const intent = useRef(0);
     const [atBottom, setAtBottom] = useState(true);
     const [content, setContent] = useState<HTMLDivElement | null>(null);
 
-    const scrollToBottom = useCallback(() => {
+    const pin = useCallback(() => {
         const node = scroller.current;
         if (!node) return;
+        node.scrollTop = node.scrollHeight;
+        lastTop.current = node.scrollTop;
+    }, []);
+
+    const scrollToBottom = useCallback(() => {
         stuck.current = true;
         setAtBottom(true);
-        node.scrollTop = node.scrollHeight;
-    }, []);
+        pin();
+    }, [pin]);
 
     // New text below the fold follows the reader down only while they are
     // already at the end: scrolling up to read something earlier must hold.
+    // The box itself is watched too, so a composer growing under the thread
+    // does not cover its last line.
     useEffect(() => {
-        if (!content || typeof ResizeObserver === "undefined") return;
+        const node = scroller.current;
+        if (!content || !node || typeof ResizeObserver === "undefined") return;
         const observer = new ResizeObserver(() => {
-            const node = scroller.current;
-            if (node && stuck.current) node.scrollTop = node.scrollHeight;
+            if (stuck.current) pin();
         });
         observer.observe(content);
+        observer.observe(node);
         return () => observer.disconnect();
-    }, [content]);
+    }, [content, pin]);
 
+    const leave = () => {
+        stuck.current = false;
+        setAtBottom(false);
+    };
+
+    // Only the person leaves the end. A scroll event the browser raises on
+    // its own - the pin's, delivered a frame late after more lines landed, a
+    // clamp, an anchoring shift - is put back instead.
     const onScroll = () => {
         const node = scroller.current;
         if (!node) return;
-        const near = node.scrollHeight - node.scrollTop - node.clientHeight <= STICK_SLACK;
-        stuck.current = near;
-        setAtBottom(near);
+        const top = node.scrollTop;
+        const near = node.scrollHeight - top - node.clientHeight <= STICK_SLACK;
+        const up = top < lastTop.current;
+        lastTop.current = top;
+        if (near) {
+            stuck.current = true;
+            setAtBottom(true);
+        } else if (!stuck.current) setAtBottom(false);
+        else if (up && Date.now() - intent.current < INTENT_MS) leave();
+        else pin();
+    };
+
+    const reach = () => {
+        intent.current = Date.now();
+    };
+    const onWheel = (event: WheelEvent<HTMLDivElement>) => {
+        reach();
+        const node = scroller.current;
+        if (event.deltaY < 0 && node && node.scrollHeight > node.clientHeight) leave();
+    };
+    const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (UP_KEYS.has(event.key) || (event.key === " " && event.shiftKey)) reach();
     };
 
     const value = useMemo(
@@ -89,6 +138,10 @@ export function Conversation({ className, children, ...props }: ConversationProp
                 <div
                     ref={scroller}
                     onScroll={onScroll}
+                    onWheel={onWheel}
+                    onTouchStart={reach}
+                    onPointerDown={reach}
+                    onKeyDown={onKeyDown}
                     role="log"
                     aria-live="polite"
                     className="h-full overflow-y-auto overscroll-contain"

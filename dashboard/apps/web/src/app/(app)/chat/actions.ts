@@ -27,6 +27,7 @@ import * as saved from "@/lib/chat/saved-media";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import * as polls from "@/lib/chat/polls";
+import * as pollBallots from "@/lib/chat/poll-ballots";
 import * as locations from "@/lib/chat/locations";
 import * as pins from "@/lib/chat/pins";
 import * as reminders from "@/lib/chat/reminders";
@@ -84,6 +85,7 @@ import type { ChatChannelView, ChatElsewhere, ChatMemberView } from "@/lib/chat/
 import { requirePostable, searchForConversation, selfMatching } from "@/lib/chat/access";
 import { mayChangeChatPicture } from "@/lib/chat/picture-access";
 import { MAX_AVATAR_BYTES, sniffImageMime, storeAvatar } from "@/lib/avatar-service";
+import { chimingKind, type LiveClientKind } from "@/lib/notifications/live-clients";
 
 const CHAT_PATH = "/chat";
 
@@ -421,6 +423,8 @@ export interface SharedMediaItem {
     readonly hasPoster: boolean;
     readonly thumbhash: string | null;
     readonly sentAt: string;
+    /** A sealed file: what it is, and the bytes, come from its message in `sealed` once the page opens it. */
+    readonly sealed?: true;
 }
 
 /** Messages per page of the gallery: a few screens of tiles three abreast. */
@@ -439,7 +443,7 @@ const sharedMediaSchema = z.object({
 export async function listSharedMediaAction(
     input: unknown,
     proof?: string | null
-): Promise<{ items: readonly SharedMediaItem[]; next: string | null }> {
+): Promise<{ items: readonly SharedMediaItem[]; sealed?: readonly ChatMessageView[]; next: string | null }> {
     const me = await actor();
     const parsed = sharedMediaSchema.safeParse(input);
     if (!parsed.success) return { items: [], next: null };
@@ -455,8 +459,8 @@ export async function listSharedMediaAction(
     });
     const items = hits.flatMap(({ message }) =>
         message.attachments
-            .filter((file) => file.inline && !file.spoiler)
-            .filter((file) => /^(image|video)\//.test(file.contentType))
+            .filter((file) => file.sealed || (file.inline && !file.spoiler))
+            .filter((file) => file.sealed || /^(image|video)\//.test(file.contentType))
             .map((file) => ({
                 id: file.id,
                 messageId: message.id,
@@ -466,12 +470,15 @@ export async function listSharedMediaAction(
                 durationMs: file.durationMs,
                 hasPoster: file.hasPoster,
                 thumbhash: file.thumbhash,
-                sentAt: message.createdAt
+                sentAt: message.createdAt,
+                ...(file.sealed ? { sealed: true as const } : {})
             }))
     );
+    const sealed = hits.flatMap(({ message }) => (message.attachments.some((file) => file.sealed) ? [message] : []));
     const last = hits.at(-1);
     return {
         items,
+        ...(sealed.length ? { sealed } : {}),
         next:
             hits.length === SHARED_MEDIA_PAGE && last
                 ? encodeSharedCursor({ createdAt: last.message.createdAt, id: last.message.id })
@@ -702,14 +709,14 @@ export async function createPollAction(input: unknown): Promise<{ id?: string; e
                 (await getTranslations("chat"))("errors.pollNotSent")
         };
 
-    const { channelId, question, options, multiple, hideResults, hours } = parsed.data;
+    const { channelId, question, options, multiple, hideResults, anonymous, hours } = parsed.data;
     const result = await guard(() =>
         messages.send(
             me,
             { channelId, body: question, parentId: parsed.data.parentId ?? null },
             [],
             parsed.data.replyToId ? { messageId: parsed.data.replyToId, forwarded: false } : null,
-            { options, multiple, hideResults, closesAt: core.pollClosesAt(hours) }
+            { options, multiple, hideResults, anonymous, closesAt: core.pollClosesAt(hours) }
         )
     );
     return result.error ? { error: result.error } : { id: result.value };
@@ -742,6 +749,39 @@ export async function pollAction(
     const me = await actor();
     const result = await guard(() => polls.readPoll(me, messageId));
     return result.error ? { error: result.error } : { poll: result.value ?? null };
+}
+
+/** Who picked each answer of a public poll. Refused for an anonymous one. */
+export async function pollVotersAction(
+    messageId: unknown
+): Promise<{ answers?: readonly polls.ChatPollVotersView[]; error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(messageId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.pollGone") };
+    const result = await guard(() => polls.readPollVoters(me, parsed.data));
+    return result.error ? { error: result.error } : { answers: result.value };
+}
+
+/**
+ * Cast, replace or take back a sealed ballot on a poll in a sealed
+ * conversation; the server stores it without being able to read it.
+ */
+export async function castBallotAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = pollBallots.castBallotSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.voteNotCounted") };
+    return guard(() => pollBallots.castBallot(me, parsed.data));
+}
+
+/** One page of a sealed poll's ballots, which this browser opens and counts. */
+export async function pollBallotsAction(
+    input: unknown
+): Promise<{ page?: pollBallots.BallotsPage; error?: string }> {
+    const me = await actor();
+    const parsed = pollBallots.readBallotsSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.pollGone") };
+    const result = await guard(() => pollBallots.readBallots(me, parsed.data));
+    return result.error ? { error: result.error } : { page: result.value };
 }
 
 /** Close a poll early. Whoever asked it, and whoever moderates the room. */
@@ -780,11 +820,19 @@ export async function linkPreviewAction(
  * would bury the four things in it that mattered.
  */
 export async function messageToastsAction(
-    channelIds: string[]
-): Promise<{ toasts: MessageToast[] }> {
+    channelIds: string[],
+    lookup?: boolean
+): Promise<{ toasts: MessageToast[]; sounder: LiveClientKind | null }> {
     const me = await actor();
     const asked = Array.isArray(channelIds) ? channelIds.map(String) : [];
-    return { toasts: await messageToasts(me, asked) };
+    // A lookup is for a notice already drawn (answering it, marking it read),
+    // and finds its message even in a conversation open somewhere right now.
+    if (lookup === true)
+        return { toasts: await messageToasts(me, asked, { includeViewed: true }), sounder: null };
+    // Which kind of client makes the sound, as of now rather than as of the
+    // stream's last frame: the person may have switched windows in between, and
+    // the answer rides a request the client was making anyway.
+    return { toasts: await messageToasts(me, asked), sounder: chimingKind(me.id) };
 }
 
 /** Whether the GIF and sticker tabs have anything behind them. */

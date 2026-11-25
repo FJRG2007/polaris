@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import * as core from "@polaris/core";
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 
@@ -119,7 +120,16 @@ export const mlsBody = z.discriminatedUnion("op", [
     // Every member's public account key, a page at a time: the committer seals each epoch's history key to all of them.
     z.object({ op: z.literal("member-account-keys"), channelId, after: z.string().uuid().optional() }),
     // The accounts holding a leaf in the caller's copy of the group: which have left, and who is in but has no leaf.
-    z.object({ op: z.literal("roster"), channelId, accounts: z.array(z.string().uuid()).min(1).max(1000), ciphersuite }),
+    // `devices`: the leaves of those accounts other than the caller's own (older callers sent none): which are retired.
+    z.object({
+        op: z.literal("roster"),
+        channelId,
+        accounts: z.array(z.string().uuid()).min(1).max(1000),
+        devices: z.array(deviceAddressText).max(1000).default([]),
+        ciphersuite
+    }),
+    // The session's own device leaves: its account signed out of this browser.
+    z.object({ op: z.literal("retire-device"), device: deviceId }),
     z.object({ op: z.literal("group"), channelId }),
     z.object({ op: z.literal("create-group"), channelId, groupId: base64Url(16, 256), ciphersuite, groupInfo: mlsBytes }),
     z.object({
@@ -148,6 +158,20 @@ export const mlsBody = z.discriminatedUnion("op", [
         clientKey: z.string().uuid(),
         parentId: z.string().uuid().nullable().optional(),
         replyToId: z.string().uuid().nullable().optional(),
+        // Files sealed in this browser and staged with `?sealed=1`, named (with their keys) inside the seal.
+        uploads: z.array(z.string().uuid()).min(1).max(25).optional(),
+        // A poll whose question and answers are in the seal: only how many answers, and its rules.
+        poll: z
+            .object({
+                options: z.number().int().min(core.MIN_POLL_OPTIONS).max(core.MAX_POLL_OPTIONS),
+                multiple: z.boolean(),
+                hideResults: z.boolean(),
+                // Absent from a tab still on the build before the choice: anonymous, which publishes nothing.
+                anonymous: z.boolean().default(true),
+                hours: core.chatPollCreateSchema.shape.hours
+            })
+            .strict()
+            .optional(),
         epoch,
         senderLeaf: z.number().int().min(0).max(0xffffffff),
         ciphertext: base64Url(17, 256 * 1024),

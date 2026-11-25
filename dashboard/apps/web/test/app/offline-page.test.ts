@@ -11,9 +11,9 @@ import { readFileSync } from "node:fs";
 import en from "../../messages/en-US/components.json";
 import es from "../../messages/es-ES/components.json";
 import { generateKeyPairSync, sign } from "node:crypto";
-import { isLocalOrigin, rememberInstance } from "@/lib/local-address";
+import { onLocalCertificate, rememberInstance } from "@/lib/local-address";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { challengeMessage, isGatewayFailure } from "@polaris/core/instance-fallback";
+import { challengeMessage } from "@polaris/core/instance-fallback";
 
 const HTML = readFileSync(join(__dirname, "../../public/offline.html"), "utf8");
 const SCRIPT = /<script>([\s\S]*)<\/script>/.exec(HTML)?.[1] ?? "";
@@ -87,7 +87,7 @@ describe("the offline page", () => {
     });
 
     it("carries the address to one that proved it is this Polaris", async () => {
-        const origin = "https://polaris.local";
+        const origin = "https://lan-192-168-1-2.example.com";
         await open([here, origin], { [origin]: "signed" });
         expect(offered()?.getAttribute("href")).toBe(`${origin}/s/share-token?key=value`);
         expect(offered()?.textContent).toBe(en.network.useLocal);
@@ -106,10 +106,26 @@ describe("the offline page", () => {
         expect(offered()?.getAttribute("href")).toBe(origin);
     });
 
+    it("never fetches an address on the local certificate, and still offers it", async () => {
+        const local = ["https://polaris.local", "https://192.168.1.2", "https://10.0.0.5"];
+        const seen = await open([here, ...local], {
+            "https://polaris.local": "signed",
+            "https://192.168.1.2": "signed"
+        });
+        expect(seen.some(({ url }) => local.some((origin) => url.startsWith(origin)))).toBe(false);
+        expect(offered()?.getAttribute("href")).toBe("https://polaris.local");
+        expect(offered()?.textContent).toBe(en.network.useLocal);
+    });
+
+    it("falls back to the local address when the LAN name does not resolve", async () => {
+        await open([here, "https://lan-192-168-1-2.example.com", "https://polaris.local"], {});
+        expect(offered()?.getAttribute("href")).toBe("https://polaris.local");
+    });
+
     it.each<Reply>(["stranger", "not-polaris", 404, 429])(
         "never offers an address that answers as something else: %s",
         async (reply) => {
-            const origin = "https://polaris.local";
+            const origin = "https://lan-192-168-1-2.example.com";
             await open([here, origin], { [origin]: reply });
             expect(offered()).toBeNull();
         }
@@ -127,7 +143,7 @@ describe("the offline page", () => {
     });
 
     it("sends a nonce and nothing else, with no cookie", async () => {
-        const origin = "https://polaris.local";
+        const origin = "https://lan-192-168-1-2.example.com";
         const seen = await open([here, origin], { [origin]: "signed" });
         const asked = seen.filter(({ url }) => url.startsWith(origin));
         expect(asked.map(({ url }) => url)).toEqual([`${origin}/api/instance/challenge`]);
@@ -135,7 +151,7 @@ describe("the offline page", () => {
         expect(Object.keys(JSON.parse(String(asked[0]?.init.body)))).toEqual(["nonce"]);
     });
 
-    it("draws the same line between local and public as the banner", async () => {
+    it("offers unasked exactly what the banner offers unasked", async () => {
         const origins = [
             "https://polaris.local",
             "https://10.1.2.3",
@@ -145,21 +161,24 @@ describe("the offline page", () => {
             "https://172.32.0.1",
             "https://8.8.8.8",
             "https://example.com",
-            "https://local.example.com"
+            "https://local.example.com",
+            "https://lan-192-168-1-2.example.com"
         ];
         for (const origin of origins) {
             kept.clear();
             await open([origin], {});
-            expect(offered() !== null, origin).toBe(isLocalOrigin(origin));
+            expect(offered() !== null, origin).toBe(onLocalCertificate(origin));
         }
     });
 
-    it("reads the same statuses as a gateway as the rest of Polaris", async () => {
-        const origin = "https://polaris.local";
+    it("takes no status from the LAN name as proof", async () => {
+        // No status is proof: a gateway failure is a LAN name that is not there, any
+        // other is one that is not this Polaris. Neither is offered.
+        const origin = "https://lan-192-168-1-2.example.com";
         for (const status of [500, 502, 503, 504, 519, 520, 530, 531]) {
             kept.clear();
             await open([origin], { [origin]: status });
-            expect(offered() !== null, `status ${status}`).toBe(isGatewayFailure(status));
+            expect(offered(), `status ${status}`).toBeNull();
         }
     });
 

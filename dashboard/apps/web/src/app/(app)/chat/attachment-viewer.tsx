@@ -35,6 +35,8 @@ export interface ViewedFile {
     readonly name: string;
     readonly size: number;
     readonly sentAt: string;
+    /** A sealed file: the address of the clear bytes this page opened (the route holds only the sealed blob). */
+    readonly openedUrl?: string;
 }
 
 /** Extensions that are plainly text and have no highlighting worth doing, so
@@ -100,7 +102,7 @@ export function AttachmentViewer({ file, onClose }: { file: ViewedFile | null; o
                     : null
             }
             onOpenChange={(open) => !open && onClose()}
-            urlFor={attachmentUrl}
+            urlFor={file?.openedUrl ? () => file.openedUrl! : attachmentUrl}
             // Somebody else's file on a message. Editing it would have nowhere
             // to write: an attachment is the bytes that were sent, and a message
             // that quietly changed after it was read is not a message.

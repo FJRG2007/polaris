@@ -6,6 +6,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { appBaseUrl } from "@/lib/domain-service";
+import { publicHostname } from "@/lib/domain-edge";
 import { listConnections } from "@/lib/connections/store";
 import { githubCredentialsForUser } from "@/lib/github-access";
 import { readGithubAccount, type GithubAccount } from "@/lib/github-service";
@@ -50,7 +52,11 @@ export async function gitIdentityFor(ownerId: string | null, repoFullName: strin
         if (identity) return identity;
     }
     const user = await prisma.user
-        .findUnique({ where: { id: ownerId }, select: { name: true, email: true } })
+        .findUnique({ where: { id: ownerId }, select: { id: true, name: true } })
         .catch(() => null);
-    return identityFromUser(user);
+    // The instance's own public hostname, or none: never a guessed domain.
+    const host = await appBaseUrl()
+        .then((url) => publicHostname(url))
+        .catch(() => null);
+    return identityFromUser(user, host);
 }

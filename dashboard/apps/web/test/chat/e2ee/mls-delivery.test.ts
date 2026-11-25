@@ -565,6 +565,45 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         expect(commits()).toBe(settled);
     });
 
+    it("before sealing, takes out the leaves of retired devices, the account's own other browsers included", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const aliceOld = await open(ALICE, "alice-old-pc");
+        const bob = await open(BOB, "bob-phone-1");
+        const bobLost = await open(BOB, "bob-phone-2");
+        for (const device of [alice, aliceOld, bob, bobLost]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        for (const device of [bob, bobLost]) await device.sync(CHANNEL);
+        await aliceOld.ensureGroup(CHANNEL);
+        for (const device of [alice, bob, bobLost]) await device.sync(CHANNEL);
+        expect(bobLost.groupOf(CHANNEL)).toEqual(alice.groupOf(CHANNEL));
+        expect(aliceOld.groupOf(CHANNEL)).toEqual(alice.groupOf(CHANNEL));
+
+        // Bob signs his lost phone out from it; Alice's old PC has not been seen for 31 days.
+        await bobLost.retire();
+        state.tables.mlsDevice!.find((d) => d.device === "alice-old-pc")!.lastSeenAt = new Date(Date.now() - 31 * 86_400_000);
+        const id = await alice.sendSealed(CHANNEL, new TextEncoder().encode("after the cleanup"));
+
+        // Bob's other phone opens it.
+        await bob.sync(CHANNEL);
+        expect(new TextDecoder().decode((await bob.readSealed(CHANNEL, [id]))[0]!.opened!)).toBe("after the cleanup");
+        // The old PC, served the log and the row, reads its own removal and cannot open it.
+        state.tables.mlsDevice!.find((d) => d.device === "alice-old-pc")!.lastSeenAt = new Date();
+        await aliceOld.sync(CHANNEL);
+        expect(aliceOld.groupOf(CHANNEL)).toBeNull();
+
+        // Nothing changed since: the next message commits nothing.
+        const commits = () => state.tables.mlsGroupEvent!.filter((e) => e.kind === "commit").length;
+        const settled = commits();
+        await alice.sendSealed(CHANNEL, new TextEncoder().encode("again"));
+        expect(commits()).toBe(settled);
+
+        // The old PC is back in use: it rejoins on its own.
+        await aliceOld.register();
+        await aliceOld.ensureGroup(CHANNEL);
+        expect(aliceOld.groupOf(CHANNEL)).toEqual(alice.groupOf(CHANNEL));
+    });
+
     it("edits a sealed message: it opens to the new words, and the old version is kept sealed", async () => {
         const alice = await open(ALICE, "alice-laptop");
         const bob = await open(BOB, "bob-phone-1");
@@ -716,9 +755,70 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         state.members.delete(`${BOB}:${CHANNEL}`);
         const roster = (accounts: string[], as = ALICE) => call({ op: "roster", channelId: CHANNEL, accounts, ciphersuite: 0x004f }, as);
         // Dave is in the conversation with no device, so there is nothing to add him by.
-        expect((await roster([ALICE, BOB])).body).toEqual({ departed: [BOB], joinable: [CAROL] });
-        expect((await roster([ALICE, CAROL])).body).toEqual({ departed: [], joinable: [] });
+        expect((await roster([ALICE, BOB])).body).toEqual({ departed: [BOB], joinable: [CAROL], retired: [] });
+        expect((await roster([ALICE, CAROL])).body).toEqual({ departed: [], joinable: [], retired: [] });
         expect((await roster([ALICE], BOB)).status).toBe(403);
+    });
+
+    it("names the retired devices among a group's leaves: signed out, unseen past the limit, or never known", async () => {
+        await device(ALICE, "alice-laptop");
+        await device(BOB, "bob-phone-1");
+        await device(BOB, "bob-phone-2");
+        await device(BOB, "bob-tablet");
+        await call({ op: "publish-key-packages", device: "bob-tablet", ciphersuite: 0x004f, keyPackages: [blob(5)] }, BOB);
+        const devices = [`${BOB}/bob-phone-1`, `${BOB}/bob-phone-2`, `${BOB}/bob-tablet`, `${BOB}/bob-gone-00`, `${EVE}/eve-laptop`];
+        const roster = (as = ALICE) => call({ op: "roster", channelId: CHANNEL, accounts: [ALICE, BOB], devices, ciphersuite: 0x004f }, as);
+
+        // Bob signs one phone out: the server forgets it and its packages, idempotently.
+        expect((await call({ op: "retire-device", device: "bob-phone-2" }, BOB)).body).toEqual({ ok: true });
+        expect((await call({ op: "retire-device", device: "bob-phone-2" }, BOB)).body).toEqual({ ok: true });
+        expect(state.tables.mlsDevice!.some((d) => d.device === "bob-phone-2")).toBe(false);
+        // Bob's tablet has not been seen for 31 days (the default limit is 30).
+        const tablet = state.tables.mlsDevice!.find((d) => d.device === "bob-tablet")!;
+        tablet.lastSeenAt = new Date(Date.now() - 31 * 86_400_000);
+        // Eve is not named, so nothing is said about her devices.
+        expect((await roster()).body.retired).toEqual([`${BOB}/bob-phone-2`, `${BOB}/bob-tablet`, `${BOB}/bob-gone-00`]);
+
+        // The tablet is added to nothing new, and its packages go; it publishes fresh ones when it is back.
+        expect((await call({ op: "claim-key-packages", channelId: CHANNEL, userIds: [BOB], ciphersuite: 0x004f })).body.keyPackages).toEqual([]);
+        expect(state.tables.mlsKeyPackage!.filter((k) => k.device === "bob-tablet")).toEqual([]);
+
+        // An administrator's limit of 90 days keeps it; one out of range is clamped to 7-90.
+        state.tables.setting = [{ key: "chat.e2ee.inactiveDeviceDays", value: "90" }];
+        expect((await roster()).body.retired).toEqual([`${BOB}/bob-phone-2`, `${BOB}/bob-gone-00`]);
+        state.tables.setting = [{ key: "chat.e2ee.inactiveDeviceDays", value: "1000" }];
+        expect((await roster()).body.retired).toEqual([`${BOB}/bob-phone-2`, `${BOB}/bob-gone-00`]);
+        state.tables.setting = [{ key: "chat.e2ee.inactiveDeviceDays", value: "1" }];
+        tablet.lastSeenAt = new Date(Date.now() - 6 * 86_400_000);
+        expect((await roster()).body.retired).toEqual([`${BOB}/bob-phone-2`, `${BOB}/bob-gone-00`]);
+
+        // Coming back registers it again: it is in use from then on.
+        state.tables.setting = [];
+        tablet.lastSeenAt = new Date(Date.now() - 31 * 86_400_000);
+        await device(BOB, "bob-tablet");
+        expect((await roster()).body.retired).toEqual([`${BOB}/bob-phone-2`, `${BOB}/bob-gone-00`]);
+
+        // A member the server runs is never retired for being quiet; an older caller that names no devices gets none.
+        const polar = "00000000-0000-0000-0000-000000000001";
+        const quiet = await call({ op: "roster", channelId: CHANNEL, accounts: [ALICE, BOB, polar], devices: [`${polar}/polar-service`], ciphersuite: 0x004f });
+        expect(quiet.body.retired).toEqual([]);
+        expect((await call({ op: "roster", channelId: CHANNEL, accounts: [ALICE, BOB], ciphersuite: 0x004f })).body.retired).toEqual([]);
+        // Retiring needs a session, and takes only the session's own devices.
+        expect((await call({ op: "retire-device", device: "alice-laptop" }, null)).status).toBe(401);
+        await call({ op: "retire-device", device: "alice-laptop" }, BOB);
+        expect(state.tables.mlsDevice!.some((d) => d.device === "alice-laptop")).toBe(true);
+    });
+
+    it("notes a device's use at most once an hour, so an open tab never counts as inactive", async () => {
+        await device(ALICE, "alice-laptop");
+        const row = state.tables.mlsDevice!.find((d) => d.device === "alice-laptop")!;
+        const longAgo = new Date(Date.now() - 40 * 86_400_000);
+        row.lastSeenAt = longAgo;
+        await call({ op: "events", channelId: CHANNEL, device: "alice-laptop", after: "0" });
+        const seen = row.lastSeenAt as Date;
+        expect(seen.getTime()).toBeGreaterThan(longAgo.getTime());
+        await call({ op: "events", channelId: CHANNEL, device: "alice-laptop", after: "0" });
+        expect(row.lastSeenAt).toBe(seen);
     });
 
     it("refuses a sealed message with another device's signature, from a future epoch, or from a device not its own", async () => {

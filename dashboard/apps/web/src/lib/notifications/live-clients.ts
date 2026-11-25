@@ -42,6 +42,8 @@
  * annoyance and a swallowed one is a missed message.
  */
 
+import { focusedClientKind } from "./presence";
+
 /** What kind of Polaris is holding a connection. Sent by the client, so it is
  *  treated as a claim: the worst a lying one can do is take its own account's
  *  chime, which is a thing it could already do by being the only client. */
@@ -111,15 +113,23 @@ const clients = new Map<string, Map<string, LiveClient>>();
 /**
  * Which connection should raise the effects that belong to the device.
  *
- * Pure, and the whole rule: a client somebody is at first, then a desktop
- * client, then the one that has been open longest, then the lowest id. With
+ * Pure, and the whole rule: a client somebody is at first, then the kind of
+ * client in front of them (`focused`, the window that is visible and focused -
+ * see `presence`) or a desktop client when no window is, then the one that has
+ * been open longest, then the lowest id. Preferring the app whatever was in
+ * front made the app behind a browser chime for a conversation the browser was
+ * showing. With
  * nobody at any of them, the one touched most recently, then the same order.
  * The last two are not arbitrary - the answer
  * has to be the same for every connection asking, and it must not move while
  * nothing changes, or two clients would trade the chime between them and a burst
  * of messages would sound on both.
  */
-export function chimingClient(live: readonly LiveClient[], now = Date.now()): string | null {
+export function chimingClient(
+    live: readonly LiveClient[],
+    now = Date.now(),
+    focused: LiveClientKind | null = null
+): string | null {
     // A client that has the sound switched off is not a candidate. It would win on
     // being the app and then play nothing, and everybody else would have been told
     // to stay quiet - so the one switch somebody flipped to silence one window
@@ -133,11 +143,20 @@ export function chimingClient(live: readonly LiveClient[], now = Date.now()): st
     const pool = willing.length > 0 ? willing : live;
     // The same shape for nobody being anywhere: then the app is as good a place
     // as any, and the ordinary rule still has to elect somebody.
-    const attended = pool.filter((client) => present(client, now));
+    // A window in front of somebody is somebody at it, whatever its idle clock
+    // says: reading without touching anything is still reading.
+    const attended = pool.filter(
+        (client) => (client.kind === focused && !client.away) || present(client, now)
+    );
+    const preferred = focused ?? "desktop";
     let best: LiveClient | null = null;
     for (const client of attended.length > 0 ? attended : pool) {
         if (!best) best = client;
-        else if (attended.length > 0 ? better(client, best) : leftLater(client, best))
+        else if (
+            attended.length > 0
+                ? better(client, best, preferred)
+                : leftLater(client, best, preferred)
+        )
             best = client;
     }
     return best?.id ?? null;
@@ -152,16 +171,16 @@ function present(client: LiveClient, now: number): boolean {
 }
 
 /** Between clients nobody is at: the one left most recently, then the usual order. */
-function leftLater(one: LiveClient, than: LiveClient): boolean {
+function leftLater(one: LiveClient, than: LiveClient, preferred: LiveClientKind): boolean {
     const mine = one.activeAt ?? 0;
     const theirs = than.activeAt ?? 0;
     if (mine !== theirs) return mine > theirs;
-    return better(one, than);
+    return better(one, than, preferred);
 }
 
-function better(one: LiveClient, than: LiveClient): boolean {
-    const mine = one.kind === "desktop" ? 0 : 1;
-    const theirs = than.kind === "desktop" ? 0 : 1;
+function better(one: LiveClient, than: LiveClient, preferred: LiveClientKind): boolean {
+    const mine = one.kind === preferred ? 0 : 1;
+    const theirs = than.kind === preferred ? 0 : 1;
     if (mine !== theirs) return mine < theirs;
     if (one.opened !== than.opened) return one.opened < than.opened;
     return one.id < than.id;
@@ -291,7 +310,7 @@ export function liveClientChimes(userId: string, id: string, now = Date.now()): 
     sweep(now);
     const held = clients.get(userId);
     if (!held || held.size === 0) return true;
-    const elected = chimingClient([...held.values()], now);
+    const elected = chimingClient([...held.values()], now, focusedClientKind(userId, now));
     return elected === null || elected === id;
 }
 
@@ -312,7 +331,7 @@ export function chimingKind(userId: string, now = Date.now()): LiveClientKind | 
     const held = clients.get(userId);
     if (!held || held.size === 0) return null;
     const live = [...held.values()];
-    const elected = chimingClient(live, now);
+    const elected = chimingClient(live, now, focusedClientKind(userId, now));
     return live.find((client) => client.id === elected)?.kind ?? null;
 }
 

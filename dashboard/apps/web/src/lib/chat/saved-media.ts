@@ -177,7 +177,8 @@ async function validate(actor: ChatActor, source: string): Promise<string> {
         const attachmentId = cleaned.slice(ATTACHMENT.length);
         // A view-once file is not one to keep: it reads as gone.
         const attachment = await prisma.chatAttachment.findUnique({
-            where: { id: attachmentId, viewOnce: false },
+            // A sealed file is a blob only its conversation's members can open: never saved from here.
+            where: { id: attachmentId, viewOnce: false, sealed: false },
             select: { message: { select: { channelId: true } } }
         });
         if (!attachment) throw new ChatAccessError({ key: "errors.pictureGone" });

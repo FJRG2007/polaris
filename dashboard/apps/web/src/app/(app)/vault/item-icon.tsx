@@ -17,7 +17,9 @@
  * account there. It never goes through the server - a server that fetched
  * favicons would be a server that learns every domain in a vault it is not
  * supposed to be able to read - and it never goes through a third-party icon
- * service for the same reason.
+ * service for the same reason. Never from a name on the local network either: such
+ * a host rarely has a public certificate, and an image from one the reader once
+ * clicked through marks this whole page "Not secure".
  *
  * Then the letters, which always work: two characters off the domain, on a
  * colour derived from it, so the same site is the same square every time and two
@@ -52,6 +54,15 @@ const KNOWN: readonly {
 
 /** The colour behind the letters. From the domain rather than the name, so the
  *  same site is the same colour on every item that points at it. */
+/** A host whose favicon may be fetched: a public name, not an address or a name on
+ *  the local network, which would serve it on a certificate no public CA issued. */
+const PRIVATE_HOST =
+    /^(\[.*\]|\d{1,3}(\.\d{1,3}){3}|[^.]+)$|\.(local|lan|internal|localhost|home\.arpa|home|corp)$/;
+
+export function mayFetchFavicon(host: string): boolean {
+    return !PRIVATE_HOST.test(host.toLowerCase());
+}
+
 function tint(seed: string): string {
     let hash = 0;
     for (let index = 0; index < seed.length; index += 1) {
@@ -98,7 +109,7 @@ export function ItemIcon({
         );
     }
 
-    if (favicons && host && !failed) {
+    if (favicons && host && mayFetchFavicon(host) && !failed) {
         return (
             // eslint-disable-next-line @next/next/no-img-element -- one small icon per row, no loader wanted
             <img

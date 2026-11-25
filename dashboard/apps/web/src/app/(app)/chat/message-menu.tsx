@@ -19,6 +19,7 @@
  * clicking one pixel to the left of where you meant.
  */
 
+import { attachmentFileUrl } from "./message-gallery";
 import * as core from "@polaris/core";
 import { isPlayable } from "./voice-recorder";
 import { publishMessageAction, setReminderAction } from "./actions";
@@ -436,7 +437,7 @@ function MessageMenuBody({
                 life: 0
             });
         }
-        const failure = await saveRecording(`/api/chat/attachments/${file.id}`, file.name, format);
+        const failure = await saveRecording(attachmentFileUrl(file), file.name, format);
         setSaving(null);
         toast.dismiss(note);
         if (failure) toast.show({ title: failure });
@@ -480,7 +481,7 @@ function MessageMenuBody({
                         label: t("messageMenu.download"),
                         title: loose.name,
                         link: {
-                            href: `/api/chat/attachments/${loose.id}?download=1`,
+                            href: attachmentFileUrl(loose, "download"),
                             download: loose.name
                         }
                     },

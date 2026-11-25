@@ -152,6 +152,8 @@ vi.mock("@/lib/deploy/ports-hostd", () => ({
         container = daemon.container;
     }
 }));
+// The session's git identity reads GitHub links; nothing here is about it.
+vi.mock("@/lib/agents/session-git-identity-source", () => ({ gitIdentityFor: async () => null }));
 vi.mock("@/lib/github-service", () => ({
     githubAppInstallationToken: async () => "installation-token",
     cloneAuthHeader: (token: string | null) => (token ? `Authorization: Basic ${token}` : null),

@@ -156,6 +156,10 @@ vi.mock("@polaris/db", () => {
             findMany: async () => [],
             deleteMany: async () => ({ count: 0 })
         },
+        // The rollback copy of a migrated message's words goes with them too.
+        chatMigrationRollback: {
+            deleteMany: async () => ({ count: 0 })
+        },
         chatAttachment: {
             findMany: async () => [],
             deleteMany: async ({ where }: { where: { messageId: string } }) => {

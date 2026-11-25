@@ -19,6 +19,7 @@
  */
 
 import { useOpenedSealed } from "./opened-sealed";
+import { prefetchMedia } from "./media-download";
 import { rewritable } from "./rewritable";
 import { fittedSize, placeholderUrl } from "@/lib/chat/media-shape";
 import { VanishMark } from "./vanish-controls";
@@ -90,7 +91,7 @@ import { TranslateButton, TranslatableText, TranslationNote } from "./translated
 import { VideoPreview } from "@/components/video-preview";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
 import { AttachmentViewer, previewableAs, type ViewedFile } from "./attachment-viewer";
-import { attachmentImageUrl, messageGallery } from "./message-gallery";
+import { attachmentFileUrl, attachmentImageUrl, messageGallery } from "./message-gallery";
 import { useChatPreferences } from "./chat-preferences";
 import { captionGoesBelow } from "@/lib/chat/preference-schema";
 import { usePersonPress } from "@/components/person-press";
@@ -134,7 +135,8 @@ function SentFile({
     shielded?: boolean;
 }) {
     const t = useTranslations("chat");
-    const readable = previewableAs(file.name, file.contentType);
+    // A sealed file is read and saved from what this page opened (the route holds only the sealed blob).
+    const readable = file.sealed && !file.openedUrl ? null : previewableAs(file.name, file.contentType);
     const chip =
         "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-start text-xs transition-colors hover:bg-card-hover";
 
@@ -161,7 +163,7 @@ function SentFile({
     if (!readable) {
         return (
             <a
-                href={`/api/chat/attachments/${file.id}?download=1`}
+                href={attachmentFileUrl(file, "download")}
                 download={file.name}
                 className={chip}
             >
@@ -186,7 +188,7 @@ function SentFile({
                 className={chip}
                 title={t("messageList.openNamed", { name: file.name })}
                 onClick={() =>
-                    onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at })
+                    onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at, ...(file.openedUrl ? { openedUrl: file.openedUrl } : {}) })
                 }
             >
                 {file.borrowed ? (
@@ -200,7 +202,7 @@ function SentFile({
             </button>
             {!shielded && (
                 <a
-                    href={`/api/chat/attachments/${file.id}?download=1`}
+                    href={attachmentFileUrl(file, "download")}
                     download={file.name}
                     aria-label={t("messageList.downloadNamed", { name: file.name })}
                     title={t("messageList.download")}
@@ -429,6 +431,9 @@ export function MessageList({
 }: MessageListProps) {
     // Sealed rows drawn with what this device opened them to (none while sealed chat is off).
     const messages = useOpenedSealed(listed);
+    // A sealed file's kind is known once its message opened here: the sealed blob
+    // is then kept ahead by the reader's media setting, as a plain file is.
+    useEffect(() => prefetchMedia(messages.filter((message) => message.sealed)), [messages]);
     // Every handler a row receives, held to one identity - see `useSteady`.
     const onOpenThread = useSteady(given.onOpenThread);
     const onReact = useSteady(given.onReact)!;
@@ -1504,7 +1509,11 @@ const Message = memo(function Message({
                                             }
                                             covered={file.spoiler || coverAll}
                                         >
-                                            {file.inline && sending ? (
+                                            {file.sealed && !file.openedUrl && !sending ? (
+                                                // Sealed, and not opened on this page yet (or not
+                                                // openable here): its name, nothing to fetch.
+                                                <SentFile file={file} at={message.createdAt} onOpen={onOpenFile} pending />
+                                            ) : file.inline && sending ? (
                                                 <KeepableImage
                                                     href={pendingUrl ?? ""}
                                                     shape={file}
@@ -1517,7 +1526,7 @@ const Message = memo(function Message({
                                             ) : file.inline ? (
                                                 <HeldPictureIf held={message.autoLoad === false && !local} file={file}>
                                                 <KeepableImage
-                                                    href={attachmentImageUrl(file.id)}
+                                                    href={attachmentImageUrl(file)}
                                                     shape={file}
                                                     alt={file.name}
                                                     source={`attachment:${file.id}`}
@@ -1526,7 +1535,7 @@ const Message = memo(function Message({
                                                     onLocalDone={local ? () => releaseLocal(local) : undefined}
                                                     onOpen={() =>
                                                         onOpenImage({
-                                                            url: attachmentImageUrl(file.id),
+                                                            url: attachmentImageUrl(file),
                                                             name: file.name,
                                                             messageId: message.id,
                                                             forwardable: message.forwardable,
@@ -1580,7 +1589,7 @@ const Message = memo(function Message({
                                                 </span>
                                             ) : isPlayable(file.contentType) ? (
                                                 <VoiceNote
-                                                    href={`/api/chat/attachments/${file.id}`}
+                                                    href={attachmentFileUrl(file)}
                                                     name={file.name}
                                                     recorded={isVoiceMessage(
                                                         file.name,
@@ -1599,7 +1608,7 @@ const Message = memo(function Message({
                                                 <VideoPreview
                                                     name={file.name}
                                                     size={file.size}
-                                                    src={`/api/chat/attachments/${file.id}`}
+                                                    src={attachmentFileUrl(file)}
                                                     // A frame of the video itself, taken
                                                     // by the browser that sent it. A few
                                                     // kilobytes, and the difference
@@ -1609,9 +1618,11 @@ const Message = memo(function Message({
                                                     // chose not to have media load on its
                                                     // own (`auto-download`): play is the ask.
                                                     poster={
-                                                        file.hasPoster && message.autoLoad !== false
-                                                            ? `/api/chat/attachments/${file.id}?poster=1`
-                                                            : undefined
+                                                        file.sealed
+                                                            ? file.openedPosterUrl
+                                                            : file.hasPoster && message.autoLoad !== false
+                                                              ? `/api/chat/attachments/${file.id}?poster=1`
+                                                              : undefined
                                                     }
                                                     // Its blur under the still, and its own
                                                     // shape rather than 16:9, so the frame
@@ -1625,7 +1636,7 @@ const Message = memo(function Message({
                                                     download={
                                                         message.shielded
                                                             ? undefined
-                                                            : `/api/chat/attachments/${file.id}?download=1`
+                                                            : attachmentFileUrl(file, "download")
                                                     }
                                                 />
                                             ) : (

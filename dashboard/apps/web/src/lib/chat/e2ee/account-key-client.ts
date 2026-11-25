@@ -25,6 +25,7 @@ import * as deviceLock from "@polaris/chat-crypto/device-lock";
 import * as passkeyLock from "@polaris/chat-crypto/passkey-lock";
 import { LOCK_ENVELOPE_BYTES } from "@polaris/chat-crypto/locks";
 import * as passwordLock from "@polaris/chat-crypto/password-lock";
+import * as safety from "@polaris/chat-crypto/safety-number";
 import * as passwordWorker from "@/lib/chat/e2ee/password-worker-client";
 import { platformSealedStore } from "@polaris/chat-crypto/platform-store";
 import { platformKeyWrap } from "@/lib/chat/e2ee/platform-key-wrap";
@@ -105,6 +106,44 @@ export function publishedKeyVerifier(): account.AccountKeyVerifier {
             return state.accountKey?.akVersion === akVersion && account.samePublicKeys(published, keys);
         }
     };
+}
+
+/** A conversation's safety number with one other person, or why there is none. */
+export type PairSafety =
+    | { readonly kind: "ready"; readonly digits: string }
+    /** The other person has no account key yet: nothing has been sealed to them. */
+    | { readonly kind: "no-key" }
+    | { readonly kind: "unavailable" };
+
+/**
+ * The safety number (design 4.6) between this account and `peerId`, from the
+ * keys the server publishes for both - which is the point: compared with the
+ * one on the other person's screen, a key the server substituted on either
+ * side shows as a different number.
+ */
+export async function pairSafetyNumber(channelId: string, peerId: string): Promise<PairSafety> {
+    const state = await keyState();
+    const mine = state ? publishedOf(state) : null;
+    if (!state || !mine) return { kind: "unavailable" };
+    try {
+        const response = await fetch("/api/e2ee/mls", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ op: "account-keys", channelId, userIds: [peerId] })
+        });
+        if (!response.ok) return { kind: "unavailable" };
+        const answer = (await response.json()) as { accountKeys?: { userId: string; signPublicKey: string; hpkePublicKey: string }[] };
+        const theirs = answer.accountKeys?.find((found) => found.userId === peerId);
+        if (!theirs) return { kind: "no-key" };
+        const digits = await safety.safetyNumber(
+            { userId: state.userId, keys: mine },
+            { userId: peerId, keys: { signPublicKey: fromText(theirs.signPublicKey), hpkePublicKey: fromText(theirs.hpkePublicKey) } }
+        );
+        return { kind: "ready", digits };
+    } catch {
+        return { kind: "unavailable" };
+    }
 }
 
 /**

@@ -68,16 +68,31 @@ export function planQueue(
     return picked;
 }
 
+/**
+ * When a queued session joined the queue: its creation, or for one reopened
+ * after it ended the moment it was asked to start again (`startedAt`, set by
+ * `reopenSessionRecord`). Ordering by creation alone put a reopened session
+ * ahead of every start that had been waiting for it.
+ */
+export function queueKey(row: { startedAt: Date | null; createdAt: Date }): Date {
+    return row.startedAt ?? row.createdAt;
+}
+
 /** Where a queued session stands: 1 is next. Counted within its own account,
  *  which is the order this person can actually reason about. */
 export async function queuePosition(sessionId: string): Promise<number | null> {
     const row = await prisma.agentSession.findUnique({
         where: { id: sessionId },
-        select: { state: true, startedById: true, createdAt: true }
+        select: { state: true, startedById: true, startedAt: true, createdAt: true }
     });
     if (!row || row.state !== "queued") return null;
+    const key = queueKey(row);
     const ahead = await prisma.agentSession.count({
-        where: { state: "queued", startedById: row.startedById, createdAt: { lt: row.createdAt } }
+        where: {
+            state: "queued",
+            startedById: row.startedById,
+            OR: [{ startedAt: { lt: key } }, { startedAt: null, createdAt: { lt: key } }]
+        }
     });
     return ahead + 1;
 }
@@ -101,11 +116,11 @@ export async function queuePositions(
     ];
     const rows = await prisma.agentSession.findMany({
         where: { state: "queued", startedById: { in: accounts } },
-        select: { id: true, startedById: true },
+        select: { id: true, startedById: true, startedAt: true, createdAt: true },
         orderBy: { createdAt: "asc" },
         take: accounts.length * MAX_QUEUED_PER_ACCOUNT
     });
-    return rankWithinAccount(rows);
+    return rankWithinAccount([...rows].sort((a, b) => queueKey(a).getTime() - queueKey(b).getTime()));
 }
 
 /** 1-based rank of each row within its own account, in the order given. */
@@ -128,9 +143,12 @@ export const MAX_QUEUED_PER_ACCOUNT = 20;
 
 /** The prompt a queued session was given, kept as its first message. */
 async function firstPrompt(sessionId: string): Promise<string | null> {
+    // The newest one typed here: a reopened session's earlier prompts were
+    // answered before it stopped, and a row copied from another session (its
+    // vendor id says so) or synced from the transcript was never this start's.
     const message = await prisma.agentSessionMessage.findFirst({
-        where: { sessionId, role: "user" },
-        orderBy: { createdAt: "asc" },
+        where: { sessionId, role: "user", kind: "text", vendorId: null },
+        orderBy: { createdAt: "desc" },
         select: { body: true }
     });
     return message?.body ?? null;
@@ -248,7 +266,7 @@ async function claim(): Promise<string[]> {
         const queue = await tx.agentSession.findMany({
             where: { state: "queued" },
             orderBy: { createdAt: "asc" },
-            select: { id: true, startedById: true, createdAt: true },
+            select: { id: true, startedById: true, startedAt: true, createdAt: true },
             take: 500
         });
         if (queue.length === 0) return [];
@@ -269,7 +287,7 @@ async function claim(): Promise<string[]> {
             queue.map((row) => ({
                 id: row.id,
                 accountId: row.startedById ?? "",
-                queuedAt: row.createdAt
+                queuedAt: queueKey(row)
             })),
             aliveByAccount,
             perAccount,
@@ -367,6 +385,41 @@ export async function admitSession(
     // request, because the terminal is a clone and an install away.
     if (prompt) await sessions.addSessionMessage(session.id, "user", prompt, input.startedById);
     return { session, queuedAt: null };
+}
+
+/**
+ * Start a session that ended again, as itself: the same record, thread, branch
+ * and conversation, on a new machine. The agent reopens its conversation from
+ * the id it reported (`vendorSessionId`): `--resume <id>` in the terminal,
+ * ACP `session/load` and Codex `thread/resume` in Chat. A prompt is recorded
+ * as the next message and delivered once the agent is up. Over a ceiling it
+ * waits in the queue like any start. Null when it had not ended (another tab
+ * reopened it first), so a double send never starts two machines.
+ */
+export async function reopenSession(sessionId: string, userId: string, prompt: string | null): Promise<Admission | null> {
+    await makeRoom(userId).catch((error: unknown) => {
+        console.error(`[agent-queue] could not make room for ${userId}:`, error);
+    });
+    if (!(await sessions.reopenSessionRecord(sessionId))) return null;
+    if (prompt) await sessions.addSessionMessage(sessionId, "user", prompt, userId);
+    const full = capacity.capacityRefusal(await capacity.sessionCapacity(userId));
+    if (full) {
+        const view = await sessions.sessionViewById(sessionId);
+        return view ? { session: view, queuedAt: (await queuePosition(sessionId)) ?? 1 } : null;
+    }
+    // Claimed the way the sweep claims, so the sweep never starts it a second time.
+    const claimed = await prisma.agentSession.updateMany({
+        where: { id: sessionId, state: "queued" },
+        data: { state: "starting" }
+    });
+    const reissued = claimed.count > 0 ? await sessions.reissueSessionToken(sessionId) : null;
+    if (!reissued) return null;
+    try {
+        await runtime.startSession(reissued.session, reissued.token);
+    } catch (startError) {
+        return { session: reissued.session, queuedAt: null, startError };
+    }
+    return { session: reissued.session, queuedAt: null };
 }
 
 /** Take a queued session out of the queue. False when it was no longer queued

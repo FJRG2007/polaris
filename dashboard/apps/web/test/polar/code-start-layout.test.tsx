@@ -164,7 +164,7 @@ function chips(): string[] {
     return screen
         .getAllByRole("button")
         .map((button) => button.getAttribute("aria-label") ?? "")
-        .filter((label) => /^(Where the agent works|Issue|Skill):/.test(label))
+        .filter((label) => /^(Where the agent works|From an issue|Skill):/.test(label))
         .map((label) => label.split(":")[0] ?? "");
 }
 
@@ -173,7 +173,7 @@ describe("Code opens without moving", () => {
         render(<PolarChat />, { wrapper: MessagesWrapper });
         await screen.findByRole("textbox", { name: "Task for the agent" });
         const before = chips();
-        expect(before).toEqual(["Where the agent works", "Issue"]);
+        expect(before).toEqual(["Where the agent works", "From an issue"]);
         const where = screen.getByRole("button", { name: /^Where the agent works:/ });
         expect((where as HTMLButtonElement).disabled).toBe(true);
         gate.resolve();

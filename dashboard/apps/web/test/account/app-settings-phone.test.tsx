@@ -62,7 +62,7 @@ async function draw(category: core.AppSettingCategory) {
 async function drawDownloads() {
     render(
         <MessagesWrapper>
-            <ThisDeviceApp />
+            <ThisDeviceApp desktop={false} />
         </MessagesWrapper>
     );
     await act(async () => {

@@ -15,6 +15,7 @@ import { useSyncExternalStore } from "react";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import * as rules from "@/lib/chat/offline/media-download";
 import { attachmentImageUrl } from "./message-gallery";
+import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 
 /** Read by `account-switch` and `public/sw.js`. */
 export const MEDIA_CACHE = "polaris-chat-media";
@@ -162,6 +163,12 @@ async function drain(): Promise<void> {
     await trimMedia().catch(() => undefined);
 }
 
+/** A sealed file's type and size as its opened seal names them; null until the message opened here. */
+function sealedKind(message: ChatMessageView, id: string): { type: string; size: number } | null {
+    const ref = sealedChat.openedContent(message.id, message.sealedEditedAt)?.files?.find((file) => file.id === id);
+    return ref ? { type: ref.type, size: ref.size } : null;
+}
+
 /** Fetch the media of these messages that the reader's setting allows now. */
 export function prefetchMedia(messages: readonly ChatMessageView[]): void {
     if (typeof window === "undefined") return;
@@ -173,8 +180,12 @@ export function prefetchMedia(messages: readonly ChatMessageView[]): void {
         for (const file of message.attachments) {
             // Shown once and gone: never kept on a device.
             if (file.viewOnce) continue;
-            if (!rules.shouldDownload(rules.mediaKindOf(file.contentType), prefs, network)) continue;
-            if (!rules.fitsUnderCap(file.size, capBytes)) continue;
+            // Sealed: what it is comes from its seal once opened here; the blob
+            // kept is the sealed one, which this page opens itself.
+            const kind = file.sealed ? sealedKind(message, file.id) : { type: file.contentType, size: file.size };
+            if (!kind) continue;
+            if (!rules.shouldDownload(rules.mediaKindOf(kind.type), prefs, network)) continue;
+            if (!rules.fitsUnderCap(kind.size, capBytes)) continue;
             const url = new URL(attachmentImageUrl(file.id), window.location.origin).href;
             if (queued.has(url)) continue;
             queued.add(url);

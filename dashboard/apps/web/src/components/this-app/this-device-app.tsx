@@ -1,9 +1,12 @@
 "use client";
 
 /**
- * The Polaris app this page runs in, at the top of Downloads: its version, a
- * check for a newer one, the download's progress and the restart into it.
- * Nothing in a browser, where Downloads is only the list of what to install.
+ * The Polaris app this page runs in: its version, a check for a newer one, the
+ * download's progress and the restart into it. Drawn at the top of Settings >
+ * This app > General, and on Downloads for the phone app only - inside the
+ * desktop app, Downloads' own desktop card already names the version and
+ * offers the check, so a second block there said the same thing twice.
+ * Nothing in a browser.
  *
  * Drawn from what the app knows at once (its version is on the bridge itself),
  * so it never waits. With no connection - Downloads opened from the window's
@@ -20,11 +23,11 @@ import { phoneAppSettings, type PhoneAppSettings } from "@/lib/mobile-bridge";
 import { useDesktopBridge, usePhoneAppSettings } from "@/components/desktop-app";
 import { readDesktopUpdateCheck, type DesktopUpdateCheck, type PolarisDesktop } from "@/lib/desktop-bridge";
 
-export function ThisDeviceApp() {
+export function ThisDeviceApp({ desktop = true }: { desktop?: boolean }) {
     const bridge = useDesktopBridge();
     const phone = usePhoneAppSettings();
     if (bridge && (bridge.checkForUpdates || bridge.updateReady || bridge.appSettings)) {
-        return <DesktopApp bridge={bridge} />;
+        return desktop ? <DesktopApp bridge={bridge} /> : null;
     }
     if (phone) {
         const settings = phoneAppSettings();

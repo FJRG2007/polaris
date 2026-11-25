@@ -1,16 +1,34 @@
 /**
+ * What sealed chat is with `POLARIS_INTERNAL_CHAT_E2EE` unset - which is every
+ * install, since existing ones never receive a new `.env` key (repo CLAUDE.md).
+ * Phase 14 of docs/chat-e2ee-proposal.md turns it on by changing this one
+ * constant in a release; nothing else has to move, and nobody sets a variable.
+ */
+export const CHAT_E2EE_DEFAULT_ON = false;
+
+/**
  * The internal rollout flag for chat end-to-end encryption.
  *
- * Off everywhere, and deliberately not a setting: no screen offers it and no
- * install writes it. Phases 1 to 13 of docs/chat-e2ee-proposal.md land behind
- * it and are switched on together in phase 14, in a release that flips this
- * default rather than asking anybody to set a variable. Until then every route
- * behind it answers 404 and the password sign-in is exactly what it was.
+ * Deliberately not a setting: no screen offers it and no install writes it.
+ * Unset, it is `CHAT_E2EE_DEFAULT_ON` (off until phase 14); `1` turns it on
+ * and `0` off whatever the default, so once the default is on, `0` is the
+ * kill switch for an incident, as `POLARIS_INTERNAL_PASSWORD_LOCK=0` is - not
+ * a setting. Any other value is the default, so a typo never flips it. While
+ * it is off every route behind it answers 404 and the password sign-in is
+ * exactly what it was.
  *
  * Read on every call rather than once, so a test can switch it per case.
  */
 export function chatE2eeEnabled(): boolean {
-    return process.env.POLARIS_INTERNAL_CHAT_E2EE === "1";
+    return chatE2eeFrom(process.env.POLARIS_INTERNAL_CHAT_E2EE, CHAT_E2EE_DEFAULT_ON);
+}
+
+/** The flag's rule, apart from the environment, so the default-on shape is tested before it is shipped. */
+export function chatE2eeFrom(value: string | undefined, defaultOn: boolean): boolean {
+    const set = value?.trim();
+    if (set === "1") return true;
+    if (set === "0") return false;
+    return defaultOn;
 }
 
 /**

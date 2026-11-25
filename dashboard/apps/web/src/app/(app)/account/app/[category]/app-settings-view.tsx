@@ -23,6 +23,7 @@ import { Check } from "lucide-react";
 import * as core from "@polaris/core/app-settings";
 import { useDesktopBridge, usePhoneAppSettings } from "@/components/desktop-app";
 import { HostsManager } from "@/components/this-app/hosts-manager";
+import { ThisDeviceApp } from "@/components/this-app/this-device-app";
 import { phoneAppSettings, phoneHosts, type PhoneAppSettings } from "@/lib/mobile-bridge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -54,6 +55,8 @@ export function AppSettingsScreen({ category }: { category: core.AppSettingCateg
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t(`categories.${category}.title`)}</h1>
                 <AppSettingsIntro category={category} />
             </div>
+            {/* The app's version and its updates, first thing under General. */}
+            {category === "general" && <ThisDeviceApp />}
             <AppSettingsView category={category} />
         </div>
     );

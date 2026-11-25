@@ -42,6 +42,7 @@ interface PollRow {
     messageId: string;
     multiple: boolean;
     hideResults: boolean;
+    anonymous: boolean;
     closesAt: Date | null;
     closedAt: Date | null;
     options: OptionRow[];
@@ -61,6 +62,8 @@ let votes: { optionId: string; userId: string }[] = [];
  *  whether they run the room. */
 let postable = true;
 let mayModerate = false;
+/** Whether the reader reaches the conversation at all. */
+let reachable = true;
 
 class FakeAccessError extends Error {
     constructor(text?: string | ChatText) {
@@ -73,7 +76,10 @@ class FakeRuleError extends FakeAccessError {}
 vi.mock("@/lib/chat/access", () => ({
     ChatAccessError: FakeAccessError,
     ChatRuleError: FakeRuleError,
-    requireChannel: async (_actor: unknown, channelId: string) => ({ channelId, mayModerate }),
+    requireChannel: async (_actor: unknown, channelId: string) => {
+        if (!reachable) throw new FakeAccessError("Not yours");
+        return { channelId, mayModerate };
+    },
     requirePostable: async (_actor: unknown, channelId: string) => {
         if (!postable) throw new FakeAccessError("You are not in that conversation");
         return { channelId, mayPost: true, mayModerate };
@@ -109,9 +115,12 @@ const store = {
                     ? {
                           multiple: poll.multiple,
                           hideResults: poll.hideResults,
+                          anonymous: poll.anonymous,
                           closesAt: poll.closesAt,
                           closedAt: poll.closedAt,
-                          options: poll.options.map((option) => ({ id: option.id }))
+                          options: [...poll.options]
+                              .sort((left, right) => left.position - right.position)
+                              .map((option) => ({ id: option.id }))
                       }
                     : null
             };
@@ -138,8 +147,24 @@ const store = {
         }
     },
     chatPollVote: {
-        findMany: async ({ where }: { where: { optionId: { in: string[] } } }) =>
-            votes.filter((vote) => where.optionId.in.includes(vote.optionId)),
+        findMany: async ({
+            where,
+            take
+        }: {
+            where: { optionId: string | { in: string[] } };
+            take?: number;
+        }) => {
+            const wanted = where.optionId;
+            const found = votes.filter((vote) =>
+                typeof wanted === "string" ? vote.optionId === wanted : wanted.in.includes(vote.optionId)
+            );
+            // The voters list asks for whose votes they are; the tallies do not.
+            return typeof wanted === "string"
+                ? found.slice(0, take).map((vote) => ({ user: { id: vote.userId, name: vote.userId.toUpperCase() } }))
+                : found;
+        },
+        count: async ({ where }: { where: { optionId: string } }) =>
+            votes.filter((vote) => vote.optionId === where.optionId).length,
         deleteMany: async ({
             where
         }: {
@@ -165,7 +190,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { endPoll, pollsFor, readPoll, vote } = await import("@/lib/chat/polls");
+const { endPoll, pollsFor, readPoll, readPollVoters, vote } = await import("@/lib/chat/polls");
 
 const ADA = { id: "ada" };
 const GRACE = { id: "grace" };
@@ -177,6 +202,7 @@ function seed(options: Partial<PollRow> & { answers?: number; authorId?: string 
         messageId: "m1",
         multiple: options.multiple ?? false,
         hideResults: options.hideResults ?? false,
+        anonymous: options.anonymous ?? true,
         closesAt: options.closesAt ?? null,
         closedAt: options.closedAt ?? null,
         options: Array.from({ length: answers }, (_, index) => ({
@@ -201,6 +227,7 @@ beforeEach(() => {
     votes = [];
     postable = true;
     mayModerate = false;
+    reachable = true;
 });
 
 describe("what is stored", () => {
@@ -457,5 +484,75 @@ describe("what the card is given", () => {
         const view = await readPoll(GRACE, "m1");
         expect(view?.voters).toBe(1);
         expect(view?.voted).toBe(false);
+    });
+});
+
+describe("public and anonymous votes", () => {
+    it("asks anonymously unless the asker says otherwise", () => {
+        const parsed = chatPollCreateSchema.parse({
+            channelId: "0190a8c1-0000-7000-8000-000000000001",
+            question: "Lunch?",
+            options: ["Pizza", "Sushi"]
+        });
+        expect(parsed.anonymous).toBe(true);
+        expect(
+            chatPollCreateSchema.parse({
+                channelId: "0190a8c1-0000-7000-8000-000000000001",
+                question: "Lunch?",
+                options: ["Pizza", "Sushi"],
+                anonymous: false
+            }).anonymous
+        ).toBe(false);
+    });
+
+    it("tells the card which one it is", async () => {
+        seed({ anonymous: false });
+        expect((await pollsFor(ADA.id, ["m1"])).get("m1")?.anonymous).toBe(false);
+    });
+
+    it("lists who picked each answer of a public poll, in answer order", async () => {
+        seed({ anonymous: false, answers: 3 });
+        await vote(ADA, { messageId: "m1", optionIds: ["o2"] });
+        await vote(GRACE, { messageId: "m1", optionIds: ["o2"] });
+        const answers = await readPollVoters(ADA, "m1");
+        expect(answers.map((answer) => answer.optionId)).toEqual(["o1", "o2", "o3"]);
+        expect(answers[1]?.voters.map((voter) => voter.id)).toEqual(["ada", "grace"]);
+        expect(answers[0]).toEqual({ optionId: "o1", voters: [], more: 0 });
+    });
+
+    it("follows a changed vote rather than remembering the old one", async () => {
+        seed({ anonymous: false });
+        await vote(ADA, { messageId: "m1", optionIds: ["o1"] });
+        await vote(ADA, { messageId: "m1", optionIds: ["o2"] });
+        const answers = await readPollVoters(GRACE, "m1");
+        expect(answers[0]?.voters).toEqual([]);
+        expect(answers[1]?.voters.map((voter) => voter.id)).toEqual(["ada"]);
+    });
+
+    it("never says who picked what in an anonymous poll, to the asker or a moderator", async () => {
+        seed({ anonymous: true, authorId: ADA.id });
+        await vote(GRACE, { messageId: "m1", optionIds: ["o1"] });
+        await expect(readPollVoters(ADA, "m1")).rejects.toThrow("anonymous");
+        mayModerate = true;
+        await expect(readPollVoters(ADA, "m1")).rejects.toThrow("anonymous");
+        // The counts are still there, and one vote per person still holds.
+        const view = (await pollsFor(ADA.id, ["m1"])).get("m1");
+        expect(view?.options[0]?.votes).toBe(1);
+        await vote(GRACE, { messageId: "m1", optionIds: ["o1"] });
+        expect((await pollsFor(ADA.id, ["m1"])).get("m1")?.voters).toBe(1);
+    });
+
+    it("keeps the names back while a hidden poll runs, and gives them once it closes", async () => {
+        const poll = seed({ anonymous: false, hideResults: true });
+        await vote(GRACE, { messageId: "m1", optionIds: ["o1"] });
+        await expect(readPollVoters(ADA, "m1")).rejects.toThrow("closes");
+        poll.closedAt = new Date();
+        expect((await readPollVoters(ADA, "m1"))[0]?.voters.map((voter) => voter.id)).toEqual(["grace"]);
+    });
+
+    it("refuses a reader who may not reach the conversation", async () => {
+        seed({ anonymous: false });
+        reachable = false;
+        await expect(readPollVoters(GRACE, "m1")).rejects.toThrow("Not yours");
     });
 });

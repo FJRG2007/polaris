@@ -14,7 +14,17 @@
         "discard": "Discard",
         "failed": "Some changes could not be applied",
         "stillPending": "They are still pending. Deploying again retries only these.",
-        "discardAll": "Discard all here"
+        "discardAll": "Discard all here",
+        "kinds": {
+            "serviceDelete": "Delete service",
+            "databaseDelete": "Delete database",
+            "volumeDelete": "Delete volume",
+            "environmentSync": "Sync into"
+        },
+        "syncDetail": "{count, plural, one {# change} other {# changes}} from {source}",
+        "volumeWipe": "The data in it is destroyed.",
+        "volumeDetach": "The volume is detached and removed.",
+        "discardSync": "Discard the sync into {name}"
     },
     "glance": {
         "up": "Answering",
@@ -68,7 +78,10 @@
         "attention": "{count, plural, one {# service needs a look} other {# services need a look}}",
         "name": "Project name",
         "cancel": "Cancel",
-        "create": "Create"
+        "create": "Create",
+        "sync": "Sync",
+        "syncHint": "Sync this environment with another",
+        "syncNeedsTwo": "Needs another environment you can deploy to"
     },
     "detail": {
         "localNotReady": "The local host is not ready to build and deploy. This needs the full edition with a running <code>{daemon}</code>.",

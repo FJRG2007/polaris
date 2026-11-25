@@ -14,7 +14,17 @@
         "discard": "Descartar",
         "failed": "Algunos cambios fallaron",
         "stillPending": "Siguen pendientes. Al desplegar de nuevo solo se reintentan estos.",
-        "discardAll": "Descartar todos"
+        "discardAll": "Descartar todos",
+        "kinds": {
+            "serviceDelete": "Eliminar servicio",
+            "databaseDelete": "Borrar la base",
+            "volumeDelete": "Eliminar volumen",
+            "environmentSync": "Sincronizar"
+        },
+        "syncDetail": "{count, plural, one {# cambio} other {# cambios}} de {source}",
+        "volumeWipe": "Se destruyen sus datos.",
+        "volumeDetach": "El volumen se desconecta y se elimina.",
+        "discardSync": "Descartar la sincronización de {name}"
     },
     "glance": {
         "up": "Responde",
@@ -68,7 +78,10 @@
         "attention": "{count, plural, one {# servicio requiere atención} other {# servicios requieren atención}}",
         "name": "Nombre",
         "cancel": "Cancelar",
-        "create": "Crear"
+        "create": "Crear",
+        "sync": "Sincro",
+        "syncHint": "Sincroniza este entorno con otro",
+        "syncNeedsTwo": "Requiere otro entorno donde desplegar"
     },
     "detail": {
         "localNotReady": "El equipo local no está listo para compilar y desplegar. Necesita la edición completa con <code>{daemon}</code> en marcha.",

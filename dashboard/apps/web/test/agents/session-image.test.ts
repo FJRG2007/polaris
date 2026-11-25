@@ -112,6 +112,22 @@ describe("the session machine image", () => {
         expect(up).toHaveBeenLastCalledWith("node:24", "missing");
     });
 
+    it("keeps the stock image fresh while the machine image cannot be pulled, and tries it again", async () => {
+        const up = vi.fn(async (name: string) => {
+            if (name === "ghcr.io/x/machine") throw new Error("No such image");
+        });
+        const pull = vi.fn(async (name: string) => {
+            if (name === "ghcr.io/x/machine") throw new Error("manifest unknown");
+        });
+        await image.upWithSessionImage(up, pull, images, () => 10);
+        await image.sessionImageRefreshing();
+        expect(pull.mock.calls).toEqual([["ghcr.io/x/machine"], ["node:24"]]);
+        // Not counted as refreshed: the next start asks for the machine image again.
+        await image.upWithSessionImage(up, pull, images, () => 20);
+        await image.sessionImageRefreshing();
+        expect(pull.mock.calls.slice(2)).toEqual([["ghcr.io/x/machine"], ["node:24"]]);
+    });
+
     it("passes on a failure the stock image has too", async () => {
         const up = vi.fn(async () => {
             throw new Error("could not create network");

@@ -579,6 +579,36 @@ export async function reissueSessionToken(
 }
 
 /**
+ * Put a session that ended back in line to start again: the same record,
+ * thread, branch and conversation id, queued until the caller (or the queue)
+ * starts it. False when it had not ended - another tab reopened it first - so
+ * a double send never starts two machines.
+ */
+export async function reopenSessionRecord(sessionId: string): Promise<boolean> {
+    const updated = await prisma.agentSession.updateMany({
+        where: { id: sessionId, state: { in: ["stopped", "failed"] } },
+        data: {
+            state: "queued",
+            error: null,
+            detail: "",
+            finishedAt: null,
+            containerId: null,
+            // This run's own clock. `startedAt` is when it was asked to start,
+            // which is its place in the queue (`queueKey`) and what the silence
+            // sweep counts from until the new machine reports; the old machine's
+            // last report, probe and hook sequence (in that machine's clock)
+            // would otherwise fail it as silent or drop its first hooks as stale.
+            startedAt: new Date(),
+            lastEventAt: null,
+            lastEventSeq: null,
+            lastAliveAt: null,
+            lastProbedAt: null
+        }
+    });
+    return updated.count > 0;
+}
+
+/**
  * The session a reporting token belongs to, or null.
  *
  * A token stops working the moment its session is over, which is what stops a
@@ -625,6 +655,16 @@ export async function sessionRepository(sessionId: string): Promise<string | nul
         select: { repo: { select: { repoFullName: true } } }
     });
     return record?.repo?.repoFullName ?? null;
+}
+
+/** The person who started a session, whose own GitHub sign-in its git pushes
+ *  as. Null for a session that no longer exists or that nobody started. */
+export async function sessionStarter(sessionId: string): Promise<string | null> {
+    const record = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { startedById: true }
+    });
+    return record?.startedById ?? null;
 }
 
 /** Whose work a session is doing: the account that owns the repository it runs
@@ -972,6 +1012,31 @@ export async function sessionMessages(
             at: record.createdAt.toISOString()
         }))
         .reverse();
+}
+
+/**
+ * The agent's tool calls and their results, oldest first: the newest `limit`,
+ * none older than `since` (the oldest message the thread holds, so the steps
+ * never reach further back than what they sit between). One indexed read
+ * (`sessionId, createdAt`); the rows were cut to the decoders' bounds when
+ * they were stored.
+ */
+export async function sessionToolRows(
+    sessionId: string,
+    since: string | null,
+    limit = 300
+): Promise<{ id: string; kind: string; subject: string; ref: string; body: string; at: string }[]> {
+    const records = await prisma.agentSessionMessage.findMany({
+        where: {
+            sessionId,
+            kind: { in: ["tool", "result"] },
+            ...(since ? { createdAt: { gte: new Date(since) } } : {})
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit,
+        select: { id: true, kind: true, subject: true, ref: true, body: true, createdAt: true }
+    });
+    return records.map(({ createdAt, ...rest }) => ({ ...rest, at: createdAt.toISOString() })).reverse();
 }
 
 /** Note that the machine got as far as having a process. */

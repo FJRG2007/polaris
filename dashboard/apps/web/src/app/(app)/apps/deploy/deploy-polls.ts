@@ -276,6 +276,12 @@ export const promotionPreview = (
         signal
     );
 
+export const syncPreview = (
+    input: { sourceEnvironmentId: string; targetEnvironmentId: string },
+    signal?: AbortSignal
+) =>
+    readPoll<Answer<typeof projects.previewSyncAction>>("/api/deploy/sync/preview", input, signal);
+
 export const volumeDetail = (volumeId: string, signal?: AbortSignal) =>
     readPoll<Answer<typeof projects.volumeDetailAction>>(
         "/api/deploy/volumes/detail",

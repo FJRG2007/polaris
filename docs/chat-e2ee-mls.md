@@ -390,9 +390,6 @@ What is built on top of it:
   address, ops in-process through `answerMls`; a service's sealed message is
   stored with no author under Polar's or the webhook's name). Polar answering,
   a webhook posting and the member list's switch are built too (see below).
-- Sign-out deletes the browser's MLS device, but its leaf stays in each group
-  until another member removes it (`reconcile` removes only the leaves of
-  accounts that left, not a signed-out device of an account still in it).
 
 ## Turning it on: what is missing (2026-11-24)
 
@@ -403,20 +400,20 @@ share of the work, not of the code.
 | # | Gap | Blocks default-on? | Done |
 | --- | --- | --- | --- |
 | 1 | **Real-browser run of the sealed flows.** The text flows passed end to end against a production build on 2026-11-24 (see the note under this table). Also passed in a browser (2026-11-24, round 18): the launcher's Chat search finding a sealed message by its words on the sender's and the reader's browser; a webhook posting over HTTP into a sealed group (204, stored sealed under the given name, opened by both members, `?wait=true` answered); two tabs of one browser sending in turn and at once, every message opened by the other side - which showed the tabs fighting over the device, now fixed ("Every tab of a browser shares its device"; the fix itself is unit-tested and not yet re-run in a browser). Not yet: the chat panel's own search, the "Polar in this chat" switch (the driver did not reach it through the info panel), Polar's Approve and Cancel (needs a provider). | Yes | ~65% |
-| 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). A page loaded before sealed chat was on is told to reload instead (`errors.sealedOnlyReload`, see "Sealed only"). Left: the per-conversation state the migration (row 5) needs to switch a conversation to sealed-only before its group exists. | Yes | ~75% |
-| 3 | **Message kinds that are still plain.** Attachments (file bytes and names), voice notes, polls, scheduled messages, forum post titles, server-side translations, link cards. Each needs a sealed form (proposal 10b for files: encrypted in the browser, the key inside the sealed message). Until then a sealed conversation leaks whatever is sent as one of these. | Yes | ~15% (text, edits, replies, threads, Polar, webhooks are sealed) |
-| 4 | **Default-on switch.** `chatE2eeEnabled()` reads `=== "1"`. Default-on has to be on with nothing set and keep an env kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md). | Yes | 0% (one line, last) |
-| 5 | **Migration of existing chats** (proposal 8): nothing is built - no per-conversation state table, no server-side migrator sealing legacy history under `HK(c, legacy)`, no backup gate, no M3 verification, no cut-over, no purge of the plain columns, no admin progress line. Today an existing conversation becomes sealed only from the next message a sealed browser sends; everything before stays plain. | Yes (owner: every existing chat migrated) | 0% |
+| 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). A page loaded before sealed chat was on is told to reload instead (`errors.sealedOnlyReload`, see "Sealed only"). A conversation the migration cut is sealed only before any browser has made its group (`conversationSealed` reads `ChatMigration`). Left: a sealed form for editing an old plain message in a sealed conversation. | Yes | ~85% |
+| 3 | **Message kinds that are still plain.** Built (2026-11-25): attachments, see "Sealed files"; polls, see "Sealed polls" (question and answers sealed; votes sealed with the tally in each browser, see "Sealed votes"; public or anonymous chosen at creation, see "Public and anonymous votes"). Left: voice notes recorded in a sealed conversation ride the sealed-file path (their length and shape are inside the seal) but are not verified in a browser; sealed reactions (proposal: "votos cifrados; recuento en el cliente"; votes done), scheduled messages, forum post titles, server-side translations, link cards, files sent to be seen once and files left in a Drive (refused in a sealed conversation, nothing sent in the clear). Until each has its sealed form a sealed conversation cannot send it. | Yes | ~52% (text, edits, replies, threads, Polar, webhooks, files - with the gallery, forum list and video stills - poll questions, answers and votes are sealed) |
+| 4 | **Default-on switch.** Built (2026-11-25): `chatE2eeEnabled()` is `chatE2eeFrom(env, CHAT_E2EE_DEFAULT_ON)` in `flag.ts` - `1` on, `0` off, anything else the default - so turning it on is changing `CHAT_E2EE_DEFAULT_ON` to `true` in a release, on with nothing set and `0` kept as the kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md); tested in `test/chat/e2ee/flag.test.ts`. Left: the flip itself (last), and a kill switch that does not lock anybody out of a conversation already sealed only (today `0` makes every sealed route answer 404). | Yes | ~40% |
+| 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback` for the 30-day rollback), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Left: the admin progress line (`migrationProgress()` exists, no screen yet), rollback (restore from `ChatMigrationRollback`), the purge after 30 days (decision 4), attachments/polls/system rows (row 3), members with no account key yet getting the legacy key later (needs `ORK` or a member device re-sealing it), a "history before [date]" label. | Yes (owner: every existing chat migrated) | ~45% |
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
-| 7 | **Key transparency** (proposal 4.6): `AccountKeyVerifier` has no log behind it, so a server could hand out a substitute account key. Safety numbers and key-change notices are not built. | Yes, for "government-grade" | 0% |
-| 8 | **Device hygiene**: a signed-out browser's leaf stays in each group until someone removes it; inactive-device removal (decision 7) and the "new device added" notice are not built. | Yes, for post-compromise security | ~10% |
+| 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info. Left: `AccountKeyVerifier` still has no log behind it, so a server could hand out a substitute account key - the append-only key log with a signed root and inclusion and consistency checks in the browser; key-change notices in the conversation; the verified mark; scanning the other person's QR in the app. | Yes, for "government-grade" | ~15% |
+| 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody. Left: the screen for the instance limit (the `Setting` key is read, 7-90) and the organisation's own limit, the "new device added" notice on the account's other devices, a device list with revoke. | Yes, for post-compromise security | ~50% |
 | 9 | **Server features that read chat text**: whole-Polaris export/import and backups carry sealed rows but no keys; moderation reports, retention and compliance export (proposal 9), automations that read messages. Each needs its sealed answer or an explicit "not in sealed conversations". | Partly (export/import must round-trip) | ~10% |
 | 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. | No (documented limit) | ~40% |
 | 11 | **Web code trust** (proposal 4.7): published hash of the crypto bundle, extension and desktop checking it, strict CSP and Trusted Types on message rendering. | No for default-on; yes for intelligence deployments | ~10% |
 | 12 | **Large channels**: steady-state commit size with a filled tree is unmeasured (phase 0); batched adds and removes for 10,000-member channels are not built. | For big spaces | ~20% |
 
 Rough overall to "on by default, every existing chat migrated, recoverable":
-about 35%. Text messaging between people on the web, with edits, Polar and
+about 44%. Text messaging between people on the web, with edits, Polar and
 webhooks, is built and covered by tests against the real MLS binding; the
 migration, the plain-write cut, the other message kinds, `ORK` and
 transparency are the bulk of what is left.
@@ -442,6 +439,311 @@ device - every send stays "not sent yet" in the outbox, and nothing is sent in
 the clear instead. CI sets `POLARIS_CORE_RS_REQUIRED=1`, so a published image
 always carries it.
 
+## Safety numbers (built 2026-11-25)
+
+A one-to-one conversation's info has a "Safety number" row while sealed chat is
+on (`safety-number.tsx`, view `safety` of `conversation-info.tsx`): 60 digits in
+12 groups of 5, a QR of them (`polaris-safety-number:1:` followed by the
+digits) and a copy button, for the two people to compare in person or on a
+call. Nothing waits on it; it is for whoever does not want to take the server's
+word for whose key their browser seals to.
+
+- **Derivation** (`@polaris/chat-crypto/safety-number`): Signal's numeric
+  fingerprint (libsignal `rust/protocol/src/fingerprint.rs`; WhatsApp's
+  security code is the same construction). Per account: SHA-512 over a version,
+  the key, the account id and the key again, then 5,199 rounds of SHA-512 over
+  the previous digest and the key; the first 30 bytes as six big-endian 40-bit
+  numbers mod 100,000 are that account's 30 digits. The "key" is both public
+  halves of the account key (Ed25519 and X-Wing) under the package's canonical
+  length-prefixed encoding, so swapping either half changes the number; the
+  version is `0x0001`, never read as a Signal number; the two halves are ordered
+  by account id (proposal 4.6), so both sides agree without comparing digits.
+  Cross-checked against an independent Python implementation of the same steps;
+  a fixed vector in `test/safety-number.test.ts` keeps it stable across releases.
+- **Inputs**: this account's published keys (`/api/e2ee/keys` `state`) and the
+  other person's (`/api/e2ee/mls` `account-keys`, which answers only people who
+  reach the conversation) - deliberately what the server publishes, since that
+  is what a substituted key would show up in. `pairSafetyNumber()` in
+  `account-key-client.ts`; the person with no account key yet gets "has not
+  opened sealed chat yet", a failure a retry.
+- **Groups**: no number (each pair compares its own, proposal 4.6); a member's
+  number is reached from the one-to-one conversation with them.
+
+Prior art read for the rest of row 7: Signal safety numbers (above); WhatsApp
+Key Transparency, an auditable key directory (AKD, a Merkle-patricia tree of
+key versions with published epoch roots, 2023); CONIKS (Melara et al., USENIX
+Security 2015: per-user key histories in a signed Merkle prefix tree, clients
+monitoring their own entries and checking the server does not fork the tree);
+IETF KEYTRANS (draft-ietf-keytrans-architecture, -protocol). The next step
+follows them: an append-only log of account key versions (RFC 6962-style tree),
+a signed tree head, the browser checking inclusion of every key it seals to and
+consistency with the last head it saw, and each account's own devices
+monitoring its entries - which is what turns a substituted key from invisible
+into a failed check.
+
+## Device hygiene (built 2026-11-25)
+
+A leaf that nobody uses any more is a key that still receives everything said
+in the group: a browser signed out (its store deleted, the leaf left behind), a
+lost laptop, a device last opened months ago. Removing those leaves is what
+gives MLS its post-compromise security in practice: a leaf that never
+updates keeps the keys it had when it was last seen. WhatsApp logs a linked
+device out after 30 days unused and Signal unlinks an inactive one (the proposal
+cites 45 days); Matrix keeps a device until it is signed out. Decision 7 of the
+proposal: 30 days by default, 7 to 90 adjustable.
+
+- **Retired devices.** A device is retired when its record is gone (signed out,
+  or never known) or its `lastSeenAt` is older than the limit
+  (`retiredDevices`, `inactiveCutoff`, `mls-delivery.ts`). The limit is
+  `INACTIVE_DEVICE_DAYS` (30) unless the `Setting` key
+  `chat.e2ee.inactiveDeviceDays` holds another, clamped to 7-90, so it works on
+  every install with nothing set.
+- **Sign-out retires the browser's device** while the session still stands
+  (`retireBrowserDevice` in `mls-browser.ts`, called by `signOut` before the
+  sign-out request; op `retire-device`): the server deletes the device and its
+  key packages. It waits at most 3 seconds and never fails the sign-out; a
+  device it did not reach is retired by the limit instead. "Sign out of all"
+  and a session ended from another device are covered by the limit only.
+- **Use keeps a device in.** Registering sets `lastSeenAt`; every op a device
+  makes as itself (`events`, `commit`, `application` - a send reads the log first) moves it at most
+  once an hour (`touchDevice`), so a tab left open for weeks stays in.
+- **Members take the leaves out.** `roster` takes the device addresses of the
+  group's leaves (`devices`, at most 1,000 per call; older callers send none)
+  and answers `retired`, only for the accounts the call names or the caller's
+  own, so it says nothing about anybody outside the caller's group.
+  `reconcile` - run before every sealed send - removes retired leaves in the
+  same commit as the devices of accounts that left, the account's own other
+  browsers included. A member the server runs (Polar, a webhook) is never
+  retired for being quiet: its device lives on the server and registers each
+  time it acts.
+- **Nobody adds a retired device.** `claim-key-packages` skips a device past
+  the limit and deletes its key packages; it publishes fresh ones when back.
+- **Coming back needs nothing.** A retired device that opens again registers,
+  and rejoins each conversation by its own external commit when it opens it
+  (the account still reaches it); the past comes from its account's history
+  keys, so no history is lost.
+- **What the server can do with it.** A server lying in `retired` can only
+  make members remove a live device, which then rejoins by itself: a denial
+  of service it could cause anyway by withholding messages. It cannot add a
+  device this way.
+
+Tests: `mls-delivery.test.ts` (the route's `retired` answer, the limit and its
+clamp, the hourly touch, claims skipping a stale device; against the real MLS
+binding, a send that removes a signed-out phone and an unseen PC in one commit,
+the remaining phone still reading, the removed PC reading its removal, and the
+PC rejoining), `retire-browser-device.test.ts`.
+
+## Sealed files (built 2026-11-25)
+
+Proposal 10b, first part. `@polaris/chat-crypto/file-content` seals a file
+under a fresh 256-bit key in 64 KiB AES-256-GCM chunks (nonce = counter and a
+last-chunk flag, so a cut, reordered or extended blob does not open) and
+checks the SHA-256 of the clear bytes after opening.
+
+- Sending (`send-with-files.ts`, `sealed-files.ts`): with sealed chat on, every
+  file is sealed in the browser and uploaded with `?sealed=1`; the server keeps
+  it as `name = "file"`, `application/octet-stream`, `ChatUpload.sealed` /
+  `ChatAttachment.sealed` (migration `20281201000000_chat_sealed_files`). The
+  message's seal carries, per file, the attachment id (the upload id is kept as
+  the attachment id), key, digest, name, type, size, picture shape, sound and
+  cover (`sealedFileSchema`). No still is uploaded for a sealed video.
+- Server (`sealed-messages.sendSealed`, op `send-sealed` field `uploads`): a
+  sealed send claims only sealed uploads, a plain send only plain ones, under
+  `chat.attach` and the conversation's file limit; a retry answers the stored
+  message; a failed send removes the claimed bytes; Polar and webhooks cannot
+  attach. Saved media refuses a sealed file.
+- Reading (`opened-sealed.ts`): an opened message's sealed files are fetched,
+  opened and checked against the digest, and drawn from object URLs (256 MiB
+  kept per page, oldest revoked first); until then, or if one does not open,
+  the row shows the file's name with nothing to fetch. An edit keeps the
+  message's files and keys.
+- Once opened, a sealed file opens in the file viewer and the picture viewer
+  from its opened bytes, and is saved from them (`saveFile` hands a `blob:`
+  address over as it is). The media setting keeps the sealed blob ahead
+  (`prefetchMedia`, by the type and size its seal names), so the offline copy
+  holds it too; it is opened from there like any other time.
+- The info page's photos and videos (`shared-media.tsx`): the server lists a
+  message with a sealed file among them without knowing its type and sends the
+  sealed message along; the page opens it, keeps its pictures and videos
+  (`sharedTiles`, `shared-media-items.ts`; a covered one is left out as a plain
+  one is) and opens only those files. A tile still opening is drawn and cannot
+  be opened yet; one that did not open, or anything that is not a picture or a
+  video, leaves the grid. The forum list opens a sealed post the same way and
+  draws its picture (forum posts themselves are still refused in a sealed
+  conversation, row 3).
+- A sealed video's still is taken on the reader's page from the bytes it
+  opened (`sealed-stills.ts`, the sender's `posterFor`), once per file and up
+  to 300 per page, and drawn in the conversation, the gallery and the forum
+  list. None is uploaded: a still on the server would be a picture of the
+  video in the clear. Its blur (the seal's thumbhash) is drawn until then.
+- Not covered yet: a sealed file is opened whole in memory (100 MiB ceiling);
+  per-author deduplication and blob reference counting (10b.2) are not built.
+
+Verified: unit tests (`packages/chat-crypto/test/file-content.test.ts`,
+`apps/web/test/chat/e2ee/sealed-files.test.ts`,
+`apps/web/test/chat/e2ee/sealed-media.test.ts`). Not run in a browser yet.
+
+## Sealed polls (built 2026-11-25)
+
+With sealed chat on, the poll dialog (`send-poll.ts`) seals the question as the
+body and the answers as `poll.options` (`sealedPollSchema`, 2-10 answers of
+up to 100 characters) and sends them with `send-sealed`, which carries only
+`poll: { options: <count>, multiple, hideResults, anonymous, hours }`. The server
+(`sealed-messages.sendSealed`) writes the usual `ChatPoll` with one answer row
+per answer and no words in it; a poll from Polar or a webhook, or one with
+files, is refused (`pollRefused`). Readers name the answers from the seal by
+position (`openedPoll` in `opened-sealed.ts`), and a card refreshed from the
+live frame keeps the words it already drew (`keepTexts`). A sealed poll is not
+editable, as a plain one is not.
+
+What the server still sees: how many answers, the rules, when it closes, and
+who has voted and when. Which answer anybody picked is sealed: see "Sealed
+votes".
+
+### Sealed votes (built 2026-11-25)
+
+In a sealed conversation a vote is a ballot sealed in the voter's browser, and
+the tally is made in each member's browser. The server can no longer link a
+voter to an answer.
+
+How others do it. Signal sends a vote as an end-to-end encrypted group message
+(`PollVote`: the poll it answers, the option indexes, and a per-poll
+`voteCount` that grows with each re-vote so the newest wins), and every client
+counts ([Signal blog, "Signal Polls"](https://signal.org/blog/polls/); a 2026
+advisory on Signal iOS, [GHSL-2026-112/113](https://securitylab.github.com/advisories/GHSL-2026-112_GHSL-2026-113_Signal-iOS/),
+was a vote accepted for a poll in another conversation - the binding below
+rules that out). WhatsApp encrypts each vote under a key derived from the
+poll's own message secret, the poll id, its creator and the voter, with the
+SHA-256 of each picked option inside (as implemented by the open
+`whatsmeow` client, `msgsecret.go`). Matrix polls
+([MSC3381](https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/3381-polls.md))
+are `m.poll.response` events, encrypted like any event in an encrypted room;
+clients count only each sender's latest response before the poll ends. In all
+three the server learns that somebody voted and when, never what. Polaris does
+the same, with the server keeping one ballot per voter so a vote is counted
+once without anybody's browser having to replay a log.
+
+- A ballot is three bytes, the version and a 16-bit mask of the picked
+  positions (`encodeBallot`), so every sealed ballot is 20 bytes whatever it
+  picks. It is sealed under the conversation's `HK(c, e)` for the current
+  epoch (`sealBallot`, `packages/chat-crypto/src/message-content.ts`) with
+  key and nonce derived from `canonical(LABEL, "ballot", conversation, epoch,
+  poll, ballotId, voter)`: `ballotId` is fresh and random per ballot, `voter`
+  the account id on a public poll and empty on an anonymous one. A ballot
+  moved to another poll, conversation, epoch or (public) voter does not open;
+  a message never opens as a ballot or the reverse.
+- `ChatPollBallot` (migration `20281203000000_chat_poll_ballots`) holds one
+  row per poll and voter: one vote per person, a new ballot replaces it,
+  taking the vote back deletes it (`castBallot`, `lib/chat/poll-ballots.ts`,
+  `castBallotAction`). The usual checks hold: the room allows reacting, the
+  poll is open, the epoch is one the group reached, the size is a ballot's.
+- `readBallots` (`pollBallotsAction`, pages of 1,000 by `ballotId`) hands out
+  only the reader's own ballot while a poll hides its results; an anonymous
+  poll's ballots without voters, in the order of their random ids; a public
+  poll's with their voters, which is what "See votes" lists in the browser.
+- Each browser (`sealed-votes.ts`) opens the ballots, discards any that pick no
+  answer, an answer the poll does not have, or several on a one-answer poll
+  (the server cannot check this), and adds them to the counts. A plain vote on
+  a sealed poll is refused (`errors.sealedOnlyReload`); a page without sealed
+  chat shows the poll read-only. Votes cast in the clear before a poll took
+  sealed ballots are still counted by the server, and go with that voter's
+  first ballot.
+
+What the server still knows: who has voted on which poll and when (also how
+many have), not what. Limits: on an anonymous poll every member's browser can
+open every ballot but not tell whose it is; the server could still tell a
+member which row is whose, so an anonymous poll is anonymous to the server and
+to members separately, not to the two colluding. A ballot is not signed by a
+device: the server cannot make one (it holds no history key), but it could
+withhold a ballot or hand back an older one of the same voter, as it could
+withhold a message. Timing is visible: a member watching counts change right
+after a live frame can guess who just voted, as on a plain poll.
+
+Verified: unit tests (`packages/chat-crypto/test/ballot.test.ts`,
+`apps/web/test/chat/e2ee/sealed-votes.test.ts`: ballots really sealed and
+opened through the server's rules, `test/chat/poll-card.test.tsx`). Not run
+in a browser yet, and the migration not yet run against a real PostgreSQL.
+
+### Public and anonymous votes (built 2026-11-25)
+
+Every poll, plain or sealed, is asked either anonymous or public, and the
+choice cannot be changed afterwards (`ChatPoll.anonymous`, migration
+`20281202000000_chat_poll_anonymous`). This follows Telegram, whose polls are
+anonymous or public and fixed at creation, with a "view votes" list on a public
+one; Discord's polls always show who voted, and Slack has no poll of its own
+(apps such as Polly offer both modes).
+
+- Anonymous is the default in the dialog and in the schema
+  (`chatPollCreateSchema.anonymous`, and the sealed `poll.anonymous` a tab
+  from before the choice omits), and every poll asked before the choice existed
+  was migrated as anonymous: those votes were cast with nobody able to see them.
+- An anonymous poll only ever shows counts. `readPollVoters`
+  (`lib/chat/polls.ts`, `pollVotersAction`) refuses it for everybody, the asker
+  and moderators included (`errors.pollAnonymous`); no export, notification or
+  live frame names a voter (the "posted" frame carries no actor).
+- A public poll gets "See votes" on the card once its counts show: who picked
+  each answer, up to `MAX_POLL_VOTERS_LISTED` per answer with "and N more". A
+  poll that hides its results keeps the list back until it closes
+  (`errors.pollVotersHidden`).
+- One vote per person and changing your vote work the same in both modes.
+- Meeting chat polls are answered by seats, half of them guests, and stay
+  count-only; the dialog does not offer the choice inside a call.
+
+What the server still holds for an anonymous plain poll: the vote rows (who
+picked which answer), which one vote per person and changing your vote are
+enforced from. No screen or API reads them back as names; the database itself,
+and so a database backup, still has them. In a sealed conversation it holds
+sealed ballots instead (see "Sealed votes").
+
+Verified: unit tests (`apps/web/test/chat/e2ee/sealed-polls.test.ts`,
+`test/chat/polls.test.ts`, `poll-card.test.tsx`, `poll-dialog.test.tsx`). Not
+run in a browser yet.
+
+## Migration of existing chats (built 2026-11-25)
+
+`lib/chat/e2ee/legacy-migration.ts`, run by the dashboard every 10 minutes
+(`instrumentation-node.ts`, one process via `whenAlone`). Nothing runs while
+sealed chat is off, or while there is no available backup of Polaris's own
+database (`ProtectedResource` kind `polaris-database`) from the last 24 hours
+(proposal 8.5). Per conversation with plain text messages:
+
+1. `HK(c, legacy)` and a one-time Ed25519 key are made in memory. `HK` is sealed
+   to every member account key (`ChatHistoryKey`, epoch `LEGACY_EPOCH` =
+   2^63-1, above any epoch an MLS group reaches) before anything is sealed
+   under it. Nobody with an account key: `pending` / `noAccountKey`.
+2. Every `kind = "text"` row with words and no device seal is sealed exactly as
+   a browser seals one: same content (`encodeSealedContent`, with its
+   translation), `messageId` its `clientKey` (set to the row id when it had
+   none), sender leaf 0, device `migration`, signed by the one-time key. Its
+   edit history is revisions 0..n-1, the message revision n. Readers open these
+   with no change (`openStored` checks the row's signature key and fetches
+   the account envelope for the epoch).
+3. M3: every row is opened again with `HK` and compared with its plain text; a
+   row edited meanwhile is sealed again; a version that does not open to its
+   text, or text a reader could not open, leaves the conversation `failed`,
+   exactly as it was.
+4. Cut: state `cut` (from then `conversationSealed` refuses plain writes), then
+   each row's text is moved to `ChatMigrationRollback` and emptied in one
+   transaction, guarded on the text still being what was verified. Rows that
+   raced the cut are sealed in up to five catch-up rounds; any left are
+   logged and recorded as `reason = stragglers`.
+5. `HK` is zeroed. A cut is never repeated: the key is gone.
+
+Resumable: any state but `cut` clears what an earlier run sealed (those rows
+still hold their text) and the legacy envelopes, then starts over. Deleting a
+message deletes its rollback copy; deleting a conversation deletes its state
+and copies (foreign keys, migration `20281130000000_chat_legacy_migration`).
+
+Verified: unit tests (`test/chat/e2ee/legacy-migration.test.ts`: the seal
+verifies and opens with the reader's checks, bindings, envelope to an account
+key) and one run against a real PostgreSQL 17 with every migration applied: a
+crashed half-done run resumed, two messages and one edit sealed, verified and
+cut, envelopes for both members, the history opened with a member's account
+key and every signature checked, the rollback copy holding the three texts,
+plain writes refused, a second run changing nothing, and the state and copies
+gone with the conversation. Not exercised: a running dashboard doing it on its
+timer, a large instance (throughput unmeasured).
+
 ## Sealed only (built 2026-11-24)
 
 A conversation with an MLS group takes only sealed writes from people. The check
@@ -451,7 +753,7 @@ sits in the one place every person-authored message passes through:
 message, and `scheduleMessage` refuses at scheduling time, because a scheduled
 message is stored in the clear until it goes. The sentence is
 `errors.sealedOnly`; it is what a call to the API or a kind of message with no
-sealed form yet (row 3: files, voice, polls, locations, forum posts, invite and
+sealed form yet (row 3: locations, forum posts, invite and
 game cards) gets in a sealed conversation. A browser with sealed chat on never
 reaches it with text, because its outbox seals every text send.
 

@@ -11,6 +11,7 @@
  */
 
 import { useState } from "react";
+import { Download } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { Skeleton, Switch, useOptimisticToggle } from "@polaris/ui";
 import { setLanSignInAction } from "./actions";
@@ -85,6 +86,15 @@ export function LanSignInCard({
                                     </li>
                                 ))}
                             </ul>
+                            {/* These addresses carry the local CA's certificate: with
+                                its root installed they open with no warning at all. */}
+                            <a
+                                href="/api/system/local-ca"
+                                className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                            >
+                                <Download className="size-3.5 shrink-0" aria-hidden />
+                                {t("domains.certificate.download")}
+                            </a>
                         </>
                     )}
                     {error ? (

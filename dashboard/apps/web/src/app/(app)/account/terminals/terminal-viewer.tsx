@@ -4,13 +4,12 @@
  * One terminal opened from the web: its panes listed through the relay
  * (`pane.list`), the chosen pane's output streamed live into a read-only
  * xterm, and - for whoever may control it - a line to insert into that pane's
- * input (`input.insert`). The socket uses a one-shot ticket for this terminal,
+ * input (`input.insert`). The output is the dashboard's one terminal view
+ * (`terminal-view.tsx`), read-only. The socket uses a one-shot ticket for this terminal,
  * from `open`: the account's own action here, a link's on `/k/<token>`, where
  * the viewer is drawn on the page instead of in a dialog.
  */
 
-import "@xterm/xterm/css/xterm.css";
-import type { Terminal } from "@xterm/xterm";
 import { useEffect, useRef, useState } from "react";
 import {
     Button,
@@ -25,6 +24,7 @@ import {
 } from "@polaris/ui";
 import { openTerminalAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { TerminalView, type TerminalSink, type TerminalTransport } from "@/app/(app)/apps/deploy/terminal-view";
 
 /** The control protocol version the terminal speaks (rook `local_control`). */
 const PROTOCOL_VERSION = 1;
@@ -77,8 +77,7 @@ export function TerminalViewer({
     const [text, setText] = useState("");
     const [sent, setSent] = useState<string | null>(null);
     const socket = useRef<WebSocket | null>(null);
-    const term = useRef<Terminal | null>(null);
-    const host = useRef<HTMLDivElement | null>(null);
+    const sink = useRef<TerminalSink | null>(null);
     const watched = useRef<string | null>(null);
 
     const words = (code: string) =>
@@ -139,8 +138,8 @@ export function TerminalViewer({
                     return;
                 }
                 if (frame.type === "output" && frame.pane === watched.current && typeof frame.data === "string") {
-                    if (frame.gap) term.current?.write(`\r\n[${t("terminals.viewer.gap")}]\r\n`);
-                    term.current?.write(decode(frame.data));
+                    if (frame.gap) sink.current?.write(`\r\n[${t("terminals.viewer.gap")}]\r\n`);
+                    sink.current?.write(decode(frame.data));
                     return;
                 }
                 if (frame.type === "watch_end" && frame.pane === watched.current) {
@@ -165,33 +164,20 @@ export function TerminalViewer({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [terminalId, attempt]);
 
-    // The pane's output: a read-only xterm, watched while the dialog shows it.
-    useEffect(() => {
-        if (state !== "ready" || !pane || !host.current) return;
-        let disposed = false;
-        let instance: Terminal | null = null;
-        void (async () => {
-            const [{ Terminal: XTerm }, { FitAddon }] = await Promise.all([import("@xterm/xterm"), import("@xterm/addon-fit")]);
-            if (disposed || !host.current) return;
-            instance = new XTerm({ disableStdin: true, convertEol: false, scrollback: 5000, theme: { background: "#0b0e14" } });
-            const fit = new FitAddon();
-            instance.loadAddon(fit);
-            instance.open(host.current);
-            fit.fit();
-            term.current = instance;
-            watched.current = pane;
-            setProblem(null);
-            socket.current?.send(JSON.stringify({ type: "watch", instance: terminalId, pane }));
-        })();
+    // The pane's output: the read-only terminal view, watched while it shows.
+    const watch: TerminalTransport = (into) => {
+        const shown = pane;
+        sink.current = into;
+        watched.current = shown;
+        setProblem(null);
+        socket.current?.send(JSON.stringify({ type: "watch", instance: terminalId, pane: shown }));
         return () => {
-            disposed = true;
             if (socket.current?.readyState === WebSocket.OPEN)
-                socket.current.send(JSON.stringify({ type: "unwatch", instance: terminalId, pane }));
+                socket.current.send(JSON.stringify({ type: "unwatch", instance: terminalId, pane: shown }));
             watched.current = null;
-            term.current = null;
-            instance?.dispose();
+            sink.current = null;
         };
-    }, [state, pane, terminalId]);
+    };
 
     const insert = async () => {
         const ws = socket.current as (WebSocket & { request?: (kind: string, params: unknown, target?: string) => Promise<{ envelope?: unknown; code?: string }> }) | null;
@@ -255,7 +241,14 @@ export function TerminalViewer({
                     {panes && panes.length === 0 ? (
                         <p className="text-sm text-muted-foreground">{t("terminals.viewer.noPanes")}</p>
                     ) : (
-                        <div ref={host} className="h-80 min-w-0 overflow-hidden rounded-md bg-[#0b0e14] p-2" />
+                        pane ? (
+                            <TerminalView
+                                transport={watch}
+                                transportKey={`${terminalId}:${attempt}:${pane}`}
+                                readOnly
+                                polarPlace={name}
+                            />
+                        ) : null
                     )}
                     {problem ? (
                         <p role="status" className="text-sm text-muted-foreground">

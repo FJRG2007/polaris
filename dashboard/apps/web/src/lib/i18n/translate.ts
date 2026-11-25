@@ -12,7 +12,15 @@
 
 import { webCatalogs } from "../../../messages";
 import type { Namespace, NamespaceTranslator, WebKey } from "./types";
-import type { Client, Locale, MessageParams, Namespaces } from "@polaris/core";
+import { logMissingMessage, withFallback } from "./fallback";
+import {
+    SOURCE_LOCALE,
+    type Client,
+    type Locale,
+    type MessageParams,
+    type Namespaces,
+    type Translator
+} from "@polaris/core";
 
 /** One message by its qualified key: `translate("es-ES", "nav.account.signOut")`. */
 export function translate(locale: Locale, key: WebKey, params?: MessageParams): string {
@@ -25,7 +33,18 @@ export function translatorFor<N extends Namespace>(
     namespace: N,
     client?: Client
 ): NamespaceTranslator<N> {
-    return webCatalogs.translator(locale, namespace, client);
+    const own = webCatalogs.translator(locale, namespace, client) as unknown as Translator;
+    const fallback =
+        locale === SOURCE_LOCALE
+            ? undefined
+            : (webCatalogs.translator(SOURCE_LOCALE, namespace, client) as unknown as Translator);
+    return withFallback(own, fallback, (key) =>
+        missed(namespace, key)
+    ) as unknown as NamespaceTranslator<N>;
+}
+
+function missed(namespace: string, key: string): void {
+    logMissingMessage(`${namespace}.${key}`, "server");
 }
 
 /** The namespaces a screen needs, as the browser is handed them. */

@@ -84,13 +84,18 @@ confirmed: whether E2B's default user has sudo, and Daytona's isolation layer.
   resolves, on every start, the linked GitHub account for the repository's
   owner (else the first linked): its display name or login, and its public
   address or `<id>+<login>@users.noreply.github.com`; with no GitHub link, the
-  Polaris account's name and address. The boot (`SET_GIT_IDENTITY`) writes it to
+  Polaris account's name and a no-reply address that never exposes their own,
+  `<user id>@users.noreply.<this instance's public hostname>` (`polaris.invalid`,
+  RFC 2606, when the instance has none; never a guessed domain). Linking GitHub
+  later switches the next start to the GitHub address. The boot (`SET_GIT_IDENTITY`) writes it to
   the home's global config where the home is the person's own, to the checkout
   only in a shared home, and on an enrolled server only when that machine has
   no identity of its own. `git push` and `gh` already go through the session's
-  credential helper (`gitCredentialScript`, `INSTALL_GH`), which mints a token
-  scoped to the session's one repository per use, so no token is in the
-  environment or in a file. `GIT_PROMPT` and `GH_PROMPT` tell Claude Code both
+  credential helper (`gitCredentialScript`, `INSTALL_GH`), which per use hands
+  out the person's GitHub App user token (their App sign-in that reaches the
+  repository, refreshed when expired) or, without one, an installation token
+  scoped to the session's one repository, so no token is in the environment or
+  in a file. `GIT_PROMPT` and `GH_PROMPT` tell Claude Code both
   are set up, only when they are.
 
 ## Isolation

@@ -39,6 +39,13 @@ export class CodexAppServerMissing extends Error {
 
 /** What a driver needs from the session and the machine. Tests replace it. */
 export interface CodexDriverDeps {
+    /**
+     * The agent would not reopen the session's stored conversation (its
+     * transcript is not in this home): what to put in front of the next
+     * prompt so the new conversation still knows the old one, or null. Shown
+     * on the thread as one notice line, never as the prompt it builds.
+     */
+    resumeRefused?(sessionId: string): Promise<string | null>;
     /** The session's checkout, stored thread and permission mode, or null
      *  when it is gone. */
     session(sessionId: string): Promise<{
@@ -91,6 +98,8 @@ export class CodexSessionDriver {
     private connection: Connection | null = null;
     private opening: Promise<Connection> | null = null;
     private turn: Turn | null = null;
+    /** The summary the next prompt carries after a refused `thread/resume`. */
+    private carried: string | null = null;
     /** Turns that completed before `turn/start` answered with their id. */
     private readonly early = new Map<string, { status: string; error: string | null }>();
     private stored: Promise<unknown> = Promise.resolve();
@@ -128,15 +137,19 @@ export class CodexSessionDriver {
         this.turn = turn;
         turn.done = done.then((outcome) => this.endTurn(connection, turn, outcome.status, outcome.error));
 
+        const carried = this.carried;
+        this.carried = null;
         let started: unknown;
         try {
             started = await connection.rpc.request("turn/start", {
                 threadId: connection.threadId,
-                input: [{ type: "text", text }],
+                input: [{ type: "text", text: carried ? `${carried}\n\n${text}` : text }],
                 approvalPolicy: settings.approvalPolicy,
                 sandboxPolicy: settings.sandboxPolicy
             });
         } catch (error) {
+            // Kept for the next message: this one never reached the thread.
+            this.carried ??= carried;
             this.deps.log(`${this.sessionId}: the turn did not start`, error);
             turn.end("failed", null);
             await turn.done;
@@ -225,6 +238,7 @@ export class CodexSessionDriver {
                     threadId = resumed.thread.id;
                 } catch (error) {
                     this.deps.log(`${this.sessionId}: Codex would not reopen its thread, starting a new one`, error);
+                    this.carried = (await this.deps.resumeRefused?.(this.sessionId).catch(() => null)) ?? null;
                 }
             }
             if (!threadId) {

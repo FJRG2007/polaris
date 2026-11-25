@@ -21,6 +21,9 @@
  */
 
 import * as actions from "./actions";
+import { keepTexts } from "./opened-sealed";
+import * as sealedVotes from "./sealed-votes";
+import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, cn } from "@polaris/ui";
 import { useChatStream } from "./use-chat-stream";
@@ -28,7 +31,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatPollView } from "@/lib/chat/polls";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
-import { BarChart3, Check, CircleSlash, Loader2 } from "lucide-react";
+import { PollVotersDialog } from "./poll-voters-dialog";
+import { BarChart3, Check, CircleSlash, EyeOff, Loader2, Users } from "lucide-react";
 
 export function PollCard({
     message,
@@ -58,9 +62,35 @@ export function PollCard({
     const [shown, setShown] = useState<ChatPollView>(poll);
     const [busy, setBusy] = useState(false);
     const [ending, setEnding] = useState(false);
+    const [listing, setListing] = useState(false);
     useEffect(() => setShown(poll), [poll]);
 
+    /**
+     * A poll in a sealed conversation is voted on with sealed ballots, which
+     * this browser opens and counts (`sealed-votes.ts`): the server's answer
+     * counts only votes cast in the clear before. Read again whenever the
+     * card is, and null until the first read lands.
+     */
+    const sealed = shown.sealedVotes === true;
+    const [ballots, setBallots] = useState<readonly sealedVotes.OpenedBallot[] | null>(null);
+    const [ballotRead, setBallotRead] = useState(0);
+    useEffect(() => {
+        if (!sealed || !sealedChatActive()) return;
+        let live = true;
+        sealedVotes
+            .loadBallots(message.channelId, message.id, poll)
+            .then((opened) => live && setBallots(opened))
+            .catch((caught: unknown) => console.warn("polaris: a sealed poll's votes could not be counted here:", caught));
+        return () => {
+            live = false;
+        };
+    }, [sealed, message.channelId, message.id, poll, ballotRead]);
+    const view = sealed && ballots ? sealedVotes.withBallots(shown, ballots) : shown;
+
     const closed = shown.closed;
+    // Only a poll that says it is public is drawn as one: a card cached by a
+    // build from before the choice carries no flag, and those are anonymous.
+    const open = shown.anonymous === false;
 
     /**
      * Somebody else voted.
@@ -83,18 +113,21 @@ export function PollCard({
                 if (frame.kind !== "posted" || !frame.channels.includes(message.channelId)) return;
                 if (voting.current || closed) return;
                 void actions.pollAction(message.id).then((result) => {
-                    if (result.poll && !voting.current) setShown(result.poll);
+                    // A sealed poll's answers come back without words: keep the ones its seal opened to.
+                    if (result.poll && !voting.current) setShown(keepTexts(result.poll, poll));
                 });
+                setBallotRead((count) => count + 1);
             },
-            [message.channelId, message.id, closed]
+            [message.channelId, message.id, closed, poll]
         )
     );
-    const mayVote = canPost && !closed && !message.deleted;
+    // A sealed poll is never voted on in the clear: without sealed chat on this page it is read only.
+    const mayVote = canPost && !closed && !message.deleted && (!sealed || sealedChatActive());
     /** What the bars are a share of. People rather than presses: on a poll that
      *  takes several answers the shares add up past a hundred, which is the
      *  honest reading - "seven of the nine can make Tuesday". */
-    const denominator = Math.max(shown.voters, 1);
-    const most = shown.results ? Math.max(0, ...shown.options.map((option) => option.votes)) : 0;
+    const denominator = Math.max(view.voters, 1);
+    const most = view.results ? Math.max(0, ...view.options.map((option) => option.votes)) : 0;
 
     /**
      * Press an answer.
@@ -106,14 +139,37 @@ export function PollCard({
     const pick = async (optionId: string) => {
         if (!mayVote || busy) return;
         const before = shown;
-        const on = shown.options.find((option) => option.id === optionId)?.mine ?? false;
-        const wanted = shown.multiple
-            ? shown.options
+        const on = view.options.find((option) => option.id === optionId)?.mine ?? false;
+        const wanted = view.multiple
+            ? view.options
                   .filter((option) => (option.id === optionId ? !on : option.mine))
                   .map((option) => option.id)
             : on
               ? []
               : [optionId];
+
+        if (sealed) {
+            const ballotsBefore = ballots;
+            const voted = wanted.length > 0;
+            // The ballot replaces this reader's earlier one, and any vote they cast in the clear before.
+            const picks = wanted.map((id) => view.options.findIndex((option) => option.id === id));
+            setBallots([...(ballots ?? []).filter((ballot) => !ballot.mine), ...(voted ? [{ picks, mine: true }] : [])]);
+            setShown({ ...guessed(shown, []), voters: shown.voters + (voted ? 1 : 0) - (view.voted ? 1 : 0), voted });
+            setBusy(true);
+            const result = await sealedVotes
+                .castSealedVote(message.channelId, message.id, view, wanted)
+                .catch((caught: unknown) => {
+                    console.warn("polaris: a sealed vote was not cast:", caught);
+                    return { error: t("pollCard.voteNotCast") };
+                });
+            setBusy(false);
+            if (result.error) {
+                setShown(before);
+                setBallots(ballotsBefore);
+                onError(result.error);
+            }
+            return;
+        }
 
         setShown(guessed(shown, wanted));
         setBusy(true);
@@ -138,18 +194,18 @@ export function PollCard({
         <div className="mt-1 max-w-md rounded-md border border-border bg-card p-3">
             <p className="mb-2 flex items-center gap-1.5 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
                 <BarChart3 className="size-3" />
-                {closed ? t("pollCard.pollClosed") : shown.multiple ? t("pollCard.pickAsManyAsApply") : t("pollCard.pickOne")}
+                {closed ? t("pollCard.pollClosed") : view.multiple ? t("pollCard.pickAsManyAsApply") : t("pollCard.pickOne")}
             </p>
 
             <ul className="flex flex-col gap-1">
-                {shown.options.map((option) => {
-                    const share = shown.results
+                {view.options.map((option) => {
+                    const share = view.results
                         ? Math.round((option.votes / denominator) * 100)
                         : 0;
                     // Only once it is over, and only when there is something to
                     // win: a leader halfway through is not a result, and marking
                     // one would be the card taking a side.
-                    const won = closed && shown.results && option.votes > 0 && option.votes === most;
+                    const won = closed && view.results && option.votes > 0 && option.votes === most;
                     return (
                         <li key={option.id}>
                             <button
@@ -167,7 +223,7 @@ export function PollCard({
                                     it: a separate track would double the height
                                     of every answer, and ten of those is a card
                                     nobody can see the end of. */}
-                                {shown.results && (
+                                {view.results && (
                                     <span
                                         aria-hidden="true"
                                         style={{ width: `${Math.min(100, share)}%` }}
@@ -180,7 +236,7 @@ export function PollCard({
                                 <span
                                     className={cn(
                                         "relative flex size-4 shrink-0 items-center justify-center border",
-                                        shown.multiple ? "rounded-[3px]" : "rounded-full",
+                                        view.multiple ? "rounded-[3px]" : "rounded-full",
                                         option.mine
                                             ? "border-primary bg-primary text-primary-foreground"
                                             : "border-border-strong"
@@ -193,7 +249,7 @@ export function PollCard({
                                 >
                                     {option.text}
                                 </span>
-                                {shown.results && (
+                                {view.results && (
                                     <span className="relative shrink-0 text-xs tabular-nums text-muted-foreground">
                                         {share}% ({option.votes})
                                     </span>
@@ -206,27 +262,40 @@ export function PollCard({
 
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 <span className="tabular-nums">
-                    {t("pollCard.votes", { count: shown.voters })}
+                    {t("pollCard.votes", { count: view.voters })}
                 </span>
                 <span aria-hidden="true">-</span>
                 {closed ? (
-                    <span>{shown.endedEarly ? t("pollCard.closedEarly") : t("pollCard.closed")}</span>
-                ) : shown.closesAt ? (
+                    <span>{view.endedEarly ? t("pollCard.closedEarly") : t("pollCard.closed")}</span>
+                ) : view.closesAt ? (
                     <span>
                         {t.rich("pollCard.closes", {
-                            time: () => <RelativeTime key="time" iso={shown.closesAt!} tense="future" />
+                            time: () => <RelativeTime key="time" iso={view.closesAt!} tense="future" />
                         })}
                     </span>
                 ) : (
                     <span>{t("pollCard.openUntilItIsClosed")}</span>
                 )}
-                {!shown.results && !closed && (
+                {!view.results && !closed && (
                     <>
                         <span aria-hidden="true">-</span>
                         <span>{t("pollCard.resultsShowWhenItCloses")}</span>
                     </>
                 )}
+                <span aria-hidden="true">-</span>
+                <span
+                    className="inline-flex items-center gap-1"
+                    title={open ? t("pollCard.publicHint") : t("pollCard.anonymousHint")}
+                >
+                    {open ? <Users className="size-3 shrink-0" /> : <EyeOff className="size-3 shrink-0" />}
+                    {open ? t("pollCard.public") : t("pollCard.anonymous")}
+                </span>
                 {busy && <Loader2 className="size-3 animate-spin" aria-label={t("pollCard.savingYourVote")} />}
+                {open && view.results && view.voters > 0 && (
+                    <Button size="xs" variant="ghost" onClick={() => setListing(true)}>
+                        {t("pollCard.seeVotes")}
+                    </Button>
+                )}
                 {canEnd && !closed && (
                     <Button
                         size="xs"
@@ -240,6 +309,14 @@ export function PollCard({
                     </Button>
                 )}
             </div>
+            {listing && (
+                <PollVotersDialog
+                    messageId={message.id}
+                    poll={view}
+                    sealedVoters={sealed && ballots ? sealedVotes.votersByAnswer(view, ballots) : undefined}
+                    onOpenChange={setListing}
+                />
+            )}
         </div>
     );
 }

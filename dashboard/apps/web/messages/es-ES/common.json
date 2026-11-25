@@ -55,6 +55,8 @@
     },
     "pages": {
         "error": {
+            "offlineTitle": "No se puede conectar con Polaris",
+            "offlineBody": "Volverá a intentarlo en cuanto vuelva la conexión.",
             "updatedTitle": "Polaris se ha actualizado mientras esta página estaba abierta",
             "brokeTitle": "Esta página ha fallado",
             "updatedBody": "{surface, select, app {Esta ventana sigue con la versión antigua y el servidor ya no le responde. Al recargar se carga la nueva; se perderá lo que hayas escrito en la página.} other {Esta pestaña sigue con la versión antigua y el servidor ya no le responde. Al recargar se carga la nueva; se perderá lo que hayas escrito en la página.}}",
@@ -75,6 +77,8 @@
             "toOverview": "Ir al resumen"
         },
         "globalError": {
+            "offlineTitle": "No se puede conectar con Polaris",
+            "offlineBody": "Volverá a intentarlo en cuanto vuelva la conexión.",
             "updatedTitle": "Polaris se actualizó con esta página abierta",
             "brokeTitle": "Polaris no ha podido iniciar esta página",
             "updatedBody": "{surface, select, app {Esta ventana sigue con la versión anterior. Recarga para cargar la nueva.} other {Esta pestaña sigue con la versión anterior. Recarga para cargar la nueva.}}",

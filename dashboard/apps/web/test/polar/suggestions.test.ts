@@ -67,7 +67,7 @@ const generated = (text: string) => ({
     warnings: []
 });
 
-const { sanitizeSuggestion, suggestsAfter, startPolarSuggestion, settledPolarSuggestion } =
+const { sanitizeSuggestion, suggestsAfter, startPolarSuggestion, settledPolarSuggestion, codePolarSuggestion } =
     await import("@/lib/polar/suggestions");
 const { polarHelperModel } = await import("@/lib/polar/helper-model");
 
@@ -239,5 +239,44 @@ describe("polarHelperModel", () => {
         const helper = await polarHelperModel(OWNER, chat, null);
         expect(helper.source).toBe("chat");
         expect(helper.resolved).toBe(chat);
+    });
+});
+
+describe("codePolarSuggestion", () => {
+    const SESSION = "33333333-3333-4333-8333-333333333333";
+    const turn = { asked: "Add a test for the parser", answered: "Added parser.test.ts; it passes." };
+
+    it("writes one suggestion per turn with the helper and no chat thread", async () => {
+        const { helper, calls } = helperAnswering("Run the whole suite");
+        const resolve = vi.fn(async () => helper);
+        const first = await codePolarSuggestion(OWNER, SESSION, "a1", turn, resolve);
+        const again = await codePolarSuggestion(OWNER, SESSION, "a1", turn, resolve);
+        expect(first).toBe("Run the whole suite");
+        expect(again).toBe("Run the whole suite");
+        expect(resolve).toHaveBeenCalledTimes(1);
+        expect(calls).toHaveLength(1);
+        expect(state.recorded).toEqual([expect.objectContaining({ threadId: null, surface: "helper" })]);
+    });
+
+    it("is none for another person, and none when no helper can be served", async () => {
+        const { helper } = helperAnswering("Commit it");
+        await codePolarSuggestion(OWNER, SESSION, "a2", turn, async () => helper);
+        expect(await settledPolarSuggestion(STRANGER, `code:${SESSION}`, "a2")).toBeNull();
+        expect(await codePolarSuggestion(OWNER, SESSION, "a3", turn, async () => null)).toBeNull();
+    });
+
+    it("spends nothing once the helper's ceiling is reached", async () => {
+        const base = helperAnswering("Commit it");
+        const { calls } = base;
+        const helper = {
+            ...(base.helper as object),
+            resolved: {
+                ...(base.helper as { resolved: object }).resolved,
+                credential: { source: "instance", provider: "openai" }
+            }
+        } as never;
+        state.hit = { scope: "everyone" };
+        expect(await codePolarSuggestion(OWNER, SESSION, "a4", turn, async () => helper)).toBeNull();
+        expect(calls).toHaveLength(0);
     });
 });

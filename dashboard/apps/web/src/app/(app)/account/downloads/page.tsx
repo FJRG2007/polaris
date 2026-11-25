@@ -99,7 +99,7 @@ export default async function DownloadsPage() {
         <DownloadsView
             repo={repo}
             serverUrl={serverUrl}
-            thisDevice={<ThisDeviceApp />}
+            thisDevice={<ThisDeviceApp desktop={false} />}
             webApp={<InstallAppOffer />}
             tv={
                 <TvOffer

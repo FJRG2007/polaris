@@ -36,6 +36,13 @@ export interface DriverDeps {
     version(sessionId: string, binary: string): Promise<string | null>;
     /** Start (or restart) the agent with this launch line. */
     start(sessionId: string, argv: readonly string[]): Promise<void>;
+    /**
+     * The agent would not reopen the session's stored conversation (its
+     * transcript is not in this home): what to put in front of the next
+     * prompt so the new conversation still knows the old one, or null. Shown
+     * on the thread as one notice line, never as the prompt it builds.
+     */
+    resumeRefused?(sessionId: string): Promise<string | null>;
     pipe(sessionId: string): Promise<PipeIo>;
     storeRows(sessionId: string, rows: readonly HistoryRow[]): Promise<unknown>;
     recordEvents(
@@ -54,6 +61,32 @@ export interface DriverDeps {
     /** How long a freshly started agent may take to appear on its pipe. */
     startWaitMs?: number;
     sleep?: (ms: number) => Promise<void>;
+}
+
+const STEP_DETAIL_CHARS = 200;
+
+/**
+ * The step events a batch of rows stands for, the way a hook reports them in
+ * a terminal session: a call announced is `tool.start`, its result `tool.end`
+ * or `tool.failed`. A call described again is the same step and adds none.
+ * What the thread counts and the workspace wakes on (`lastToolAt`). Pure.
+ */
+export function stepEvents(
+    rows: readonly HistoryRow[],
+    names: { titleOf(ref: string): string }
+): { kind: core.AgentSessionEventKind; detail: string; subject: string }[] {
+    const events: { kind: core.AgentSessionEventKind; detail: string; subject: string }[] = [];
+    for (const row of rows) {
+        if (row.kind === "tool" && !row.replace)
+            events.push({ kind: "tool.start", detail: row.body.slice(0, STEP_DETAIL_CHARS), subject: row.subject });
+        else if (row.kind === "result")
+            events.push({
+                kind: row.subject === "error" ? "tool.failed" : "tool.end",
+                detail: "",
+                subject: names.titleOf(row.ref)
+            });
+    }
+    return events;
 }
 
 /** A refusal written for the person, shown as it stands. */
@@ -118,6 +151,8 @@ export class AcpSessionDriver {
     private connection: Connection | null = null;
     private opening: Promise<Connection> | null = null;
     private turn: Promise<void> | null = null;
+    /** The summary the next prompt carries after a refused `session/load`. */
+    private carried: string | null = null;
     /** Stored rows, in order, so a turn's closing rows land after its last update. */
     private stored: Promise<unknown> = Promise.resolve();
     private closedByUs = false;
@@ -140,7 +175,9 @@ export class AcpSessionDriver {
         if (this.turn) throw new AcpRefusal("The agent is still on the last message. Stop it or wait for it to finish.");
         const connection = await this.connect();
         await this.deps.recordEvents(this.sessionId, [{ kind: "prompt", detail: "", subject: "" }]);
-        const run = connection.client.prompt(connection.acpSessionId, text);
+        const carried = this.carried;
+        this.carried = null;
+        const run = connection.client.prompt(connection.acpSessionId, carried ? `${carried}\n\n${text}` : text);
         this.turn = run.then(
             (response) => this.endTurn(connection, response.stopReason, null),
             (error: unknown) => this.endTurn(connection, undefined, error)
@@ -208,6 +245,9 @@ export class AcpSessionDriver {
                 if (notification.sessionId !== connection.acpSessionId) return;
                 const rows = connection.normalizer.push(notification.update);
                 if (rows.length > 0) this.store(rows);
+                const steps = stepEvents(rows, connection.normalizer);
+                // After the rows, so a page woken by the event finds the step.
+                if (steps.length > 0) this.recordSteps(steps);
                 const draft = connection.normalizer.draft();
                 if (draft) this.draft.set(draft.id, draft.text);
                 else this.draft.end();
@@ -222,6 +262,8 @@ export class AcpSessionDriver {
                 const tool = (request.toolCall.title?.trim() || request.toolCall.kind || "tool").slice(0, 80);
                 await this.deps.recordEvents(this.sessionId, [{ kind: "permission", detail: tool, subject: tool }]);
                 const chosen = await ask(request, signal);
+                // Back to working once answered: the `permission` event left
+                // the session waiting, and the call's own row said so before.
                 await this.deps.recordEvents(this.sessionId, [{ kind: "tool.start", detail: "", subject: tool }]);
                 return chosen;
             },
@@ -248,6 +290,7 @@ export class AcpSessionDriver {
                     modes = loaded.modes?.availableModes ?? [];
                 } catch (error) {
                     this.deps.log(`${this.sessionId}: the agent would not reopen its conversation, starting a new one`, error);
+                    this.carried = (await this.deps.resumeRefused?.(this.sessionId).catch(() => null)) ?? null;
                 }
             }
             if (!acpSessionId) {
@@ -274,6 +317,14 @@ export class AcpSessionDriver {
             if (!this.closedByUs) this.deps.log(`${this.sessionId}: the connection to the agent ended`);
         });
         return ready;
+    }
+
+    private recordSteps(
+        events: readonly { kind: core.AgentSessionEventKind; detail: string; subject: string }[]
+    ): void {
+        this.stored = this.stored
+            .then(() => this.deps.recordEvents(this.sessionId, events))
+            .catch((error: unknown) => this.deps.log(`${this.sessionId}: step events were not recorded`, error));
     }
 
     private store(rows: readonly HistoryRow[]): void {

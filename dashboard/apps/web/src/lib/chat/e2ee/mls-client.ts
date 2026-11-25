@@ -62,6 +62,8 @@ const MEMBER_PAGES = 100;
 /** Accounts per `roster` request. */
 const ROSTER_PAGE = 1_000;
 const ACCOUNT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** `${userId}/${device}`, as the delivery service addresses a device. */
+const DEVICE_ADDRESS = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[A-Za-z0-9_-]{8,64}$/;
 
 export interface MlsCommitOut {
     commit: Uint8Array;
@@ -213,6 +215,10 @@ function fromText(value: string): Uint8Array {
 /** The account ids in an answer's list; anything else in it is ignored. */
 function accountIds(value: unknown): string[] {
     return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string" && ACCOUNT_ID.test(id)) : [];
+}
+
+function deviceAddresses(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((address): address is string => typeof address === "string" && DEVICE_ADDRESS.test(address)) : [];
 }
 
 const sameBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((byte, i) => byte === b[i]);
@@ -393,6 +399,11 @@ export class MlsDevice {
      * left is removed, then the devices of the people in it who hold no leaf
      * are added (a Welcome, and the new epoch's history key sealed to them),
      * so they read what is said next without having opened the conversation.
+     * In the same commit go the leaves of retired devices - a browser its
+     * account signed out of, or one unseen past the instance's limit (decision
+     * 7) - of anybody, this account's other devices included: a lost browser
+     * stops receiving what is said from the next send on. A retired device that
+     * comes back rejoins by its own external commit.
      * A removal that fails fails the caller - `sendSealed` does not seal past
      * it; an add that fails is logged and tried again next time, and the
      * newcomer can still join by its own external commit.
@@ -400,21 +411,45 @@ export class MlsDevice {
     async reconcile(channelId: string): Promise<void> {
         const roster = this.rosterAccounts(this.requireGroup(channelId));
         if (!roster.length) return;
+        const leaves = this.leafAddresses(this.requireGroup(channelId)).filter((address) => address !== this.address);
         const departed = new Set<string>();
         const joinable = new Set<string>();
+        const retired = new Set<string>();
         for (let start = 0; start < roster.length; start += ROSTER_PAGE) {
-            const answer = await this.send({ op: "roster", channelId, accounts: roster.slice(start, start + ROSTER_PAGE), ciphersuite: this.ciphersuite as 0x004f });
+            const accounts = roster.slice(start, start + ROSTER_PAGE);
+            const page = new Set(accounts);
+            const devices = leaves.filter((address) => page.has(address.slice(0, address.indexOf("/")))).slice(0, ROSTER_PAGE);
+            const answer = await this.send({ op: "roster", channelId, accounts, devices, ciphersuite: this.ciphersuite as 0x004f });
             for (const id of accountIds(answer.departed)) departed.add(id);
             for (const id of accountIds(answer.joinable)) joinable.add(id);
+            for (const address of deviceAddresses(answer.retired)) if (page.has(address.slice(0, address.indexOf("/")))) retired.add(address);
         }
         departed.delete(this.options.userId);
-        if (departed.size) await this.removeAccounts(channelId, [...departed]);
+        retired.delete(this.address);
+        if (departed.size || retired.size) {
+            const prefixes = [...departed].map((id) => `${id}/`);
+            await this.removeLeaves(channelId, (identity) => identity !== this.address && (retired.has(identity) || prefixes.some((prefix) => identity.startsWith(prefix))));
+        }
         const present = new Set(this.rosterAccounts(this.requireGroup(channelId)));
         const adding = [...joinable].filter((id) => !present.has(id) && !departed.has(id));
         if (!adding.length) return;
         await this.addAccounts(channelId, adding).catch((caught: unknown) => {
             console.warn("polaris: people new to a sealed conversation could not be added to its group:", caught);
         });
+    }
+
+    /** The device addresses holding a leaf in this copy of the group, this device's own among them. */
+    private leafAddresses(groupId: Uint8Array): string[] {
+        return [...new Set(this.member.members(groupId).map((m) => decoder.decode(m.identity)))].filter((address) => DEVICE_ADDRESS.test(address));
+    }
+
+    /**
+     * This device is leaving for good (its account signs out of the browser):
+     * the server forgets it and its key packages, and every group drops its
+     * leaf at the next member's send.
+     */
+    async retire(): Promise<void> {
+        await this.send({ op: "retire-device", device: this.options.device });
     }
 
     /** The accounts holding a leaf in this copy of the group, this device's own among them. */
@@ -490,7 +525,18 @@ export class MlsDevice {
      * message id is `clientKey`, made fresh for each message and reused only
      * to retry the same one. Returns the stored message's id.
      */
-    async sendSealed(channelId: string, plaintext: Uint8Array, options: { clientKey?: string; parentId?: string | null; replyToId?: string | null } = {}): Promise<string> {
+    async sendSealed(
+        channelId: string,
+        plaintext: Uint8Array,
+        options: {
+            clientKey?: string;
+            parentId?: string | null;
+            replyToId?: string | null;
+            uploads?: readonly string[];
+            /** A sealed poll: how many answers it has (their words are in the seal) and its rules. */
+            poll?: { options: number; multiple: boolean; hideResults: boolean; anonymous: boolean; hours: number };
+        } = {}
+    ): Promise<string> {
         this.requireGroup(channelId);
         await this.pull(channelId);
         await this.reconcile(channelId);
@@ -510,12 +556,44 @@ export class MlsDevice {
             clientKey,
             parentId: options.parentId ?? null,
             replyToId: options.replyToId ?? null,
+            ...(options.uploads?.length ? { uploads: [...options.uploads] } : {}),
+            ...(options.poll ? { poll: options.poll } : {}),
             epoch: epoch.toString(),
             senderLeaf: binding.senderLeaf,
             ciphertext: toText(ciphertext),
             signature: toText(signature)
         });
         return String(answer.id);
+    }
+
+    /**
+     * Seal a poll ballot (`content.encodeBallot` picks) under the group's
+     * current history key, the group brought up to date first as for a send,
+     * so somebody who left cannot open it. `voter` is this account on a public
+     * poll and null on an anonymous one. Answers what the server stores.
+     */
+    async sealBallot(channelId: string, pollId: string, voter: string | null, picks: readonly number[]): Promise<{ ballotId: string; epoch: string; sealed: string }> {
+        this.requireGroup(channelId);
+        await this.pull(channelId);
+        await this.reconcile(channelId);
+        const epoch = this.member.epoch(this.requireGroup(channelId));
+        const key = await this.historyKey(channelId, epoch);
+        // Never voted in the clear instead: the caller shows the vote as not counted.
+        if (!key) throw new Error("this device holds no history key for the conversation's current epoch");
+        const ballotId = crypto.randomUUID();
+        const binding = { conversationId: channelId, epoch, pollId, ballotId, voter };
+        const sealed = await content.sealBallot(key, binding, content.encodeBallot(picks));
+        return { ballotId, epoch: epoch.toString(), sealed: toText(sealed) };
+    }
+
+    /** The picks of a stored ballot, or null for one that does not open here. */
+    async openBallot(channelId: string, pollId: string, voter: string | null, row: { ballotId: string; epoch: string; sealed: string }): Promise<number[] | null> {
+        const epoch = BigInt(row.epoch);
+        const key = await this.historyKey(channelId, epoch).catch(() => null);
+        if (!key) return null;
+        const binding = { conversationId: channelId, epoch, pollId, ballotId: row.ballotId, voter };
+        const opened = await content.openBallot(key, binding, fromText(row.sealed)).catch(() => null);
+        return opened ? content.decodeBallot(opened) : null;
     }
 
     /**

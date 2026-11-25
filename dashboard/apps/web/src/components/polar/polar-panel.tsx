@@ -2845,91 +2845,39 @@ export function PolarChat({
                         chat, so they stay in Code too; temporary and sharing are
                         the chat's own. */}
                     <>
-                        <span className="polar-head-wide flex items-center gap-2">
-                            {!threadShown ? null : !chatStarted ? (
-                                <MessageAction
-                                    label={temporary ? t("temporary.off") : t("temporary.on")}
-                                    aria-pressed={temporary}
-                                    className={cn(temporary && "bg-muted text-foreground")}
-                                    onClick={() => setTemporary(!temporary)}
-                                >
-                                    <Ghost />
-                                </MessageAction>
-                            ) : temporary ? (
-                                <MessageAction
-                                    label={t("temporary.keep")}
-                                    disabled={!chatAnswered}
-                                    onClick={() => void keepTemporary()}
-                                >
-                                    <Bookmark />
-                                </MessageAction>
-                            ) : (
-                                <MessageAction
-                                    label={t("temporary.shareChat")}
-                                    disabled={!chatAnswered}
-                                    onClick={() => setSharingChat(true)}
-                                >
-                                    <Share2 />
-                                </MessageAction>
-                            )}
+                        {!threadShown ? null : !chatStarted ? (
                             <MessageAction
-                                label={t("commands.manage")}
-                                onClick={() => setManaging(true)}
+                                label={temporary ? t("temporary.off") : t("temporary.on")}
+                                aria-pressed={temporary}
+                                className={cn(temporary && "bg-muted text-foreground")}
+                                onClick={() => setTemporary(!temporary)}
                             >
-                                <SquareSlash />
+                                <Ghost />
                             </MessageAction>
+                        ) : temporary ? (
                             <MessageAction
-                                label={t("usage.title")}
-                                onClick={() => setShowUsage(true)}
+                                label={t("temporary.keep")}
+                                disabled={!chatAnswered}
+                                onClick={() => void keepTemporary()}
                             >
-                                <Gauge />
+                                <Bookmark />
                             </MessageAction>
-                            {/* A page, not a dialog: it holds every section and the
-                                connectors, which is more than a dialog over the chat
-                                reads well. The panel is hidden on Polar's own pages, so
-                                settings open in the main window and the browser's back
-                                returns to the page the panel was open on, still open. */}
+                        ) : (
                             <MessageAction
-                                label={t("settings.open")}
-                                onClick={() =>
-                                    settingsPath.openFromChat((href) => router.push(href))
-                                }
+                                label={t("temporary.shareChat")}
+                                disabled={!chatAnswered}
+                                onClick={() => setSharingChat(true)}
                             >
-                                <Settings2 />
+                                <Share2 />
                             </MessageAction>
-                        </span>
+                        )}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <MessageAction
-                                    label={t("actions.more")}
-                                    className="polar-head-narrow"
-                                >
+                                <MessageAction label={t("actions.more")}>
                                     <MoreHorizontal />
                                 </MessageAction>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="min-w-48">
-                                {!threadShown ? null : !chatStarted ? (
-                                    <DropdownMenuItem onSelect={() => setTemporary(!temporary)}>
-                                        <Ghost />
-                                        {temporary ? t("temporary.off") : t("temporary.on")}
-                                    </DropdownMenuItem>
-                                ) : temporary ? (
-                                    <DropdownMenuItem
-                                        disabled={!chatAnswered}
-                                        onSelect={() => void keepTemporary()}
-                                    >
-                                        <Bookmark />
-                                        {t("temporary.keep")}
-                                    </DropdownMenuItem>
-                                ) : (
-                                    <DropdownMenuItem
-                                        disabled={!chatAnswered}
-                                        onSelect={() => setSharingChat(true)}
-                                    >
-                                        <Share2 />
-                                        {t("temporary.shareChat")}
-                                    </DropdownMenuItem>
-                                )}
                                 <DropdownMenuItem onSelect={() => setManaging(true)}>
                                     <SquareSlash />
                                     {t("commands.manage")}

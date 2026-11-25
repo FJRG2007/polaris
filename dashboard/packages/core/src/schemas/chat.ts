@@ -885,6 +885,13 @@ export const chatPollCreateSchema = z.object({
     multiple: z.boolean().default(false),
     /** Whether the tallies stay hidden until it closes. */
     hideResults: z.boolean().default(false),
+    /**
+     * Whether only the counts are ever shown, never who picked what - to the
+     * person who asked it and to the admins as much as anybody. Fixed when it is
+     * asked. On unless somebody turns it off: a client that does not say gets
+     * the choice that publishes nothing.
+     */
+    anonymous: z.boolean().default(true),
     /** How long it stays open, in hours. Zero for one that only a person ends. */
     hours: z
         .number()
@@ -911,6 +918,10 @@ export const chatPollVoteSchema = z.object({
 });
 
 export type ChatPollVoteInput = z.infer<typeof chatPollVoteSchema>;
+
+/** How many voters a public poll lists under one answer. Past this the list says
+ *  how many more there are rather than growing without end. */
+export const MAX_POLL_VOTERS_LISTED = 200;
 
 /** When a poll of this length runs out, or null when it has no clock. */
 export function pollClosesAt(hours: number, now = new Date()): Date | null {

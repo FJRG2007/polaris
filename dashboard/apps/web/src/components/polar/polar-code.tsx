@@ -44,7 +44,9 @@ import {
 } from "@/lib/polar/agents/code-sources";
 import { CodeModelPicker } from "@/components/polar/code-model-picker";
 import { neighbourSession, useCodeKeys, useStopTwice } from "@/components/polar/polar-code-keys";
-import { useCodeTheme } from "@/components/polar/polar-display";
+import { useCodeSteps, useCodeTheme } from "@/components/polar/polar-display";
+import { CodeStepCard, StepsOffer, StepsToggle, stepLine, stepsSummary } from "@/components/polar/code-steps-view";
+import { DEFAULT_CODE_STEP_VIEW } from "@/lib/polar/code-steps";
 import { CodeAccountSwitch } from "@/components/polar/code-account-switch";
 import { CodeAgentSwitch, canSwitchAgent } from "@/components/polar/code-agent-switch";
 import { KNOWN_ENGINES } from "@/components/polar/session-engine";
@@ -55,6 +57,7 @@ import { Work } from "@/components/polar/elements/work";
 import { Shimmer } from "@/components/polar/elements/shimmer";
 import { BusyVerb } from "@/components/polar/elements/busy-verb";
 import { CodeBootLine } from "@/components/polar/polar-code-boot";
+import { ClientMessages } from "@/components/i18n/client-namespaces";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
@@ -103,6 +106,7 @@ import { CodeVoiceCall, type VoiceWatch } from "@/components/polar/code-voice-ca
 import type { RealtimeLink } from "@/lib/polar/realtime-link";
 import { parseVoiceDelegation } from "@/lib/polar/voice-handoff";
 import { useCodeSlash } from "@/components/polar/polar-code-slash";
+import { useCodeSuggestion } from "@/components/polar/code-suggestion";
 import * as codeCommands from "@/lib/polar/code-commands";
 import * as goals from "@/lib/polar/goals";
 import { goalStateKey, PolarGoalBar } from "@/components/polar/polar-goal";
@@ -111,7 +115,7 @@ import { ContextBar } from "@/components/polar/polar-context";
 import * as codeStatus from "@/lib/polar/code-status";
 import {
     CodeContextCard,
-    CodeExportMenu,
+    CodeSessionMenu,
     CodeQueuedList,
     CodeStatusLine,
     downloadTranscript
@@ -140,7 +144,9 @@ import {
     readPermissionMode,
     readRepo,
     REPOS_ROUTE,
-    useRepoName
+    useRepoName,
+    knownRepoName,
+    rememberRepoName
 } from "@/components/polar/polar-code-context";
 import { githubRepoOf } from "@/lib/agents/repo-ref";
 import type { PendingPermission } from "@/lib/agents/session-permissions";
@@ -166,7 +172,6 @@ import {
     Globe,
     MousePointer2,
     SquareTerminal,
-    Keyboard,
     MessageSquare,
     PanelRight,
     Pencil,
@@ -206,23 +211,20 @@ const PolarCodeWorkspace = dynamic(
     { ssr: false }
 );
 
-/** A session's pull request, its Share button and Continue on phone, in the
- *  Agents app's words.
+/** A session's pull request and its Share button, in the Agents app's words.
  *  Drawn only where somebody can steer the session, so loaded there. */
 const SessionTools = dynamic(
     () =>
         Promise.all([
             import("@/components/agents/sessions/session-pull"),
             import("@/components/agents/sessions/share-button"),
-            import("@/components/i18n/client-namespaces"),
-            import("@/components/agents/sessions/continue-button")
-        ]).then(([pull, share, i18n, phone]) =>
+            import("@/components/i18n/client-namespaces")
+        ]).then(([pull, share, i18n]) =>
             function SessionTools({ session }: { session: SessionView }) {
                 return (
                     <i18n.ClientMessages namespaces={["agents"]} fallback={null}>
                         {session.pullRequest ? <pull.SessionPull session={session} /> : null}
                         <share.SessionShareButton sessionId={session.id} title={session.title} />
-                        <phone.ContinueOnPhoneButton sessionId={session.id} />
                     </i18n.ClientMessages>
                 );
             }
@@ -935,7 +937,8 @@ export function SignInRefusedNotice({ account }: { account: string | null }) {
  *  talk to, so a task that has not started says so on the button. */
 function useCodeComposerParts(
     busy: boolean,
-    call: { readonly disabled: boolean; readonly onOpen: () => void } | null = null
+    call: { readonly disabled: boolean; readonly onOpen: () => void } | null = null,
+    refusal: string | null = null
 ) {
     const t = useTranslations("polar");
     const [notice, setNotice] = useState<VoiceNotice | null>(null);
@@ -954,7 +957,7 @@ function useCodeComposerParts(
             onRemove: uploads.remove,
             onRetry: uploads.retry
         },
-        voiceMode: call ?? { refusal: t("code.voiceNeedsSession") }
+        voiceMode: call ?? { refusal: refusal ?? t("code.voiceNeedsSession") }
     };
 }
 
@@ -1054,6 +1057,8 @@ function CodeStart({
     // A repository picked from GitHub that could not be set up, and what kept it.
     const [repoGap, setRepoGap] = useState<{ id: string; gap: GithubAppGap } | null>(null);
     const [connecting, setConnecting] = useState(false);
+    // The GitHub repository being connected, named on the chip meanwhile.
+    const [pendingRepo, setPendingRepo] = useState<string | null>(null);
     const [busy, startTransition] = useTransition();
     const parts = useCodeComposerParts(busy);
     // Full access until the stored pick is read: the server render has no storage.
@@ -1332,6 +1337,7 @@ function CodeStart({
         setError(null);
         setRepoGap(null);
         setConnecting(true);
+        setPendingRepo(id);
         void runAction(
             () =>
                 postCode<{ id?: string; error?: string; githubGap?: GithubAppGap }>(REPOS_ROUTE, {
@@ -1341,12 +1347,17 @@ function CodeStart({
         )
             .then((result) => {
                 if (result?.id) {
+                    const name = knownRepoName(id);
+                    if (name) rememberRepoName(result.id, name);
                     onRepo(result.id);
                     onRefresh();
                 } else if (result?.githubGap) setRepoGap({ id, gap: result.githubGap });
                 else if (result?.error) setError(result.error);
             })
-            .finally(() => setConnecting(false));
+            .finally(() => {
+                setConnecting(false);
+                setPendingRepo(null);
+            });
     };
 
     const shownError = error ?? choicesError;
@@ -1433,6 +1444,7 @@ function CodeStart({
                         branch={baseRef}
                         onBranch={onBaseRef}
                         disabled={busy || pending || connecting}
+                        pendingRepo={connecting ? pendingRepo : null}
                     />
                     {repoId !== NO_REPO ? (
                         <CodeIssueChip
@@ -1591,7 +1603,10 @@ function CodeThread({
         busy,
         thread?.canManage && thread.session.live
             ? { disabled: busy || call !== null, onOpen: () => onCall({ greeting: null, watching: [] }) }
-            : null
+            : null,
+        // A stopped session takes a typed message, which starts it again; a
+        // call needs it up first.
+        thread && !thread.session.live ? t("code.voiceNeedsRestart") : null
     );
     const signal = useUnmountSignal();
     // The handed-over commands follow the CLI the session runs.
@@ -1609,6 +1624,15 @@ function CodeThread({
         commands,
         enigma: enigma.code,
         onCommand: (command, rest) => runCommand(command, rest)
+    });
+    // The suggested next message after a turn (`code-suggestion.tsx`).
+    const suggestion = useCodeSuggestion({
+        sessionId,
+        thread,
+        value: reply,
+        onAccept: setReply,
+        inputId,
+        enabled: call === null
     });
 
     const read = useCallback(() => {
@@ -1681,7 +1705,8 @@ function CodeThread({
     // message from the person - counted, so a repeat of an earlier line is not
     // mistaken for this one.
     const said = thread?.entries.filter((entry) => entry.role === "user").length ?? 0;
-    const [sent, setSent] = useState<{ text: string; said: number } | null>(null);
+    // `during`: sent while a turn ran, whose steps stay open under it.
+    const [sent, setSent] = useState<{ text: string; said: number; during: boolean } | null>(null);
     const pending = sent !== null && said <= sent.said;
     useEffect(() => {
         if (sent !== null && !pending) setSent(null);
@@ -1703,7 +1728,7 @@ function CodeThread({
         if (prompt.length > PROMPT_MAX) return setError(t("code.pick.tooLong"));
         setError(null);
         setInfo(null);
-        setSent({ text, said });
+        setSent({ text, said, during: thread?.session.live === true && thread.session.state === "working" });
         setReply("");
         if (carried.length > 0) setPicks([]);
         startTransition(() => {
@@ -1963,6 +1988,16 @@ function CodeThread({
 
     const session = thread?.session;
     const blocks = useMemo(() => codeBlocks(thread?.entries ?? []), [thread]);
+    // How the agent's steps show: the person's pick, compact until they make one.
+    const stepsPick = useCodeSteps();
+    const stepView = stepsPick ?? DEFAULT_CODE_STEP_VIEW;
+    const hasSteps = useMemo(() => (thread?.entries ?? []).some((entry) => entry.type === "tool"), [thread]);
+    /** The live line a running turn shows, even folded: "Running npm test". */
+    const currentStep = (entries: readonly PolarCodeEntry[]): string | null => {
+        const last = entries.at(-1);
+        if (!last) return null;
+        return last.step ? stepLine(t, last.step, stepView) : last.text;
+    };
     // The places a stopped session can be continued on, read once it stopped.
     const places = useCodeComputers(!live && !!thread?.canManage && canPrompt);
     // The agent mid-turn draws its steps moving; a message on its way to it
@@ -2067,7 +2102,11 @@ function CodeThread({
         });
     };
 
-    const dock = !thread ? null : !live ? (
+    // A stopped session keeps its reply box, like any chat: what is sent there
+    // starts it again on its own conversation (`reopenSessionAs`). Only work
+    // still held in its kept container cannot start again yet.
+    const reopenable = Boolean(thread?.canManage && canPrompt && thread.view.work?.state !== "kept");
+    const dock = !thread ? null : !live && !reopenable ? (
         <div className="flex min-w-0 flex-col gap-2">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                 <Notice>{t("code.ended")}</Notice>
@@ -2118,7 +2157,9 @@ function CodeThread({
             {memoryOpen && thread.view.repoFullName ? (
                 <div className="flex min-w-0 items-start gap-2 rounded-lg border border-border px-3 py-2">
                     <div className="min-w-0 flex-1">
-                        <RepoMemorySection repoFullName={thread.view.repoFullName} />
+                        <ClientMessages namespaces={["agents"]} fallback={null}>
+                            <RepoMemorySection repoFullName={thread.view.repoFullName} />
+                        </ClientMessages>
                     </div>
                     <Button
                         type="button"
@@ -2193,7 +2234,12 @@ function CodeThread({
             <div className="relative">
             {slash.list}
             <PolarComposer
-                textareaProps={slash.textareaProps}
+                textareaProps={{
+                    ...slash.textareaProps,
+                    onKeyDown: suggestion.onKeyDown(slash.textareaProps.onKeyDown),
+                    "aria-describedby": suggestion.describedBy
+                }}
+                beforeInput={suggestion.beforeInput}
                 kit={voiceKit}
                 inCall={call !== null}
                 notice={parts.notice}
@@ -2202,7 +2248,7 @@ function CodeThread({
                 label={t("code.reply")}
                 value={reply}
                 onValueChange={setReply}
-                placeholder={t("code.reply")}
+                placeholder={suggestion.placeholder(t("code.reply"))}
                 disabled={busy}
                 maxLength={PROMPT_MAX}
                 onSubmit={send}
@@ -2234,21 +2280,27 @@ function CodeThread({
                 picker={
                     liveSource || liveMode || liveEffort || liveAccount || liveSurface || liveSwitch ? (
                         <>
+                            {/* Both dialogs speak the Agents app's words, which the
+                                shell does not hand to Polar (BUG-0037). */}
                             {liveSwitch ? (
-                                <CodeAgentSwitch
-                                    sessionId={sessionId}
-                                    disabled={busy}
-                                    onSwitched={onOpen}
-                                    onError={setError}
-                                />
+                                <ClientMessages namespaces={["agents"]} fallback={null}>
+                                    <CodeAgentSwitch
+                                        sessionId={sessionId}
+                                        disabled={busy}
+                                        onSwitched={onOpen}
+                                        onError={setError}
+                                    />
+                                </ClientMessages>
                             ) : null}
                             {liveAccount ? (
-                                <CodeAccountSwitch
-                                    sessionId={sessionId}
-                                    disabled={busy}
-                                    onSwitched={read}
-                                    onError={setError}
-                                />
+                                <ClientMessages namespaces={["agents"]} fallback={null}>
+                                    <CodeAccountSwitch
+                                        sessionId={sessionId}
+                                        disabled={busy}
+                                        onSwitched={read}
+                                        onError={setError}
+                                    />
+                                </ClientMessages>
                             ) : null}
                             {liveSource ? (
                                 <CodeModelPicker
@@ -2311,6 +2363,7 @@ function CodeThread({
                         {session.stateLabel}
                     </span>
                 ) : null}
+                {hasSteps ? <StepsToggle view={stepView} /> : null}
                 {thread?.canManage ? (
                     <button
                         type="button"
@@ -2322,17 +2375,8 @@ function CodeThread({
                         <PanelRight className="size-4" />
                     </button>
                 ) : null}
-                <button
-                    type="button"
-                    onClick={onKeysHelp}
-                    aria-label={t("code.keys.shortcuts")}
-                    title={t("code.keys.shortcuts")}
-                    className="max-md:hidden inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:size-11"
-                >
-                    <Keyboard className="size-4" />
-                </button>
-                {thread ? <CodeExportMenu sessionId={sessionId} /> : null}
                 {thread?.canManage ? <SessionTools session={thread.view} /> : null}
+                {thread ? <CodeSessionMenu sessionId={sessionId} onKeysHelp={onKeysHelp} /> : null}
             </CodeSessionBar>
             <PolarThreadFrame fullPage={fullPage} dock={dock}>
                 {thread === undefined && failed ? (
@@ -2357,6 +2401,7 @@ function CodeThread({
                     <p className="text-sm text-muted-foreground">{t("code.gone")}</p>
                 ) : (
                     <>
+                        {hasSteps && stepsPick === null && thread.canManage ? <StepsOffer /> : null}
                         {blocks.map((block, index) =>
                             block.kind === "message" ? (
                                 <CodeMessage
@@ -2369,15 +2414,27 @@ function CodeThread({
                                 <Work
                                     key={`${block.entries[0]?.at}-${index}`}
                                     messageId={`code:${sessionId}:${index}`}
-                                    streaming={turning && !pending && index === blocks.length - 1}
-                                    current={block.entries.at(-1)?.text ?? null}
+                                    // A message sent mid-turn leaves the running steps
+                                    // open; one sent after it does not reopen the last.
+                                    streaming={
+                                        turning && (!pending || sent?.during === true) && index === blocks.length - 1
+                                    }
+                                    current={currentStep(block.entries)}
                                     tools={block.entries.length}
-                                    failed={0}
+                                    failed={block.entries.filter((entry) => entry.step?.state === "failed").length}
                                     seconds={null}
-                                    summary={t("code.steps", { count: block.entries.length })}
+                                    summary={stepsSummary(t, block.entries)}
+                                    follow={{ open: stepView === "detailed" }}
                                 >
-                                    <ol className="space-y-1">
-                                        {block.entries.map((entry, line) => (
+                                    <ol className="flex min-w-0 flex-col gap-1">
+                                        {block.entries.map((entry, line) =>
+                                            entry.step ? (
+                                                <CodeStepCard
+                                                    key={entry.id || `${entry.at}-${line}`}
+                                                    step={entry.step}
+                                                    view={stepView}
+                                                />
+                                            ) : (
                                             <li
                                                 key={`${entry.at}-${line}`}
                                                 className="flex min-w-0 gap-1.5"
@@ -2394,7 +2451,8 @@ function CodeThread({
                                                     </span>
                                                 ) : null}
                                             </li>
-                                        ))}
+                                            )
+                                        )}
                                     </ol>
                                 </Work>
                             )
@@ -2440,7 +2498,9 @@ function CodeThread({
                                 <ThinkingOrb state="breathing" size={20} decorative />
                                 <Shimmer>
                                     {thread.session.state === "starting" && thread.canManage ? (
-                                        <CodeBootLine sessionId={sessionId} fallback={t("code.quiet")} />
+                                        <ClientMessages namespaces={["agents"]} fallback={t("code.quiet")}>
+                                            <CodeBootLine sessionId={sessionId} fallback={t("code.quiet")} />
+                                        </ClientMessages>
                                     ) : (
                                         t("code.quiet")
                                     )}

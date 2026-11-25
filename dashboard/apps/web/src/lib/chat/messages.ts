@@ -282,6 +282,12 @@ export interface ChatAttachmentView {
     /** Whether there is a still to draw before anybody plays it. Not the still
      *  itself: it is fetched by its own route, like the file. */
     readonly hasPoster: boolean;
+    /** Sealed in the sender's browser: its name, type and bytes open only with the key in its message's seal (`sealed-files.ts`). */
+    readonly sealed?: boolean;
+    /** A sealed file opened on this page: the object URL its clear bytes are drawn from (set by the reader's page, never by the server). */
+    readonly openedUrl?: string;
+    /** A sealed video's still, taken on this page from its opened bytes (never by the server). */
+    readonly openedPosterUrl?: string;
     /** Its pixel size and blurred stand-in, measured by the sender, so the
      *  bubble has its final size before the bytes come - see
      *  `lib/chat/media-shape`. Null for files sent before they were kept. */
@@ -715,6 +721,8 @@ async function sendUnguarded(
         readonly options: readonly string[];
         readonly multiple: boolean;
         readonly hideResults: boolean;
+        /** Absent means anonymous, the choice that publishes nothing. */
+        readonly anonymous?: boolean;
         readonly closesAt: Date | null;
     } | null = null,
     /**
@@ -872,6 +880,7 @@ async function sendUnguarded(
                               create: {
                                   multiple: poll.multiple,
                                   hideResults: poll.hideResults,
+                                  anonymous: poll.anonymous ?? true,
                                   closesAt: poll.closesAt,
                                   options: {
                                       createMany: {
@@ -1602,6 +1611,8 @@ export async function remove(
             await tx.chatReaction.deleteMany({ where: { messageId } });
             // The answers and their votes cascade from this one row.
             await tx.chatPoll.deleteMany({ where: { messageId } });
+            // The rollback copy of a migrated message's words goes with them.
+            await tx.chatMigrationRollback.deleteMany({ where: { messageId } });
             await tx.chatMessage.update({
                 where: { id: messageId },
                 // A pin on a line that no longer says anything is a bar above
@@ -2620,6 +2631,7 @@ export async function decorateMessages(
                 width: true,
                 height: true,
                 thumbhash: true,
+                sealed: true,
                 messageId: true,
                 durationMs: true,
                 contentType: true,
@@ -2811,6 +2823,7 @@ export async function decorateMessages(
             contentType: file.contentType,
             inline: isInlineImage(file.contentType) && !file.viewOnce,
             borrowed: file.borrowed,
+            ...(file.sealed ? { sealed: true } : {}),
             ...(file.viewOnce
                 ? {
                       viewOnce: {

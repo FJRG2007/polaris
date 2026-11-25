@@ -18,6 +18,9 @@
  * back is a press, not typing.
  */
 
+// First: its first line is when the bundle began to run.
+import { markStartup, startupMarked, writeStartupLog } from "./startup-log";
+import { join } from "node:path";
 import { addonShortcutsNow, addonsSnapshotNow, registerAddonViewScheme, startDeviceAddons, stopDeviceAddons } from "./addons/electron";
 import { HOST_UPDATE_ACCESS_PATH, hostsRoute, readSettingsProbe, readUpdateAccess, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
 import { openTvInstall } from "./tv-install";
@@ -37,7 +40,7 @@ import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
 import { watchForUpdates, type FirstCheck, type Update } from "./updates";
-import { updateBeforeOpening, type Opening } from "./update-first";
+import { openBeforeChecking } from "./open-first";
 import { UpdateReadyState } from "./update-ready";
 import { CHANNELS, type AddressCheck, type HostStatus, type Outcome } from "@/shared/bridge";
 import { allowPermission } from "./permissions";
@@ -54,7 +57,7 @@ import { setOpenAtLogin, startedAtLogin } from "./login-item";
 import { restoredPlace } from "@/shared/window-place";
 import * as settings from "./settings";
 import { cancelRelaunch, holdCall, loadRelaunch, markRelaunch, relaunched } from "./relaunch";
-import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpdateAttempted, updateAttempted } from "./settings";
+import { savedServers, serverAddress, setSavedServers, setServerAddress } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, warmLocalSheet, type LocalSheet } from "./windows";
 import { app, autoUpdater, BrowserWindow, dialog, net, powerMonitor, screen, session, type WebContents } from "electron";
@@ -152,11 +155,6 @@ const updates = new UpdateReadyState((state) => {
 
 /** Show the Polaris - at a path when one is given - in the main window. */
 function showPolaris(path?: string): void {
-    if (updating && !updating.isDestroyed()) {
-        updating.show();
-        updating.focus();
-        return;
-    }
     const origin = server();
     if (!origin) {
         openConnect();
@@ -213,17 +211,26 @@ function showOpening(): void {
     if (!main && !connect) showPolaris();
 }
 
-/** The window shown while an update goes in before the app opens. */
-let updating: BrowserWindow | null = null;
-/** Show that an update is going in. Settles when the window is closed. */
-function showUpdating(): Promise<void> {
-    const window = openLocalWindow("updating", { title: "Polaris", width: 380, height: 360 });
-    updating = window;
-    return new Promise((resolve) => {
-        window.on("closed", () => {
-            if (updating === window) updating = null;
-            resolve();
-        });
+/** Where each start's timings go (`startup-log.ts`). */
+function startupLogPath(): string {
+    return join(app.getPath("userData"), "logs", "startup.log");
+}
+
+/** Whether this start was the computer's, at sign-in. Read once. */
+let startedByLogin = false;
+
+/** The first window to draw ends the start: its timings are written then, once.
+ *  Every window is watched until one has, since the first may close before. */
+function timeStartup(window: BrowserWindow): void {
+    if (startupMarked("painted")) return;
+    markStartup("window");
+    window.once("ready-to-show", () => {
+        markStartup("painted");
+        // After the window's own handler, which shows it unless it starts in the tray.
+        setTimeout(() => {
+            if (!window.isDestroyed() && window.isVisible()) markStartup("shown");
+            void writeStartupLog(startupLogPath(), app.getVersion(), startedByLogin);
+        }, 0);
     });
 }
 
@@ -362,6 +369,7 @@ function openMain(url: string): void {
     const hidden = startHidden;
     startHidden = false;
     const window = openPolarisWindow(url, server, { ...savedPlace(), hidden });
+    timeStartup(window);
     main = window;
     rememberPlace(window);
     // A start that shows no window says once that it happened, or it reads as
@@ -506,6 +514,7 @@ function openConnect(settings: LocalSettingsState = { reason: null }): void {
         return;
     }
     const window = openLocalWindow("connect", { title: "Polaris", width: 560, height: 560 });
+    timeStartup(window);
     connect = window;
     window.on("closed", () => {
         if (connect === window) connect = null;
@@ -868,7 +877,6 @@ function leaveServer(): void {
     sheet?.close();
     main = null;
     for (const window of BrowserWindow.getAllWindows()) if (window !== connect) window.close();
-    updating = null;
 }
 
 function servers() {
@@ -962,7 +970,8 @@ function start(): void {
     // Whether this run is the app restarting itself, with the calls it carries:
     // read once, before anything can restart again; handed to the pages once.
     loadRelaunch();
-    startHidden = startedAtLogin(process.argv) && settings.toggle("startMinimized");
+    startedByLogin = startedAtLogin(process.argv);
+    startHidden = startedByLogin && settings.toggle("startMinimized");
 
     registerAddonViewScheme();
     app.on("browser-window-created", (_event, window) => hideMenuBar(window));
@@ -973,6 +982,9 @@ function start(): void {
     });
 
     app.whenReady().then(() => {
+        markStartup("ready");
+        // A start whose first window never draws still leaves its line.
+        setTimeout(() => void writeStartupLog(startupLogPath(), app.getVersion(), startedByLogin), 120_000).unref();
         // The season's icon from the last launch, before any window or the tray is up.
         restoreAppIcon();
         // The tray icon first: on a sign-in that is all a start in the tray shows, and
@@ -1001,6 +1013,7 @@ function start(): void {
         };
         menuActions = menu;
         refreshMenu();
+        markStartup("tray");
         // This computer runs Polar Code sessions for the Polaris in use, once paired.
         void runner().use(current);
         // Something that may mean the server can be reached now: ask at once rather
@@ -1179,8 +1192,6 @@ function start(): void {
                       }
             );
         };
-        /** The update the app was about to restart into, unannounced until it opens. */
-        let heldBack: Update | null = null;
         /** The version Squirrel failed to apply, announced with the antivirus guide. */
         let didNotInstall: string | null = null;
         const notInstalled = (update: Update) => {
@@ -1193,53 +1204,32 @@ function start(): void {
                 )
             );
         };
-        const first = (updateWatch = watchForUpdates((update) => {
-            menuUpdate = {
-                version: update.version,
-                open: () => openDownloads(update),
-                ...(update.restart ? { restart: update.restart } : {})
-            };
-            refreshMenu();
-            updates.found(update);
-            // The app is about to restart into it: nothing to announce.
-            if (updating && update.restart) {
-                heldBack = update;
-                return;
-            }
-            announce(update);
-        }, notInstalled));
-
-        void updateBeforeOpening(first, {
-            attempted: updateAttempted,
-            attempt: setUpdateAttempted,
-            opened: () => main !== null,
-            showUpdating,
-            restart: () => updates.install().ok
-        })
-            .catch((): Opening => "open")
-            .then((opening) => {
-                app.on("activate", () => {
-                    // A window kept in the tray is still a window: the Dock brings it back.
-                    if (main && !main.isDestroyed() && !main.isVisible()) showPolaris();
-                    else if (BrowserWindow.getAllWindows().length === 0) showOpening();
-                });
-                if (opening !== "open") {
-                    deepLinks.opened();
-                    return;
-                }
-                // The app opens first: closing the last window would quit it.
-                const waited = updating;
-                updating = null;
-                showOpening();
-                waited?.close();
-                if (heldBack) announce(heldBack);
-            });
+        app.on("activate", () => {
+            // A window kept in the tray is still a window: the Dock brings it back.
+            if (main && !main.isDestroyed() && !main.isVisible()) showPolaris();
+            else if (BrowserWindow.getAllWindows().length === 0) showOpening();
+        });
+        // The app opens at once; the release check answers in the background.
+        updateWatch = openBeforeChecking({
+            open: showOpening,
+            check: () =>
+                watchForUpdates((update) => {
+                    menuUpdate = {
+                        version: update.version,
+                        open: () => openDownloads(update),
+                        ...(update.restart ? { restart: update.restart } : {})
+                    };
+                    refreshMenu();
+                    updates.found(update);
+                    announce(update);
+                }, notInstalled)
+        });
     });
 
     app.on("second-instance", (_event, argv) => {
         const link = startedFor(argv);
         if (link) deepLinks.arrive(link);
-        if (!link || updating) showPolaris();
+        if (!link) showPolaris();
     });
     app.on("open-url", (event, url) => {
         event.preventDefault();

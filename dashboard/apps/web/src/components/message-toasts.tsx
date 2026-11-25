@@ -71,6 +71,7 @@ import {
 } from "@/lib/desktop-notify";
 import { noticeAllowed } from "@/lib/notifications/browser-notices";
 import { notificationSoundEnabled } from "@/lib/notification-sound";
+import { noteSounderKind } from "@/lib/notifications/sounding-client";
 import {
     arrivalAlert,
     markSeenOnDevice,
@@ -178,7 +179,7 @@ async function answerFromDesktop(
 
 /** The newest message in a conversation, which is what its notice announced. */
 async function newestAnnounced(channelId: string): Promise<string | undefined> {
-    const { toasts } = await messageToastsAction([channelId]).catch(() => ({ toasts: [] }));
+    const { toasts } = await messageToastsAction([channelId], true).catch(() => ({ toasts: [] }));
     return toasts.find((one) => one.channelId === channelId)?.messageId;
 }
 
@@ -288,7 +289,13 @@ export function MessageToasts() {
         pending.current.clear();
         if (asked.length === 0) return;
 
-        const { toasts: arrived } = await messageToastsAction(asked).catch(() => ({ toasts: [] }));
+        const { toasts: arrived, sounder } = await messageToastsAction(asked).catch(() => ({
+            toasts: [],
+            sounder: null
+        }));
+        // Which client chimes, as the server sees it now: the window in front of
+        // the person may have changed since the stream last said.
+        noteSounderKind(sounder);
         const toasts = await withOpenedWords(device.current, arrived);
         let sounded = false;
         for (const message of toasts) {

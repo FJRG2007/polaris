@@ -6,6 +6,7 @@ import { polarisProjectIds } from "@/lib/deploy/managed-projects";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { readerProjectGlance } from "@/lib/deploy/project-glance";
 import { listProjectStagedChanges } from "@/lib/deploy-staged-changes";
+import { accessCan, accessInEnvironment, requireProjectAccess } from "@/lib/deploy-project-access";
 
 export const dynamic = "force-dynamic";
 
@@ -39,11 +40,20 @@ export default async function ProjectLayout({
     // The switcher in this shell lists the shelf the project itself is on, not
     // whichever one happens to be open: a project reached by link must not offer
     // to jump to services from somewhere else entirely.
-    const [projects, staged, glance] = await Promise.all([
+    const [projects, staged, glance, access] = await Promise.all([
         listProjects(user.id, project.orgId),
         listProjectStagedChanges(projectId),
-        readerProjectGlance(projectId, user.id)
+        readerProjectGlance(projectId, user.id),
+        canManage ? requireProjectAccess(projectId, user.id, "project.read").catch(() => null) : null
     ]);
+    // The checks syncEnvironmentAction makes, so the top bar offers a sync
+    // exactly between the environments the action would take.
+    const syncEnvironmentIds =
+        access && accessCan(access, "deploy.run")
+            ? project.environments
+                  .filter((environment) => accessInEnvironment(access, environment.id))
+                  .map((environment) => environment.id)
+            : [];
 
     return (
         <ProjectShell
@@ -60,6 +70,7 @@ export default async function ProjectLayout({
             projects={projects.map((item) => ({ id: item.id, name: item.name }))}
             staged={staged}
             canManage={canManage}
+            syncEnvironmentIds={syncEnvironmentIds}
         >
             {children}
         </ProjectShell>

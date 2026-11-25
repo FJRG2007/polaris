@@ -16,7 +16,12 @@ import { formatElapsed } from "@polaris/core";
 import { unlockProofFor } from "./lock-session";
 import { attachmentImageUrl } from "./message-gallery";
 import { placeholderUrl } from "@/lib/chat/media-shape";
+import { useOpenedSealed } from "./opened-sealed";
+import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
+import * as sealedFiles from "@/lib/chat/e2ee/sealed-files";
+import type { ChatMessageView } from "@/lib/chat/messages";
 import { listSharedMediaAction, type SharedMediaItem } from "./actions";
+import { galleryRef, sharedTiles, type SealedState, type SharedTile } from "./shared-media-items";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { ImageViewer, thumbnailOf, type ViewedImage } from "@/components/image-viewer";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -25,7 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 const PREVIEW_TILES = 6;
 
 interface SharedMedia {
-    readonly items: readonly SharedMediaItem[];
+    readonly items: readonly SharedTile[];
     /** Whether the first page has come back, or failed to. */
     readonly loaded: boolean;
     readonly failed: boolean;
@@ -37,6 +42,8 @@ interface SharedMedia {
 /** The conversation's pictures and videos, newest first, a page at a time. */
 export function useSharedMedia(channelId: string): SharedMedia {
     const [items, setItems] = useState<readonly SharedMediaItem[]>([]);
+    // The sealed messages behind sealed tiles, opened on this page to say what each file is.
+    const [sealed, setSealed] = useState<readonly ChatMessageView[]>([]);
     const [next, setNext] = useState<string | null>(null);
     const [loaded, setLoaded] = useState(false);
     const [failed, setFailed] = useState(false);
@@ -56,6 +63,8 @@ export function useSharedMedia(channelId: string): SharedMedia {
                 const page = await listSharedMediaAction({ channelId, before }, unlockProofFor(channelId));
                 if (current.current !== asked) return;
                 setItems((known) => (before ? [...known, ...page.items] : page.items));
+                const behind = page.sealed ?? [];
+                setSealed((known) => (before ? (behind.length ? [...known, ...behind] : known) : behind));
                 setNext(page.next);
                 setFailed(false);
             } catch {
@@ -75,6 +84,7 @@ export function useSharedMedia(channelId: string): SharedMedia {
         current.current = channelId;
         busy.current = false;
         setItems([]);
+        setSealed([]);
         setNext(null);
         setLoaded(false);
         void fetchPage(null);
@@ -85,16 +95,55 @@ export function useSharedMedia(channelId: string): SharedMedia {
         else if (failed) void fetchPage(null);
     }, [failed, fetchPage, next]);
 
-    return { items, loaded, failed, more: next !== null, loading, loadMore };
+    const opened = useOpenedSealed(sealed, galleryRef);
+    // Bumped when a sealed file settles, so one that did not open leaves the grid.
+    const [, setSettled] = useState(0);
+    useEffect(() => {
+        if (!sealedChat.sealedChatActive()) return;
+        let live = true;
+        for (const message of opened) {
+            const files = sealedChat.openedContent(message.id, message.sealedEditedAt)?.files ?? [];
+            for (const ref of files.filter(galleryRef))
+                if (!sealedFiles.openedFileUrl(ref.id) && !sealedFiles.fileFailed(ref.id))
+                    void sealedFiles.openSealedFile(ref).then(() => {
+                        if (live) setSettled((count) => count + 1);
+                    });
+        }
+        return () => {
+            live = false;
+        };
+    }, [opened]);
+    const tiles = sharedTiles(items, opened, sealedState());
+
+    return { items: tiles, loaded, failed, more: next !== null, loading, loadMore };
+}
+
+/** What this page knows about sealed messages and files, read at each draw. */
+function sealedState(): SealedState {
+    return {
+        readable: sealedChat.sealedChatActive(),
+        content: sealedChat.openedContent,
+        fileFailed: sealedFiles.fileFailed
+    };
 }
 
 /** The address a tile draws: the picture, or a video's still. */
-function tileUrl(item: SharedMediaItem): string | null {
+function tileUrl(item: SharedTile): string | null {
+    if (item.sealed) return (item.video ? item.openedPosterUrl : item.openedUrl) ?? null;
     if (!item.video) return attachmentImageUrl(item.id);
     return item.hasPoster ? `${attachmentImageUrl(item.id)}?poster=1` : null;
 }
 
-function viewed(item: SharedMediaItem): ViewedImage {
+function viewed(item: SharedTile): ViewedImage {
+    if (item.sealed)
+        return {
+            url: item.openedUrl ?? "",
+            name: item.name,
+            messageId: item.messageId,
+            forwardable: item.forwardable,
+            placeholder: placeholderUrl(item.thumbhash),
+            ...(item.video ? { video: true, poster: item.openedPosterUrl } : {})
+        };
     return {
         url: attachmentImageUrl(item.id),
         name: item.name,
@@ -107,7 +156,7 @@ function viewed(item: SharedMediaItem): ViewedImage {
     };
 }
 
-function MediaTile({ item, onOpen }: { item: SharedMediaItem; onOpen: (item: SharedMediaItem) => void }) {
+function MediaTile({ item, onOpen }: { item: SharedTile; onOpen: (item: SharedTile) => void }) {
     const t = useTranslations("chat");
     const src = tileUrl(item);
     const placeholder = placeholderUrl(item.thumbhash);
@@ -136,7 +185,17 @@ function MediaTile({ item, onOpen }: { item: SharedMediaItem; onOpen: (item: Sha
         "relative block aspect-square min-w-0 overflow-hidden bg-muted bg-cover bg-center outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
     const style = placeholder ? { backgroundImage: `url(${placeholder})` } : undefined;
     return (
-        <button type="button" title={item.name} onClick={() => onOpen(item)} className={className} style={style}>
+        <button
+            type="button"
+            title={item.name || undefined}
+            aria-label={item.pending ? t("info.mediaOpening") : undefined}
+            aria-disabled={item.pending || undefined}
+            onClick={() => {
+                if (!item.pending) onOpen(item);
+            }}
+            className={cn(className, item.pending && "cursor-progress animate-pulse")}
+            style={style}
+        >
             {face}
         </button>
     );
@@ -149,9 +208,9 @@ function TileGrid({ wide, children }: { wide: boolean; children: ReactNode }) {
 }
 
 /** The chat's viewer over the pictures and videos loaded so far, opened on one. */
-function useViewer(items: readonly SharedMediaItem[]) {
+function useViewer(items: readonly SharedTile[]) {
     const [viewing, setViewing] = useState<ViewedImage | null>(null);
-    const gallery = useMemo(() => items.map(viewed), [items]);
+    const gallery = useMemo(() => items.filter((item) => !item.pending).map(viewed), [items]);
     const viewer = (
         <ImageViewer
             image={viewing}
@@ -161,7 +220,7 @@ function useViewer(items: readonly SharedMediaItem[]) {
             origin={thumbnailOf}
         />
     );
-    return { open: (item: SharedMediaItem) => setViewing(viewed(item)), viewer };
+    return { open: (item: SharedTile) => setViewing(viewed(item)), viewer };
 }
 
 /** The info page's part: the newest tiles and the way into all of them. */
@@ -231,7 +290,7 @@ export function SharedMediaAll({ media, wide }: { media: SharedMedia; wide: bool
 
     const months = useMemo(() => {
         const name = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" });
-        const runs: { key: string; label: string; items: SharedMediaItem[] }[] = [];
+        const runs: { key: string; label: string; items: SharedTile[] }[] = [];
         for (const item of media.items) {
             const sent = new Date(item.sentAt);
             const key = `${sent.getFullYear()}-${sent.getMonth()}`;

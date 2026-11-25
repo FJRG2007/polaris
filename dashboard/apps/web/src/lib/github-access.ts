@@ -120,6 +120,36 @@ export async function githubTokenForOwner(
     return githubAppInstallationToken(owner).catch(() => null);
 }
 
+/**
+ * The GitHub App user token (user-to-server) somebody's agent session pushes
+ * and opens pull requests with, so the work lands on GitHub as them, with no
+ * more than they and the App may both do.
+ *
+ * Only an App sign-in link counts, never a pasted personal token: that one is
+ * not limited to the repositories the App is installed on. The link for the
+ * repository's owner is tried first, and a link is only used once GitHub says
+ * it reaches the repository, since a user token sees only the installations
+ * its person can, and handing out one that does not would turn a working push
+ * into a refused one. Null when no link reaches it; the caller then uses the
+ * installation. An expired token is refreshed on the way (`usableToken`).
+ */
+export async function githubAppUserTokenFor(
+    userId: string,
+    owner: string,
+    repo: string
+): Promise<string | null> {
+    const links = (await githubCredentialsForUser(userId).catch(() => [])).filter(
+        (credential) => credential.method === "oauth"
+    );
+    const preferred = credentialFor(links, owner);
+    const ordered = preferred ? [preferred, ...links.filter((entry) => entry !== preferred)] : [];
+    for (const credential of ordered) {
+        if ((await repoAccessFor(owner, repo, credential.token).catch(() => "unknown")) === "reachable")
+            return credential.token;
+    }
+    return null;
+}
+
 /** Who a clone goes out as, and the header that says so. */
 export interface CloneIdentity {
     /** The git `http.extraHeader` value. Never logged: it carries the token. */

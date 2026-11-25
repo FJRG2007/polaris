@@ -11,6 +11,7 @@ import { Prisma, prisma } from "@polaris/db";
 import { transcriptionChoiceSchema } from "@/lib/polar/transcription";
 import { sessionEngineSchema } from "@/lib/polar/native/engine-choice";
 import { codeThemeOf, type CodeTheme } from "@/lib/polar/code-theme";
+import { codeStepViewOf, type CodeStepView } from "@/lib/polar/code-steps";
 import {
     displayOf,
     helperModelOf,
@@ -33,6 +34,8 @@ export interface PolarPreferences extends PolarDisplay {
     sessionEngine: string | null;
     /** The colors Polar Code paints code and diffs in. */
     codeTheme: CodeTheme;
+    /** How Code shows the agent's steps; null until the person picks. */
+    codeSteps: CodeStepView | null;
 }
 
 const SELECTED = {
@@ -47,9 +50,11 @@ const SELECTED = {
     showContextBar: true,
     autoCompact: true,
     reopenLastChat: true,
+    codeSuggestions: true,
     transcriptionModel: true,
     sessionEngine: true,
-    codeTheme: true
+    codeTheme: true,
+    codeSteps: true
 } as const;
 
 /** A stored pick that still reads as one, or null. */
@@ -75,6 +80,7 @@ function preferencesOf(
         writingSkills?: unknown;
         sessionEngine?: unknown;
         codeTheme?: unknown;
+        codeSteps?: unknown;
     } | null
 ): PolarPreferences {
     return {
@@ -88,6 +94,7 @@ function preferencesOf(
             : [],
         sessionEngine: sessionEngineSchema.safeParse(row?.sessionEngine).success ? (row?.sessionEngine as string) : null,
         codeTheme: codeThemeOf(row?.codeTheme),
+        codeSteps: codeStepViewOf(row?.codeSteps),
         ...displayOf(row)
     };
 }
@@ -114,7 +121,8 @@ export async function setPolarPreferences(
         ...(patch.writingContext !== undefined ? { writingContext: patch.writingContext } : {}),
         ...(patch.writingSkills !== undefined ? { writingSkills: patch.writingSkills } : {}),
         ...(patch.sessionEngine !== undefined ? { sessionEngine: patch.sessionEngine } : {}),
-        ...(patch.codeTheme !== undefined ? { codeTheme: patch.codeTheme } : {})
+        ...(patch.codeTheme !== undefined ? { codeTheme: patch.codeTheme } : {}),
+        ...(patch.codeSteps !== undefined ? { codeSteps: patch.codeSteps } : {})
     };
     const row = await prisma.polarPreference.upsert({
         where: { userId },

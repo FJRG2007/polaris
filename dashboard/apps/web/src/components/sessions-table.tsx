@@ -298,6 +298,13 @@ export function SessionsTable({
         }))
     ], groups);
     const grouped = new Set(groups.flatMap((group) => group.memberIds));
+    // Rows on no device of their own. Under the last device group with nothing
+    // between them they read as that device's, so they get a header of their own.
+    const looseCount =
+        sessions.filter((session) => !grouped.has(session.id)).length +
+        extensions.filter((extension) => !grouped.has(extension.id)).length +
+        deviceSessions.filter((device) => !grouped.has(device.id)).length +
+        clients.length;
     function toggle(key: string) {
         setCollapsed((was) => {
             const next = new Set(was);
@@ -675,6 +682,20 @@ export function SessionsTable({
                                     </Fragment>
                                 );
                             })}
+                            {groups.length > 0 && looseCount > 0 ? (
+                                <tr className="border-t border-border bg-surface/40" data-testid="other-sessions">
+                                    <td className="w-full max-w-0 px-3 py-2" colSpan={compact ? 2 : 7}>
+                                        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                            <span className="min-w-0 truncate font-semibold">
+                                                {t("sessionsTable.otherSessions")}
+                                            </span>
+                                            <Badge variant="neutral">
+                                                {t("sessionsTable.deviceGroup.count", { count: looseCount })}
+                                            </Badge>
+                                        </span>
+                                    </td>
+                                </tr>
+                            ) : null}
                             {sessionRows
                                 .filter((session) => !grouped.has(session.id))
                                 .map(renderSession)}

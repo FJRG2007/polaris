@@ -97,12 +97,18 @@ function readableName(name: string): string {
  * The body is a stream and is never collected: what bounds it is the cap the
  * caller wrapped it in - see `cappedStream` - and the request itself.
  */
+/** What a sealed upload is stored as: its real name and type are inside the seal. */
+export const SEALED_NAME = "file";
+export const SEALED_TYPE = "application/octet-stream";
+
 export async function stageUpload(input: {
     readonly userId: string;
     readonly channelId: string;
     readonly name: string;
     readonly contentType: string;
     readonly spoiler: boolean;
+    /** Sealed in the sender's browser: an opaque blob, stored as "file" with no type or cover of its own (they travel in the seal). */
+    readonly sealed?: boolean;
     readonly body: ReadableStream<Uint8Array>;
     /** What the sender said it weighs. Passed to the storage for the drivers that
      *  need a length before the first chunk; never recorded. */
@@ -112,7 +118,7 @@ export async function stageUpload(input: {
     const path = `${folder}/${crypto.randomUUID()}`;
     // What the browser said, or the name when it said nothing: a phone gallery
     // pick often has no type, and the upload then carries none either.
-    const contentType = typeOfFile(input.contentType, input.name);
+    const contentType = input.sealed ? SEALED_TYPE : typeOfFile(input.contentType, input.name);
 
     const placed = await streamFile({
         target: await chatTarget(),
@@ -129,12 +135,13 @@ export async function stageUpload(input: {
         data: {
             userId: input.userId,
             channelId: input.channelId,
-            name: readableName(input.name),
+            name: input.sealed ? SEALED_NAME : readableName(input.name),
             contentType,
             size: BigInt(placed.size),
             connectionId: placed.targetId === LOCAL_TARGET ? null : placed.targetId,
             path,
-            spoiler: input.spoiler
+            spoiler: input.sealed ? false : input.spoiler,
+            sealed: input.sealed === true
         },
         select: { id: true, name: true, size: true, contentType: true }
     });
@@ -164,14 +171,16 @@ export async function claimUploads(
     userId: string,
     channelId: string,
     ids: readonly string[],
-    extra?: readonly (SoundAndStill | undefined)[]
+    extra?: readonly (SoundAndStill | undefined)[],
+    /** Claim sealed uploads (for a sealed message) rather than plain ones; never a mix. */
+    sealed = false
 ): Promise<StoredAttachment[]> {
     if (ids.length === 0) return [];
     for (const id of ids) {
         if (!UUID.test(id)) throw new UploadRefused("One of those files is no longer here");
     }
     const rows = await prisma.chatUpload.findMany({
-        where: { id: { in: [...ids] }, userId, channelId }
+        where: { id: { in: [...ids] }, userId, channelId, sealed }
     });
     if (rows.length !== new Set(ids).size) {
         // Either it was never staged here, it belongs to somebody else, it was
@@ -185,6 +194,8 @@ export async function claimUploads(
     return ids.map((id, at) => {
         const row = found.get(id)!;
         const beside = extra?.[at];
+        // A sealed file keeps its upload's id, which is what its message names inside the seal.
+        if (sealed) return { id: row.id, sealed: true, name: row.name, size: Number(row.size), contentType: row.contentType, connectionId: row.connectionId, path: row.path, posterPath: null, posterConnectionId: null, borrowed: false, spoiler: false, durationMs: null, waveform: null };
         return {
             name: row.name,
             size: Number(row.size),

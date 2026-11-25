@@ -307,7 +307,9 @@
             "tooMany": "Este canal ya tiene el máximo de seguidores.",
             "notPublishable": "Solo se publica un mensaje del propio canal con texto.",
             "filesNotPublished": "Aún no se pueden publicar mensajes con archivos."
-        }
+        },
+        "pollAnonymous": "Los votos de esa encuesta son anónimos",
+        "pollVotersHidden": "Quién eligió qué se verá cuando cierre"
     },
     "media": {
         "refused": {
@@ -1097,7 +1099,11 @@
         "question": "Pregunta",
         "answers": "Respuestas",
         "answerN": "Respuesta {n}",
-        "removeAnswerN": "Quitar respuesta {n}"
+        "removeAnswerN": "Quitar respuesta {n}",
+        "anonymousVotes": "Votos anónimos",
+        "onlyTheCountsAreShown": "Solo se ven los recuentos, nunca quién eligió qué. No se puede cambiar después.",
+        "everybodySeesWhoPicked": "Todos aquí pueden ver quién eligió cada respuesta. No se puede cambiar después.",
+        "keepTheVotesAnonymous": "Votos anónimos"
     },
     "clip": {
         "recordAClip": "Grabar un clip",
@@ -1618,10 +1624,22 @@
         "openUntilItIsClosed": "Abierta hasta que se cierre",
         "resultsShowWhenItCloses": "Resultados al cerrarse",
         "savingYourVote": "Guardando tu voto",
+        "voteNotCast": "No se emitió el voto. Inténtalo de nuevo.",
         "closing": "Cerrando...",
         "endPoll": "Cerrar",
         "votes": "{count, plural, one {1 voto} other {{count} votos}}",
-        "closes": "Se cierra <time></time>"
+        "closes": "Se cierra <time></time>",
+        "anonymous": "Anónima",
+        "public": "Pública",
+        "anonymousHint": "Solo se ven los recuentos, nunca quién eligió qué",
+        "publicHint": "Todos aquí pueden ver quién eligió cada respuesta",
+        "seeVotes": "Ver votos",
+        "whoVoted": "Quién votó",
+        "whoVotedDescription": "Esta encuesta es pública, así que todos aquí pueden ver esto.",
+        "nobodyPickedThis": "Nadie la eligió",
+        "andMore": "{count, plural, one {y 1 más} other {y {count} más}}",
+        "votersNotLoaded": "Los votos no se cargaron.",
+        "tryAgain": "Reintentar"
     },
     "newSpace": {
         "newSpace": "Otro espacio",
@@ -2858,9 +2876,17 @@
         "mediaSeeAll": "Ver todo",
         "mediaFailed": "No se cargaron las fotos",
         "mediaRetry": "Reintentar",
+        "mediaOpening": "Abriendo",
         "polar": "Polar en este chat",
         "polarHint": "Polar lee lo que se diga aquí a partir de ahora, igual que quien gestiona Polaris y el proveedor del modelo. Pregúntale con @polar.",
-        "polarNotYours": "Solo quien puede añadir gente aquí puede cambiarlo."
+        "polarNotYours": "Solo quien puede añadir gente aquí puede cambiarlo.",
+        "safetyNumber": "Código seguro",
+        "safetyHint": "Compara estos números con los de la pantalla de {name}, en persona o en una llamada. Si coinciden, nadie lee en medio.",
+        "safetyNoKey": "{name} aún no ha abierto el chat cifrado, así que no hay número que comparar.",
+        "safetyFailed": "No se pudo calcular el número de seguridad.",
+        "safetyRetry": "Reintentar",
+        "safetyCopy": "Copiar número",
+        "safetyCopied": "Número copiado"
     },
     "location": {
         "title": "Enviar ubicación",

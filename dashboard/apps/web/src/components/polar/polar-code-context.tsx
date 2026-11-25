@@ -143,6 +143,21 @@ interface RepoEntry {
 }
 type RepoPage = { items: RepoEntry[]; next: string | null } | null;
 
+/** The name of every repository this page has listed, by id, so a pick from
+ *  a searched or later page - or one still being connected - names itself on
+ *  the chip the frame it is clicked rather than after a read. */
+const repoNames = new Map<string, string>();
+
+/** Remember a repository's name for the chip. */
+export function rememberRepoName(id: string, name: string): void {
+    repoNames.set(id, name);
+}
+
+/** A repository's name this page has already seen, or null. */
+export function knownRepoName(id: string): string | null {
+    return repoNames.get(id) ?? null;
+}
+
 /** One connected repository by id, or null when it is gone or not this person's. */
 export async function readRepo(id: string): Promise<RepoEntry | null> {
     const page = await readPoll<RepoPage>(REPOS_ROUTE, { id });
@@ -210,21 +225,27 @@ function useRepoList(choices: PolarCodeChoices | null, query: string) {
  *  first page - read once by its id. */
 export function useRepoName(repoId: string, known: readonly RepoEntry[]): string | null {
     const [named, setNamed] = useState<RepoEntry | null>(null);
+    const remembered = knownRepoName(repoId);
     const missing =
-        repoId !== "" && repoId !== NO_REPO && !known.some((entry) => entry.id === repoId);
+        repoId !== "" &&
+        repoId !== NO_REPO &&
+        remembered === null &&
+        !known.some((entry) => entry.id === repoId);
     useEffect(() => {
         if (!missing) return;
         let live = true;
         readRepo(repoId)
             .then((entry) => {
-                if (live && entry) setNamed(entry);
+                if (!entry) return;
+                rememberRepoName(entry.id, entry.name);
+                if (live) setNamed(entry);
             })
             .catch(() => undefined);
         return () => {
             live = false;
         };
     }, [missing, repoId]);
-    return named?.id === repoId ? named.name : null;
+    return remembered ?? (named?.id === repoId ? named.name : null);
 }
 
 /** A new task's place: the button that opens the repository menu. */
@@ -270,7 +291,13 @@ function RepoItems({
                 </DropdownMenuItem>
             )}
             {shown.map((entry) => (
-                <DropdownMenuItem key={entry.id} onSelect={() => onRepo(entry.id)}>
+                <DropdownMenuItem
+                    key={entry.id}
+                    onSelect={() => {
+                        rememberRepoName(entry.id, entry.name);
+                        onRepo(entry.id);
+                    }}
+                >
                     <FolderGit2 className="size-3.5 shrink-0" />
                     <span className="min-w-0 truncate" title={entry.name}>
                         {entry.name}
@@ -418,7 +445,8 @@ export function CodeWhereChip({
     refreshing,
     branch,
     onBranch,
-    disabled
+    disabled,
+    pendingRepo = null
 }: {
     /** Null while the choices are on their way. */
     choices: PolarCodeChoices | null;
@@ -430,6 +458,9 @@ export function CodeWhereChip({
     branch: string;
     onBranch: (branch: string) => void;
     disabled: boolean;
+    /** A repository picked from GitHub while it is being connected: named on
+     *  the chip at once, and dropped back to the last one if it fails. */
+    pendingRepo?: string | null;
 }) {
     const t = useTranslations("polar");
     const [open, setOpen] = useState(false);
@@ -437,8 +468,12 @@ export function CodeWhereChip({
     const [query, setQuery] = useState("");
     const known = choices?.repos ?? [];
     const chosenRepo = useRepoName(repoId, known);
+    const pendingName = pendingRepo ? knownRepoName(pendingRepo) : null;
     const repoName =
-        known.find((entry) => entry.id === repoId)?.name ?? chosenRepo ?? t("code.workspace");
+        pendingName ??
+        known.find((entry) => entry.id === repoId)?.name ??
+        chosenRepo ??
+        t("code.workspace");
     const hasRepo = repoId !== "" && repoId !== NO_REPO;
     const { value, failed } = useBranches(repoId, hasRepo);
     const fallback = value?.defaultBranch ?? null;
@@ -447,7 +482,7 @@ export function CodeWhereChip({
     const typed = query.trim();
     const matches = (value?.branches ?? []).filter((name) => menuSearchMatches(name, query));
     const listed = value?.branches.includes(typed) ?? false;
-    const label = hasRepo ? `${repoName} - ${branchName}` : repoName;
+    const label = hasRepo && !pendingName ? `${repoName} - ${branchName}` : repoName;
     const choose = (name: string) => {
         onBranch(name === fallback ? "" : name);
         setOpen(false);
@@ -473,7 +508,7 @@ export function CodeWhereChip({
                 >
                     <FolderGit2 className="size-3.5 shrink-0" aria-hidden />
                     <span className="min-w-0 truncate text-foreground">{repoName}</span>
-                    {hasRepo ? (
+                    {hasRepo && !pendingName ? (
                         <>
                             <GitBranch className="size-3.5 shrink-0" aria-hidden />
                             <span className="min-w-0 max-w-[40%] shrink-[2] truncate">
@@ -987,14 +1022,34 @@ export type PickedIssue = Pick<RepoIssue, "number" | "title">;
 /** How long typing settles before GitHub is searched. */
 const ISSUE_SEARCH_MS = 300;
 
-/** The repository's open issues for the chip: GitHub's own search for what is
- *  typed, asked once the typing settles, the stale answer dropped. */
+/** Each repository's open issues as last read, unsearched: the chip opens on
+ *  them at once and reads them again behind. */
+const issueCache = new Map<string, readonly RepoIssue[]>();
+
+/** The issues already held that answer what is typed: "#12" or "12" by
+ *  number, anything else by every word in the title. Pure. */
+export function localIssueMatches(items: readonly RepoIssue[], query: string): RepoIssue[] {
+    const asked = query.trim().toLowerCase();
+    if (!asked) return [...items];
+    const number = /^#?(\d{1,9})$/.exec(asked)?.[1];
+    if (number) return items.filter((item) => String(item.number).startsWith(number));
+    const words = asked.split(/\s+/);
+    return items.filter((item) => {
+        const title = item.title.toLowerCase();
+        return words.every((word) => title.includes(word));
+    });
+}
+
+/** The repository's open issues for the chip: what this page already holds
+ *  first - the last list, filtered as it is typed - then GitHub's own search
+ *  for what is typed once the typing settles, the stale answer dropped. */
 function useIssues(repoId: string, query: string, open: boolean) {
     const [state, setState] = useState<{
         key: string;
         items: readonly RepoIssue[] | null;
         failed: boolean;
     }>({ key: "", items: null, failed: false });
+    const [attempt, setAttempt] = useState(0);
     const asked = query.trim();
     const key = `${repoId}:${asked}`;
     useEffect(() => {
@@ -1007,9 +1062,10 @@ function useIssues(repoId: string, query: string, open: boolean) {
                     { repo: repoId, q: asked },
                     controller.signal
                 )
-                    .then((answer) =>
-                        setState({ key, items: answer?.items ?? null, failed: answer === null })
-                    )
+                    .then((answer) => {
+                        if (answer && !asked) issueCache.set(repoId, answer.items);
+                        setState({ key, items: answer?.items ?? null, failed: answer === null });
+                    })
                     .catch(() => {
                         if (!controller.signal.aborted)
                             setState({ key, items: null, failed: true });
@@ -1021,8 +1077,17 @@ function useIssues(repoId: string, query: string, open: boolean) {
             clearTimeout(timer);
             controller.abort();
         };
-    }, [asked, key, open, repoId]);
-    return state.key === key ? state : { key, items: null, failed: false };
+    }, [asked, attempt, key, open, repoId]);
+    const retry = () => {
+        setState({ key: "", items: null, failed: false });
+        setAttempt((count) => count + 1);
+    };
+    if (state.key === key && (state.items !== null || !issueCache.has(repoId)))
+        return { ...state, retry };
+    // Nothing read for this search yet, or it failed with a list in hand: the
+    // list held, filtered here, rather than an empty menu.
+    const held = issueCache.get(repoId);
+    return { key, items: held ? localIssueMatches(held, asked) : null, failed: false, retry };
 }
 
 /** Start the task from one of the repository's open issues. */
@@ -1040,7 +1105,7 @@ export function CodeIssueChip({
     const t = useTranslations("polar");
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
-    const { items, failed } = useIssues(repoId, query, open);
+    const { items, failed, retry } = useIssues(repoId, query, open);
     const shown = issue ? `#${issue.number} ${issue.title}` : t("code.issue.label");
     return (
         <span className="flex min-w-0 max-w-full items-center gap-0.5">
@@ -1088,9 +1153,19 @@ export function CodeIssueChip({
                         </div>
                     ) : null}
                     {failed ? (
-                        <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                            {t("code.issue.failed")}
-                        </p>
+                        <div className="flex flex-col items-start gap-1 px-2 py-1.5">
+                            <p className="text-xs text-muted-foreground">{t("code.issue.failed")}</p>
+                            <DropdownMenuItem
+                                onSelect={(event) => {
+                                    // Stays open: the list lands right here.
+                                    event.preventDefault();
+                                    retry();
+                                }}
+                            >
+                                <RefreshCw className="size-3.5 shrink-0" aria-hidden />
+                                {t("code.issue.retry")}
+                            </DropdownMenuItem>
+                        </div>
                     ) : null}
                     {items?.map((item) => (
                         <DropdownMenuItem

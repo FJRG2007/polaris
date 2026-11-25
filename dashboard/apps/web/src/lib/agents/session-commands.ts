@@ -1589,6 +1589,42 @@ export const REPO_SETUP = [
     "fi"
 ];
 
+/**
+ * The conversation a session started again on a new machine reopens
+ * (`claude --resume <id>`, `codex resume <id>`), written where the hooks keep
+ * it, so the runner's turns and a relaunch find it too. Exported for the shell
+ * test that runs it.
+ */
+export const SEED_RESUME_ID = [
+    'if [ "$POLARIS_REOPENED" != "yes" ] && [ -n "$POLARIS_AGENT_RESUME_ID" ]; then',
+    '  case "$POLARIS_AGENT_RESUME_ID" in *[!A-Za-z0-9_-]*) ;; *) printf %s "$POLARIS_AGENT_RESUME_ID" > "$POLARIS_STATE_DIR/agent-session-id" ;; esac',
+    "fi"
+];
+
+/**
+ * The agent's launch: the conversation it was in when the machine restarted,
+ * or the one a reopened session seeded. A tool that refuses that conversation
+ * (its transcript is not in this home) exits at once, and then starts on a new
+ * one rather than leaving the person at a shell. Exported for the shell test.
+ */
+export const LAUNCH_AGENT = [
+    'POLARIS_RESUME_ID=""',
+    'if [ "$POLARIS_REOPENED" = "yes" ] && [ -f "$POLARIS_STATE_DIR/agent-session-id" ]; then',
+    '  POLARIS_RESUME_ID="$(head -c 128 "$POLARIS_STATE_DIR/agent-session-id")"',
+    "fi",
+    "resumed_here=no",
+    'if [ -z "$POLARIS_RESUME_ID" ] && [ -n "$POLARIS_AGENT_RESUME_ID" ] && [ -f "$POLARIS_STATE_DIR/agent-session-id" ]; then',
+    '  POLARIS_RESUME_ID="$(head -c 128 "$POLARIS_STATE_DIR/agent-session-id")"',
+    "  resumed_here=yes",
+    "fi",
+    'resume_at="$(date +%s)"',
+    'if ! sh "$POLARIS_STATE_DIR/launch.sh" "$POLARIS_RESUME_ID" && [ "$resumed_here" = "yes" ] && [ $(( $(date +%s) - resume_at )) -lt 20 ]; then',
+    '  rm -f "$POLARIS_STATE_DIR/agent-session-id"',
+    '  echo "polaris: the agent could not reopen its conversation here, so it starts a new one"',
+    '  sh "$POLARIS_STATE_DIR/launch.sh" "" || true',
+    "fi"
+];
+
 const START_AGENT = [
     // Enigma's own settings, into the home the agent reads - the skills, the
     // memory file, the commands, the trust and bypass settings.
@@ -1702,16 +1738,13 @@ const START_AGENT = [
     '  echo "polaris: this session has ended. Its work is kept here and the agent was not started again."',
     "  exec sh",
     "fi",
+    ...SEED_RESUME_ID,
     // Every prompt as a turn of its own, without the interface: nothing is
     // typed into a terminal, and no first-run screen can stand in the way.
     'if [ -n "$POLARIS_AGENT_HEADLESS" ]; then',
     '  exec sh "$POLARIS_STATE_DIR/runner.sh"',
     "fi",
-    'POLARIS_RESUME_ID=""',
-    'if [ "$POLARIS_REOPENED" = "yes" ] && [ -f "$POLARIS_STATE_DIR/agent-session-id" ]; then',
-    '  POLARIS_RESUME_ID="$(head -c 128 "$POLARIS_STATE_DIR/agent-session-id")"',
-    "fi",
-    'sh "$POLARIS_STATE_DIR/launch.sh" "$POLARIS_RESUME_ID" || true',
+    ...LAUNCH_AGENT,
     'echo "polaris: the agent exited. This terminal is still yours."',
     "exec sh"
 ];

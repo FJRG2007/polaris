@@ -214,6 +214,12 @@ const LogViewer = dynamic(
     { ssr: false }
 );
 
+/** The dashboard's one terminal surface, for a console an app streams into. */
+const TerminalView = dynamic(
+    () => import("@/app/(app)/apps/deploy/terminal-view").then((module) => module.TerminalView),
+    { ssr: false }
+);
+
 /** The shared keyboard shortcuts - an app's help and the settings that move its
  *  keys. Opened from a key or a settings page, so loaded there. */
 const ShortcutsDialog = dynamic(
@@ -288,6 +294,7 @@ export const clientHost = {
     i18nProvider: { useClient, useLocale },
     jsonView: { CodeLine, CodeEditor },
     logViewer: { LogViewer },
+    terminalView: { TerminalView },
     logos: { IntegrationLogo },
     mediaPlayer: { MediaPlayer },
     notificationSound: { soundGain },

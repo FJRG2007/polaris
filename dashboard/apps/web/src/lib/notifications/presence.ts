@@ -21,6 +21,7 @@
  */
 
 import { viewSubject } from "./view-subject";
+import type { LiveClientKind } from "./live-clients";
 
 /**
  * How long a report is believed for. Comfortably longer than the heartbeat, so a
@@ -38,6 +39,10 @@ interface Viewer {
     /** What the tab has open inside that path, when the path does not say
      *  (see `view-subject`): an agent session in Polar. */
     subject: string | null;
+    /** Which kind of client the tab is in, when it said: the desktop app or a
+     *  browser. A report is only ever made while the tab is visible and focused,
+     *  so this is the kind of client the person is using right now. */
+    client: LiveClientKind | null;
     at: number;
 }
 
@@ -76,7 +81,8 @@ export function recordPresence(
     viewerId: string,
     path: string,
     now = Date.now(),
-    subject: string | null = null
+    subject: string | null = null,
+    client: LiveClientKind | null = null
 ): void {
     sweep(now);
     const normalized = viewPath(path);
@@ -87,7 +93,7 @@ export function recordPresence(
         held = new Map();
         viewers.set(userId, held);
     }
-    held.set(viewerId, { path: normalized, subject: viewSubject(subject), at: now });
+    held.set(viewerId, { path: normalized, subject: viewSubject(subject), client, at: now });
 
     // Past the cap the oldest report goes, which is the one least likely to be a
     // tab somebody is looking at.
@@ -135,6 +141,48 @@ export function isViewing(
         if (subject ? viewer.subject === subject : viewer.path === target) return true;
     }
     return false;
+}
+
+/**
+ * Whether any tab of this account is showing a page `shows` accepts.
+ *
+ * For a screen that answers to more than one path - a conversation is open at
+ * its own address and at the address of any message in it - where `isViewing`
+ * matches one. Bounded like it: at most `MAX_VIEWERS_PER_USER` entries, read
+ * from memory, so it costs nothing to ask once per message.
+ */
+export function isViewingWhere(
+    userId: string,
+    shows: (path: string) => boolean,
+    now = Date.now()
+): boolean {
+    const held = viewers.get(userId);
+    if (!held) return false;
+    for (const viewer of held.values()) {
+        if (now - viewer.at > PRESENCE_TTL_MS) continue;
+        if (shows(viewer.path)) return true;
+    }
+    return false;
+}
+
+/**
+ * The kind of client this account is looking at right now, when one said.
+ *
+ * Every report is made by a tab that is visible and focused, and withdrawn the
+ * moment it is not, so the newest live one is the window in front of the
+ * person. Null when no tab is in front of anybody, or none said what it is (a
+ * page loaded before the field existed), and the caller falls back to its own
+ * rule.
+ */
+export function focusedClientKind(userId: string, now = Date.now()): LiveClientKind | null {
+    const held = viewers.get(userId);
+    if (!held) return null;
+    let newest: Viewer | null = null;
+    for (const viewer of held.values()) {
+        if (!viewer.client || now - viewer.at > PRESENCE_TTL_MS) continue;
+        if (!newest || viewer.at > newest.at) newest = viewer;
+    }
+    return newest?.client ?? null;
 }
 
 /**

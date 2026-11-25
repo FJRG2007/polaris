@@ -3,8 +3,8 @@
 /**
  * Interactive terminal. Mints a one-shot ticket, opens a WebSocket to the deploy
  * sidecar presenting the token over Sec-WebSocket-Protocol, and wires xterm.js to
- * it: server output -> terminal, keystrokes -> server, and a resize control frame
- * on fit. xterm is imported dynamically so it stays out of the server bundle.
+ * it through the shared terminal view (`terminal-view.tsx`): server output ->
+ * terminal, keystrokes -> server, and a resize control frame on fit.
  *
  * The same panel serves a container on a deploy target, a container on a
  * Containers connection, and a shell on a registered server; which one is
@@ -12,55 +12,12 @@
  * ticket is minted for.
  */
 
-import "@xterm/xterm/css/xterm.css";
-import type { Terminal } from "@xterm/xterm";
-import {
-    AppLogo,
-    Button,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-    MenuShortcut
-} from "@polaris/ui";
+import { Button } from "@polaris/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-    ArrowDown,
-    ArrowLeft,
-    ArrowRight,
-    ArrowUp,
-    ClipboardPaste,
-    Command,
-    Copy,
-    Eraser,
-    Keyboard,
-    Loader2,
-    RotateCw,
-    Search,
-    ShieldAlert,
-    TextSelect
-} from "lucide-react";
-import { SELECTION_QUOTE_MAX } from "@/lib/polar/shared";
+import { Loader2, RotateCw, Search, ShieldAlert } from "lucide-react";
 import type { LocalPath } from "@/lib/server-local-path";
-import { useTerminalLayout } from "@/lib/use-terminal-layout";
-import { FIND_HIGHLIGHT_LIMIT, TerminalFindBar, type TerminalSearch } from "./terminal-find-bar";
-import { contextMenuNotice } from "@/lib/context-menu/target";
-import { usePolarOptional } from "@/components/polar/polar-panel";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { copyText, readClipboard } from "@/lib/context-menu/editing";
-import {
-    BAR_KEYS,
-    POLAR_LINES,
-    barKeyFace,
-    barKeySequence,
-    clipboardShortcut,
-    isMacPlatform,
-    keyboardInset,
-    terminalExcerpt,
-    withModifiers,
-    type BarKey
-} from "@/lib/terminal-keys";
+import { TerminalView, type TerminalTransport } from "./terminal-view";
 
 /** What to attach to: a container on a deploy target, a container on a
  *  Containers connection, a registered server - as the Polaris login, or as root
@@ -201,55 +158,32 @@ type Status =
     | { kind: "connectingTo"; address: string }
     | { kind: "reason"; text: string };
 
-/** The live terminal, for the parts of the panel outside the session effect. */
-interface LiveTerminal {
-    term: Terminal;
-    send: (data: string) => void;
-}
-
-/** A right-click on the terminal: where, and what was selected at that moment. */
-interface MenuAt {
-    x: number;
-    y: number;
-    selection: string;
-}
-
-/**
- * The rows of the terminal's buffer as text, newest last, a wrapped row joined
- * to the one it continues. Reads only the tail Polar is ever given.
- */
-function bufferLines(term: Terminal): string[] {
-    const buffer = term.buffer.active;
-    const start = Math.max(0, buffer.length - POLAR_LINES * 3);
-    const lines: string[] = [];
-    for (let row = start; row < buffer.length; row++) {
-        const line = buffer.getLine(row);
-        if (!line) continue;
-        const text = line.translateToString(true);
-        if (line.isWrapped && lines.length > 0) lines[lines.length - 1] += text;
-        else lines.push(text);
+/** The ticket request for a target: which session the sidecar opens for it. */
+function ticketBody(target: TerminalTarget, resume: string | undefined): Record<string, unknown> {
+    switch (target.kind) {
+        case "host":
+            return { hostId: target.hostId, mode: target.asRoot ? "ssh-root" : "ssh", terminalSessionId: resume };
+        case "docker":
+            return { connectionId: target.connectionId, containerRef: target.containerRef };
+        case "agent":
+            return { sessionId: target.sessionId, ...(target.shell === undefined ? {} : { shell: true }) };
+        default:
+            return { applicationId: target.applicationId, mode: "terminal" };
     }
-    return lines;
 }
 
-/** Ctrl+Shift+F (Cmd+Shift+F on a Mac): open the find bar. Plain Ctrl+F stays
- *  with the shell, where it is a key readline and editors use. */
-export function isFindShortcut(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey">): boolean {
-    return (event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === "f";
-}
-
-/** Whether this is a touch screen, kept current. */
-function useCoarsePointer(): boolean {
-    const [coarse, setCoarse] = useState(false);
-    useEffect(() => {
-        const query = window.matchMedia?.("(pointer: coarse)");
-        if (!query) return;
-        const update = () => setCoarse(query.matches);
-        update();
-        query.addEventListener("change", update);
-        return () => query.removeEventListener("change", update);
-    }, []);
-    return coarse;
+/** What identifies a target's connection: its contents, not the object. Pure. */
+export function targetKey(target: TerminalTarget): string {
+    switch (target.kind) {
+        case "host":
+            return `host:${target.hostId}:${target.asRoot ? "root" : "login"}`;
+        case "docker":
+            return `docker:${target.connectionId}:${target.containerRef}`;
+        case "agent":
+            return `agent:${target.sessionId}:${target.shell ?? "agent"}`;
+        default:
+            return `app:${target.applicationId}`;
+    }
 }
 
 export function TerminalPanel({
@@ -293,11 +227,6 @@ export function TerminalPanel({
     findServer?: () => Promise<FindServerResult>;
 }) {
     const t = useTranslations("common");
-    const polar = usePolarOptional();
-    const coarse = useCoarsePointer();
-    const { layout, change } = useTerminalLayout();
-    const keysShown = layout.keys ?? coarse;
-    const mountRef = useRef<HTMLDivElement>(null);
     const [status, setStatus] = useState<Status>({ kind: "connecting" });
     const [failure, setFailure] = useState<Failure | null>(null);
     // Bumped by Retry: the session is keyed on it, so asking again is a fresh
@@ -312,124 +241,22 @@ export function TerminalPanel({
     const sessionRef = useRef(resumeId);
     const callbacks = useRef({ onSession, onClosed });
     callbacks.current = { onSession, onClosed };
-    // The key bar's and the menu's way into the live session, and the bar's
-    // Ctrl and Alt held for the next key.
-    const live = useRef<LiveTerminal | null>(null);
-    const heldRef = useRef({ ctrl: false, alt: false });
-    const [held, setHeld] = useState({ ctrl: false, alt: false });
-    const [menu, setMenu] = useState<MenuAt | null>(null);
-    // Find in the output (terminal-find-bar.tsx); the addon is the terminal's,
-    // so it comes and goes with the session.
-    const [search, setSearch] = useState<TerminalSearch | null>(null);
-    const [finding, setFinding] = useState(false);
-    // Read by the menu's close, which must leave the keyboard in the find bar
-    // it just opened rather than take it back to the terminal.
-    const findingRef = useRef(false);
-    findingRef.current = finding;
-    // The object identity of `target` would restart the session on every parent
-    // render; its contents are what actually decide the connection.
-    const key =
-        target.kind === "host"
-            ? `host:${target.hostId}:${target.asRoot ? "root" : "login"}`
-            : target.kind === "docker"
-              ? `docker:${target.connectionId}:${target.containerRef}`
-              : target.kind === "agent"
-                ? `agent:${target.sessionId}:${target.shell ?? "agent"}`
-                : `app:${target.applicationId}`;
 
-    const release = (): void => {
-        heldRef.current = { ctrl: false, alt: false };
-        setHeld(heldRef.current);
-    };
-
-    useEffect(() => {
+    // Mint a ticket, then open the WS with the token as the subprotocol. The
+    // view calls this once per terminal it puts on screen.
+    const transport: TerminalTransport = (sink) => {
         let disposed = false;
         let socket: WebSocket | undefined;
         let opened = false;
-        // Everything the session set up, undone in reverse when it ends - also
-        // when it ends half way, while a ticket or the socket is still on its
-        // way, so a closed dialog never leaves a terminal opening behind it.
         const undo: (() => void)[] = [];
         setFailure(null);
-        setStatus(
-            movedTo.current ? { kind: "connectingTo", address: movedTo.current } : { kind: "connecting" }
-        );
+        setStatus(movedTo.current ? { kind: "connectingTo", address: movedTo.current } : { kind: "connecting" });
 
-        async function start(): Promise<void> {
-            const [{ Terminal: XTerm }, { FitAddon }, { SearchAddon }] = await Promise.all([
-                import("@xterm/xterm"),
-                import("@xterm/addon-fit"),
-                import("@xterm/addon-search")
-            ]);
-            const mount = mountRef.current;
-            if (disposed || !mount) return;
-
-            const term = new XTerm({
-                fontSize: 13,
-                cursorBlink: true,
-                theme: { background: "#0b0e14" },
-                // The search addon draws its match highlights as decorations,
-                // which xterm only offers behind this flag.
-                allowProposedApi: true
-            });
-            undo.push(() => term.dispose());
-            const fit = new FitAddon();
-            term.loadAddon(fit);
-            const finder = new SearchAddon({ highlightLimit: FIND_HIGHLIGHT_LIMIT });
-            term.loadAddon(finder);
-            setSearch(finder);
-            undo.push(() => setSearch(null));
-            term.open(mount);
-            const refit = (): void => {
-                try {
-                    fit.fit();
-                } catch {
-                    // Not laid out yet (a hidden tab): the next resize fits it.
-                }
-            };
-            refit();
-
-            // Copy and paste the way a desktop terminal does (`clipboardShortcut`).
-            // A paste is left to the browser: the key's own paste lands on
-            // xterm's focused input, which xterm reads - bracketed where the
-            // shell asked for it - with no clipboard permission to ask for.
-            const mac = isMacPlatform(navigator.platform ?? "");
-            term.attachCustomKeyEventHandler((event) => {
-                if (isFindShortcut(event)) {
-                    if (event.type === "keydown") {
-                        event.preventDefault();
-                        setFinding(true);
-                    }
-                    return false;
-                }
-                const action = clipboardShortcut(event, term.hasSelection(), mac);
-                if (action === "paste") return false;
-                if (action !== "copy") return true;
-                event.preventDefault();
-                const text = term.getSelection();
-                // Ctrl+C clears what it copied, so the next one is the interrupt.
-                if (!event.shiftKey) term.clearSelection();
-                void copyText(text);
-                return false;
-            });
-
-            // Mint a ticket, then open the WS with the token as the subprotocol.
+        void (async () => {
             const res = await fetch("/api/deploy/terminal/ticket", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify(
-                    target.kind === "host"
-                        ? {
-                              hostId: target.hostId,
-                              mode: target.asRoot ? "ssh-root" : "ssh",
-                              terminalSessionId: sessionRef.current
-                          }
-                        : target.kind === "docker"
-                          ? { connectionId: target.connectionId, containerRef: target.containerRef }
-                          : target.kind === "agent"
-                            ? { sessionId: target.sessionId, ...(target.shell === undefined ? {} : { shell: true }) }
-                            : { applicationId: target.applicationId, mode: "terminal" }
-                )
+                body: JSON.stringify(ticketBody(target, sessionRef.current))
             }).catch(() => null);
             if (disposed) return;
             if (!res?.ok) {
@@ -437,11 +264,7 @@ export function TerminalPanel({
                 // permitted), and that is more use than "could not authorize".
                 const reason = (await res?.json().catch(() => null)) as { error?: string } | null;
                 if (disposed) return;
-                setStatus(
-                    reason?.error
-                        ? { kind: "reason", text: reason.error }
-                        : { kind: "couldNotAuthorize" }
-                );
+                setStatus(reason?.error ? { kind: "reason", text: reason.error } : { kind: "couldNotAuthorize" });
                 return;
             }
             const { token } = (await res.json()) as { token: string };
@@ -452,16 +275,16 @@ export function TerminalPanel({
             ws.binaryType = "arraybuffer";
 
             const sendSize = (): void => {
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
-                }
+                if (ws.readyState !== WebSocket.OPEN) return;
+                const { cols, rows } = sink.size();
+                ws.send(JSON.stringify({ resize: { cols, rows } }));
             };
 
             ws.onopen = () => {
                 opened = true;
                 movedTo.current = null;
                 setStatus({ kind: "connected" });
-                refit();
+                sink.refit();
                 sendSize();
             };
             ws.onmessage = (event) => {
@@ -471,11 +294,7 @@ export function TerminalPanel({
                     callbacks.current.onSession?.(frame.id, frame.number);
                     return;
                 }
-                term.write(
-                    event.data instanceof ArrayBuffer
-                        ? new Uint8Array(event.data)
-                        : (event.data as string)
-                );
+                sink.write(event.data instanceof ArrayBuffer ? new Uint8Array(event.data) : (event.data as string));
             };
             // A session that ran and ended is just over. One that never opened is a
             // failure, and which of the two it is decides what there is to say: the
@@ -492,46 +311,20 @@ export function TerminalPanel({
             // handler has the code and reason, so this only avoids a silent gap.
             ws.onerror = () => !opened && !disposed && setStatus({ kind: "couldNotConnect" });
 
-            const send = (data: string): void => {
+            sink.input((data) => {
                 if (ws.readyState === WebSocket.OPEN) ws.send(data);
-            };
-            live.current = { term, send };
-            undo.push(() => {
-                live.current = null;
             });
-            const onData = term.onData((typed) => {
-                const { ctrl, alt } = heldRef.current;
-                if (!ctrl && !alt) return send(typed);
-                release();
-                send(withModifiers(typed, ctrl, alt));
-            });
-            undo.push(() => onData.dispose());
-            // Every size change - the window, the dialog filling it, full screen,
-            // a phone's keyboard - refits, and a new size is told to the shell.
-            const onResize = term.onResize(sendSize);
-            undo.push(() => onResize.dispose());
-            let frame = 0;
-            const observer = new ResizeObserver(() => {
-                cancelAnimationFrame(frame);
-                frame = requestAnimationFrame(refit);
-            });
-            observer.observe(mount);
-            undo.push(() => {
-                cancelAnimationFrame(frame);
-                observer.disconnect();
-            });
-        }
+            undo.push(() => sink.input(null));
+            // Every size change is told to the shell.
+            undo.push(sink.onResize(sendSize));
+        })();
 
-        void start();
         return () => {
             disposed = true;
             socket?.close();
             for (const step of undo.reverse()) step();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` stands in
-        // for the target's contents; depending on the object would reconnect on
-        // every parent render.
-    }, [key, attempt]);
+    };
 
     useEffect(() => {
         if (resumeId === undefined || resumeId === sessionRef.current) return;
@@ -539,212 +332,29 @@ export function TerminalPanel({
         setAttempt((n) => n + 1);
     }, [resumeId]);
 
-    const focus = (): void => live.current?.term.focus();
-
-    const closeFind = (): void => {
-        setFinding(false);
-        focus();
-    };
-
-    const copySelection = async (text: string): Promise<void> => {
-        if (!text) return;
-        contextMenuNotice(t((await copyText(text)) ? "terminal.menu.copied" : "terminal.menu.copyFailed"));
-    };
-
-    // The menu's Paste has to read the clipboard itself (a key's paste does not):
-    // through the one reader the app's menus share, then into xterm's own paste
-    // so a shell that asked for bracketed paste gets it.
-    const pasteFromMenu = async (): Promise<void> => {
-        const read = await readClipboard();
-        const current = live.current;
-        if (!read.ok) {
-            contextMenuNotice(t("terminal.menu.pasteBlocked"));
-        } else if (current && read.contents.text) {
-            // A shell takes text only: a picture on the clipboard pastes nothing.
-            current.term.paste(read.contents.text);
-        }
-        focus();
-    };
-
-    const askPolar = (selection: string): void => {
-        if (!polar?.allowed) return;
-        const current = live.current;
-        const excerpt = terminalExcerpt(current ? bufferLines(current.term) : [], selection, SELECTION_QUOTE_MAX);
-        const place = polarPlace ?? label;
-        polar.ask(
-            excerpt?.text ?? "",
-            excerpt
-                ? t(excerpt.source === "selection" ? "terminal.polar.aboutSelection" : "terminal.polar.aboutOutput", {
-                      place
-                  })
-                : t("terminal.polar.aboutNothing", { place }),
-            false,
-            // A server's shell binds the chat to that server and account, so
-            // a command Polar proposes goes there unless it names another.
-            target.kind === "host"
-                ? { id: target.hostId, root: target.asRoot === true, name: place }
-                : null
-        );
-    };
-
     const statusText =
         status.kind === "reason"
             ? status.text
             : status.kind === "connectingTo"
               ? t("terminal.status.connectingTo", { address: status.address })
               : t(`terminal.status.${status.kind}`);
+    const place = polarPlace ?? label;
 
     return (
-        <div className={`flex min-w-0 flex-col gap-2 ${fill ? "min-h-0 flex-1" : ""}`}>
-            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                <span className="min-w-0 flex-1 truncate" title={label}>
-                    {label}
-                </span>
-                <span className="min-w-0 max-w-[45%] truncate" title={statusText} aria-live="polite">
-                    {statusText}
-                </span>
-                <div className="flex shrink-0 items-center gap-0.5">
-                    {polar?.allowed ? (
-                        <Button
-                            size="icon-xs"
-                            variant="ghost"
-                            aria-label={t("terminal.toolbar.askPolar")}
-                            title={t("terminal.toolbar.askPolar")}
-                            onClick={() => askPolar(live.current?.term.getSelection() ?? "")}
-                        >
-                            <AppLogo appId="polar" size={14} />
-                        </Button>
-                    ) : null}
-                    {coarse ? (
-                        <Button
-                            size="icon-xs"
-                            variant="ghost"
-                            aria-label={t("terminal.toolbar.typeHere")}
-                            title={t("terminal.toolbar.typeHere")}
-                            onClick={focus}
-                        >
-                            <Keyboard />
-                        </Button>
-                    ) : null}
-                    <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        aria-pressed={finding}
-                        aria-label={t("terminal.toolbar.find")}
-                        title={t("terminal.toolbar.find")}
-                        onClick={() => (finding ? closeFind() : setFinding(true))}
-                    >
-                        <Search />
-                    </Button>
-                    <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        aria-pressed={keysShown}
-                        aria-label={t(keysShown ? "terminal.toolbar.hideKeys" : "terminal.toolbar.showKeys")}
-                        title={t(keysShown ? "terminal.toolbar.hideKeys" : "terminal.toolbar.showKeys")}
-                        onClick={() => change({ keys: !keysShown })}
-                    >
-                        <Command />
-                    </Button>
-                    {toolbar}
-                </div>
-            </div>
-            {finding ? <TerminalFindBar search={search} onClose={closeFind} /> : null}
-            <div
-                ref={mountRef}
-                className={`${fill ? "min-h-40 flex-1" : height} w-full min-w-0 overflow-hidden rounded-md bg-[#0b0e14] p-2`}
-                onContextMenu={(event) => {
-                    // The terminal's own menu: Polaris's global one would see
-                    // only xterm's hidden input, when the click landed on it.
-                    event.preventDefault();
-                    setMenu({
-                        x: event.clientX,
-                        y: event.clientY,
-                        selection: live.current?.term.getSelection() ?? ""
-                    });
-                }}
-            />
-            <DropdownMenu open={menu !== null} onOpenChange={(open) => (open ? undefined : setMenu(null))}>
-                <DropdownMenuTrigger asChild>
-                    <span
-                        aria-hidden
-                        tabIndex={-1}
-                        className="pointer-events-none fixed size-0"
-                        style={{ left: menu?.x ?? 0, top: menu?.y ?? 0 }}
-                    />
-                </DropdownMenuTrigger>
-                {menu ? (
-                    <DropdownMenuContent
-                        align="start"
-                        sideOffset={2}
-                        container={menuContainer}
-                        data-terminal-menu
-                        onCloseAutoFocus={(event) => {
-                            // Back to the terminal, not to the invisible anchor -
-                            // unless the menu just opened the find bar.
-                            event.preventDefault();
-                            if (!findingRef.current) focus();
-                        }}
-                    >
-                        <DropdownMenuItem
-                            disabled={!menu.selection}
-                            onSelect={() => void copySelection(menu.selection)}
-                        >
-                            <Copy />
-                            {t("terminal.menu.copy")}
-                            <MenuShortcut keys="Mod+Shift+C" />
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => void pasteFromMenu()}>
-                            <ClipboardPaste />
-                            {t("terminal.menu.paste")}
-                            <MenuShortcut keys="Mod+V" />
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onSelect={() => {
-                                findingRef.current = true;
-                                setFinding(true);
-                            }}
-                        >
-                            <Search />
-                            {t("terminal.menu.find")}
-                            <MenuShortcut keys="Mod+Shift+F" />
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => live.current?.term.selectAll()}>
-                            <TextSelect />
-                            {t("terminal.menu.selectAll")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => live.current?.term.clear()}>
-                            <Eraser />
-                            {t("terminal.menu.clear")}
-                        </DropdownMenuItem>
-                        {polar?.allowed ? (
-                            <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onSelect={() => askPolar(menu.selection)}>
-                                    <AppLogo appId="polar" size={16} />
-                                    {t(menu.selection ? "terminal.menu.askPolarSelection" : "terminal.menu.askPolar")}
-                                </DropdownMenuItem>
-                            </>
-                        ) : null}
-                    </DropdownMenuContent>
-                ) : null}
-            </DropdownMenu>
-            {keysShown ? (
-                <KeyBar
-                    held={held}
-                    onKey={(barKey) => {
-                        if (barKey === "ctrl" || barKey === "alt") {
-                            heldRef.current = { ...heldRef.current, [barKey]: !heldRef.current[barKey] };
-                            setHeld(heldRef.current);
-                        } else {
-                            const { ctrl, alt } = heldRef.current;
-                            live.current?.send(barKeySequence(barKey, ctrl, alt));
-                            release();
-                        }
-                        focus();
-                    }}
-                />
-            ) : null}
+        <TerminalView
+            transport={transport}
+            transportKey={`${targetKey(target)}#${attempt}`}
+            label={label}
+            status={statusText}
+            polarPlace={place}
+            // A server's shell binds the chat to that server and account, so
+            // a command Polar proposes goes there unless it names another.
+            polarServer={target.kind === "host" ? { id: target.hostId, root: target.asRoot === true, name: place } : null}
+            toolbar={toolbar}
+            fill={fill}
+            menuContainer={menuContainer}
+            height={height}
+        >
             {failure ? (
                 <FailureNote
                     failure={failure}
@@ -769,76 +379,7 @@ export function TerminalPanel({
                     }}
                 />
             ) : null}
-        </div>
-    );
-}
-
-const KEY_ICON = { up: ArrowUp, down: ArrowDown, left: ArrowLeft, right: ArrowRight } as const;
-
-/** How far the on-screen keyboard covers the window, kept current as it opens,
- *  closes and changes height. Zero where the browser cannot say. */
-function useKeyboardInset(): number {
-    const [inset, setInset] = useState(0);
-    useEffect(() => {
-        const viewport = window.visualViewport;
-        if (!viewport) return;
-        const measure = () => setInset(keyboardInset(window.innerHeight, viewport.height, viewport.offsetTop));
-        measure();
-        viewport.addEventListener("resize", measure);
-        viewport.addEventListener("scroll", measure);
-        return () => {
-            viewport.removeEventListener("resize", measure);
-            viewport.removeEventListener("scroll", measure);
-        };
-    }, []);
-    return inset;
-}
-
-/**
- * The keys a keyboard may lack - Escape, Tab, Ctrl and Alt for the next key,
- * the arrows, the shell's symbols, ^C ^D ^L - shown by default on a touch
- * screen and switched on or off from the header anywhere. Under the terminal
- * while the on-screen keyboard is down; pinned just above it while it is up,
- * the way Termius and Blink do it. A press never takes the focus, so the
- * keyboard stays where it is.
- */
-function KeyBar({ held, onKey }: { held: { ctrl: boolean; alt: boolean }; onKey: (key: BarKey) => void }) {
-    const t = useTranslations("common");
-    const inset = useKeyboardInset();
-    return (
-        <div
-            role="toolbar"
-            aria-label={t("terminal.keys.bar")}
-            style={inset > 0 ? { bottom: inset } : undefined}
-            className={`flex min-w-0 gap-1 overflow-x-auto ${
-                inset > 0 ? "fixed inset-x-0 z-50 border-t border-border bg-elevated px-2 py-1" : ""
-            }`}
-        >
-            {BAR_KEYS.map((key) => {
-                const Icon = key === "up" || key === "down" || key === "left" || key === "right" ? KEY_ICON[key] : null;
-                const named = key === "esc" || key === "tab" || key === "ctrl" || key === "alt";
-                const name = named ? t(`terminal.keys.${key}Name`) : t(`terminal.keys.${key}`);
-                const face = barKeyFace(key) ?? (named ? t(`terminal.keys.${key}`) : null);
-                const modifier = key === "ctrl" || key === "alt";
-                const on = modifier && held[key];
-                return (
-                    <button
-                        key={key}
-                        type="button"
-                        aria-label={name}
-                        title={name}
-                        aria-pressed={modifier ? on : undefined}
-                        onPointerDown={(event) => event.preventDefault()}
-                        onClick={() => onKey(key)}
-                        className={`grid min-h-11 min-w-11 shrink-0 place-items-center rounded-md px-2 font-mono text-xs [@media(pointer:fine)]:min-h-8 [@media(pointer:fine)]:min-w-8 ${
-                            on ? "bg-primary text-primary-foreground" : "bg-muted text-foreground active:bg-card-hover"
-                        }`}
-                    >
-                        {Icon ? <Icon className="size-4" aria-hidden /> : face}
-                    </button>
-                );
-            })}
-        </div>
+        </TerminalView>
     );
 }
 /**

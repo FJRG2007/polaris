@@ -69,6 +69,22 @@ export async function openBrowserDevice(userId: string, account?: MlsDeviceOptio
  * keys it kept and its index of opened sealed text - when the account signs out of this browser. Its groups see a
  * stale leaf until a member removes it; a later sign-in is a new device.
  */
+/**
+ * Tell the server this browser's device for the account is leaving, while the
+ * session still stands (before the sign-out): it forgets the device and its key
+ * packages, and every group drops its leaf at the next member's send. Never
+ * holds the sign-out up for long: a request that does not answer in `waitMs`
+ * is let go, and the inactivity limit retires the device later instead.
+ */
+export async function retireBrowserDevice(userId: string, waitMs = 3_000, transport = fetchTransport()): Promise<void> {
+    const device = localStorage.getItem(DEVICE_NOTE + userId);
+    if (!device) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<void>((resolve) => (timer = setTimeout(resolve, waitMs)));
+    await Promise.race([transport({ op: "retire-device", device }).then(() => undefined, () => undefined), late]);
+    clearTimeout(timer);
+}
+
 export async function forgetBrowserDevice(userId: string): Promise<void> {
     const known = localStorage.getItem(DEVICE_NOTE + userId);
     if (!known) return;

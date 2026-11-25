@@ -20,8 +20,14 @@ export const ATTACHMENTS_DIR = ".polaris/attachments";
 /** The most one prompt carries in all. */
 export const SESSION_ATTACHMENTS_MAX_BYTES = 10 * 1024 * 1024;
 
-/** Raw bytes per command: 64 KiB of base64, well under one argument's limit. */
-const CHUNK_BYTES = 48 * 1024;
+/**
+ * Raw bytes per command. The host daemon refuses any argument over 16384 bytes
+ * (`deploy_exec_run`, `crates/polaris-hostd/src/handlers.rs`), and the whole
+ * command is one argument (`sh -c ...`): 10 KiB is 13656 bytes of base64,
+ * which leaves room for the `cd` into the working directory and the file name.
+ * At 48 KiB every file over 12 KiB failed on its first chunk.
+ */
+export const CHUNK_BYTES = 10 * 1024;
 
 /** A file name that is safe unquoted in a shell and on any file system. */
 export function attachmentFileName(index: number, name: string): string {

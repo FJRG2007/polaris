@@ -343,7 +343,7 @@ export function appSettingsTarget(state: {
  * The categories the phone app lists, of the same group: its servers, and the
  * rest of what it keeps on the phone (notifications, language, Vault autofill)
  * under General. The other categories are the desktop app's alone; the app's
- * version and its updates are on Downloads.
+ * version and its updates head General (and Downloads, on the phone).
  */
 export const APP_PHONE_CATEGORIES = ["general", "hosts"] as const satisfies readonly AppSettingCategory[];
 

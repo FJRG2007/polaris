@@ -23,6 +23,7 @@ import { prisma } from "@polaris/db";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as promotion from "@/lib/deploy/promotion";
 import type { PromotionPreview } from "@/lib/deploy/promotion";
+import * as envSync from "@/lib/deploy/environment-sync";
 import * as projectService from "@/lib/deploy-project-service";
 import { readMonthToDate, type StatementView } from "@/lib/billing/statement";
 import {
@@ -44,6 +45,8 @@ import {
     environmentNetworkModeSchema,
     environmentPromotionSchema,
     environmentStageSchema,
+    environmentSyncPreviewSchema,
+    environmentSyncSchema,
     projectAccessInputSchema,
     projectFlagsSchema,
     projectGeneralSchema,
@@ -53,6 +56,7 @@ import {
     type EnvironmentNetworkMode,
     type EnvironmentPromotionInput,
     type EnvironmentStage,
+    type EnvironmentSyncInput,
     type ProjectAccessInput,
     type ProjectCapability,
     type ProjectFlags,
@@ -740,7 +744,28 @@ export async function applyStagedChangesAction(input: {
         const access = await requireEnvironmentAccess(input.environmentId, user.id, "deploy.run");
         if (access.projectId !== input.projectId)
             return { error: await reply("environment.elsewhere") };
-        const result = await staged.applyStagedChanges(input.environmentId, access.ownerId);
+        const result = await staged.applyStagedChanges(input.environmentId, access.ownerId, {
+            // A parked sync runs with what the person deploying it may do now,
+            // not with what whoever parked it could.
+            sync: async (change) => {
+                const sourceId = change.payload.sourceEnvironmentId;
+                if (!sourceId || !accessInEnvironment(access, sourceId))
+                    throw new Error(await reply("environment.notFound"));
+                const outcome = await envSync.applySync({
+                    sourceId,
+                    targetId: input.environmentId,
+                    ownerId: access.ownerId,
+                    actorId: user.id,
+                    items: change.payload.items ?? [],
+                    reach: { source: access.capabilities, target: access.capabilities }
+                });
+                deployAffected(outcome.affected, access.ownerId, user.id);
+                // Left staged until every picked item went in; applying it again
+                // does only what is still different.
+                const failed = outcome.failures[0] ?? null;
+                if (failed) throw new Error(failed.error);
+            }
+        });
         await recordDeployAudit({
             actorId: user.id,
             action: "deploy.changeset.apply",
@@ -943,5 +968,160 @@ export async function listPromotionsAction(
         const user = await requirePermission("deploy.read");
         const access = await requireProjectAccess(projectId, user.id, "project.read");
         return { promotions: await promotion.listPromotions(access.projectId) };
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Environment sync
+// ---------------------------------------------------------------------------
+
+/**
+ * What the reader holds on each side of a sync. Capabilities are the project's;
+ * an entry limited to some environments has to reach both of them, or the sync
+ * is refused as if the other one did not exist.
+ */
+async function syncAccess(
+    input: { sourceEnvironmentId: string; targetEnvironmentId: string },
+    userId: string
+) {
+    const access = await requireEnvironmentAccess(
+        input.targetEnvironmentId,
+        userId,
+        "project.read"
+    );
+    if (!accessInEnvironment(access, input.sourceEnvironmentId))
+        throw new Error(await reply("environment.notFound"));
+    return { access, reach: { source: access.capabilities, target: access.capabilities } };
+}
+
+/** Deploy the services a sync changed. Each one is its own release; one that
+ *  fails to start is in its own history and does not hold up the others. */
+function deployAffected(applicationIds: readonly string[], ownerId: string, actorId: string) {
+    for (const id of applicationIds)
+        void deployService
+            .deployApplication(id, ownerId, actorId, { audit: { reason: "environment.sync" } })
+            .catch((error: unknown) =>
+                console.error("polaris: a service changed by a sync did not deploy:", error)
+            );
+}
+
+export async function previewSyncAction(input: {
+    sourceEnvironmentId: string;
+    targetEnvironmentId: string;
+}): Promise<Result<{ preview: envSync.SyncPreview; canDeploy: boolean }>> {
+    return attempt("environment.syncFailed", async () => {
+        const user = await requirePermission("deploy.read");
+        const parsed = environmentSyncPreviewSchema.safeParse(input);
+        if (!parsed.success)
+            return { error: await firstIssue(parsed.error, "environment.checkDetails") };
+        const { access, reach } = await syncAccess(parsed.data, user.id);
+        const preview = await envSync.previewSync(
+            parsed.data.sourceEnvironmentId,
+            parsed.data.targetEnvironmentId,
+            access.ownerId,
+            reach
+        );
+        return { preview, canDeploy: accessCan(access, "deploy.run") };
+    });
+}
+
+/**
+ * Apply the picked changes of a sync and deploy what they touched, or park the
+ * whole sync in the receiving environment's changeset to deploy later. Parking
+ * it again replaces the earlier pick rather than adding a second one.
+ */
+export async function syncEnvironmentAction(input: EnvironmentSyncInput): Promise<
+    Result<{
+        staged: boolean;
+        applied: number;
+        deployed: number;
+        refused: number;
+        stagedRemovals: string[];
+        failures: { id: string; error: string }[];
+    }>
+> {
+    return attempt("environment.syncFailed", async () => {
+        const user = await requirePermission("deploy.manage");
+        const parsed = environmentSyncSchema.safeParse(input);
+        if (!parsed.success)
+            return { error: await firstIssue(parsed.error, "environment.checkDetails") };
+        const { access, reach } = await syncAccess(parsed.data, user.id);
+        const sourceId = parsed.data.sourceEnvironmentId;
+        const targetId = parsed.data.targetEnvironmentId;
+        const preview = await envSync.previewSync(sourceId, targetId, access.ownerId, reach);
+        const picked = parsed.data.items.filter((id) =>
+            preview.diff.items.some((item) => item.id === id)
+        );
+        const allowed = picked.filter((id) => !preview.refusals[id]);
+        if (picked.length > 0 && allowed.length === 0)
+            return { error: await reply("environment.syncNotAllowed") };
+        if (allowed.length === 0) return { error: await reply("environment.syncNothing") };
+        if (!accessCan(access, "deploy.run"))
+            return { error: await reply("environment.syncCannotDeploy") };
+
+        if (parsed.data.mode === "stage") {
+            await staged.stageChange({
+                environmentId: targetId,
+                kind: "environment.sync",
+                targetType: "environment",
+                targetId,
+                targetName: preview.targetName,
+                payload: {
+                    sourceEnvironmentId: sourceId,
+                    sourceName: preview.sourceName,
+                    items: allowed
+                },
+                createdById: user.id
+            });
+            await recordDeployAudit({
+                actorId: user.id,
+                orgId: access.orgId ?? undefined,
+                action: "deploy.env.sync.stage",
+                targetType: "environment",
+                targetId,
+                metadata: { from: sourceId, items: allowed.length }
+            });
+            refresh(access.projectId);
+            return {
+                staged: true,
+                applied: 0,
+                deployed: 0,
+                refused: picked.length - allowed.length,
+                stagedRemovals: [],
+                failures: []
+            };
+        }
+
+        const outcome = await envSync.applySync({
+            sourceId,
+            targetId,
+            ownerId: access.ownerId,
+            actorId: user.id,
+            items: allowed,
+            reach
+        });
+        deployAffected(outcome.affected, access.ownerId, user.id);
+        await recordDeployAudit({
+            actorId: user.id,
+            orgId: access.orgId ?? undefined,
+            action: "deploy.env.sync",
+            targetType: "environment",
+            targetId,
+            metadata: {
+                from: sourceId,
+                applied: outcome.applied,
+                failed: outcome.failures.map((failure) => failure.id),
+                deployed: outcome.affected.length
+            }
+        });
+        refresh(access.projectId);
+        return {
+            staged: false,
+            applied: outcome.applied.length,
+            deployed: outcome.affected.length,
+            refused: picked.length - allowed.length + outcome.refused.length,
+            stagedRemovals: outcome.stagedRemovals,
+            failures: outcome.failures
+        };
     });
 }

@@ -162,6 +162,10 @@ export async function chatTarget(): Promise<UploadTarget> {
 
 /** One file, as it was stored. */
 export interface StoredAttachment {
+    /** The row's id, when it is chosen before the row exists: a sealed file keeps its upload's id, named inside its message's seal. */
+    readonly id?: string;
+    /** Sealed in the sender's browser - see `ChatAttachment.sealed`. */
+    readonly sealed?: boolean;
     readonly name: string;
     readonly size: number;
     readonly contentType: string;

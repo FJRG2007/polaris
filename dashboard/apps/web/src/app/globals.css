@@ -1189,23 +1189,9 @@ dialog.pdfSlick-dialog .dialogButton {
     container-type: inline-size;
 }
 
-.polar-head-narrow {
-    display: none;
-}
-
 @container (max-width: 36rem) {
     .polar-mode-label {
         display: none;
-    }
-}
-
-@container (max-width: 30rem) {
-    .polar-head-wide {
-        display: none;
-    }
-
-    .polar-head-narrow {
-        display: inline-flex;
     }
 }
 

@@ -400,6 +400,7 @@ model User {
     chatChannelMemberships ChatChannelMember[]
     chatLock               ChatLock?
     chatPollVotes        ChatPollVote[]
+    chatPollBallots      ChatPollBallot[]
     contactNamesGiven    ContactName[]       @relation("ContactNamesGiven")
     contactNamesReceived ContactName[]       @relation("ContactNamesReceived")
     chatReportsMade     ChatReport[]         @relation("ChatReportsMade")
@@ -10912,6 +10913,7 @@ model ChatChannel {
     avatar   ChatChannelAvatar?
     members  ChatChannelMember[]
     messages ChatMessage[]
+    migration ChatMigration?
     meetings Meeting[]
     scheduled ChatScheduledMessage[]
     uploads  ChatUpload[]
@@ -11271,6 +11273,7 @@ model ChatMessage {
     reminders   ChatReminder[]
     linkFlags   ChatMessageLinkFlag[]
     edits       ChatMessageEdit[]
+    migrationRollback ChatMigrationRollback[]
     reports     ChatReport[]
     polarCalls  PolarChatCall[]
     hiddenFor   ChatMessageHidden[]
@@ -11633,6 +11636,12 @@ model ChatPoll {
     // running total is one where the first few votes decide the rest, which is
     // exactly what a room asking something contentious wants to avoid.
     hideResults Boolean   @default(false)
+    // Whether who picked what stays unknown to everybody, the person who asked
+    // it and the admins included: only the counts are ever shown. Chosen when it
+    // is asked and never changed after, since a vote cast in secret must not
+    // become a public one. True by default, and for every poll asked before the
+    // choice existed - those votes were cast with nobody able to see them.
+    anonymous   Boolean   @default(true)
     // When it runs out on its own, or null for one that only a person ends.
     // Whether it is over is worked out on read from these two, the same way a
     // mute that expires is: nothing has to be running for a poll to close on
@@ -11646,6 +11655,7 @@ model ChatPoll {
 
     message ChatMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
     options ChatPollOption[]
+    ballots ChatPollBallot[]
 
     @@index([closesAt])
 }
@@ -11721,6 +11731,33 @@ model ChatPollVote {
 
     @@unique([optionId, userId])
     @@index([optionId])
+    @@index([userId])
+}
+
+// One person's sealed vote on a poll in a sealed conversation
+// (docs/chat-e2ee-mls.md, "Sealed votes").
+//
+// The answers picked are sealed in the voter's browser under the
+// conversation's history key, so this row says that somebody voted and never
+// what they picked: the tally is made in each member's browser. One row per
+// voter is what keeps it one vote per person; voting again replaces it and
+// taking the vote back deletes it. `ballotId` is a fresh random id per ballot,
+// bound into the seal and the order an anonymous poll's ballots are read in, so
+// that order says nothing about who cast which.
+model ChatPollBallot {
+    pollId    String   @db.Uuid
+    userId    String   @db.Uuid
+    ballotId  String   @db.Uuid
+    // The MLS epoch whose history key sealed it.
+    epoch     BigInt
+    sealed    Bytes
+    updatedAt DateTime @default(now()) @updatedAt
+
+    poll ChatPoll @relation(fields: [pollId], references: [messageId], onDelete: Cascade)
+    user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([pollId, userId])
+    @@unique([pollId, ballotId])
     @@index([userId])
 }
 
@@ -11802,6 +11839,11 @@ model ChatAttachment {
     // sender's setting stood when it was sent (`UserPrivacy.viewOnceWatermark`).
     // Copied per file so a later change never alters what was already sent.
     watermark    Boolean  @default(true)
+    // Sealed in the sender's browser (docs/chat-e2ee-proposal.md 10b): the bytes
+    // are an opaque blob, the name and type above say nothing ("file",
+    // octet-stream), and the key, digest and real name travel inside the sealed
+    // message that carries it. Never shown inline, given a still or read here.
+    sealed       Boolean  @default(false)
     createdAt    DateTime @default(now())
 
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
@@ -11925,6 +11967,10 @@ model ChatUpload {
     // Sent covered, chosen before the upload because that is when the sender
     // marked it.
     spoiler   Boolean  @default(false)
+    // Sealed in the sender's browser: an opaque blob for a sealed message (see
+    // `ChatAttachment.sealed`). A sealed upload only rides a sealed message,
+    // and a sealed message only carries sealed uploads.
+    sealed    Boolean  @default(false)
     createdAt DateTime @default(now())
 
     user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -18210,6 +18256,13 @@ model PolarPreference {
     // The colors Polar Code paints code and diffs in: one of CODE_THEMES
     // (apps/web/src/lib/polar/code-theme.ts). Null is the design system's own.
     codeTheme      String?
+    // How Polar Code shows the agent's steps: compact (a line each) or
+    // detailed (cards open), from apps/web/src/lib/polar/code-steps.ts. Null
+    // is not chosen yet, read as compact.
+    codeSteps      String?
+    // Whether a Code session suggests the next message after each turn
+    // (apps/web/src/lib/polar/code-suggestion.ts).
+    codeSuggestions Boolean @default(true)
     updatedAt      DateTime @updatedAt
 }
 
@@ -19340,6 +19393,52 @@ model MlsGroupEvent {
 
     @@index([channelId, seq])
     @@index([recipient, seq])
+}
+
+// Where an existing conversation's plain history is on its way to sealed
+// (docs/chat-e2ee-mls.md, "Migration of existing chats"; proposal 8): one row
+// per conversation the migrator has looked at. `state` is pending | converting
+// | cut | failed. `cut` is sealed only: its messages were sealed under a
+// one-time history key for the legacy epoch, verified, and their plain text
+// moved to `ChatMigrationRollback`. `reason` says why one is pending or failed
+// (noAccountKey, noMembers, mismatch). `signKey` is the public half of the
+// one-time Ed25519 key that signed the sealed history.
+model ChatMigration {
+    channelId String    @id @db.Uuid
+    state     String    @default("pending")
+    reason    String?
+    sealed    Int       @default(0)
+    signKey   Bytes?
+    cutAt     DateTime?
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+    @@index([state])
+}
+
+// The plain text a cut conversation's rows held, kept for the 30-day rollback
+// (proposal 13, decision 4) and nothing else: no screen and no API reads it.
+// `kind` is message (body and translation of a ChatMessage) or edit (body of a
+// ChatMessageEdit), and `messageId` the message either belongs to, so deleting
+// the message deletes its copy. Deleted by the purge once the rollback window
+// closes.
+model ChatMigrationRollback {
+    id          String   @db.Uuid
+    kind        String
+    messageId   String   @db.Uuid
+    channelId   String   @db.Uuid
+    body        String
+    translation Json?
+    createdAt   DateTime @default(now())
+
+    message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@id([kind, id])
+    @@index([messageId])
+    @@index([channelId])
+    @@index([createdAt])
 }
 
 // The conversation's history key for one epoch, sealed to one account's key

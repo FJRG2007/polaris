@@ -20,6 +20,7 @@ import {
     type PolarDisplayKey
 } from "@/lib/polar/display";
 import { CODE_THEMES, codeThemeOf, DEFAULT_CODE_THEME, type CodeTheme } from "@/lib/polar/code-theme";
+import { CODE_STEP_VIEWS, codeStepViewOf, type CodeStepView } from "@/lib/polar/code-steps";
 
 const CACHE_KEY = "polar.display";
 
@@ -61,6 +62,7 @@ export const polarDisplayStore = {
                 if (!data) return;
                 polarDisplayStore.set(displayOf(data));
                 codeThemeStore.set(codeThemeOf((data as { codeTheme?: unknown }).codeTheme));
+                codeStepsStore.set(codeStepViewOf((data as { codeSteps?: unknown }).codeSteps));
             })
             .catch(() => undefined);
         return request.then(() => polarDisplayStore.get());
@@ -138,6 +140,63 @@ export async function changeCodeTheme(next: CodeTheme): Promise<boolean> {
     return false;
 }
 
+const STEPS_CACHE_KEY = "polar.codeSteps";
+let stepView: CodeStepView | null | undefined;
+const stepListeners = new Set<() => void>();
+
+/** How Polar Code shows the agent's steps, per person: the device's last known
+ *  pick at once, the server's when it answers. Null until the person picks. */
+export const codeStepsStore = {
+    get(): CodeStepView | null {
+        if (stepView === undefined) {
+            if (typeof window === "undefined") return null;
+            try {
+                stepView = codeStepViewOf(window.localStorage.getItem(STEPS_CACHE_KEY));
+            } catch {
+                stepView = null;
+            }
+        }
+        return stepView;
+    },
+    set(next: CodeStepView | null): void {
+        if (codeStepsStore.get() === next) return;
+        stepView = next;
+        try {
+            if (next) window.localStorage.setItem(STEPS_CACHE_KEY, next);
+            else window.localStorage.removeItem(STEPS_CACHE_KEY);
+        } catch {
+            // Not kept on this device; the server still has it.
+        }
+        for (const listener of stepListeners) listener();
+    },
+    subscribe(listener: () => void): () => void {
+        stepListeners.add(listener);
+        void polarDisplayStore.load();
+        return () => stepListeners.delete(listener);
+    }
+};
+
+/** The person's pick, or null when they have not made one. */
+export function useCodeSteps(): CodeStepView | null {
+    return useSyncExternalStore(codeStepsStore.subscribe, codeStepsStore.get, () => null);
+}
+
+/** Changes how steps show, at once, and puts the old pick back when the
+ *  server says no. */
+export async function changeCodeSteps(next: CodeStepView): Promise<boolean> {
+    const before = codeStepsStore.get();
+    if (before === next) return true;
+    codeStepsStore.set(next);
+    const response = await fetch("/api/polar/preferences", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ codeSteps: next })
+    }).catch(() => null);
+    if (response?.ok) return true;
+    codeStepsStore.set(before);
+    return false;
+}
+
 /** Turns one switch, at once, and back again when the server says no. */
 export async function changePolarDisplay(key: PolarDisplayKey, value: boolean): Promise<boolean> {
     const before = polarDisplayStore.get();
@@ -154,8 +213,9 @@ export async function changePolarDisplay(key: PolarDisplayKey, value: boolean): 
 }
 
 /** The suggestion switch lives with the helper model (`polar-helper-settings.tsx`),
- *  and which chat opens with "When Polar opens" (`polar-open-settings.tsx`). */
-type DisplayRow = Exclude<PolarDisplayKey, "suggestions" | "reopenLastChat">;
+ *  which chat opens with "When Polar opens" (`polar-open-settings.tsx`), and
+ *  Code's suggestion sits with Code steps. */
+type DisplayRow = Exclude<PolarDisplayKey, "suggestions" | "reopenLastChat" | "codeSuggestions">;
 
 const ROWS: readonly {
     key: DisplayRow;
@@ -215,11 +275,62 @@ function CodeThemeSettings() {
     );
 }
 
-/** The "Chat display" section of Polar's settings, and Code's theme under it. */
+/** The "Code steps" section: what the agent's work shows by default. */
+function CodeStepsSettings() {
+    const t = useTranslations("polar");
+    const toast = useToast();
+    const view = useCodeSteps() ?? "compact";
+    const display = usePolarDisplay();
+    return (
+        <section className="flex flex-col gap-2">
+            <div className="min-w-0">
+                <h2 className="text-sm font-medium text-foreground">{t("settings.codeSteps.title")}</h2>
+                <p className="text-xs text-muted-foreground">{t("settings.codeSteps.intro")}</p>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2">
+                <p className="min-w-0 flex-1 truncate text-sm text-foreground">{t("settings.codeSteps.label")}</p>
+                <Select
+                    value={view}
+                    aria-label={t("settings.codeSteps.label")}
+                    className="w-56 max-w-full"
+                    onValueChange={(value) => {
+                        const next = codeStepViewOf(value);
+                        if (!next) return;
+                        void changeCodeSteps(next).then((saved) =>
+                            saved ? undefined : toast.show({ title: t("settings.codeSteps.failed") })
+                        );
+                    }}
+                    options={CODE_STEP_VIEWS.map((name) => ({
+                        value: name,
+                        label: t(`settings.codeSteps.names.${name}`)
+                    }))}
+                />
+            </div>
+            <div className="flex min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2">
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm text-foreground">{t("settings.codeSuggestions.label")}</p>
+                    <p className="text-xs text-muted-foreground">{t("settings.codeSuggestions.hint")}</p>
+                </div>
+                <Switch
+                    checked={display.codeSuggestions}
+                    aria-label={t("settings.codeSuggestions.label")}
+                    onChange={(value) =>
+                        void changePolarDisplay("codeSuggestions", value).then((saved) =>
+                            saved ? undefined : toast.show({ title: t("settings.codeSuggestions.failed") })
+                        )
+                    }
+                />
+            </div>
+        </section>
+    );
+}
+
+/** The "Chat display" section of Polar's settings, and Code's under it. */
 export function DisplaySettings() {
     return (
         <div className="flex flex-col gap-6">
             <ChatDisplaySettings />
+            <CodeStepsSettings />
             <CodeThemeSettings />
         </div>
     );

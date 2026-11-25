@@ -307,7 +307,9 @@
             "tooMany": "This channel has as many followers as it can have.",
             "notPublishable": "Only a message of the channel itself, with words in it, can be published.",
             "filesNotPublished": "Messages with files cannot be published yet."
-        }
+        },
+        "pollAnonymous": "The votes on that poll are anonymous",
+        "pollVotersHidden": "Who picked what shows once the poll closes"
     },
     "media": {
         "refused": {
@@ -1097,7 +1099,11 @@
         "question": "Question",
         "answers": "Answers",
         "answerN": "Answer {n}",
-        "removeAnswerN": "Remove answer {n}"
+        "removeAnswerN": "Remove answer {n}",
+        "anonymousVotes": "Anonymous votes",
+        "onlyTheCountsAreShown": "Only the counts are shown, never who picked what. This cannot be changed later.",
+        "everybodySeesWhoPicked": "Everybody here can see who picked each answer. This cannot be changed later.",
+        "keepTheVotesAnonymous": "Keep the votes anonymous"
     },
     "clip": {
         "recordAClip": "Record a clip",
@@ -1618,10 +1624,22 @@
         "openUntilItIsClosed": "Open until it is closed",
         "resultsShowWhenItCloses": "Results show when it closes",
         "savingYourVote": "Saving your vote",
+        "voteNotCast": "That vote was not cast. Try again.",
         "closing": "Closing...",
         "endPoll": "End poll",
         "votes": "{count, plural, one {1 vote} other {{count} votes}}",
-        "closes": "Closes <time></time>"
+        "closes": "Closes <time></time>",
+        "anonymous": "Anonymous",
+        "public": "Public",
+        "anonymousHint": "Only the counts are shown, never who picked what",
+        "publicHint": "Everybody here can see who picked each answer",
+        "seeVotes": "See votes",
+        "whoVoted": "Who voted",
+        "whoVotedDescription": "This poll was asked in public, so everybody here can see this.",
+        "nobodyPickedThis": "Nobody picked this",
+        "andMore": "{count, plural, one {and 1 more} other {and {count} more}}",
+        "votersNotLoaded": "The votes did not load.",
+        "tryAgain": "Try again"
     },
     "newSpace": {
         "newSpace": "New space",
@@ -2858,9 +2876,17 @@
         "mediaSeeAll": "See all",
         "mediaFailed": "Photos and videos did not load",
         "mediaRetry": "Try again",
+        "mediaOpening": "Still opening",
         "polar": "Polar in this chat",
         "polarHint": "Polar reads what is said here from now on, and so do whoever runs Polaris and the model provider. Ask it with @polar.",
-        "polarNotYours": "Only someone who may add people here can change this."
+        "polarNotYours": "Only someone who may add people here can change this.",
+        "safetyNumber": "Safety number",
+        "safetyHint": "Compare these numbers with the ones on {name}'s screen, in person or on a call. If they match, nobody is reading in between.",
+        "safetyNoKey": "{name} has not opened sealed chat yet, so there is no number to compare.",
+        "safetyFailed": "The safety number could not be worked out.",
+        "safetyRetry": "Try again",
+        "safetyCopy": "Copy number",
+        "safetyCopied": "Number copied"
     },
     "location": {
         "title": "Share location",

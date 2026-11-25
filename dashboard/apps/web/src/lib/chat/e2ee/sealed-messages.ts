@@ -33,7 +33,11 @@
  * not deleted, not past their expiry, not another reader's ephemeral answer.
  */
 
+import * as core from "@polaris/core";
 import { prisma, Prisma } from "@polaris/db";
+import { can } from "@polaris/auth";
+import { claimUploads, UploadRefused } from "@/lib/chat/uploads";
+import { removeStoredFiles, type StoredAttachment } from "@/lib/chat/attachments";
 import { publishChatChange } from "@/lib/chat/live";
 import { expiryForChannel } from "@/lib/chat/vanish";
 import { unhideOnMessage } from "@/lib/chat/chat-lock";
@@ -53,6 +57,10 @@ export interface SealedSend {
     parentId?: string | null;
     /** The message this one answers, quoted above it (metadata, as a thread is). */
     replyToId?: string | null;
+    /** Sealed files staged for this message (`claimUploads(..., sealed)`); their keys are inside the seal. */
+    uploads?: readonly string[];
+    /** A poll: its question and answers are inside the seal; the server keeps one empty answer row per answer, the rules and the votes. */
+    poll?: { options: number; multiple: boolean; hideResults: boolean; anonymous: boolean; hours: number };
     epoch: bigint;
     senderLeaf: number;
     ciphertext: Uint8Array;
@@ -61,7 +69,7 @@ export interface SealedSend {
 
 /** Why a sealed message was not taken; the route answers it as a refusal. */
 export class SealedRefusal extends Error {
-    constructor(readonly reason: "unknownDevice" | "unknownGroup" | "futureEpoch" | "olderEpoch" | "staleRevision" | "notSealed" | "badSignature") {
+    constructor(readonly reason: "unknownDevice" | "unknownGroup" | "futureEpoch" | "olderEpoch" | "staleRevision" | "notSealed" | "badSignature" | "filesRefused" | "pollRefused") {
         super(`the sealed message was refused (${reason})`);
         this.name = "SealedRefusal";
     }
@@ -82,13 +90,32 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
     const signatureKey = new Uint8Array(device.signatureKey);
     if (!(await content.verifyMessageSignature(signatureKey, binding, input.ciphertext, input.signature))) throw new SealedRefusal("badSignature");
     const service = serviceKind(userId);
-    if (service) return postAsService(service, input, signatureKey);
-    const id = await messages.send(
+    // A poll carries no files, and is asked by a person.
+    if (input.poll && (service || input.uploads?.length)) throw new SealedRefusal("pollRefused");
+    if (service) {
+        if (input.uploads?.length) throw new SealedRefusal("filesRefused");
+        return postAsService(service, input, signatureKey);
+    }
+    if (input.uploads?.length) {
+        // A retry of a send that landed answers the stored message: its uploads were claimed by it.
+        const already = await prisma.chatMessage.findFirst({ where: { authorId: userId, clientKey: input.clientKey }, select: { id: true } });
+        if (already) return already.id;
+    }
+    const files = input.uploads?.length ? await sealedFiles(userId, input.channelId, input.uploads) : [];
+    const id = await sendClaimed(files, () => messages.send(
         { id: userId },
         { channelId: input.channelId, body: "", clientKey: input.clientKey, parentId: input.parentId ?? null },
-        [],
+        files,
         input.replyToId ? { messageId: input.replyToId, forwarded: false } : null,
-        null,
+        input.poll
+            ? {
+                  options: Array.from({ length: input.poll.options }, () => ""),
+                  multiple: input.poll.multiple,
+                  hideResults: input.poll.hideResults,
+                  anonymous: input.poll.anonymous,
+                  closesAt: core.pollClosesAt(input.poll.hours)
+              }
+            : null,
         null,
         null,
         {
@@ -99,7 +126,7 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
             e2eeSignature: owned(input.signature),
             e2eeSignatureKey: owned(signatureKey)
         }
-    );
+    ));
     // Where Polar was added, it opens the message with its own device to see whether it is asked.
     void import("./sealed-polar")
         .then((polar) =>
@@ -107,6 +134,33 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
         )
         .catch((error: unknown) => console.error("chat: Polar could not be asked:", error));
     return id;
+}
+
+/**
+ * The sealed files a message names, claimed from what `userId` staged in the
+ * conversation, under every rule the plain upload and send apply: allowed to
+ * attach, files allowed here, and no more than the conversation takes. A
+ * plain upload is never claimed here, nor a sealed one by the plain send.
+ */
+async function sealedFiles(userId: string, channelId: string, uploads: readonly string[]): Promise<StoredAttachment[]> {
+    const rules = await rulesForChannel(channelId);
+    if (!(await can(userId, "chat.attach")) || rules.maxAttachments === 0 || uploads.length > rules.maxAttachments) throw new SealedRefusal("filesRefused");
+    try {
+        return await claimUploads(userId, channelId, uploads, undefined, true);
+    } catch (caught) {
+        if (caught instanceof UploadRefused) throw new SealedRefusal("filesRefused");
+        throw caught;
+    }
+}
+
+/** Send with claimed files; a send that fails takes their bytes off the storage rather than leaving them to nobody. */
+async function sendClaimed(files: readonly StoredAttachment[], send: () => Promise<string>): Promise<string> {
+    try {
+        return await send();
+    } catch (caught) {
+        if (files.length) await removeStoredFiles(files).catch((error: unknown) => console.error("chat: sealed files of a failed send were not removed:", error));
+        throw caught;
+    }
 }
 
 /** A new version of one of the caller's sealed messages (validated by `mlsBody`). */

@@ -173,6 +173,8 @@
         "noInstallationSession": "Polaris has no GitHub App installation for {owner}, so it cannot check the repository out. Connect it again under Agents settings.",
         "queueFull": "You already have {count} sessions waiting to start, which is as many as one account may queue. Cancel one, or wait for one to start.",
         "queueCancelled": "Cancelled before it started.",
+        "resumeSummary": "The agent could not reopen this conversation, so it was given a summary of it.",
+        "handoffFileFailed": "Polaris could not write the earlier conversation into this session. The agent was given a summary of it.",
         "accountFull": "You already have {count} sessions running, which is the most one account may have at once. Stop one and this will start.",
         "unknownAgent": "Polaris no longer knows an agent called {cli}.",
         "noTerminal": "its agent never opened a terminal to type into",
@@ -275,29 +277,6 @@
         "start": "Starting the agent"
     },
     "session": {
-        "continue": {
-            "button": "Continue on phone",
-            "title": "Continue on phone",
-            "description": "Scan this with your phone to open this session there.",
-            "expires": "Works once, for 5 minutes.",
-            "copy": "Copy link",
-            "copied": "Link copied",
-            "phoneAsks": "A phone wants to sign in to open this session.",
-            "device": "Device",
-            "from": "From",
-            "pin": "Your PIN",
-            "needsPin": "Set a quick-unlock PIN in Security to allow it.",
-            "allow": "Allow",
-            "refuse": "Refuse",
-            "gone": "This link was used or expired.",
-            "again": "New link",
-            "errors": {
-                "busy": "Too many links. Try again in a few minutes.",
-                "denied": "Only this session's owner can open it elsewhere.",
-                "failed": "Could not do that. Try again.",
-                "copy": "Could not copy the link."
-            }
-        },
         "account": {
             "button": "Account",
             "title": "Switch account",

@@ -31,6 +31,10 @@ export interface HistoryRow {
     /** When the agent wrote the line, in epoch milliseconds, or null when it
      *  did not say. */
     readonly at: number | null;
+    /** A call the agent described again once it knew more (its command, its
+     *  path): the stored row takes this name and input instead of being kept
+     *  as it was. Only ever on a `tool` row. */
+    readonly replace?: boolean;
 }
 
 /** The markers a transcript can carry. Each has a sentence on the page. */

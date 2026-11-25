@@ -221,7 +221,8 @@ export function decodeSharedCursor(raw: string | null): SharedCursor | null {
 const MEDIA_CLAUSE = {
     attachments: {
         some: {
-            OR: [{ contentType: { startsWith: "image/" } }, { contentType: { startsWith: "video/" } }]
+            // A sealed file's type is inside its message's seal: the reader's page keeps the pictures and videos.
+            OR: [{ contentType: { startsWith: "image/" } }, { contentType: { startsWith: "video/" } }, { sealed: true }]
         }
     }
 };

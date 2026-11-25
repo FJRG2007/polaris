@@ -267,7 +267,12 @@ describe("the settings page", () => {
     it("is where the gear in the chat goes, with no dialog", async () => {
         render(<PolarChat />, { wrapper: MessagesWrapper });
         await screen.findByRole("textbox");
-        fireEvent.click(screen.getByRole("button", { name: "Polar settings" }));
+        // Settings sit in the head's "..." menu, not always in sight.
+        fireEvent.pointerDown(screen.getByRole("button", { name: "More actions" }), {
+            button: 0,
+            ctrlKey: false
+        });
+        fireEvent.click(await screen.findByRole("menuitem", { name: "Polar settings" }));
         expect(pushed).toEqual(["/polar/settings/memory"]);
         expect(screen.queryByRole("dialog")).toBeNull();
     });

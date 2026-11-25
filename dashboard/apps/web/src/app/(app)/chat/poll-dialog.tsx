@@ -60,6 +60,8 @@ export interface PollDraft {
     options: string[];
     multiple: boolean;
     hideResults: boolean;
+    /** Whether only the counts are ever shown, never who picked what. */
+    anonymous: boolean;
     hours: number;
 }
 
@@ -69,6 +71,7 @@ export function PollDialog({
     onConfirm,
     busy = false,
     timed = true,
+    anonymity = true,
     error
 }: {
     open: boolean;
@@ -83,6 +86,13 @@ export function PollDialog({
      * outlives the only place it can be answered.
      */
     timed?: boolean;
+    /**
+     * Whether the asker chooses between public and anonymous votes.
+     *
+     * Off inside a call, whose questions are answered by seats rather than
+     * accounts - half of them guests - and only ever show counts.
+     */
+    anonymity?: boolean;
     /** What the server said, when it refused one this dialog thought was fine. */
     error?: string;
 }) {
@@ -91,6 +101,9 @@ export function PollDialog({
     const [answers, setAnswers] = useState<string[]>(() => Array(OPENING_ANSWERS).fill(""));
     const [multiple, setMultiple] = useState(false);
     const [hideResults, setHideResults] = useState(false);
+    // On until the asker turns it off, the way Telegram asks its polls: the
+    // choice that publishes nothing is the one nobody has to remember to make.
+    const [anonymous, setAnonymous] = useState(true);
     const [hours, setHours] = useState<number>(core.DEFAULT_POLL_HOURS);
     /** The box to put the caret in after one is added, so the row that just
      *  appeared is the row being typed into. */
@@ -106,6 +119,7 @@ export function PollDialog({
         setAnswers(Array(OPENING_ANSWERS).fill(""));
         setMultiple(false);
         setHideResults(false);
+        setAnonymous(true);
         setHours(core.DEFAULT_POLL_HOURS);
     }, [open]);
 
@@ -162,7 +176,7 @@ export function PollDialog({
 
     const send = () => {
         if (busy || refusal) return;
-        onConfirm({ question: asked, options: kept, multiple, hideResults, hours });
+        onConfirm({ question: asked, options: kept, multiple, hideResults, anonymous, hours });
     };
 
     const durations = [...core.POLL_DURATIONS, core.POLL_NO_END].map((value) => ({
@@ -280,6 +294,23 @@ export function PollDialog({
                             aria-label={t("poll.hideTheResultsUntilThe")}
                         />
                     </label>
+
+                    {anonymity && (
+                        <label className="flex items-center justify-between gap-3 text-sm">
+                            <span>
+                                {t("poll.anonymousVotes")}
+                                <span className="block text-xs text-muted-foreground">
+                                    {anonymous ? t("poll.onlyTheCountsAreShown") : t("poll.everybodySeesWhoPicked")}
+                                </span>
+                            </span>
+                            <Switch
+                                checked={anonymous}
+                                disabled={busy}
+                                onChange={setAnonymous}
+                                aria-label={t("poll.keepTheVotesAnonymous")}
+                            />
+                        </label>
+                    )}
 
                     {timed && (
                         <label className="flex items-center justify-between gap-3 text-sm">

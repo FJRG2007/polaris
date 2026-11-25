@@ -241,6 +241,19 @@ export function saveFile(
         readonly onGaveUp?: () => void;
     } = {}
 ): void {
+    // Bytes this page already holds (a sealed chat file opened here): saved as
+    // they are. A query would make the address name nothing, and no server answers it.
+    if (url.startsWith("blob:")) {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = options.as ?? label;
+        anchor.rel = "noopener";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        options.onStarted?.();
+        return;
+    }
     const transfer = beginTransfer({ name: label, way: "down", total: null });
     // The ticket is how a navigation reports back: the response sets a cookie
     // naming it, which can only happen once the server has answered - see

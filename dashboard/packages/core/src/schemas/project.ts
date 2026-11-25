@@ -147,19 +147,29 @@ export const projectFlagsSchema = z.object(
  * the ones a misclick cannot take back, and they are what Railway's changeset is
  * for. Everything else - a variable, a domain, a port - still applies as it did.
  */
-export const STAGED_CHANGE_KINDS = ["service.delete", "database.delete", "volume.delete"] as const;
+export const STAGED_CHANGE_KINDS = [
+    "service.delete",
+    "database.delete",
+    "volume.delete",
+    "environment.sync"
+] as const;
 export type StagedChangeKind = (typeof STAGED_CHANGE_KINDS)[number];
 
 export const STAGED_CHANGE_LABELS: Record<StagedChangeKind, string> = {
     "service.delete": "Delete service",
     "database.delete": "Delete database",
-    "volume.delete": "Delete volume"
+    "volume.delete": "Delete volume",
+    "environment.sync": "Sync from another environment"
 };
 
 /** Extra detail carried by a staged change, per kind. */
 export const stagedChangePayloadSchema = z.object({
     /** On a volume: destroy the data as well as detaching it. */
-    wipe: z.boolean().optional()
+    wipe: z.boolean().optional(),
+    /** On a sync: the environment it takes from, and the changes picked. */
+    sourceEnvironmentId: z.string().uuid().optional(),
+    sourceName: z.string().max(200).optional(),
+    items: z.array(z.string().max(400)).max(5000).optional()
 });
 
 export type StagedChangePayload = z.infer<typeof stagedChangePayloadSchema>;

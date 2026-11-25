@@ -20,15 +20,22 @@
  * `Server Action "..." was not found on the server` - which is not a fault in the
  * page, cannot be retried away, and is cured by fetching the new build. So it is
  * recognised and reloaded from, once, before anybody is shown an error at all.
+ *
+ * Nor does a request that never reached the server - the desktop app opening a
+ * second before the network settled. That is retried by itself, with the page's
+ * skeleton up meanwhile (`useNetworkRetry`), and only once the retries ran out
+ * does a card say so, in words about the connection rather than the exception.
  */
 
 import { useRouter } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody } from "@polaris/ui";
-import { RotateCcw, TriangleAlert } from "lucide-react";
+import { RotateCcw, TriangleAlert, WifiOff } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
 import { checkForNewBuild } from "@/lib/new-build";
+import { RouteSkeleton } from "@/components/route-skeleton";
+import { resetNetworkStreak, useNetworkRetry } from "@/lib/network-retry";
 
 export default function AppError({
     error,
@@ -42,6 +49,7 @@ export default function AppError({
     const [retrying, startRetry] = useTransition();
     const [attempts, setAttempts] = useState(1);
     const staleBuild = isStaleBuildError(error);
+    const network = useNetworkRetry(error, retry);
 
     useEffect(() => {
         console.error(error);
@@ -65,6 +73,42 @@ export default function AppError({
             router.refresh();
             reset();
         });
+    }
+
+    /** The reader's own Try again on the connection card starts the retries afresh. */
+    function retryNow() {
+        resetNetworkStreak();
+        retry();
+    }
+
+    // A blip is answered by the retries, not by a card: the page keeps its shape.
+    if (network === "retrying" && !staleBuild) return <RouteSkeleton />;
+
+    if (network === "offline" && !staleBuild) {
+        return (
+            <div className="mx-auto flex max-w-lg flex-col gap-4 py-10">
+                <Card>
+                    <CardBody className="flex flex-col gap-4">
+                        <div className="flex items-start gap-3">
+                            <WifiOff className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+                            <div className="flex min-w-0 flex-col gap-1">
+                                <h1 className="text-sm font-medium">{t("pages.error.offlineTitle")}</h1>
+                                <p className="text-sm text-muted-foreground">{t("pages.error.offlineBody")}</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="ghost" onClick={() => window.location.reload()}>
+                                {t("pages.error.reload")}
+                            </Button>
+                            <Button onClick={retryNow} disabled={retrying}>
+                                <RotateCcw className="size-4" />
+                                {retrying ? t("pages.error.trying") : t("pages.error.tryAgain")}
+                            </Button>
+                        </div>
+                    </CardBody>
+                </Card>
+            </div>
+        );
     }
 
     return (

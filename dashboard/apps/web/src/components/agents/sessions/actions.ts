@@ -135,10 +135,12 @@ export async function listSessionsAction(
     });
 }
 
-export async function sessionDetailAction(sessionId: string): Promise<{
+export async function sessionDetailAction(sessionId: string, withTools?: unknown): Promise<{
     session: sessions.SessionView;
     events: { kind: string; detail: string; subject: string; at: string }[];
     messages: { id: string; role: string; body: string; authorId: string | null; at: string }[];
+    /** The agent's tool calls and results, when asked for. */
+    tools: { id: string; kind: string; subject: string; ref: string; body: string; at: string }[];
 } | null> {
     const user = await requirePermission("agents.read");
     const session = await sessions.getSession(sessionId, user.id);
@@ -147,7 +149,11 @@ export async function sessionDetailAction(sessionId: string): Promise<{
         sessions.sessionEvents(sessionId),
         sessions.sessionMessages(sessionId)
     ]);
-    return { session, events, messages };
+    // A full page of messages has older ones unread: the steps start where
+    // the messages do. Fewer is the whole session.
+    const since = messages.length >= 100 ? (messages[0]?.at ?? null) : null;
+    const tools = withTools === true ? await sessions.sessionToolRows(sessionId, since) : [];
+    return { session, events, messages, tools };
 }
 
 /**
@@ -440,11 +446,45 @@ async function carryConversation(
             );
             return;
         }
-        const { note, file } = await handoffs.handoffFor(carry.parent, { kind: carry.kind, targetCli: session.cli });
-        after(() => runtime.deliverHandoff(session, note, file));
+        const { note, bare, file } = await handoffs.handoffFor(carry.parent, { kind: carry.kind, targetCli: session.cli });
+        after(() => runtime.deliverHandoff(session, note, file, bare));
     } catch (error) {
         console.error(`[agent-session] ${session.id}: conversation not carried:`, error instanceof Error ? error.message : "unknown");
     }
+}
+
+/**
+ * Start a session that ended again as itself - the same record, thread and
+ * conversation, on a new machine (`queue.reopenSession`) - and hand it the
+ * prompt once its agent is up. Refused only while its work is still in the
+ * kept container: a new machine would start from before it.
+ */
+export async function reopenSessionAs(
+    session: sessions.SessionView,
+    userId: string,
+    text: string | null,
+    files: readonly sessionAttachments.SessionAttachment[] = []
+): Promise<{ error?: string; queued?: boolean }> {
+    const t = await getTranslations("agents");
+    if (session.work?.state === "kept") return { error: t("session.restore.kept") };
+    let admission: Awaited<ReturnType<typeof queue.reopenSession>>;
+    try {
+        admission = await queue.reopenSession(session.id, userId, text);
+    } catch (error) {
+        if (error instanceof sessions.SessionRefusal) return { error: agentText(t, error.message) };
+        throw error;
+    }
+    // Another tab started it first; this prompt then goes the ordinary way.
+    if (!admission) return text ? promptSessionAction({ sessionId: session.id, text }) : {};
+    if (admission.startError)
+        return { error: agentText(t, sessions.readableFailure(admission.startError, `reopening ${session.id}`)) };
+    if (admission.queuedAt !== null) return { queued: true };
+    if (text) {
+        const prompt = sessionAttachments.withAttachmentNote(text, files.map((file) => file.path));
+        const carried = files.length > 0 ? { session: admission.session, userId, files } : null;
+        after(() => runtime.deliverFirstPrompt(session.id, prompt, carried));
+    }
+    return {};
 }
 
 /** Where a fork runs instead of its parent's machine. */
@@ -626,7 +666,13 @@ export async function promptSessionAction(input: unknown): Promise<{ error?: str
 
     const session = await sessions.getSession(parsed.data.sessionId, user.id);
     if (!session) return { error: t("sessions.errors.gone") };
-    if (core.isSessionOver(session.state)) return { error: t("sessions.errors.ended") };
+    // A stopped session is a chat that went quiet: the prompt starts it again.
+    if (core.isSessionOver(session.state)) {
+        const files = await sessionAttachments.sessionAttachmentsFor(user.id, parsed.data.attachments);
+        if ("refusal" in files) return { error: t(`sessions.errors.files.${files.refusal}`) };
+        const reopened = await reopenSessionAs(session, user.id, parsed.data.text, files.files);
+        return reopened.error ? { error: reopened.error } : { queued: reopened.queued };
+    }
     // No terminal yet. Only the first prompt waits with it; anything after that
     // would be typed into a machine that does not exist.
     if (core.isSessionQueued(session.state)) return { error: t("sessions.errors.queued") };

@@ -25,6 +25,7 @@
 
 import { z } from "zod";
 import * as core from "@polaris/core";
+import { mediaShapeSchema } from "@/lib/chat/media-shape";
 import type { MlsDevice, SealedStored } from "./mls-client";
 import type { IndexedSealed, SealedSearchIndex } from "./sealed-search-index";
 
@@ -34,10 +35,49 @@ export const OPENED_LIMIT = 5_000;
 /** `read-sealed` takes at most this many ids per request. */
 const READ_PAGE = 100;
 
+/** 32 bytes as unpadded base64url: a file's key or the SHA-256 of its clear bytes. */
+const key32 = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+
+/**
+ * One file the message carries (proposal 10b): which stored attachment holds
+ * its sealed bytes, the key that opens them and the digest they must open to,
+ * and everything the server used to hold about it in the clear - its name,
+ * type, size, picture shape, sound and whether it arrives covered.
+ */
+export const sealedFileSchema = z
+    .object({
+        id: z.string().uuid(),
+        key: key32,
+        sha256: key32,
+        name: z.string().min(1).max(200),
+        type: z.string().min(1).max(200),
+        size: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+        shape: mediaShapeSchema.nullable().optional(),
+        durationMs: z.number().int().positive().max(60 * 60 * 1000).optional(),
+        waveform: z.string().regex(/^[0-9]{1,64}$/).optional(),
+        spoiler: z.boolean().optional()
+    })
+    .strict();
+
+export type SealedFileRef = z.infer<typeof sealedFileSchema>;
+
+/**
+ * A poll's answers, in the order the server keeps its answer rows (the
+ * question is the body). The server holds only how many there are, the rules
+ * and the votes, never their words.
+ */
+export const sealedPollSchema = z
+    .object({ options: z.array(z.string().trim().min(1).max(core.MAX_POLL_OPTION)).min(core.MIN_POLL_OPTIONS).max(core.MAX_POLL_OPTIONS) })
+    .strict();
+
+export type SealedPoll = z.infer<typeof sealedPollSchema>;
+
 const sealedContent = z.object({
     v: z.literal(SEALED_CONTENT_VERSION),
     body: core.chatSendSchema.shape.body,
-    translation: core.chatSendSchema.shape.translation
+    translation: core.chatSendSchema.shape.translation,
+    files: z.array(sealedFileSchema).min(1).max(core.CHAT_ATTACHMENT_COUNT_CEILING).optional(),
+    poll: sealedPollSchema.optional()
 });
 
 /** What a sealed message carries inside its seal. */
@@ -47,8 +87,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
 export function encodeSealedContent(content: SealedContent): Uint8Array {
-    const { body, translation } = content;
-    return encoder.encode(JSON.stringify({ v: SEALED_CONTENT_VERSION, body, ...(translation ? { translation } : {}) }));
+    return encoder.encode(JSON.stringify({ v: SEALED_CONTENT_VERSION, ...contentOf(content) }));
 }
 
 /** The content of an opened message, or null when it is not one this version reads. */
@@ -56,8 +95,7 @@ export function decodeSealedContent(bytes: Uint8Array): SealedContent | null {
     try {
         const parsed = sealedContent.safeParse(JSON.parse(decoder.decode(bytes)));
         if (!parsed.success) return null;
-        const { body, translation } = parsed.data;
-        return translation ? { body, translation } : { body };
+        return contentOf(parsed.data);
     } catch {
         return null;
     }
@@ -157,23 +195,37 @@ export function openedContent(id: string, editedAt?: string): SealedContent | nu
     return opened.get(versionKey(id, editedAt));
 }
 
+/** The content to seal from a send or edit, with no empty field. */
+function contentOf(input: SealedContent): SealedContent {
+    return {
+        body: input.body,
+        ...(input.translation ? { translation: input.translation } : {}),
+        ...(input.files?.length ? { files: input.files } : {}),
+        ...(input.poll ? { poll: input.poll } : {})
+    };
+}
+
 export interface SealedSendInput extends SealedContent {
     channelId: string;
     /** The outbox key: the message id inside the seal and the send's idempotency key. */
     clientKey: string;
     parentId?: string | null;
     replyToId?: string | null;
+    /** With `poll`: the rules the server keeps beside its answer rows. */
+    pollRules?: { readonly multiple: boolean; readonly hideResults: boolean; readonly anonymous: boolean; readonly hours: number };
 }
 
 /** Seal and send one message; answers the stored message's id. */
 export async function sendSealedMessage(input: SealedSendInput): Promise<string> {
     const mls = await device();
     await mls.ensureGroup(input.channelId);
-    const content: SealedContent = input.translation ? { body: input.body, translation: input.translation } : { body: input.body };
+    const content = contentOf(input);
     const id = await mls.sendSealed(input.channelId, encodeSealedContent(content), {
         clientKey: input.clientKey,
         parentId: input.parentId ?? null,
-        replyToId: input.replyToId ?? null
+        replyToId: input.replyToId ?? null,
+        ...(content.files ? { uploads: content.files.map((file) => file.id) } : {}),
+        ...(content.poll ? { poll: { options: content.poll.options.length, multiple: input.pollRules?.multiple ?? false, hideResults: input.pollRules?.hideResults ?? false, anonymous: input.pollRules?.anonymous ?? true, hours: input.pollRules?.hours ?? core.DEFAULT_POLL_HOURS } } : {})
     });
     keep(id, content);
     index(input.channelId, id, undefined, content);
@@ -239,7 +291,8 @@ export interface SealedEditInput extends SealedContent {
 export async function editSealedMessage(input: SealedEditInput): Promise<string> {
     const shown = versionKey(input.messageId, input.editedAt);
     const before = opened.get(shown);
-    const content: SealedContent = input.translation ? { body: input.body, translation: input.translation } : { body: input.body };
+    // An edit rewrites the words; the files the message carries stay, with their keys.
+    const content = contentOf({ ...input, files: input.files ?? before?.files });
     keep(shown, content);
     try {
         const mls = await device();
@@ -273,4 +326,42 @@ export async function removeSealedAccounts(channelId: string, userIds: readonly 
     const mls = await device();
     if (!mls.hasGroup(channelId)) return;
     await mls.removeAccounts(channelId, [...userIds]);
+}
+
+/** A stored sealed ballot as the server hands it out (`poll-ballots.ts`). */
+export interface StoredBallot {
+    readonly ballotId: string;
+    readonly epoch: string;
+    readonly sealed: string;
+    readonly mine: boolean;
+    readonly voter?: { readonly id: string; readonly name: string };
+}
+
+/**
+ * Seal this account's vote on a sealed poll: the answer positions it picks,
+ * bound to this account on a public poll and to nobody on an anonymous one.
+ */
+export async function sealBallot(channelId: string, pollId: string, anonymous: boolean, picks: readonly number[]): Promise<{ ballotId: string; epoch: string; sealed: string }> {
+    const mls = await device();
+    await mls.ensureGroup(channelId);
+    return mls.sealBallot(channelId, pollId, anonymous ? null : viewer, picks);
+}
+
+/**
+ * What each of these ballots picks, in order; null for one that does not open
+ * here. A public ballot is opened as its named voter's (or this account's own),
+ * so one the server moved to somebody else's row does not open.
+ */
+export async function openBallots(channelId: string, pollId: string, anonymous: boolean, rows: readonly StoredBallot[]): Promise<(number[] | null)[]> {
+    if (!rows.length) return [];
+    const mls = await device();
+    const me = viewer;
+    return Promise.all(
+        rows.map((row) => {
+            const voter = anonymous ? null : (row.voter?.id ?? (row.mine ? me : null));
+            // A public ballot with nobody to bind it to cannot be checked, so it is not counted.
+            if (!anonymous && !voter) return null;
+            return mls.openBallot(channelId, pollId, voter, row);
+        })
+    );
 }

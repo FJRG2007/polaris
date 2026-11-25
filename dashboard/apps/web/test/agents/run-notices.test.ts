@@ -24,6 +24,8 @@ vi.mock("@/lib/agents/agent-run-service", () => ({
 }));
 vi.mock("@/lib/agents/agent-dispatch", () => ({ dispatchRun: vi.fn() }));
 vi.mock("@/lib/agents/agent-fallback", () => ({ considerFallback: vi.fn(async () => undefined) }));
+// The session's git identity reads GitHub links; nothing here is about it.
+vi.mock("@/lib/agents/session-git-identity-source", () => ({ gitIdentityFor: async () => null }));
 vi.mock("@/lib/github-service", () => ({ githubAppInstallationToken: vi.fn() }));
 vi.mock("@/lib/agents/agent-defaults-service", () => ({ policyForRepo: vi.fn() }));
 vi.mock("@/lib/agents/agent-repo-service", () => ({

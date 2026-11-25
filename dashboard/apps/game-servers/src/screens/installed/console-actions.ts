@@ -127,6 +127,32 @@ export async function listConsoleCommandsAction(
     }
 }
 
+/**
+ * A one-shot ticket for the live console: the server's output followed over
+ * the terminal socket, scoped to somebody who holds `games.console` (the
+ * permission-scoped socket token Pterodactyl's panel hands its console).
+ * `follow: false` is a server the socket cannot follow, which the console reads
+ * by polling instead; `refused` is somebody who may not open it at all.
+ */
+export async function openConsoleStreamAction(
+    installedAppId: string
+): Promise<{ token: string } | { follow: false } | { refused: true }> {
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { refused: true };
+    let standing: Awaited<ReturnType<typeof requireGameServer>>;
+    try {
+        standing = await requireGameServer("games.console", parsed.data);
+    } catch {
+        return { refused: true };
+    }
+    const applicationId = standing.access.install.applicationId;
+    if (!applicationId) return { follow: false };
+    const token = await host.terminalService
+        .mintConsoleTicket(standing.user.id, standing.access.ownerId, applicationId)
+        .catch(() => null);
+    return token ? { token } : { follow: false };
+}
+
 export async function saveConsoleCommandAction(
     input: SaveConsoleCommandInput
 ): Promise<{ commands?: SavedCommand[]; error?: string }> {
