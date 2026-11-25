@@ -4447,6 +4447,13 @@
             "description": "Si el chat consulta los enlaces publicados y los muestra como tarjetas.",
             "label": "Permitir vistas previas",
             "hint": "Desactivado, este servidor nunca consulta una dirección publicada y ninguna pantalla carga tarjetas ni reproductores. Cuentas y conversaciones también pueden desactivarlas."
+        },
+        "devices": {
+            "title": "Dispositivos cifrados",
+            "description": "Cuánto tiempo puede pasar sin usarse un navegador o una app antes de dejar de recibir las conversaciones cifradas.",
+            "label": "Quitar dispositivos sin uso tras",
+            "hint": "Un dispositivo que pase este límite sale de cada conversación cifrada con el siguiente mensaje y vuelve solo cuando se abre de nuevo, con su historial. Más corto es más seguro ante pérdidas.",
+            "days": "{count, plural, one {# día} other {# días}}"
         }
     }
 }

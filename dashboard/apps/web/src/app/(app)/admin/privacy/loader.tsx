@@ -7,6 +7,7 @@ import { PrivacySections } from "./privacy-sections";
 import { AfterPaint } from "@/components/after-paint";
 import { PublicProfilesForm } from "./public-profiles-form";
 import { LinkPreviewsForm } from "./link-previews-form";
+import { SealedDevicesForm } from "./sealed-devices-form";
 import { PrivacyDefaultsForm } from "./privacy-defaults-form";
 import { PeopleDiscoveryForm } from "./people-discovery-form";
 
@@ -42,6 +43,7 @@ export function PrivacyLoader({
                     defaults={<PrivacyDefaultsForm defaults={data.defaults} locks={data.locks} />}
                     discovery={<PeopleDiscoveryForm policy={data.discovery} />}
                     previews={<LinkPreviewsForm allowed={data.linkPreviews} />}
+                    devices={data.sealedDeviceDays === null ? undefined : <SealedDevicesForm days={data.sealedDeviceDays} />}
                 />
             )}
         </AfterPaint>

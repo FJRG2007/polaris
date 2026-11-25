@@ -13,7 +13,7 @@ function Section({
     id,
     children
 }: {
-    id: "profiles" | "defaults" | "discovery" | "previews";
+    id: "profiles" | "defaults" | "discovery" | "previews" | "devices";
     children: ReactNode;
 }) {
     const t = useTranslations("admin");
@@ -34,12 +34,15 @@ export function PrivacySections({
     profiles,
     defaults,
     discovery,
-    previews
+    previews,
+    devices
 }: {
     profiles: ReactNode;
     defaults: ReactNode;
     discovery: ReactNode;
     previews: ReactNode;
+    /** Sealed chat's device limit; absent while sealed chat is off. */
+    devices?: ReactNode;
 }) {
     return (
         <div className="flex flex-col gap-8">
@@ -47,6 +50,7 @@ export function PrivacySections({
             <Section id="defaults">{defaults}</Section>
             <Section id="discovery">{discovery}</Section>
             <Section id="previews">{previews}</Section>
+            {devices ? <Section id="devices">{devices}</Section> : null}
         </div>
     );
 }

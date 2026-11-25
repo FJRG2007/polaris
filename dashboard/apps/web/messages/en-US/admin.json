@@ -4447,6 +4447,13 @@
             "description": "Whether Chat looks up posted links and shows them as cards.",
             "label": "Allow link previews",
             "hint": "Off, this server never fetches a posted address and no screen loads a card or embedded player. Accounts and conversations can also turn them off."
+        },
+        "devices": {
+            "title": "Sealed chat devices",
+            "description": "How long a browser or app may go unused before it stops receiving sealed conversations.",
+            "label": "Remove unused devices after",
+            "hint": "A device past this limit leaves every sealed conversation at the next message and rejoins on its own when opened again, with its history. Shorter is safer for lost devices.",
+            "days": "{count, plural, one {# day} other {# days}}"
         }
     }
 }

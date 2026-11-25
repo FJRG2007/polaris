@@ -69,9 +69,14 @@ export const INACTIVE_DEVICE_DAYS_SETTING = "chat.e2ee.inactiveDeviceDays";
 
 /** The instance's limit, from `Setting` when an administrator set one, clamped to 7-90. */
 export async function inactiveDeviceDays(): Promise<number> {
-    const stored = Number.parseInt((await getSetting(INACTIVE_DEVICE_DAYS_SETTING).catch(() => null)) ?? "", 10);
-    if (!Number.isFinite(stored)) return INACTIVE_DEVICE_DAYS.fallback;
-    return Math.min(INACTIVE_DEVICE_DAYS.max, Math.max(INACTIVE_DEVICE_DAYS.min, stored));
+    return inactiveDaysFrom(await getSetting(INACTIVE_DEVICE_DAYS_SETTING).catch(() => null));
+}
+
+/** The limit a stored `Setting` value means: the default when unset or unreadable, else clamped to 7-90. */
+export function inactiveDaysFrom(stored: string | null | undefined): number {
+    const days = Number.parseInt(stored ?? "", 10);
+    if (!Number.isFinite(days)) return INACTIVE_DEVICE_DAYS.fallback;
+    return Math.min(INACTIVE_DEVICE_DAYS.max, Math.max(INACTIVE_DEVICE_DAYS.min, days));
 }
 
 /** The moment before which a device last seen counts as retired. */

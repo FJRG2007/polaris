@@ -8,6 +8,8 @@ import * as core from "@polaris/core";
 import { getSettings } from "@/lib/setting-store";
 import { PUBLIC_KEY } from "@/lib/profile-service";
 import { LINK_PREVIEWS_KEY } from "@/lib/chat/link-preview-policy";
+import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
+import { INACTIVE_DEVICE_DAYS_SETTING, inactiveDaysFrom } from "@/lib/chat/e2ee/mls-delivery";
 import { isLockValue, privacyDefaultKey, privacyLockKey } from "@/lib/privacy-service";
 import { DISCOVERY_POLICY_KEY, readDiscoveryPolicy, type DiscoveryPolicy } from "@/lib/discovery-policy";
 
@@ -20,6 +22,8 @@ export interface PrivacyData {
     discovery: DiscoveryPolicy;
     /** Whether Chat may draw link previews at all. */
     linkPreviews: boolean;
+    /** Days a sealed-chat device may go unused before it leaves its conversations; null while sealed chat is off. */
+    sealedDeviceDays: number | null;
 }
 
 export async function readPrivacy(): Promise<PrivacyData> {
@@ -27,12 +31,14 @@ export async function readPrivacy(): Promise<PrivacyData> {
         PUBLIC_KEY,
         DISCOVERY_POLICY_KEY,
         LINK_PREVIEWS_KEY,
+        INACTIVE_DEVICE_DAYS_SETTING,
         ...core.PRIVACY_FIELDS.map(privacyDefaultKey),
         ...core.PRIVACY_FIELDS.map(privacyLockKey)
     ]);
     return {
         publicProfiles: stored.get(PUBLIC_KEY) === "true",
         linkPreviews: stored.get(LINK_PREVIEWS_KEY) !== "off",
+        sealedDeviceDays: chatE2eeEnabled() ? inactiveDaysFrom(stored.get(INACTIVE_DEVICE_DAYS_SETTING)) : null,
         defaults: Object.fromEntries(
             core.PRIVACY_FIELDS.map((field) => [
                 field,
