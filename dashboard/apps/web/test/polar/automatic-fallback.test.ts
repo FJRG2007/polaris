@@ -13,7 +13,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const calls = vi.hoisted(() => ({
     log: [] as Array<{ provider: string; model: string; tools: string[] }>,
-    refuse: new Map<string, unknown>()
+    refuse: new Map<string, unknown>(),
+    // More catalogue rows for one test, cleared before each.
+    extra: [] as unknown[]
 }));
 
 vi.mock("@ai-sdk/mistral", async () => {
@@ -81,15 +83,21 @@ vi.mock("@/lib/polar/access", () => ({
     ]
 }));
 
-// The cool-down written on a key row; every other read is the real client's.
+// The cool-down written on a key row and the shared cooldowns row; every
+// other read is the real client's.
 vi.mock("@polaris/db", async (original) => {
     const actual = await original<typeof import("@polaris/db")>();
     const rows = { updateMany: async () => ({ count: 1 }) };
+    const settings = { findUnique: async () => null, upsert: async () => ({}) };
     return {
         ...actual,
         prisma: new Proxy(actual.prisma, {
             get: (target, name, receiver) =>
-                name === "userModelKey" ? rows : Reflect.get(target, name, receiver)
+                name === "userModelKey"
+                    ? rows
+                    : name === "setting"
+                      ? settings
+                      : Reflect.get(target, name, receiver)
         })
     };
 });
@@ -133,7 +141,8 @@ vi.mock("@/lib/agents/model-catalog", () => ({
         catalogue("xai", "grok-mini", 1),
         catalogue("deepseek", "deepseek-chat", 1),
         catalogue("cerebras", "qwen-3-32b", 1),
-        catalogue("moonshot", "kimi-k2", 1)
+        catalogue("moonshot", "kimi-k2", 1),
+        ...calls.extra
     ]
 }));
 
@@ -180,6 +189,7 @@ const setPower = tool({
 beforeEach(() => {
     calls.log = [];
     calls.refuse = new Map();
+    calls.extra = [];
     resetRouteHealth();
 });
 
@@ -250,6 +260,68 @@ describe("the same model through an aggregator", () => {
             provider: "openrouter",
             model: "meta-llama/llama-3.3-70b-instruct"
         });
+    });
+});
+
+describe("the models a Copilot login offers", () => {
+    const option = (model: string) => ({
+        provider: "github-copilot",
+        providerName: "GitHub Copilot",
+        model,
+        name: model,
+        reasoning: false,
+        attachment: false,
+        contextTokens: 100_000,
+        providerContextTokens: null,
+        costInput: null,
+        costOutput: null,
+        inputs: [],
+        releaseDate: null
+    });
+
+    it("keeps the whole catalogue when the login's own listing could not be read", () => {
+        const catalogue = [option("gpt-4.1"), option("claude-sonnet-4")];
+        expect(models.copilotOptions(catalogue, null, "GitHub Copilot")).toEqual(catalogue);
+    });
+
+    it("offers only what the login lists, with Copilot's window, then the ones the catalogue lacks", () => {
+        const catalogue = [option("gpt-4.1"), option("claude-sonnet-4"), option("o3")];
+        const listed = [
+            { id: "claude-sonnet-4", name: "Claude Sonnet 4", contextTokens: 128_000 },
+            { id: "gpt-4.1", name: "GPT-4.1", contextTokens: null },
+            { id: "gpt-5-mini", name: "GPT-5 mini", contextTokens: 64_000 },
+            // Listed but never callable through the chat endpoint.
+            { id: "gpt-5-chat-latest", name: "GPT-5 Chat", contextTokens: 64_000 }
+        ];
+        const offered = models.copilotOptions(catalogue, listed, "GitHub Copilot");
+        expect(offered.map((entry) => entry.model)).toEqual(["gpt-4.1", "claude-sonnet-4", "gpt-5-mini"]);
+        expect(offered[0]!.providerContextTokens).toBeNull();
+        expect(offered[1]!.providerContextTokens).toBe(128_000);
+        expect(offered[2]).toMatchObject({
+            provider: "github-copilot",
+            providerName: "GitHub Copilot",
+            name: "GPT-5 mini",
+            providerContextTokens: 64_000
+        });
+    });
+});
+
+describe("the order Automatic tries its stand-ins in", () => {
+    it("tries its own provider's next paid models, a few of them, before any other provider", async () => {
+        calls.extra = [
+            catalogue("groq", "qwen-qwq-32b", 0.06),
+            catalogue("groq", "gemma2-9b-it", 0.07),
+            catalogue("groq", "mixtral-8x7b-32768", 0.08),
+            catalogue("groq", "deepseek-r1-distill-llama-70b", 0.09)
+        ];
+        const resolved = await models.resolvePolarModel("fb-9", automaticChoice("fast"), PLAIN_TURN);
+        if (typeof resolved === "string") throw new Error(resolved);
+        const providers = (resolved.routed?.steps ?? []).map((entry) => entry.provider);
+        expect(resolved.option.provider).toBe("groq");
+        // The pick and three more of Groq's own (`SAME_PROVIDER_MORE`), not all four.
+        expect(providers.slice(0, 4)).toEqual(["groq", "groq", "groq", "groq"]);
+        expect(providers.filter((name) => name === "groq")).toHaveLength(4);
+        expect(providers.slice(4)).toContain("openrouter");
     });
 });
 

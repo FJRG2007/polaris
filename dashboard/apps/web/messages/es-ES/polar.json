@@ -169,6 +169,8 @@
         "unanswered": "Polar paró sin dar una respuesta.",
         "modelGone": "El modelo de esta conversación ya no se ofrece; Polar respondió con el primero que tienes disponible.",
         "stoodIn": "{busy} no estaba disponible, así que respondió {model}.",
+        "passedOver": "Probados antes: {list}.",
+        "passedOverEntry": "{provider} ({reason})",
         "provider": {
             "key": "{provider} rechazó la clave que usó Polar. Puede ser incorrecta, estar revocada o no tener un permiso.",
             "credit": "{provider} dice que la cuenta de esta clave se ha quedado sin crédito. Añade crédito o un método de pago en su facturación.",

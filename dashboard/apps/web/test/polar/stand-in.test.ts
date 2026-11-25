@@ -201,8 +201,8 @@ describe("Automatic for a free OpenRouter account", () => {
         if (typeof resolved === "string") throw new Error(resolved);
         expect(resolved.option.model).toBe("openai/gpt-mini");
         expect(resolved.standIns?.map((entry) => entry.option.model)).toEqual([
-            "liquid/lfm-3-8b:free",
-            "openai/gpt-nano"
+            "openai/gpt-nano",
+            "liquid/lfm-3-8b:free"
         ]);
     });
 
@@ -241,8 +241,8 @@ describe("the helper on a free account", () => {
         const chat = { model: chatModel as never, option: option("openai/gpt-mini"), credential };
         const helper = await polarHelperModel("helper-2", chat, null);
         expect(helper.resolved.standIns?.map((entry) => entry.option.model)).toEqual([
-            "liquid/lfm-3-8b:free",
-            "openai/gpt-nano"
+            "openai/gpt-nano",
+            "liquid/lfm-3-8b:free"
         ]);
     });
 });

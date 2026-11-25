@@ -147,6 +147,9 @@ export interface RoutedModel {
     /** Every refusal of the turn since the last answer, in order, with the
      *  step it came from. */
     refusals: () => ReadonlyArray<{ step: PlannedStep; kind: FailureKind }>;
+    /** The refusals the answering step was reached past, in order: what a
+     *  stand-in's answer says the models before it could not do. */
+    passedOver: () => ReadonlyArray<{ step: PlannedStep; kind: FailureKind }>;
 }
 
 export function routedModel(
@@ -157,6 +160,7 @@ export function routedModel(
     let answeredAt: number | null = null;
     let refusal: FailureKind | null = null;
     const trail: Array<{ step: PlannedStep; kind: FailureKind }> = [];
+    let passed: Array<{ step: PlannedStep; kind: FailureKind }> = [];
     const head = steps[0]!;
     // Wrapped even for one step: the router is also what cools a refused key
     // down, holds a key to its own allowance and notes the one that answered.
@@ -168,8 +172,9 @@ export function routedModel(
                 answeredAt = index;
                 refusal = first;
                 // What was refused before this answer did not stop the turn:
-                // a later failure lists only what refused after it.
-                trail.length = 0;
+                // a later failure lists only what refused after it, and the
+                // answer names what it stood in for.
+                if (trail.length > 0) passed = trail.splice(0);
             },
             onRefused: (kind, index) => {
                 refusal ??= kind;
@@ -183,6 +188,7 @@ export function routedModel(
         steps,
         answered: () => (answeredAt === null ? null : steps[answeredAt]!),
         firstRefusal: () => refusal,
-        refusals: () => trail
+        refusals: () => trail,
+        passedOver: () => passed
     };
 }

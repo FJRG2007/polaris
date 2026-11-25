@@ -169,6 +169,8 @@
         "unanswered": "Polar stopped without an answer.",
         "modelGone": "The model this conversation used is no longer offered, so Polar answered with your first available one.",
         "stoodIn": "{busy} was not available, so {model} answered.",
+        "passedOver": "Tried first: {list}.",
+        "passedOverEntry": "{provider} ({reason})",
         "provider": {
             "key": "{provider} refused the key Polar used. It may be wrong, revoked or missing a permission.",
             "credit": "{provider} says the account behind this key is out of credit. Add credit or a payment method in its billing settings.",

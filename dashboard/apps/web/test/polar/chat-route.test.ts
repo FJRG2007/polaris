@@ -248,6 +248,7 @@ vi.mock("@/lib/polar/models", () => ({
         tried: []
     }),
     withStandIn: <T>(resolved: T) => resolved,
+    passedOverProviders: () => [],
     followedBy: <T>(_user: string, resolved: T) => resolved,
     sameModelElsewhere: async () => null,
     rememberRefusal: () => {},

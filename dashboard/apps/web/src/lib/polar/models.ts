@@ -15,6 +15,7 @@
  */
 
 import { copilotModel, gitlabModel, loginListsModel } from "@/lib/polar/login-models";
+import { copilotModelsFor, type CopilotModel } from "@/lib/polar/copilot-models";
 import { cloudLanguageModel, cloudListsModel } from "@/lib/polar/cloud-models";
 import { isCloudProvider, readCloudSecret } from "@/lib/agents/cloud-credentials";
 import { wrapLanguageModel, type LanguageModel } from "ai";
@@ -48,6 +49,7 @@ import {
 } from "@/lib/polar/shared";
 import { zenBaseUrl, zenFreeModels, zenProviderOption } from "@/lib/polar/zen-free";
 import { zenLastStep } from "@/lib/polar/zen-stand-in";
+import { hydrateCooldowns, persistCooldown } from "@/lib/polar/cooldown-store";
 import {
     autoRoute,
     automaticCandidates,
@@ -58,6 +60,7 @@ import {
     noteNoCredit,
     noteProviderFailure,
     PLAIN_TURN,
+    shareCooldownsWith,
     unpaidProviders,
     unusableModels,
     type AutoRoute,
@@ -317,6 +320,10 @@ async function keyedModelOptions(
                         windows.get(slug)?.get(model.modelId) ?? null
                     )
                 );
+            if (slug === COPILOT_SLUG) {
+                const credentials = await polarCredentialsFor(userId, slug, null, granted).catch(() => []);
+                models = copilotOptions(models, await copilotModelsFor(credentials), name);
+            }
         }
         // Only what is current: the picker and Automatic never offer a model
         // the field has moved past (`currentModels`).
@@ -368,6 +375,47 @@ function catalogueOption(
         inputs: model.inputModalities ?? [],
         releaseDate: model.releaseDate
     };
+}
+
+const COPILOT_SLUG = "github-copilot";
+
+// Every cooldown Automatic notes is mirrored to the database, so the other
+// processes and the next start see it (`cooldown-store.ts`).
+shareCooldownsWith(persistCooldown);
+
+/** A pick's own provider's other paid models tried behind it, before any other
+ *  provider: a plan that leaves out one model may well include the next
+ *  (OpenRouter's `models[]` fallback). */
+const SAME_PROVIDER_MORE = 3;
+
+/**
+ * A Copilot login's models: the catalogue's entries its own `/models` lists,
+ * then the ones it lists that the catalogue does not know yet, each with the
+ * window Copilot reports. The catalogue alone when Copilot could not be asked
+ * (`copilotModels`). Pure.
+ */
+export function copilotOptions(
+    catalogue: readonly PolarModelOption[],
+    listed: readonly CopilotModel[] | null,
+    providerName: string
+): PolarModelOption[] {
+    if (!listed) return [...catalogue];
+    const byId = new Map(listed.map((model) => [model.id, model]));
+    const known = catalogue
+        .filter((option) => byId.has(option.model))
+        .map((option) => ({
+            ...option,
+            providerContextTokens: byId.get(option.model)!.contextTokens ?? option.providerContextTokens
+        }));
+    const named = new Set(known.map((option) => option.model));
+    const extra = listed
+        .filter((model) => !named.has(model.id) && loginListsModel(COPILOT_SLUG, model.id))
+        .map((model) => ({
+            ...gatewayOption(COPILOT_SLUG, providerName, model.id),
+            name: model.name,
+            providerContextTokens: model.contextTokens
+        }));
+    return [...known, ...extra];
 }
 
 function gatewayOption(slug: string, providerName: string, model: string): PolarModelOption {
@@ -532,6 +580,30 @@ export function answeredBy(
     resolved: Pick<ResolvedModel, "option" | "credential" | "standIns">
 ): Pick<ResolvedModel, "option" | "credential"> {
     return (resolved.standIns ?? []).find((entry) => entry.used()) ?? resolved;
+}
+
+/** Providers a stand-in's answer names at most. */
+const PASSED_OVER_MOST = 6;
+
+/**
+ * Why the model that answered is not the one picked: each provider the turn
+ * was routed past and what it said, once per provider and reason, so a free
+ * model standing in for paid ones says which paid providers failed and how
+ * (out of credit, the plan does not include the model). Empty when the pick
+ * answered. Pure.
+ */
+export function passedOverProviders(
+    resolved: Pick<ResolvedModel, "routed">
+): Array<{ provider: string; kind: FailureKind }> {
+    const passed = resolved.routed?.passedOver?.() ?? [];
+    const out: Array<{ provider: string; kind: FailureKind }> = [];
+    for (const { step, kind } of passed) {
+        const provider = step.option.providerName;
+        if (out.some((entry) => entry.provider === provider && entry.kind === kind)) continue;
+        out.push({ provider, kind });
+        if (out.length >= PASSED_OVER_MOST) break;
+    }
+    return out;
 }
 
 /** One model a turn asked and why it did not answer, as a failure lists it. */
@@ -914,9 +986,10 @@ export async function sameModelElsewhere(
 
 /**
  * The model Automatic answers a turn with: the first candidate a key is held
- * for, on each of its provider's keys, then - in this order - its own
- * provider's next free candidate (and, for a paid first pick, the next paid
- * one), the person's fallback list, and the first candidate of every other
+ * for, on each of its provider's keys, then - in this order - for a paid
+ * pick its own provider's next few paid candidates (`SAME_PROVIDER_MORE`),
+ * the same model on an aggregator, its own provider's next free candidate,
+ * the person's fallback list, and the first candidate of every other
  * provider they may spend on, with that provider's first free candidate
  * behind a paid one - one key read each, the plan bounded by
  * `STEPS_MOST` with a place kept for every key (`breadthFirst`). Another provider's key from this Polaris
@@ -930,7 +1003,7 @@ async function resolveAutomatic(
     access: PolarAccess,
     resolve: ResolveOptions = {}
 ): Promise<ResolvedModel | ModelRefusal> {
-    const options = await polarModelOptions(userId, access);
+    const [options] = await Promise.all([polarModelOptions(userId, access), hydrateCooldowns(userId)]);
     const candidates = automaticCandidates(
         options,
         signals,
@@ -949,14 +1022,17 @@ async function resolveAutomatic(
         // provider's, and the purse its ceiling was checked against.
         const mine = later.filter((entry) => entry.provider === option.provider);
         const free = mine.find(isFreeModel);
-        const paid = isFreeModel(option) ? undefined : mine.find((entry) => !isFreeModel(entry));
+        // A key refused for credit keeps only its free steps (the router), so
+        // the paid ones behind a pick cost nothing on an account without it.
+        const paid = isFreeModel(option)
+            ? []
+            : mine.filter((entry) => !isFreeModel(entry)).slice(0, SAME_PROVIDER_MORE);
         const routing = await polarRouting(userId);
         const entries: PlanEntry[] = [
             entryOf(userId, option, credentials, options, resolve.reasoning),
+            ...paid.map((entry) => entryOf(userId, entry, credentials, options)),
             ...(await sameModelEntries(userId, option, options, keysOf)),
-            ...[free, paid]
-                .filter((entry): entry is PolarModelOption => !!entry)
-                .map((entry) => entryOf(userId, entry, credentials, options)),
+            ...(free ? [entryOf(userId, free, credentials, options)] : []),
             ...(await fallbackEntries(userId, routing.fallbacks, options, keysOf))
         ];
         const seen = new Set([option.provider]);

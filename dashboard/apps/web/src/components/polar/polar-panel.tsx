@@ -3488,12 +3488,15 @@ function MessageView({
         fellBackFrom?: string | null;
         /** The model Automatic picked that was refused, when another answered. */
         standInFor?: string;
+        /** The providers the turn was routed past, and why (`passedOverProviders`). */
+        passedOver?: ReadonlyArray<{ provider?: unknown; kind?: unknown }>;
         workedMs?: number;
         model?: string;
         automatic?: boolean;
         usage?: unknown;
     };
     const spent = answerSpendOf(meta.usage);
+    const passedOver = polarFailure.passedOverOf(meta.passedOver);
     const files = message.parts.filter((part) => part.type === "file");
     const streaming = busy && last;
     const toolName = (name: string) =>
@@ -3625,6 +3628,18 @@ function MessageView({
             {meta.standInFor && meta.model ? (
                 <p className="text-xs text-muted-foreground">
                     {t("errors.stoodIn", { busy: meta.standInFor, model: meta.model })}
+                    {passedOver.length > 0
+                        ? ` ${t("errors.passedOver", {
+                              list: passedOver
+                                  .map((entry) =>
+                                      t("errors.passedOverEntry", {
+                                          provider: entry.provider,
+                                          reason: t(`errors.provider.reasons.${entry.kind}`)
+                                      })
+                                  )
+                                  .join(", ")
+                          })}`
+                        : null}
                 </p>
             ) : null}
             <AttachmentList

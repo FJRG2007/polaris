@@ -31,6 +31,19 @@ export const FAILURE_KINDS = [
 ] as const;
 export type FailureKind = (typeof FAILURE_KINDS)[number];
 
+/** The providers a stand-in's answer says it was routed past, as stored on
+ *  the answer's metadata. */
+const passedOverSchema = z
+    .array(z.object({ provider: z.string().min(1).max(80), kind: z.enum(FAILURE_KINDS) }))
+    .max(6);
+
+/** A stored answer's `passedOver`, read back through its schema: an answer
+ *  saved before it existed, or a malformed one, names nobody. Pure. */
+export function passedOverOf(value: unknown): Array<{ provider: string; kind: FailureKind }> {
+    const parsed = passedOverSchema.safeParse(value);
+    return parsed.success ? parsed.data : [];
+}
+
 export interface ProviderFailure {
     kind: FailureKind;
     status: number | null;

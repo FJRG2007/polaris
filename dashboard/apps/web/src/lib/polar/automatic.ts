@@ -7,8 +7,10 @@
  * one that reasons. Providers whose calls failed a moment ago are tried last,
  * and a provider whose key cannot be read is skipped by the caller.
  *
- * Pure except for the failure memo, which is per process and short-lived: it
- * only reorders candidates, so losing it on a restart costs one slow retry.
+ * Pure except for the failure memos, held per process and mirrored to the
+ * database through `shareCooldownsWith` (`cooldown-store.ts`), so a refusal
+ * one process saw reorders the next turn on every other one, and after a
+ * restart.
  */
 
 import { isFreeModel } from "@/lib/polar/credit";
@@ -250,25 +252,51 @@ export function automaticCandidates(
         if (a.reasoning !== b.reasoning) return a.reasoning ? -1 : 1;
         return byReleaseDesc(a, b) || byCostAsc(b, a) || byName(a, b);
     });
-    return [
-        ...sorted.filter((model) => !failing.has(model.provider)),
-        ...sorted.filter((model) => failing.has(model.provider))
-    ];
+    // Providers that answer first, then the ones failing a moment ago, then
+    // the ones out of credit (LiteLLM's router cooldowns): a provider with no
+    // credit is the last resort, its free models included.
+    const tier = (model: PolarModelOption) =>
+        unpaid.has(model.provider) ? 2 : failing.has(model.provider) ? 1 : 0;
+    return [0, 1, 2].flatMap((rank) => sorted.filter((model) => tier(model) === rank));
 }
 
 /** Most entries a memo keeps, so it cannot grow without end. */
 const MEMO_MOST = 5_000;
 
-/** A per-process memo of providers that refused one person a moment ago. */
-function providerMemo(ttl: number) {
+/** The memos whose entries are shared across processes (`cooldown-store.ts`). */
+export type CooldownMemo = "failing" | "unpaid" | "garbled" | "gone" | "echoed";
+
+type CooldownSink = (userId: string, memo: CooldownMemo, subject: string, until: number) => void;
+let sink: CooldownSink | null = null;
+
+/** Where every noted entry is also sent, so another process - or this one
+ *  after a restart - knows it too. One sink, set by the server at load. */
+export function shareCooldownsWith(next: CooldownSink | null): void {
+    sink = next;
+}
+
+/** A per-process memo of providers that refused one person a moment ago,
+ *  mirrored to the shared store through the sink. */
+function providerMemo(ttl: number, name: CooldownMemo) {
     const seen = new Map<string, number>();
+    const record = (key: string, at: number, now: number): void => {
+        if (seen.size >= MEMO_MOST) {
+            for (const [entry, noted] of seen) if (now - noted > ttl) seen.delete(entry);
+            if (seen.size >= MEMO_MOST) seen.clear();
+        }
+        seen.set(key, at);
+    };
     return {
+        /** Takes an entry noted elsewhere: kept while it is live and newer
+         *  than what this process holds. */
+        adopt(userId: string, subject: string, until: number, now: number): void {
+            const at = until - ttl;
+            const key = `${userId}\u0000${subject}`;
+            if (until > now && (seen.get(key) ?? -Infinity) < at) record(key, at, now);
+        },
         note(userId: string, provider: string, now: number): void {
-            if (seen.size >= MEMO_MOST) {
-                for (const [key, at] of seen) if (now - at > ttl) seen.delete(key);
-                if (seen.size >= MEMO_MOST) seen.clear();
-            }
-            seen.set(`${userId}\u0000${provider}`, now);
+            record(`${userId}\u0000${provider}`, now, now);
+            sink?.(userId, name, provider, now + ttl);
         },
         list(userId: string, now: number): Set<string> {
             const prefix = `${userId}\u0000`;
@@ -298,8 +326,8 @@ export function toolMarkupIn(text: string): boolean {
     return /<invoke\s+name=|<\/?tool_call\b|<\|tool_calls?[_a-z]*\|>|<\/?function_calls>/i.test(text);
 }
 
-const failures = providerMemo(FAILURE_MS);
-const garbled = providerMemo(GARBLED_MS);
+const failures = providerMemo(FAILURE_MS, "failing");
+const garbled = providerMemo(GARBLED_MS, "garbled");
 
 /** Notes that this model wrote its tool calls out as text for this person. */
 export function noteToolMarkup(userId: string, provider: string, model: string, now = Date.now()): void {
@@ -310,7 +338,7 @@ export function noteToolMarkup(userId: string, provider: string, model: string, 
 export function garbledModels(userId: string, now = Date.now()): Set<string> {
     return garbled.list(userId, now);
 }
-const unpaid = providerMemo(UNPAID_MS);
+const unpaid = providerMemo(UNPAID_MS, "unpaid");
 
 /** How long a model its provider said it does not serve stays out of
  *  Automatic: its catalogue lists it, its API answers `invalid_model`. */
@@ -318,8 +346,8 @@ export const GONE_MS = 24 * 60 * 60_000;
 /** How long a model that answered with the conversation it was shown, in
  *  place of a reply, stays out of Automatic. */
 export const ECHOED_MS = 6 * 60 * 60_000;
-const gone = providerMemo(GONE_MS);
-const echoed = providerMemo(ECHOED_MS);
+const gone = providerMemo(GONE_MS, "gone");
+const echoed = providerMemo(ECHOED_MS, "echoed");
 
 /** Notes that this provider does not serve this model to this person. */
 export function noteModelGone(userId: string, provider: string, model: string, now = Date.now()): void {
@@ -354,4 +382,30 @@ export function noteNoCredit(userId: string, provider: string, now = Date.now())
 /** The providers that refused this person for want of credit lately. */
 export function unpaidProviders(userId: string, now = Date.now()): Set<string> {
     return unpaid.list(userId, now);
+}
+
+const memos: Record<CooldownMemo, ReturnType<typeof providerMemo>> = {
+    failing: failures,
+    unpaid,
+    garbled,
+    gone,
+    echoed
+};
+
+/** Takes an entry another process noted (`cooldown-store.ts`). */
+export function adoptCooldown(
+    userId: string,
+    memo: CooldownMemo,
+    subject: string,
+    until: number,
+    now = Date.now()
+): void {
+    memos[memo]?.adopt(userId, subject, until, now);
+}
+
+/** Notes that this model ended a turn offering tools without a word for the
+ *  person - its last step empty or only tool calls. Kept off such turns like
+ *  a model that writes its tool calls as text (`noteToolMarkup`). */
+export function noteNoFinalAnswer(userId: string, provider: string, model: string, now = Date.now()): void {
+    garbled.note(userId, `${provider}/${model}`, now);
 }

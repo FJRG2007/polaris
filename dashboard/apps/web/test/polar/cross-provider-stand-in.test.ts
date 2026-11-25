@@ -119,8 +119,9 @@ describe("Automatic's stand-ins across providers", () => {
         if (typeof resolved === "string") throw new Error(resolved);
         expect(resolved.option.model).toBe("llama-fast");
         expect(resolved.standIns?.map((entry) => entry.option.model)).toEqual([
-            "gemma-free",
+            // Its own provider's next paid model, then its next free one.
             "qwen-32b",
+            "gemma-free",
             "openai/gpt-mini",
             // A paid pick brings its provider's first free model behind it:
             // a key with no credit still answers on that one.

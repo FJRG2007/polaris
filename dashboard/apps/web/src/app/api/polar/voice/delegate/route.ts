@@ -90,7 +90,8 @@ export async function POST(request: Request): Promise<Response> {
             failureLogLine(
                 "a voice delegation",
                 helper.resolved.option.providerName,
-                classifyProviderFailure(error)
+                classifyProviderFailure(error),
+                error
             )
         );
         return refuse("failed", 502);

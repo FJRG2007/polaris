@@ -121,6 +121,7 @@ import {
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import {
     answeredBy,
+    passedOverProviders,
     failedTurn,
     reasoningFor,
     rememberRefusal,
@@ -719,12 +720,14 @@ export async function POST(request: Request): Promise<Response> {
 
     const standInMeta = () => {
         const answered = answeredBy(resolved);
+        const passedOver = passedOverProviders(resolved);
         return answered.option === resolved.option
             ? {}
             : {
                   model: answered.option.name,
                   provider: answered.option.providerName,
-                  standInFor: resolved.option.name
+                  standInFor: resolved.option.name,
+                  ...(passedOver.length > 0 ? { passedOver } : {})
               };
     };
 
@@ -780,7 +783,7 @@ export async function POST(request: Request): Promise<Response> {
             const { option, credential, tried } = failedTurn(resolved);
             const failure = classifyProviderFailure(error);
             rememberRefusal(user.id, option.provider, failure.kind);
-            console.warn(failureLogLine("a turn", option.providerName, failure));
+            console.warn(failureLogLine("a turn", option.providerName, failure, error));
             return encodePolarFailure({
                 code: "provider",
                 kind: failure.kind,
