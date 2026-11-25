@@ -421,6 +421,8 @@ export interface SharedMediaItem {
     readonly hasPoster: boolean;
     readonly thumbhash: string | null;
     readonly sentAt: string;
+    /** A sealed file: what it is, and the bytes, come from its message in `sealed` once the page opens it. */
+    readonly sealed?: true;
 }
 
 /** Messages per page of the gallery: a few screens of tiles three abreast. */
@@ -439,7 +441,7 @@ const sharedMediaSchema = z.object({
 export async function listSharedMediaAction(
     input: unknown,
     proof?: string | null
-): Promise<{ items: readonly SharedMediaItem[]; next: string | null }> {
+): Promise<{ items: readonly SharedMediaItem[]; sealed?: readonly ChatMessageView[]; next: string | null }> {
     const me = await actor();
     const parsed = sharedMediaSchema.safeParse(input);
     if (!parsed.success) return { items: [], next: null };
@@ -455,8 +457,8 @@ export async function listSharedMediaAction(
     });
     const items = hits.flatMap(({ message }) =>
         message.attachments
-            .filter((file) => file.inline && !file.spoiler)
-            .filter((file) => /^(image|video)\//.test(file.contentType))
+            .filter((file) => file.sealed || (file.inline && !file.spoiler))
+            .filter((file) => file.sealed || /^(image|video)\//.test(file.contentType))
             .map((file) => ({
                 id: file.id,
                 messageId: message.id,
@@ -466,12 +468,15 @@ export async function listSharedMediaAction(
                 durationMs: file.durationMs,
                 hasPoster: file.hasPoster,
                 thumbhash: file.thumbhash,
-                sentAt: message.createdAt
+                sentAt: message.createdAt,
+                ...(file.sealed ? { sealed: true as const } : {})
             }))
     );
+    const sealed = hits.flatMap(({ message }) => (message.attachments.some((file) => file.sealed) ? [message] : []));
     const last = hits.at(-1);
     return {
         items,
+        ...(sealed.length ? { sealed } : {}),
         next:
             hits.length === SHARED_MEDIA_PAGE && last
                 ? encodeSharedCursor({ createdAt: last.message.createdAt, id: last.message.id })

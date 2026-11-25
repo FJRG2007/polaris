@@ -1618,9 +1618,11 @@ const Message = memo(function Message({
                                                     // chose not to have media load on its
                                                     // own (`auto-download`): play is the ask.
                                                     poster={
-                                                        file.hasPoster && message.autoLoad !== false
-                                                            ? `/api/chat/attachments/${file.id}?poster=1`
-                                                            : undefined
+                                                        file.sealed
+                                                            ? file.openedPosterUrl
+                                                            : file.hasPoster && message.autoLoad !== false
+                                                              ? `/api/chat/attachments/${file.id}?poster=1`
+                                                              : undefined
                                                     }
                                                     // Its blur under the still, and its own
                                                     // shape rather than 16:9, so the frame

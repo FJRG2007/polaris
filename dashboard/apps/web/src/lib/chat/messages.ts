@@ -286,6 +286,8 @@ export interface ChatAttachmentView {
     readonly sealed?: boolean;
     /** A sealed file opened on this page: the object URL its clear bytes are drawn from (set by the reader's page, never by the server). */
     readonly openedUrl?: string;
+    /** A sealed video's still, taken on this page from its opened bytes (never by the server). */
+    readonly openedPosterUrl?: string;
     /** Its pixel size and blurred stand-in, measured by the sender, so the
      *  bubble has its final size before the bytes come - see
      *  `lib/chat/media-shape`. Null for files sent before they were kept. */

@@ -15,6 +15,7 @@ import type { ChatPollView } from "@/lib/chat/polls";
 import * as sealedFiles from "@/lib/chat/e2ee/sealed-files";
 import { isInlineImage } from "@/lib/mime";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
+import { sealedStill, stillTried, takeSealedStill, wantsStill } from "./sealed-stills";
 
 /** As much of an opened body as a list row shows (as `last-messages.ts` cuts a plain one). */
 const PREVIEW_CHARS = 160;
@@ -38,7 +39,8 @@ export function unopened(
 export function withOpened(
     messages: readonly ChatMessageView[],
     opened: (id: string, editedAt?: string) => sealedChat.SealedContent | null | undefined,
-    fileUrl: (id: string) => string | undefined = sealedFiles.openedFileUrl
+    fileUrl: (id: string) => string | undefined = sealedFiles.openedFileUrl,
+    stillUrl: (id: string) => string | undefined = sealedStill
 ): readonly ChatMessageView[] {
     let changed = false;
     const out = messages.map((message) => {
@@ -56,7 +58,7 @@ export function withOpened(
             poll,
             attachments: message.attachments.map((file) => {
                 const ref = file.sealed ? refs.get(file.id) : undefined;
-                return ref ? openedFile(file, ref, fileUrl(ref.id)) : file;
+                return ref ? openedFile(file, ref, fileUrl(ref.id), stillUrl(ref.id)) : file;
             })
         };
     });
@@ -75,7 +77,12 @@ export function keepTexts(fresh: ChatPollView, drawn: ChatPollView): ChatPollVie
 }
 
 /** A sealed attachment drawn as what its seal says it is; `url` once its bytes opened on this page. */
-export function openedFile(file: ChatAttachmentView, ref: sealedChat.SealedFileRef, url: string | undefined): ChatAttachmentView {
+export function openedFile(
+    file: ChatAttachmentView,
+    ref: sealedChat.SealedFileRef,
+    url: string | undefined,
+    still?: string
+): ChatAttachmentView {
     return {
         ...file,
         name: ref.name,
@@ -89,14 +96,16 @@ export function openedFile(file: ChatAttachmentView, ref: sealedChat.SealedFileR
         spoiler: ref.spoiler === true,
         inline: isInlineImage(ref.type),
         hasPoster: false,
-        ...(url ? { openedUrl: url } : {})
+        ...(url ? { openedUrl: url } : {}),
+        ...(still ? { openedPosterUrl: still } : {})
     };
 }
 
 /** The sealed files of these opened messages that this page has not opened yet. */
 export function unopenedFiles(
     messages: readonly ChatMessageView[],
-    opened: (id: string, editedAt?: string) => sealedChat.SealedContent | null | undefined = sealedChat.openedContent
+    opened: (id: string, editedAt?: string) => sealedChat.SealedContent | null | undefined = sealedChat.openedContent,
+    wanted: (ref: sealedChat.SealedFileRef) => boolean = () => true
 ): sealedChat.SealedFileRef[] {
     const out: sealedChat.SealedFileRef[] = [];
     for (const message of messages) {
@@ -104,12 +113,32 @@ export function unopenedFiles(
         if (!message.sealed || !message.attachments?.some((file) => file.sealed)) continue;
         const files = opened(message.id, message.sealedEditedAt)?.files ?? [];
         const stored = new Set(message.attachments.filter((file) => file.sealed).map((file) => file.id));
-        for (const ref of files) if (stored.has(ref.id) && !sealedFiles.openedFileUrl(ref.id)) out.push(ref);
+        for (const ref of files) if (stored.has(ref.id) && wanted(ref) && !sealedFiles.openedFileUrl(ref.id)) out.push(ref);
     }
     return out;
 }
 
-export function useOpenedSealed(messages: readonly ChatMessageView[]): readonly ChatMessageView[] {
+/** `messages` drawn opened; `wanted` picks which of their sealed files are fetched and opened (all by default). */
+/** The opened sealed videos of these messages with no still tried on this page yet. */
+export function stillsToTake(
+    messages: readonly ChatMessageView[],
+    opened: (id: string, editedAt?: string) => sealedChat.SealedContent | null | undefined = sealedChat.openedContent
+): { ref: sealedChat.SealedFileRef; url: string }[] {
+    const out: { ref: sealedChat.SealedFileRef; url: string }[] = [];
+    for (const message of messages) {
+        if (!message.sealed || !message.attachments?.some((file) => file.sealed)) continue;
+        for (const ref of opened(message.id, message.sealedEditedAt)?.files ?? []) {
+            const url = sealedFiles.openedFileUrl(ref.id);
+            if (url && wantsStill(ref) && !stillTried(ref.id)) out.push({ ref, url });
+        }
+    }
+    return out;
+}
+
+export function useOpenedSealed(
+    messages: readonly ChatMessageView[],
+    wanted?: (ref: sealedChat.SealedFileRef) => boolean
+): readonly ChatMessageView[] {
     // Bumped when an open lands, so the rows are drawn again from the page's cache.
     const [version, setVersion] = useState(0);
     useEffect(() => {
@@ -132,9 +161,21 @@ export function useOpenedSealed(messages: readonly ChatMessageView[]): readonly 
     useEffect(() => {
         if (!sealedChat.sealedChatActive()) return;
         let live = true;
-        for (const ref of unopenedFiles(messages))
+        for (const ref of unopenedFiles(messages, sealedChat.openedContent, wanted))
             void sealedFiles.openSealedFile(ref).then((url) => {
                 if (url && live) setVersion((current) => current + 1);
+            });
+        return () => {
+            live = false;
+        };
+    }, [messages, version, wanted]);
+    // A still for each opened sealed video (opened here, prefetched, or the sender's own), taken once.
+    useEffect(() => {
+        if (!sealedChat.sealedChatActive()) return;
+        let live = true;
+        for (const { ref, url } of stillsToTake(messages))
+            void takeSealedStill(ref, url).then((still) => {
+                if (still && live) setVersion((current) => current + 1);
             });
         return () => {
             live = false;

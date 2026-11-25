@@ -94,6 +94,11 @@ export function openedFileUrl(id: string): string | undefined {
     return kept.get(id)?.url;
 }
 
+/** Whether this page tried a sealed file and it did not open (it is not tried again). */
+export function fileFailed(id: string): boolean {
+    return failed.has(id);
+}
+
 /**
  * Fetch and open one sealed file; answers its object URL, or null when it did
  * not open (a blob that is not the one its message names never draws).

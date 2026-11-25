@@ -35,6 +35,8 @@ import {
 } from "@polaris/ui";
 import { useChat } from "./chat-context";
 import { useChatStream } from "./use-chat-stream";
+import { useOpenedSealed } from "./opened-sealed";
+import type { SealedFileRef } from "@/lib/chat/e2ee/sealed-chat";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
@@ -222,6 +224,17 @@ export function ForumView({
         [forum]
     );
 
+    // A sealed post's words and files, opened on this page (its title is not sealed yet).
+    const roots = useMemo(() => (listing?.posts ?? []).map((post) => post.root), [listing]);
+    const openedRoots = useOpenedSealed(roots, postMediaRef);
+    const posts = useMemo(
+        () =>
+            (listing?.posts ?? []).map((post, at) => {
+                const root = openedRoots[at];
+                return root && root !== post.root ? { ...post, root } : post;
+            }),
+        [listing, openedRoots]
+    );
     return (
         <div className="flex h-full min-h-0 flex-col">
             <div className="flex flex-col gap-3 border-b border-border px-4 py-3">
@@ -338,7 +351,7 @@ export function ForumView({
                     </div>
                 ) : media ? (
                     <ul className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-4">
-                        {listing.posts.map((post) => (
+                        {posts.map((post) => (
                             <li key={post.id} className="relative min-w-0">
                                 <MediaTile post={post} onOpen={() => onOpenPost(post.root)} />
                                 {editable(post) && <EditButton onEdit={() => setEditing(post)} />}
@@ -347,7 +360,7 @@ export function ForumView({
                     </ul>
                 ) : (
                     <ul className="flex flex-col">
-                        {listing.posts.map((post) => (
+                        {posts.map((post) => (
                             <li key={post.id} className="relative">
                                 <PostRow
                                     post={post}
@@ -588,13 +601,21 @@ function PostRow({
     );
 }
 
+/** A sealed file the list draws: a post's picture or video. */
+function postMediaRef(ref: SealedFileRef): boolean {
+    return core.isPostMedia(ref.type);
+}
+
 /** One post in a gallery: its first picture or video, the title under it. */
 function MediaTile({ post, onOpen }: { post: ChatForumPostView; onOpen: () => void }) {
     const t = useTranslations("chat");
     const file = post.root.attachments.find((entry) => core.isPostMedia(entry.contentType));
     const video = file?.contentType.startsWith("video/") ?? false;
-    const still =
-        file && (!video || file.hasPoster) ? `/api/chat/attachments/${file.id}${video ? "?poster=1" : ""}` : null;
+    const still = file?.sealed
+        ? ((video ? file.openedPosterUrl : file.openedUrl) ?? null)
+        : file && (!video || file.hasPoster)
+          ? `/api/chat/attachments/${file.id}${video ? "?poster=1" : ""}`
+          : null;
     return (
         <button
             type="button"
