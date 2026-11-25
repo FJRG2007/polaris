@@ -25,6 +25,7 @@
 
 import { z } from "zod";
 import * as core from "@polaris/core";
+import { mediaShapeSchema } from "@/lib/chat/media-shape";
 import type { MlsDevice, SealedStored } from "./mls-client";
 import type { IndexedSealed, SealedSearchIndex } from "./sealed-search-index";
 
@@ -34,10 +35,37 @@ export const OPENED_LIMIT = 5_000;
 /** `read-sealed` takes at most this many ids per request. */
 const READ_PAGE = 100;
 
+/** 32 bytes as unpadded base64url: a file's key or the SHA-256 of its clear bytes. */
+const key32 = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+
+/**
+ * One file the message carries (proposal 10b): which stored attachment holds
+ * its sealed bytes, the key that opens them and the digest they must open to,
+ * and everything the server used to hold about it in the clear - its name,
+ * type, size, picture shape, sound and whether it arrives covered.
+ */
+export const sealedFileSchema = z
+    .object({
+        id: z.string().uuid(),
+        key: key32,
+        sha256: key32,
+        name: z.string().min(1).max(200),
+        type: z.string().min(1).max(200),
+        size: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+        shape: mediaShapeSchema.nullable().optional(),
+        durationMs: z.number().int().positive().max(60 * 60 * 1000).optional(),
+        waveform: z.string().regex(/^[0-9]{1,64}$/).optional(),
+        spoiler: z.boolean().optional()
+    })
+    .strict();
+
+export type SealedFileRef = z.infer<typeof sealedFileSchema>;
+
 const sealedContent = z.object({
     v: z.literal(SEALED_CONTENT_VERSION),
     body: core.chatSendSchema.shape.body,
-    translation: core.chatSendSchema.shape.translation
+    translation: core.chatSendSchema.shape.translation,
+    files: z.array(sealedFileSchema).min(1).max(core.CHAT_ATTACHMENT_COUNT_CEILING).optional()
 });
 
 /** What a sealed message carries inside its seal. */
@@ -47,8 +75,8 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
 export function encodeSealedContent(content: SealedContent): Uint8Array {
-    const { body, translation } = content;
-    return encoder.encode(JSON.stringify({ v: SEALED_CONTENT_VERSION, body, ...(translation ? { translation } : {}) }));
+    const { body, translation, files } = content;
+    return encoder.encode(JSON.stringify({ v: SEALED_CONTENT_VERSION, body, ...(translation ? { translation } : {}), ...(files?.length ? { files } : {}) }));
 }
 
 /** The content of an opened message, or null when it is not one this version reads. */
@@ -56,8 +84,8 @@ export function decodeSealedContent(bytes: Uint8Array): SealedContent | null {
     try {
         const parsed = sealedContent.safeParse(JSON.parse(decoder.decode(bytes)));
         if (!parsed.success) return null;
-        const { body, translation } = parsed.data;
-        return translation ? { body, translation } : { body };
+        const { body, translation, files } = parsed.data;
+        return { body, ...(translation ? { translation } : {}), ...(files?.length ? { files } : {}) };
     } catch {
         return null;
     }
@@ -157,6 +185,11 @@ export function openedContent(id: string, editedAt?: string): SealedContent | nu
     return opened.get(versionKey(id, editedAt));
 }
 
+/** The content to seal from a send or edit, with no empty field. */
+function contentOf(input: SealedContent): SealedContent {
+    return { body: input.body, ...(input.translation ? { translation: input.translation } : {}), ...(input.files?.length ? { files: input.files } : {}) };
+}
+
 export interface SealedSendInput extends SealedContent {
     channelId: string;
     /** The outbox key: the message id inside the seal and the send's idempotency key. */
@@ -169,11 +202,12 @@ export interface SealedSendInput extends SealedContent {
 export async function sendSealedMessage(input: SealedSendInput): Promise<string> {
     const mls = await device();
     await mls.ensureGroup(input.channelId);
-    const content: SealedContent = input.translation ? { body: input.body, translation: input.translation } : { body: input.body };
+    const content = contentOf(input);
     const id = await mls.sendSealed(input.channelId, encodeSealedContent(content), {
         clientKey: input.clientKey,
         parentId: input.parentId ?? null,
-        replyToId: input.replyToId ?? null
+        replyToId: input.replyToId ?? null,
+        ...(content.files ? { uploads: content.files.map((file) => file.id) } : {})
     });
     keep(id, content);
     index(input.channelId, id, undefined, content);
@@ -239,7 +273,8 @@ export interface SealedEditInput extends SealedContent {
 export async function editSealedMessage(input: SealedEditInput): Promise<string> {
     const shown = versionKey(input.messageId, input.editedAt);
     const before = opened.get(shown);
-    const content: SealedContent = input.translation ? { body: input.body, translation: input.translation } : { body: input.body };
+    // An edit rewrites the words; the files the message carries stay, with their keys.
+    const content = contentOf({ ...input, files: input.files ?? before?.files });
     keep(shown, content);
     try {
         const mls = await device();

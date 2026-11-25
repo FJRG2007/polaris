@@ -404,7 +404,7 @@ share of the work, not of the code.
 | --- | --- | --- | --- |
 | 1 | **Real-browser run of the sealed flows.** The text flows passed end to end against a production build on 2026-11-24 (see the note under this table). Also passed in a browser (2026-11-24, round 18): the launcher's Chat search finding a sealed message by its words on the sender's and the reader's browser; a webhook posting over HTTP into a sealed group (204, stored sealed under the given name, opened by both members, `?wait=true` answered); two tabs of one browser sending in turn and at once, every message opened by the other side - which showed the tabs fighting over the device, now fixed ("Every tab of a browser shares its device"; the fix itself is unit-tested and not yet re-run in a browser). Not yet: the chat panel's own search, the "Polar in this chat" switch (the driver did not reach it through the info panel), Polar's Approve and Cancel (needs a provider). | Yes | ~65% |
 | 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). A page loaded before sealed chat was on is told to reload instead (`errors.sealedOnlyReload`, see "Sealed only"). A conversation the migration cut is sealed only before any browser has made its group (`conversationSealed` reads `ChatMigration`). Left: a sealed form for editing an old plain message in a sealed conversation. | Yes | ~85% |
-| 3 | **Message kinds that are still plain.** Attachments (file bytes and names), voice notes, polls, scheduled messages, forum post titles, server-side translations, link cards. Each needs a sealed form (proposal 10b for files: encrypted in the browser, the key inside the sealed message). Until then a sealed conversation leaks whatever is sent as one of these. | Yes | ~15% (text, edits, replies, threads, Polar, webhooks are sealed) |
+| 3 | **Message kinds that are still plain.** Built (2026-11-25): attachments, see "Sealed files". Left: voice notes recorded in a sealed conversation ride the sealed-file path (their length and shape are inside the seal) but are not verified in a browser; polls, scheduled messages, forum post titles, server-side translations, link cards, files sent to be seen once and files left in a Drive (refused in a sealed conversation, nothing sent in the clear). Until each has its sealed form a sealed conversation cannot send it. | Yes | ~35% (text, edits, replies, threads, Polar, webhooks, files are sealed) |
 | 4 | **Default-on switch.** `chatE2eeEnabled()` reads `=== "1"`. Default-on has to be on with nothing set and keep an env kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md). | Yes | 0% (one line, last) |
 | 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback` for the 30-day rollback), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Left: the admin progress line (`migrationProgress()` exists, no screen yet), rollback (restore from `ChatMigrationRollback`), the purge after 30 days (decision 4), attachments/polls/system rows (row 3), members with no account key yet getting the legacy key later (needs `ORK` or a member device re-sealing it), a "history before [date]" label. | Yes (owner: every existing chat migrated) | ~45% |
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
@@ -416,7 +416,7 @@ share of the work, not of the code.
 | 12 | **Large channels**: steady-state commit size with a filled tree is unmeasured (phase 0); batched adds and removes for 10,000-member channels are not built. | For big spaces | ~20% |
 
 Rough overall to "on by default, every existing chat migrated, recoverable":
-about 40%. Text messaging between people on the web, with edits, Polar and
+about 42%. Text messaging between people on the web, with edits, Polar and
 webhooks, is built and covered by tests against the real MLS binding; the
 migration, the plain-write cut, the other message kinds, `ORK` and
 transparency are the bulk of what is left.
@@ -441,6 +441,38 @@ missing at build time) ships sealed chat switched on but unable to open a
 device - every send stays "not sent yet" in the outbox, and nothing is sent in
 the clear instead. CI sets `POLARIS_CORE_RS_REQUIRED=1`, so a published image
 always carries it.
+
+## Sealed files (built 2026-11-25)
+
+Proposal 10b, first part. `@polaris/chat-crypto/file-content` seals a file
+under a fresh 256-bit key in 64 KiB AES-256-GCM chunks (nonce = counter and a
+last-chunk flag, so a cut, reordered or extended blob does not open) and
+checks the SHA-256 of the clear bytes after opening.
+
+- Sending (`send-with-files.ts`, `sealed-files.ts`): with sealed chat on, every
+  file is sealed in the browser and uploaded with `?sealed=1`; the server keeps
+  it as `name = "file"`, `application/octet-stream`, `ChatUpload.sealed` /
+  `ChatAttachment.sealed` (migration `20281201000000_chat_sealed_files`). The
+  message's seal carries, per file, the attachment id (the upload id is kept as
+  the attachment id), key, digest, name, type, size, picture shape, sound and
+  cover (`sealedFileSchema`). No still is uploaded for a sealed video.
+- Server (`sealed-messages.sendSealed`, op `send-sealed` field `uploads`): a
+  sealed send claims only sealed uploads, a plain send only plain ones, under
+  `chat.attach` and the conversation's file limit; a retry answers the stored
+  message; a failed send removes the claimed bytes; Polar and webhooks cannot
+  attach. Saved media refuses a sealed file.
+- Reading (`opened-sealed.ts`): an opened message's sealed files are fetched,
+  opened and checked against the digest, and drawn from object URLs (256 MiB
+  kept per page, oldest revoked first); until then, or if one does not open,
+  the row shows the file's name with nothing to fetch. An edit keeps the
+  message's files and keys.
+- Not covered yet: the file viewer, the forum list, the shared-media panel and
+  the media auto-download skip sealed files (they read the route, which holds
+  only the blob); a sealed file is opened whole in memory (100 MiB ceiling);
+  per-author deduplication and blob reference counting (10b.2) are not built.
+
+Verified: unit tests (`packages/chat-crypto/test/file-content.test.ts`,
+`apps/web/test/chat/e2ee/sealed-files.test.ts`). Not run in a browser yet.
 
 ## Migration of existing chats (built 2026-11-25)
 

@@ -10,7 +10,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
-import type { ChatMessageView } from "@/lib/chat/messages";
+import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
+import * as sealedFiles from "@/lib/chat/e2ee/sealed-files";
+import { isInlineImage } from "@/lib/mime";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 
 /** As much of an opened body as a list row shows (as `last-messages.ts` cuts a plain one). */
@@ -34,7 +36,8 @@ export function unopened(
 /** Draw a sealed row with what its version opened to; one that did not open keeps its empty body. */
 export function withOpened(
     messages: readonly ChatMessageView[],
-    opened: (id: string, editedAt?: string) => sealedChat.SealedContent | null | undefined
+    opened: (id: string, editedAt?: string) => sealedChat.SealedContent | null | undefined,
+    fileUrl: (id: string) => string | undefined = sealedFiles.openedFileUrl
 ): readonly ChatMessageView[] {
     let changed = false;
     const out = messages.map((message) => {
@@ -43,9 +46,53 @@ export function withOpened(
         const content = opened(message.id, message.sealedEditedAt);
         if (!content) return message;
         changed = true;
-        return { ...message, body: content.body };
+        if (!content.files || !message.attachments) return { ...message, body: content.body };
+        const refs = new Map(content.files.map((ref) => [ref.id, ref]));
+        return {
+            ...message,
+            body: content.body,
+            attachments: message.attachments.map((file) => {
+                const ref = file.sealed ? refs.get(file.id) : undefined;
+                return ref ? openedFile(file, ref, fileUrl(ref.id)) : file;
+            })
+        };
     });
     return changed ? out : messages;
+}
+
+/** A sealed attachment drawn as what its seal says it is; `url` once its bytes opened on this page. */
+export function openedFile(file: ChatAttachmentView, ref: sealedChat.SealedFileRef, url: string | undefined): ChatAttachmentView {
+    return {
+        ...file,
+        name: ref.name,
+        contentType: ref.type,
+        size: ref.size,
+        width: ref.shape?.w ?? null,
+        height: ref.shape?.h ?? null,
+        thumbhash: ref.shape?.th ?? null,
+        durationMs: ref.durationMs ?? null,
+        waveform: ref.waveform ?? null,
+        spoiler: ref.spoiler === true,
+        inline: isInlineImage(ref.type),
+        hasPoster: false,
+        ...(url ? { openedUrl: url } : {})
+    };
+}
+
+/** The sealed files of these opened messages that this page has not opened yet. */
+export function unopenedFiles(
+    messages: readonly ChatMessageView[],
+    opened: (id: string, editedAt?: string) => sealedChat.SealedContent | null | undefined = sealedChat.openedContent
+): sealedChat.SealedFileRef[] {
+    const out: sealedChat.SealedFileRef[] = [];
+    for (const message of messages) {
+        // Some surfaces (pins, search hits) carry no attachment list at all.
+        if (!message.sealed || !message.attachments?.some((file) => file.sealed)) continue;
+        const files = opened(message.id, message.sealedEditedAt)?.files ?? [];
+        const stored = new Set(message.attachments.filter((file) => file.sealed).map((file) => file.id));
+        for (const ref of files) if (stored.has(ref.id) && !sealedFiles.openedFileUrl(ref.id)) out.push(ref);
+    }
+    return out;
 }
 
 export function useOpenedSealed(messages: readonly ChatMessageView[]): readonly ChatMessageView[] {
@@ -67,6 +114,18 @@ export function useOpenedSealed(messages: readonly ChatMessageView[]): readonly 
             live = false;
         };
     }, [messages]);
+    // The files of opened messages, fetched and opened once each; a row draws one when it lands.
+    useEffect(() => {
+        if (!sealedChat.sealedChatActive()) return;
+        let live = true;
+        for (const ref of unopenedFiles(messages))
+            void sealedFiles.openSealedFile(ref).then((url) => {
+                if (url && live) setVersion((current) => current + 1);
+            });
+        return () => {
+            live = false;
+        };
+    }, [messages, version]);
     // `version` is what says the cache moved.
     return useMemo(() => withOpened(messages, sealedChat.openedContent), [messages, version]);
 }

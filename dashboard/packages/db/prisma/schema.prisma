@@ -11804,6 +11804,11 @@ model ChatAttachment {
     // sender's setting stood when it was sent (`UserPrivacy.viewOnceWatermark`).
     // Copied per file so a later change never alters what was already sent.
     watermark    Boolean  @default(true)
+    // Sealed in the sender's browser (docs/chat-e2ee-proposal.md 10b): the bytes
+    // are an opaque blob, the name and type above say nothing ("file",
+    // octet-stream), and the key, digest and real name travel inside the sealed
+    // message that carries it. Never shown inline, given a still or read here.
+    sealed       Boolean  @default(false)
     createdAt    DateTime @default(now())
 
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
@@ -11927,6 +11932,10 @@ model ChatUpload {
     // Sent covered, chosen before the upload because that is when the sender
     // marked it.
     spoiler   Boolean  @default(false)
+    // Sealed in the sender's browser: an opaque blob for a sealed message (see
+    // `ChatAttachment.sealed`). A sealed upload only rides a sealed message,
+    // and a sealed message only carries sealed uploads.
+    sealed    Boolean  @default(false)
     createdAt DateTime @default(now())
 
     user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)

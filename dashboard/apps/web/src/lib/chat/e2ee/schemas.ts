@@ -148,6 +148,8 @@ export const mlsBody = z.discriminatedUnion("op", [
         clientKey: z.string().uuid(),
         parentId: z.string().uuid().nullable().optional(),
         replyToId: z.string().uuid().nullable().optional(),
+        // Files sealed in this browser and staged with `?sealed=1`, named (with their keys) inside the seal.
+        uploads: z.array(z.string().uuid()).min(1).max(25).optional(),
         epoch,
         senderLeaf: z.number().int().min(0).max(0xffffffff),
         ciphertext: base64Url(17, 256 * 1024),

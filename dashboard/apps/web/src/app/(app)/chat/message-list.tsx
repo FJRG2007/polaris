@@ -90,7 +90,7 @@ import { TranslateButton, TranslatableText, TranslationNote } from "./translated
 import { VideoPreview } from "@/components/video-preview";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
 import { AttachmentViewer, previewableAs, type ViewedFile } from "./attachment-viewer";
-import { attachmentImageUrl, messageGallery } from "./message-gallery";
+import { attachmentFileUrl, attachmentImageUrl, messageGallery } from "./message-gallery";
 import { useChatPreferences } from "./chat-preferences";
 import { captionGoesBelow } from "@/lib/chat/preference-schema";
 import { usePersonPress } from "@/components/person-press";
@@ -134,7 +134,8 @@ function SentFile({
     shielded?: boolean;
 }) {
     const t = useTranslations("chat");
-    const readable = previewableAs(file.name, file.contentType);
+    // A sealed file is saved from what this page opened, never read in the viewer (it fetches the route, which holds the sealed blob).
+    const readable = file.sealed ? null : previewableAs(file.name, file.contentType);
     const chip =
         "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-start text-xs transition-colors hover:bg-card-hover";
 
@@ -161,7 +162,7 @@ function SentFile({
     if (!readable) {
         return (
             <a
-                href={`/api/chat/attachments/${file.id}?download=1`}
+                href={attachmentFileUrl(file, "download")}
                 download={file.name}
                 className={chip}
             >
@@ -200,7 +201,7 @@ function SentFile({
             </button>
             {!shielded && (
                 <a
-                    href={`/api/chat/attachments/${file.id}?download=1`}
+                    href={attachmentFileUrl(file, "download")}
                     download={file.name}
                     aria-label={t("messageList.downloadNamed", { name: file.name })}
                     title={t("messageList.download")}
@@ -1504,7 +1505,11 @@ const Message = memo(function Message({
                                             }
                                             covered={file.spoiler || coverAll}
                                         >
-                                            {file.inline && sending ? (
+                                            {file.sealed && !file.openedUrl && !sending ? (
+                                                // Sealed, and not opened on this page yet (or not
+                                                // openable here): its name, nothing to fetch.
+                                                <SentFile file={file} at={message.createdAt} onOpen={onOpenFile} pending />
+                                            ) : file.inline && sending ? (
                                                 <KeepableImage
                                                     href={pendingUrl ?? ""}
                                                     shape={file}
@@ -1517,7 +1522,7 @@ const Message = memo(function Message({
                                             ) : file.inline ? (
                                                 <HeldPictureIf held={message.autoLoad === false && !local} file={file}>
                                                 <KeepableImage
-                                                    href={attachmentImageUrl(file.id)}
+                                                    href={attachmentImageUrl(file)}
                                                     shape={file}
                                                     alt={file.name}
                                                     source={`attachment:${file.id}`}
@@ -1526,7 +1531,7 @@ const Message = memo(function Message({
                                                     onLocalDone={local ? () => releaseLocal(local) : undefined}
                                                     onOpen={() =>
                                                         onOpenImage({
-                                                            url: attachmentImageUrl(file.id),
+                                                            url: attachmentImageUrl(file),
                                                             name: file.name,
                                                             messageId: message.id,
                                                             forwardable: message.forwardable,
@@ -1580,7 +1585,7 @@ const Message = memo(function Message({
                                                 </span>
                                             ) : isPlayable(file.contentType) ? (
                                                 <VoiceNote
-                                                    href={`/api/chat/attachments/${file.id}`}
+                                                    href={attachmentFileUrl(file)}
                                                     name={file.name}
                                                     recorded={isVoiceMessage(
                                                         file.name,
@@ -1599,7 +1604,7 @@ const Message = memo(function Message({
                                                 <VideoPreview
                                                     name={file.name}
                                                     size={file.size}
-                                                    src={`/api/chat/attachments/${file.id}`}
+                                                    src={attachmentFileUrl(file)}
                                                     // A frame of the video itself, taken
                                                     // by the browser that sent it. A few
                                                     // kilobytes, and the difference
@@ -1625,7 +1630,7 @@ const Message = memo(function Message({
                                                     download={
                                                         message.shielded
                                                             ? undefined
-                                                            : `/api/chat/attachments/${file.id}?download=1`
+                                                            : attachmentFileUrl(file, "download")
                                                     }
                                                 />
                                             ) : (

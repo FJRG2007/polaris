@@ -96,6 +96,7 @@ export async function PUT(
             name,
             contentType: request.headers.get("content-type") ?? "application/octet-stream",
             spoiler: url.searchParams.get("spoiler") === "1",
+            sealed: url.searchParams.get("sealed") === "1",
             body: cappedStream(request.body, biggest),
             declared: Number.isFinite(declared) && declared > 0 ? declared : undefined
         });

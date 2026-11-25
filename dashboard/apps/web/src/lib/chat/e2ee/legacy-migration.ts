@@ -234,7 +234,7 @@ async function verifyRows(channelId: string, historyKey: Uint8Array, signer: Sig
             take: BATCH
         });
         if (!rows.length) return again ? "again" : "done";
-        after = rows[rows.length - 1].id;
+        after = rows[rows.length - 1]!.id;
         for (const row of rows) {
             if (!(await rowVerifies(channelId, row, historyKey))) {
                 // The text moved since it was sealed (a plain edit before the cut): seal it again.
@@ -378,7 +378,7 @@ export async function runLegacyMigration(options: { pauseMs?: number; sleep?: (m
             }
             await sleep(options.pauseMs ?? 250);
         }
-        after = page[page.length - 1];
+        after = page[page.length - 1]!;
     }
 }
 

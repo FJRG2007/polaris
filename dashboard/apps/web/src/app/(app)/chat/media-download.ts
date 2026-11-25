@@ -173,6 +173,8 @@ export function prefetchMedia(messages: readonly ChatMessageView[]): void {
         for (const file of message.attachments) {
             // Shown once and gone: never kept on a device.
             if (file.viewOnce) continue;
+            // Sealed: the route holds only the blob, and this page opens it itself.
+            if (file.sealed) continue;
             if (!rules.shouldDownload(rules.mediaKindOf(file.contentType), prefs, network)) continue;
             if (!rules.fitsUnderCap(file.size, capBytes)) continue;
             const url = new URL(attachmentImageUrl(file.id), window.location.origin).href;

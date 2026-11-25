@@ -282,6 +282,10 @@ export interface ChatAttachmentView {
     /** Whether there is a still to draw before anybody plays it. Not the still
      *  itself: it is fetched by its own route, like the file. */
     readonly hasPoster: boolean;
+    /** Sealed in the sender's browser: its name, type and bytes open only with the key in its message's seal (`sealed-files.ts`). */
+    readonly sealed?: boolean;
+    /** A sealed file opened on this page: the object URL its clear bytes are drawn from (set by the reader's page, never by the server). */
+    readonly openedUrl?: string;
     /** Its pixel size and blurred stand-in, measured by the sender, so the
      *  bubble has its final size before the bytes come - see
      *  `lib/chat/media-shape`. Null for files sent before they were kept. */
@@ -2622,6 +2626,7 @@ export async function decorateMessages(
                 width: true,
                 height: true,
                 thumbhash: true,
+                sealed: true,
                 messageId: true,
                 durationMs: true,
                 contentType: true,
@@ -2813,6 +2818,7 @@ export async function decorateMessages(
             contentType: file.contentType,
             inline: isInlineImage(file.contentType) && !file.viewOnce,
             borrowed: file.borrowed,
+            ...(file.sealed ? { sealed: true } : {}),
             ...(file.viewOnce
                 ? {
                       viewOnce: {

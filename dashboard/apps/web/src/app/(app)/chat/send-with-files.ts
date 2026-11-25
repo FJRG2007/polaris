@@ -7,6 +7,7 @@ import type { KeptPick } from "@/components/file-picker/as-files";
 import { sendFile, type Sent } from "@/components/transfers/move-file";
 import { viewOnceText, type ViewOnceChoice } from "@/lib/chat/view-once-choice";
 import { withoutFiles, type SendOutcome, type SendProgress, type SendTrack } from "./outgoing";
+import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 
 /** Take a staged file back off the storage, for a send that failed after some of
  *  its files had already gone up. Best effort: the sweep is behind it. */
@@ -86,6 +87,8 @@ export interface FilesMessage {
  * landed, and otherwise what the box shows on it.
  */
 export async function sendWithFiles(message: FilesMessage): Promise<"sent" | Exclude<SendOutcome, void>> {
+    // A page that seals sends every file sealed, never in the clear instead.
+    if (sealedChat.sealedChatActive()) return sendSealedWithFiles(message);
     const { channelId, body, files, track, report, notUploaded } = message;
     const spoilers = message.spoilers ?? [];
     const sounds = message.sounds ?? [];
@@ -245,4 +248,75 @@ export async function sendWithFiles(message: FilesMessage): Promise<"sent" | Exc
     const id = typeof stored === "object" && stored !== null ? (stored as { id?: unknown }).id : null;
     if (typeof id === "string" && id) track?.onPosted?.(id);
     return "sent";
+}
+
+/**
+ * Send a message with files in a conversation this page seals (proposal 10b):
+ * each file is sealed here under its own key and uploaded as an opaque blob,
+ * then the message is sealed with every file's key, digest, name, type, shape
+ * and sound inside it. Files sent to be seen once and files left in a Drive
+ * are not sealed yet, so a message carrying them is not sent at all.
+ */
+async function sendSealedWithFiles(message: FilesMessage): Promise<"sent" | Exclude<SendOutcome, void>> {
+    const { channelId, body, files, track, report, notUploaded } = message;
+    if ((message.viewOnce ?? []).length > 0 || (message.fromDrive ?? []).length > 0) return { error: message.notSent };
+    const spoilers = message.spoilers ?? [];
+    const sounds = message.sounds ?? [];
+    const sealedFiles = await import("@/lib/chat/e2ee/sealed-files");
+    const refs: sealedChat.SealedFileRef[] = [];
+    const staged: string[] = [];
+    const discardAll = () => Promise.all(staged.map((id) => discardUpload(channelId, id)));
+    for (let at = 0; at < files.length; at++) {
+        const file = files[at]!;
+        const still = await posterFor(file).catch(() => null);
+        const shape = await measureMedia(file, still).catch(() => null);
+        const sound = sounds[at];
+        const sealing = await sealedFiles.sealForUpload(file, {
+            shape,
+            durationMs: sound?.durationMs ?? null,
+            waveform: sound?.waveform ?? null,
+            spoiler: spoilers.includes(at)
+        });
+        const signal = track?.signal(at);
+        track?.onFile(at, { phase: "sending", fraction: 0 });
+        const sent = await sendFile(`/api/chat/channels/${channelId}/uploads?name=file&sealed=1`, sealing.blob, {
+            listed: !track,
+            signal,
+            onProgress: (moved, total) => {
+                report?.({ file: at, files: files.length, moved, total });
+                track?.onFile(at, { phase: total > 0 && moved >= total ? "processing" : "sending", fraction: total > 0 ? Math.min(1, moved / total) : 0 });
+            }
+        });
+        if (!sent.ok) {
+            track?.onFile(at, { phase: signal?.aborted ? "cancelled" : "failed", fraction: 0 });
+            await discardAll();
+            return signal?.aborted ? { cancelled: true } : { error: notUploaded(sent, file.name) };
+        }
+        const answer: unknown = JSON.parse(sent.body || "{}");
+        const id = String((answer as { id?: unknown }).id ?? "");
+        staged.push(id);
+        track?.onFile(at, { phase: "sent", fraction: 1 });
+        refs.push(sealing.ref(id));
+        // The sender's own page draws it from the bytes it already has.
+        sealedFiles.keepLocalFile(id, file);
+    }
+    message.beforePost?.();
+    const fields = message.fields ?? {};
+    try {
+        const id = await sealedChat.sendSealedMessage({
+            channelId,
+            body,
+            clientKey: crypto.randomUUID(),
+            parentId: fields.parentId ?? null,
+            replyToId: fields.replyToId ?? null,
+            ...(message.translation ? { translation: message.translation } : {}),
+            files: refs
+        });
+        track?.onPosted?.(id);
+        return "sent";
+    } catch (caught) {
+        console.warn("polaris: a sealed message with files was not sent:", caught);
+        await discardAll();
+        return { error: message.notSent };
+    }
 }

@@ -220,6 +220,7 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                 clientKey: body.clientKey,
                 parentId: body.parentId,
                 replyToId: body.replyToId,
+                ...(body.uploads ? { uploads: body.uploads } : {}),
                 epoch: BigInt(body.epoch),
                 senderLeaf: body.senderLeaf,
                 ciphertext: bytes(body.ciphertext),
