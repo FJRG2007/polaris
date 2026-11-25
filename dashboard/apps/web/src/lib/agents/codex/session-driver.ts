@@ -168,6 +168,25 @@ export class CodexSessionDriver {
         }
     }
 
+    /**
+     * Deliver a message into the running turn: `turn/steer`, which Codex
+     * appends to the in-flight turn's input (app-server protocol v2,
+     * `TurnSteerParams`; `expectedTurnId` makes it fail rather than land in a
+     * later turn). False with no turn of this driver's to steer; a refusal
+     * throws, and the caller queues the message.
+     */
+    async steer(text: string): Promise<boolean> {
+        const connection = this.connection;
+        const id = this.turn?.id;
+        if (!connection || !id) return false;
+        await connection.rpc.request("turn/steer", {
+            threadId: connection.threadId,
+            input: [{ type: "text", text }],
+            expectedTurnId: id
+        });
+        return true;
+    }
+
     /** Stop the running turn, if there is one. */
     async cancel(): Promise<boolean> {
         const connection = this.connection;

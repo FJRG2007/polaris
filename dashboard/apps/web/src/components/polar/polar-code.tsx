@@ -1864,8 +1864,12 @@ function CodeThread({
         if (command === "stop") return stopTurn();
         const text = cli ? codeCommands.forwardedText(command, rest, cli) : null;
         // A command this agent has no spelling of says so instead of doing nothing.
-        if (text) sendText(text);
-        else setInfo(t("slash.code.notHere", { command }));
+        if (!text || !cli) return setInfo(t("slash.code.notHere", { command }));
+        // In Chat the text goes over the agent's protocol, where only some
+        // agents run it; the rest would hand the model "/name" as words.
+        if (liveSurface === "chat" && !codeCommands.runsInChat(command, cli))
+            return setInfo(t("slash.code.notInChat", { command }));
+        sendText(text);
     };
 
     // Stopping is steering the session, not starting one: whoever manages it may.

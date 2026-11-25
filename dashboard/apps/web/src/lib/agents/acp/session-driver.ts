@@ -18,7 +18,7 @@ import type * as core from "@polaris/core";
 import { AcpNormalizer } from "./normalize";
 import { NO_DRAFTS, type DraftSink } from "../session-drafts";
 import type * as acp from "@agentclientprotocol/sdk";
-import { connectAcp, type AcpClient } from "./client";
+import { connectAcp, supportsSteering, type AcpClient } from "./client";
 import type { HistoryRow } from "../transcript-decoders";
 import { acpModeFor, type AcpBinding } from "./providers";
 import { pipeStream, type PipeIo, type PipeStreamOptions } from "./transport";
@@ -145,6 +145,8 @@ interface Connection {
     /** Updates are dropped while a loaded conversation replays: they are
      *  already the session's history. */
     replaying: boolean;
+    /** Whether the agent takes a message into a running turn. */
+    steering: boolean;
 }
 
 export class AcpSessionDriver {
@@ -182,6 +184,17 @@ export class AcpSessionDriver {
             (response) => this.endTurn(connection, response.stopReason, null),
             (error: unknown) => this.endTurn(connection, undefined, error)
         );
+    }
+
+    /**
+     * Deliver a message into the running turn, the way the agent's own CLI
+     * takes one typed while it works. False when no turn of this driver's is
+     * running or the agent cannot take one; the caller queues the message.
+     */
+    async steer(text: string): Promise<boolean> {
+        const connection = this.connection;
+        if (!this.turn || !connection?.steering) return false;
+        return (await connection.client.steer(connection.acpSessionId, text)) === "injected";
     }
 
     /** Stop the running turn, if there is one. */
@@ -284,7 +297,8 @@ export class AcpSessionDriver {
                 acpSessionId: "",
                 normalizer: new AcpNormalizer(this.sessionId),
                 modes: [],
-                replaying: true
+                replaying: true,
+                steering: supportsSteering(init)
             };
             if (init.agentCapabilities?.loadSession && session.vendorSessionId) {
                 connection.acpSessionId = session.vendorSessionId;

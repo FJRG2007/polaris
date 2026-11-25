@@ -1595,6 +1595,25 @@ export async function changeSessionEffort(
     );
 }
 
+/**
+ * Deliver a message into the turn the agent is on, so it reads it at its next
+ * step and answers without stopping (Claude Code's own behaviour for a message
+ * typed mid-turn). Only Chat can: the ACP steering extension or Codex's
+ * `turn/steer`. A runner turn (`claude -p`) has no input to add to. False
+ * whenever it was not delivered, so the caller queues it instead; never throws.
+ */
+export async function steerTurn(sessionId: string, text: string): Promise<boolean> {
+    const placement = await sessionPlacement(sessionId).catch(() => null);
+    if (!placement || core.isSessionOver(placement.state) || !acpProviders.usesAcp(placement)) return false;
+    return acpDrivers
+        .acpDriver(sessionId, placement.cli)
+        .steer(text)
+        .catch((error: unknown) => {
+            console.error(`[agent-session] ${sessionId}: the message did not reach the running turn`, error);
+            return false;
+        });
+}
+
 /** Stop what the agent is doing without ending the session. */
 export async function interruptSession(sessionId: string): Promise<void> {
     const placement = await reconcileTerminalBack(sessionId, await sessionPlacement(sessionId));

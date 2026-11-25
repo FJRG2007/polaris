@@ -140,6 +140,27 @@ export function forwardedText(command: CodeCommand, rest: string, cli: string): 
     return rest && cli === "claude" && TAKES_TEXT.has(command) ? `/${name} ${rest}` : `/${name}`;
 }
 
+/**
+ * The handed-over commands each agent runs when the session is in Chat, where
+ * the text goes over its protocol instead of into its terminal. Claude Code's
+ * adapter passes "/name" to the SDK, which runs it, except /clear, which the
+ * adapter lists as unsupported (claude-agent-acp, `UNSUPPORTED_COMMANDS`).
+ * opencode's ACP runs its own command list plus a built-in /compact, and has no
+ * /new (packages/cli-rs/crates/acp `BUILTIN_COMMANDS`). Codex's app-server
+ * hands `turn/start` text to the model as it stands: no slash commands at all.
+ * An agent missing here has no documented handling, so nothing is sent for it
+ * rather than a "/name" the model would read as words.
+ */
+const RUNS_IN_CHAT: Readonly<Record<string, readonly Forwarded[]>> = {
+    claude: ["compact", "review", "security-review", "init", "plan", "simplify"],
+    opencode: ["compact", "init"]
+};
+
+/** Whether a handed-over command does anything when sent through Chat. */
+export function runsInChat(command: CodeCommand, cli: string): boolean {
+    return isForwarded(command) && (RUNS_IN_CHAT[cli] ?? []).includes(command);
+}
+
 /** Which answer `/copy [N]` copies: 1 for the newest, null for words that are
  *  not a whole number from 1 up. */
 export function copyIndex(rest: string): number | null {

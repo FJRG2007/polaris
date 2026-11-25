@@ -15,6 +15,7 @@
  */
 
 import * as acp from "@agentclientprotocol/sdk";
+import { z } from "zod";
 
 /** How long a setup request (initialize, a new or loaded session, a mode) may
  *  take before the agent is treated as not answering. A prompt has none: a
@@ -43,10 +44,35 @@ export interface AcpClient {
     ): Promise<acp.LoadSessionResponse>;
     prompt(sessionId: string, text: string): Promise<acp.PromptResponse>;
     cancel(sessionId: string): Promise<void>;
+    /** Deliver a message into the turn that is running (`STEER_METHOD`):
+     *  `injected` when the agent took it into that turn, `promptRequired`
+     *  when no turn was running, anything else when it answered otherwise. */
+    steer(sessionId: string, text: string): Promise<string>;
     setMode(sessionId: string, modeId: string): Promise<void>;
     /** Closes the connection; requests still waiting are rejected. */
     close(error?: unknown): void;
     readonly closed: Promise<void>;
+}
+
+/**
+ * The ACP steering extension: a message delivered into the running turn
+ * instead of queued behind it as another `session/prompt`. Advertised in
+ * `InitializeResponse._meta.steering.supported`; Claude Code's adapter
+ * (@agentclientprotocol/claude-agent-acp, src/acp-agent.ts `STEER_METHOD`)
+ * hands it to the SDK at priority "now", which a foreground tool call answers
+ * by moving to the background, so the model reads it at the next step.
+ * `idleBehavior: "promptRequired"` keeps an idle agent from starting a turn
+ * of its own with it: Polaris sends that one as a normal prompt.
+ */
+export const STEER_METHOD = "_session/steering";
+
+const steerResponseSchema = z.object({ outcome: z.string() });
+
+/** Whether the agent said it takes `STEER_METHOD`. Pure. */
+export function supportsSteering(init: acp.InitializeResponse): boolean {
+    const meta = (init as { _meta?: unknown })._meta;
+    const steering = meta && typeof meta === "object" ? (meta as Record<string, unknown>).steering : null;
+    return Boolean(steering && typeof steering === "object" && (steering as Record<string, unknown>).supported === true);
 }
 
 /** What Polaris tells the agent it can do. */
@@ -146,6 +172,15 @@ export function connectAcp(stream: acp.Stream, handlers: AcpHandlers): AcpClient
         },
         cancel(sessionId) {
             return agent.notify(acp.methods.agent.session.cancel, { sessionId });
+        },
+        async steer(sessionId, text) {
+            const response = await agent.request<unknown>(STEER_METHOD, {
+                sessionId,
+                prompt: [{ type: "text", text }],
+                _meta: { steering: { idleBehavior: "promptRequired" } }
+            });
+            const parsed = steerResponseSchema.safeParse(response);
+            return parsed.success ? parsed.data.outcome : "unknown";
         },
         async setMode(sessionId, modeId) {
             await setup(agent.request(acp.methods.agent.session.setMode, { sessionId, modeId }), "a mode change");

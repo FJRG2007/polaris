@@ -158,3 +158,33 @@ unsure). Size: S under a day, M a few days, L a week or more.
 | Docker inside the session | yes | ? | ? | ? | ? | no (no socket by design; needs Sysbox or a VM) | L |
 | Databases preinstalled | PostgreSQL, Redis | ? | ? | ? | ? | no | S |
 | Scheduled / triggered runs | routines | ? | ? | ? | ? | partial: `session-schedules.ts` | S |
+
+## Parity ledger: messages sent while the agent works
+
+Claude Code takes a message typed mid-turn into the running turn: the CLI and
+its ACP adapter (`@agentclientprotocol/claude-agent-acp`, `_session/steering`,
+advertised as `InitializeResponse._meta.steering.supported`) hand it to the SDK
+at priority "now", a foreground tool call moves to the background, and the
+model reads it at its next step. Codex has the same in its app-server
+(`turn/steer`, `expectedTurnId`). Only when it cannot go in does a message wait,
+and the waiting list offers send now, edit, delete and reorder; Esc stops.
+
+Why it was missed: the earlier parity pass audited the slash-command list and
+the transcript, not the composer while a turn runs. Polaris already had a queue
+that sent on turn end, so "messages while working" read as covered. Nobody
+compared what happens in the first seconds after sending, which is where the
+two differ.
+
+| Behaviour | Claude Code | Codex | Polaris |
+| --- | --- | --- | --- |
+| Message mid-turn goes into the running turn | yes | yes (`turn/steer`) | yes in Chat, when the agent advertises steering (Claude Code adapter, Codex app-server); a runner turn (`claude -p`) and agents without it queue |
+| Waiting list: send now / edit / delete / reorder | yes | partial | yes (`CodeQueuedList`); send now stops the turn and sends it next |
+| Stop and send what is waiting, or stop and send nothing | Esc | Esc | composer Stop, Esc for whoever manages the session, "Stop, send nothing" |
+| Stop reaches the turn wherever it runs | - | - | Chat cancel, runner, Ctrl+C; says so when nothing stopped |
+| Slash commands handed to the CLI actually run | yes | TUI only | terminal: yes; Chat: only where the protocol runs them (`runsInChat`), otherwise it says to use the Terminal view |
+| Steered message with files | yes | yes | no: files wait for the queue, since placing them is a step the agent would read before they exist |
+| Send now from the waiting list steers instead of stopping | yes | ? | no: send now still stops the turn first |
+
+Not exercised against a real CLI in a container (no Docker on the development
+machine): the steering calls are checked against the adapter's recorded
+`initialize` and its source, and against Codex's protocol definitions.

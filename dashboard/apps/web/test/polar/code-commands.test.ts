@@ -3,6 +3,8 @@
  * how a handed-over one is spelled for each CLI.
  */
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as codeCommands from "@/lib/polar/code-commands";
 import { codeSlashMatches } from "@/components/polar/polar-code-slash";
@@ -210,5 +212,32 @@ describe("the commands added for Claude Code parity", () => {
         expect(codeCommands.copyIndex("0")).toBeNull();
         expect(codeCommands.copyIndex("-1")).toBeNull();
         expect(codeCommands.copyIndex("two")).toBeNull();
+    });
+
+    it("sends through Chat only the commands the agent's protocol runs", () => {
+        expect(codeCommands.runsInChat("compact", "claude")).toBe(true);
+        expect(codeCommands.runsInChat("review", "claude")).toBe(true);
+        // The Claude Code adapter lists /clear as unsupported.
+        expect(codeCommands.runsInChat("clear", "claude")).toBe(false);
+        // Codex's app-server reads "/compact" as words.
+        expect(codeCommands.runsInChat("compact", "codex")).toBe(false);
+        expect(codeCommands.runsInChat("compact", "opencode")).toBe(true);
+        expect(codeCommands.runsInChat("clear", "opencode")).toBe(false);
+        expect(codeCommands.runsInChat("compact", "gemini")).toBe(false);
+        // Polaris's own commands are never "sent".
+        expect(codeCommands.runsInChat("stop", "claude")).toBe(false);
+    });
+
+    it("gives every Polaris-run command in a session a branch of its own in Code", () => {
+        const source = readFileSync(resolve(__dirname, "../../src/components/polar/polar-code.tsx"), "utf8");
+        const start = source.indexOf("const runCommand = (");
+        const body = source.slice(start, source.indexOf(String.fromCharCode(10) + "    };", start));
+        for (const cli of ["claude", "codex", "opencode", "gemini"])
+            for (const command of codeCommands.codeCommandsFor("thread", cli))
+                if (!codeCommands.forwardedText(command, "", cli))
+                    expect(body, `/${command} for ${cli}`).toContain(`command === "${command}"`);
+        // What is left says why instead of doing nothing.
+        expect(body).toContain("slash.code.notHere");
+        expect(body).toContain("slash.code.notInChat");
     });
 });

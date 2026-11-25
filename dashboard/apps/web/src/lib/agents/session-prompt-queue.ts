@@ -224,6 +224,25 @@ export async function sendPromptNow(
     return {};
 }
 
+/**
+ * Send a message typed while the agent works into its running turn, kept on
+ * the session only once the agent took it. False when it could not go now
+ * (no steering here, no turn of Chat's running, files to place first); the
+ * caller queues it. Files wait for the queue because placing them is a step
+ * the agent would read mid-turn before they exist.
+ */
+export async function steerPromptNow(
+    session: sessions.SessionView,
+    userId: string,
+    text: string,
+    attachmentIds: readonly string[]
+): Promise<boolean> {
+    if (attachmentIds.length > 0) return false;
+    if (!(await runtime.steerTurn(session.id, text))) return false;
+    await sessions.addSessionMessage(session.id, "user", text, userId);
+    return true;
+}
+
 /** One waiting row, as delivery reads it. */
 export interface QueuedRow {
     id: string;

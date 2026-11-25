@@ -261,6 +261,7 @@
             "export": "Download the transcript (add jsonl for JSONL)",
             "diff": "See the files and changes",
             "renameFailed": "Couldn't rename the session. Try again.",
+            "notInChat": "/{command} only works in the Terminal view for this agent.",
             "notHere": "/{command} does not exist for this agent.",
             "goal": "Keep the agent working until a condition holds",
             "plan": "Plan the work first, without changing anything",

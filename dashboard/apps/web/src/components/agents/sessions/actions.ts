@@ -652,7 +652,9 @@ async function noteOnTask(session: sessions.SessionView, userId: string): Promis
     }
 }
 
-export async function promptSessionAction(input: unknown): Promise<{ error?: string; queued?: boolean }> {
+export async function promptSessionAction(
+    input: unknown
+): Promise<{ error?: string; queued?: boolean; steered?: boolean }> {
     const user = await requirePermission("agents.manage");
     const parsed = core.agentSessionPromptSchema.safeParse(input);
     const t = await getTranslations("agents");
@@ -679,7 +681,16 @@ export async function promptSessionAction(input: unknown): Promise<{ error?: str
 
     // Mid-turn, or behind messages already waiting: it joins the queue and is
     // sent when the turn ends (`session-prompt-queue`).
-    if (promptQueue.shouldQueuePrompt(session.state, await promptQueue.queuedCount(session.id))) {
+    const waiting = await promptQueue.queuedCount(session.id);
+    // Mid-turn with nothing waiting: into the running turn where the agent
+    // takes one, answered at its next step instead of after the turn.
+    if (
+        session.state === "working" &&
+        waiting === 0 &&
+        (await promptQueue.steerPromptNow(session, user.id, parsed.data.text, parsed.data.attachments))
+    )
+        return { steered: true };
+    if (promptQueue.shouldQueuePrompt(session.state, waiting)) {
         const files = await sessionAttachments.sessionAttachmentsFor(user.id, parsed.data.attachments);
         if ("refusal" in files) return { error: t(`sessions.errors.files.${files.refusal}`) };
         if (!(await promptQueue.queuePrompt(session.id, user.id, parsed.data.text, parsed.data.attachments)))

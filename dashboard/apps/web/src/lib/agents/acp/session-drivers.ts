@@ -113,6 +113,8 @@ const codexDeps: CodexDriverDeps = {
 export interface ChatDriver {
     readonly busy: boolean;
     prompt(text: string): Promise<void>;
+    /** Deliver a message into the running turn; false when it was not. */
+    steer(text: string): Promise<boolean>;
     /** Stop the running turn; whether a stop reached the agent. */
     cancel(): Promise<boolean>;
     setMode(mode: core.SessionPermissionMode): Promise<void>;

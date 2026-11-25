@@ -261,6 +261,7 @@
             "export": "Descargar la transcripción (jsonl para JSONL)",
             "diff": "Ver archivos y cambios",
             "renameFailed": "No se pudo renombrar. Reinténtalo.",
+            "notInChat": "/{command} solo funciona en la vista Terminal con este agente.",
             "notHere": "/{command} no existe para este agente.",
             "goal": "Que el agente siga hasta que se cumpla algo",
             "plan": "Planificar primero, sin cambiar nada",

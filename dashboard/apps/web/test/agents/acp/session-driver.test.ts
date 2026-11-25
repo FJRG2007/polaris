@@ -44,7 +44,7 @@ function recorded(cli: string): Frame[] {
 
 /** The agent's side of its recorded conversation, answering the ids the
  *  driver actually used. */
-function agentFor(cli: string, options: { failPrompt?: boolean; holdPrompt?: boolean; refuseLoad?: boolean } = {}) {
+function agentFor(cli: string, options: { failPrompt?: boolean; holdPrompt?: boolean; refuseLoad?: boolean; steering?: boolean } = {}) {
     const frames = recorded(cli);
     const sessionId = (frames[1]!.result as { sessionId: string }).sessionId;
     let promptId: unknown = null;
@@ -52,7 +52,13 @@ function agentFor(cli: string, options: { failPrompt?: boolean; holdPrompt?: boo
         const answer = (result: unknown) => pipe.emit({ jsonrpc: "2.0", id: frame.id, result });
         switch (frame.method) {
             case "initialize":
-                return answer(frames[0]!.result);
+                return answer(
+                    options.steering
+                        ? { ...(frames[0]!.result as Frame), _meta: { steering: { supported: true } } }
+                        : frames[0]!.result
+                );
+            case "_session/steering":
+                return answer({ outcome: "injected" });
             case "session/new":
                 return answer(frames[1]!.result);
             case "session/load":
@@ -305,6 +311,30 @@ describe("AcpSessionDriver", () => {
             modeId: "plan"
         });
         await expect(driver.setMode("full")).resolves.toBeUndefined();
+        driver.close();
+    });
+
+    it("steers a message into the running turn where the agent takes one", async () => {
+        const pipe = new FakePipe(agentFor("claude", { holdPrompt: true, steering: true }));
+        const { driver } = harness("claude", pipe);
+        await driver.prompt("Fix the build");
+        await expect(driver.steer("use the other file")).resolves.toBe(true);
+        expect(pipe.received.find((frame) => frame.method === "_session/steering")?.params).toMatchObject({
+            sessionId: "sess-claude-01",
+            prompt: [{ type: "text", text: "use the other file" }],
+            _meta: { steering: { idleBehavior: "promptRequired" } }
+        });
+        driver.close();
+    });
+
+    it("does not steer an agent that never said it can, nor an idle one", async () => {
+        // Gemini's recorded start advertises no steering.
+        const pipe = new FakePipe(agentFor("gemini", { holdPrompt: true }));
+        const { driver } = harness("gemini", pipe);
+        await expect(driver.steer("x")).resolves.toBe(false);
+        await driver.prompt("Fix the build");
+        await expect(driver.steer("x")).resolves.toBe(false);
+        expect(pipe.received.some((frame) => frame.method === "_session/steering")).toBe(false);
         driver.close();
     });
 
