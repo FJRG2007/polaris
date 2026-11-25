@@ -15,6 +15,7 @@ import { APP_SETTINGS } from "@polaris/core/app-settings";
 import appSettingsMessages from "../../messages/en-US/appSettings.json";
 import { APP_SECTIONS, sectionOffered } from "@/lib/apps";
 import { APP_SETTING_CATEGORIES } from "@polaris/core/app-settings";
+import { ToastProvider } from "@polaris/ui";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -40,6 +41,7 @@ vi.mock("@enigmax/primitives/react/network", () => ({ useNetworkState: () => net
 const { AppSettingsView, forgetAppSettingsSnapshot } = await import(
     "../../src/app/(app)/account/app/[category]/app-settings-view"
 );
+const { defaultAppSettings } = await import("../../src/components/this-app/app-settings-values");
 const { default: CategoryLoading } = await import("../../src/app/(app)/account/app/[category]/loading");
 const { ThisDeviceApp, forgetDesktopUpdateState } = await import("../../src/components/this-app/this-device-app");
 
@@ -220,14 +222,97 @@ describe("the app's settings screen", () => {
         expect(screen.getByRole("button", { name: "Restart now" })).toBeTruthy();
     });
 
-    it("draws every row before the app answers, with a placeholder only on each control", async () => {
+    it("draws every control at once with the schema's defaults on a device that never saw an answer", async () => {
         install(fakeBridge({ get: vi.fn(() => new Promise(() => undefined)) }));
         await draw("search");
         expect(screen.getByText(appSettingsMessages.items.launcherEngine.label)).toBeTruthy();
-        expect(screen.getByText(appSettingsMessages.items.launcherEngine.hint)).toBeTruthy();
-        expect(screen.getByText(appSettingsMessages.items.launcher.plain)).toBeTruthy();
-        expect(document.querySelectorAll("[data-placeholder]").length).toBe(2);
-        expect(screen.queryByRole("switch")).toBeNull();
+        expect(document.querySelector("[aria-busy]")).toBeNull();
+        // Each control holds its default from the one schema, not a placeholder.
+        expect(screen.getByRole("switch", { name: "Alt+Space search" }).getAttribute("aria-checked")).toBe("true");
+        expect(screen.getByRole("combobox", { name: appSettingsMessages.items.launcherEngine.label }).textContent).toContain(
+            appSettingsMessages.engines.google
+        );
+        expect(screen.getByRole("button", { name: appSettingsMessages.shortcut.change })).toBeTruthy();
+        cleanup();
+        install(fakeBridge({ get: vi.fn(() => new Promise(() => undefined)) }));
+        await draw("advanced");
+        const hardware = APP_SETTINGS.find((entry) => entry.key === "hardwareAcceleration")!;
+        expect(screen.getByRole("switch", { name: appSettingsMessages.items.hardwareAcceleration.label }).getAttribute("aria-checked")).toBe(
+            String(hardware.default)
+        );
+        expect(screen.queryByRole("button", { name: "Restart now" })).toBeNull();
+    });
+
+    it("draws every row of every category with a control before the app answers", async () => {
+        for (const category of APP_SETTING_CATEGORIES) {
+            if (category === "hosts") continue;
+            install(fakeBridge({ get: vi.fn(() => new Promise(() => undefined)) }));
+            await draw(category);
+            expect(document.querySelector("[aria-busy]")).toBeNull();
+            // The voice widget's people limit is a number control, drawn at its default too.
+            if (category === "voice") expect(screen.getAllByRole("slider").length).toBeGreaterThan(0);
+            cleanup();
+        }
+    });
+
+    it("takes every default from the shared schema", () => {
+        const defaults = defaultAppSettings();
+        for (const entry of APP_SETTINGS) expect(defaults[entry.key as keyof typeof defaults]).toEqual(entry.default);
+        expect(defaults.restartPending).toBe(false);
+        expect(defaults.features).toEqual([]);
+    });
+
+    it("swaps a default only where the app's answer differs", async () => {
+        let answer: (value: unknown) => void = () => undefined;
+        install(fakeBridge({ get: vi.fn(() => new Promise((resolve) => (answer = resolve))) }));
+        await draw("window");
+        const before = screen.getByRole("switch", { name: "Minimize to tray" });
+        expect(before.getAttribute("aria-checked")).toBe("true");
+        await act(async () => answer({ ...SNAPSHOT, minimizeToTray: false }));
+        // The same element, now off: swapped in place rather than redrawn.
+        expect(screen.getByRole("switch", { name: "Minimize to tray" })).toBe(before);
+        expect(before.getAttribute("aria-checked")).toBe("false");
+    });
+
+    it("changes a default at once and puts it back, with a message, when the app refuses it", async () => {
+        let refuse: (value: unknown) => void = () => undefined;
+        const set = vi.fn(() => new Promise((resolve) => (refuse = resolve)));
+        install(fakeBridge({ get: vi.fn(() => new Promise(() => undefined)), set }));
+        render(
+            <MessagesWrapper>
+                <ToastProvider>
+                    <AppSettingsView category="advanced" />
+                </ToastProvider>
+            </MessagesWrapper>
+        );
+        const name = appSettingsMessages.items.hardwareAcceleration.label;
+        await act(async () => screen.getByRole("switch", { name }).click());
+        expect(set).toHaveBeenCalledWith({ key: "hardwareAcceleration", value: false });
+        expect(screen.getByRole("switch", { name }).getAttribute("aria-checked")).toBe("false");
+        // The restart it needs is offered with the switch, not after the app answers.
+        expect(screen.getByRole("button", { name: "Restart now" })).toBeTruthy();
+        await act(async () => refuse(null));
+        expect(screen.getByRole("switch", { name }).getAttribute("aria-checked")).toBe("true");
+        expect(screen.queryByRole("button", { name: "Restart now" })).toBeNull();
+        expect(screen.getByText(appSettingsMessages.saveFailed)).toBeTruthy();
+        // A default that was never an answer is not kept as one.
+        expect(window.localStorage.getItem("polaris.this-app.advanced")).toBeNull();
+    });
+
+    it("follows the restart a setting needs both ways, and takes the app's word on it", async () => {
+        window.localStorage.setItem("polaris.this-app.advanced", JSON.stringify({ ...SNAPSHOT, hardwareAcceleration: false, restartPending: true }));
+        let accept: (value: unknown) => void = () => undefined;
+        const set = vi.fn(() => new Promise((resolve) => (accept = resolve)));
+        install(fakeBridge({ get: vi.fn(() => new Promise(() => undefined)), set }));
+        await draw("advanced");
+        const name = appSettingsMessages.items.hardwareAcceleration.label;
+        expect(screen.getByRole("button", { name: "Restart now" })).toBeTruthy();
+        // Turned back to what this run started with: no restart owed.
+        await act(async () => screen.getByRole("switch", { name }).click());
+        expect(screen.getByRole("switch", { name }).getAttribute("aria-checked")).toBe("true");
+        expect(screen.queryByRole("button", { name: "Restart now" })).toBeNull();
+        await act(async () => accept({ ...SNAPSHOT, hardwareAcceleration: true, restartPending: false }));
+        expect(screen.queryByRole("button", { name: "Restart now" })).toBeNull();
     });
 
     it("draws the values kept on this device at once, and swaps only what the app answers differently", async () => {

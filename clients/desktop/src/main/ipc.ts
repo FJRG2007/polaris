@@ -780,7 +780,8 @@ export function registerIpc(host: IpcHost): void {
         }
     };
     const snapshot = async () => {
-        const status = await launcherStatus();
+        // The launcher's conflict line fills in after, through `changed`, so the page never waits on it.
+        const status = await launcherStatus(changed);
         const state = host.connectState();
         const look = voiceWidgetLook();
         const overlayLock = overlayLockStatus();

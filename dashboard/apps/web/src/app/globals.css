@@ -1334,13 +1334,21 @@ dialog.pdfSlick-dialog .dialogButton {
 }
 
 /*
- * A phone zooms the page into any field whose text is under 16px the moment it is
- * focused (Safari on iOS) and stays zoomed, so the screen then pans in every
- * direction - the code box on the sign-in steps was the one reported. On a touch
- * screen a field drawn small is drawn at 16px instead, which stops the zoom
- * without taking pinch zoom away from anybody. Fields already larger keep theirs.
+ * iOS zooms the page into any field whose text is under 16px the moment it is
+ * focused (Safari and every in-app WKWebView, the iOS Polaris app's included) and
+ * stays zoomed, so the screen then pans in every direction - the code box on the
+ * sign-in steps was the one reported. There a field drawn small is drawn at 16px
+ * instead, which stops the zoom without taking pinch zoom away from anybody.
+ * Fields already larger keep theirs.
+ *
+ * Only iOS WebKit: Android (Chrome, the Android app's WebView) and touch laptops
+ * do not zoom on focus, and the enlarged fields looked oversized beside
+ * everything else there. `-webkit-touch-callout` is supported by iOS WebKit
+ * alone - not by desktop Safari, Chrome, Chrome for Android, Android WebView or
+ * Firefox (MDN browser-compat-data, css.properties.-webkit-touch-callout) - so
+ * the `@supports` test matches exactly the engine that zooms.
  */
-@media (pointer: coarse) {
+@supports (-webkit-touch-callout: none) {
     :is(input, textarea, select):is(
             [class*="text-xs"],
             [class*="text-sm"],

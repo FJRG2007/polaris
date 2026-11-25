@@ -87,6 +87,8 @@ vi.mock("../../src/main/open-external", () => ({ openExternal: vi.fn() }));
 
 
 const launcher = await import("../../src/main/launcher");
+const hotkeys = await import("../../src/main/call-hotkeys");
+const detect = await import("../../src/main/game-detect");
 const apps = await import("../../src/main/launcher-apps");
 vi.mocked(apps.installedAppsRead).mockResolvedValue([]);
 
@@ -125,5 +127,34 @@ describe("game mode", () => {
         switches.delete("launcherGameMode");
         launcher.followLauncherSettings();
         expect([...held]).toEqual(["Alt+Space"]);
+    });
+});
+
+describe("the settings' view of the key", () => {
+    it("answers at once when the key is refused, and looks at other launchers in the background", async () => {
+        launcher.stopLauncher();
+        vi.mocked(hotkeys.holdGlobalKey).mockReturnValue(null);
+        let listed: (names: string[]) => void = () => undefined;
+        vi.mocked(detect.runningPrograms).mockImplementation(() => new Promise((resolve) => (listed = resolve)));
+        try {
+            launcher.startLauncher({ server: () => null, showPolaris: vi.fn() });
+            const onLooked = vi.fn();
+            // The look started at launch is still listing programs, and the answer does not wait on it.
+            const status = await launcher.launcherStatus(onLooked);
+            expect(status.held).toBe(false);
+            await launcher.launcherStatus(onLooked);
+            // Both reads share the one look under way.
+            expect(detect.runningPrograms).toHaveBeenCalledTimes(1);
+            listed([]);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            // Nothing found, so nothing the settings say changed.
+            expect(onLooked).not.toHaveBeenCalled();
+        } finally {
+            vi.mocked(hotkeys.holdGlobalKey).mockImplementation((key: string) => {
+                held.add(key);
+                return () => held.delete(key);
+            });
+            vi.mocked(detect.runningPrograms).mockImplementation(() => Promise.resolve([]));
+        }
     });
 });
