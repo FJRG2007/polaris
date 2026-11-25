@@ -13,7 +13,7 @@ related:
   - docs/bugs/BUG-0038-public-domain-shown-not-secure.md
 reported: 2026-11-25
 fixed: 2026-11-25
-fix_commit: "fix(integrity): a page left open across an update is checked against its own build"
+fix_commit: "fix(integrity): a page left open across an update is checked against its own build (74ac65f6b5)"
 ---
 
 ## What was seen
