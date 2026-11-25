@@ -26,6 +26,7 @@ import * as delivery from "./mls-delivery";
 import * as sealed from "./sealed-messages";
 import { backgroundUser } from "@/lib/session";
 import { mlsBody, type MlsBody } from "./schemas";
+import { LEGACY_EPOCH } from "./mls-history-keys";
 import { channelAccess, conversationAudience, type ChatAccessError } from "@/lib/chat/access";
 import { rateLimit } from "@/lib/rate-limit-service";
 
@@ -153,6 +154,13 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                 accountKeys: keys.map((k) => ({ userId: k.userId, akVersion: k.akVersion, hpkePublicKey: text(k.hpkePublicKey) })),
                 next: page.length === MEMBER_PAGE ? page[page.length - 1] : null
             });
+        }
+        case "legacy-key-gaps": {
+            // Only a member who holds the migrated history's key can pass it on; anybody else learns nothing.
+            if (!(await delivery.holdsHistoryKey(body.channelId, LEGACY_EPOCH, userId))) return json({ accountKeys: [] });
+            const audience = ((await conversationAudience({ id: userId }, body.channelId)) ?? []).filter((id) => id !== userId).sort();
+            const gaps = await delivery.legacyKeyGaps(body.channelId, LEGACY_EPOCH, audience);
+            return json({ accountKeys: gaps.map((k) => ({ userId: k.userId, hpkePublicKey: text(k.hpkePublicKey) })) });
         }
         case "roster": {
             // The people on the conversation's list reach it; anybody else named (a member the

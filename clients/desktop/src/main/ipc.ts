@@ -446,10 +446,10 @@ export function registerIpc(host: IpcHost): void {
     });
     // The page code check (docs/integrity.md): the files the preload hashed, for
     // the configured Polaris only, so no other page can make this fetch anything.
-    ipcMain.handle(CHANNELS.integrityCheck, async (event, files: unknown) => {
+    ipcMain.handle(CHANNELS.integrityCheck, async (event, files: unknown, build: unknown) => {
         const page = event.senderFrame?.url;
         if (!fromPolaris(event) || !page) return null;
-        return checkPageFiles(event.sender, new URL(page).origin, files).catch(() => null);
+        return checkPageFiles(event.sender, new URL(page).origin, files, build).catch(() => null);
     });
 
     // The call's keys, held system-wide while a call is on. A shape that does

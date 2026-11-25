@@ -447,6 +447,15 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "security.updates",
+        group: "security",
+        label: "A server's security updates",
+        description:
+            "Polaris turned automatic security updates on for a server, or a server needs a restart to finish them.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "account.signin",
         group: "security",
         label: "Sign-in waiting for approval",

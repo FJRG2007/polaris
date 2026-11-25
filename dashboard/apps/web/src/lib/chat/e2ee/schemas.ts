@@ -119,6 +119,8 @@ export const mlsBody = z.discriminatedUnion("op", [
     z.object({ op: z.literal("account-keys"), channelId, userIds: z.array(z.string().uuid()).min(1).max(100) }),
     // Every member's public account key, a page at a time: the committer seals each epoch's history key to all of them.
     z.object({ op: z.literal("member-account-keys"), channelId, after: z.string().uuid().optional() }),
+    // Members whose account key has no envelope of the migrated history's key yet, asked by one who holds it.
+    z.object({ op: z.literal("legacy-key-gaps"), channelId }),
     // The accounts holding a leaf in the caller's copy of the group: which have left, and who is in but has no leaf.
     // `devices`: the leaves of those accounts other than the caller's own (older callers sent none): which are retired.
     z.object({

@@ -4,15 +4,18 @@
  * and the worker answers it only for a page of a server somebody added.
  */
 
-import type { IntegrityVerdict } from "@polaris/core/integrity";
+import type { PageVerdict } from "@polaris/core/integrity";
+import type { IntegrityWords, OutdatedWords } from "@polaris/core/integrity-guard";
 
 export const INTEGRITY_CHECK = "integrityCheck";
 
 export type IntegrityReply =
     | {
           readonly ok: true;
-          readonly verdict: IntegrityVerdict;
+          readonly verdict: PageVerdict;
           /** The warning's words, in the extension's language. */
-          readonly words: { readonly title: string; readonly body: string; readonly files: string; readonly dismiss: string };
+          readonly words: IntegrityWords;
+          /** The words of the reload offer over a page of an earlier build. */
+          readonly outdated: OutdatedWords;
       }
     | { readonly ok: false };

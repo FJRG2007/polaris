@@ -40,6 +40,17 @@ export type IntegrityVerdict =
     | { readonly kind: "changed"; readonly build: string; readonly paths: readonly string[] }
     | { readonly kind: "unverifiable"; readonly reason: "no-stamp" | "no-manifest" | "nothing-loaded" };
 
+/**
+ * What a checker answers for a page. Besides a verdict on its code, "outdated":
+ * every file matches the signed manifest of the build the page itself was served
+ * by, and the server now runs a newer one - a tab left open across an update, or
+ * the offline copy the service worker kept. That page is genuine; it wants a
+ * reload, not a warning.
+ */
+export type PageVerdict =
+    | IntegrityVerdict
+    | { readonly kind: "outdated"; readonly build: string; readonly current: string; readonly checked: number };
+
 /** The build stamp, when it is one; `/api/version` answers null on a source build. */
 export function readStamp(value: unknown): string | null {
     const parsed = stampSchema.safeParse(value);
@@ -123,8 +134,12 @@ export interface IntegrityChecker {
     stamp(origin: string): Promise<string | null>;
     /** The signed manifest of a build, from GitHub; null when there is none. */
     manifest(stamp: string): Promise<IntegrityManifest | null>;
-    /** The verdict for files a page of `origin` loaded. */
-    check(origin: string, files: readonly CheckedFile[]): Promise<IntegrityVerdict>;
+    /**
+     * The verdict for files a page of `origin` loaded. `pageBuild` is the build
+     * the page says it was served by; each page is judged against the manifest
+     * of its own build, not of whatever the server runs by the time it asks.
+     */
+    check(origin: string, files: readonly CheckedFile[], pageBuild?: unknown): Promise<PageVerdict>;
     /** For tests: forget every manifest. */
     forget(): void;
 }
@@ -181,10 +196,28 @@ export function createIntegrityChecker(fetcher: IntegrityFetch = (url, init) => 
     return {
         stamp,
         manifest,
-        async check(origin, files) {
-            const build = await stamp(origin).catch(() => null);
-            if (!build) return judge(null, null, files);
-            return judge(build, await manifest(build).catch(() => null), files);
+        async check(origin, files, pageBuild) {
+            const current = await stamp(origin).catch(() => null);
+            const own = readStamp(pageBuild);
+            if (own && own !== current) {
+                let ownManifest: IntegrityManifest | null;
+                try {
+                    ownManifest = await manifest(own);
+                } catch {
+                    return judge(own, null, files);
+                }
+                // A build GitHub has no manifest for buys nothing: the page is
+                // judged against the build the server runs, as one that names
+                // none, so a made-up build is never a quieter verdict.
+                if (ownManifest) {
+                    const verdict = judge(own, ownManifest, files);
+                    return verdict.kind === "verified" && current
+                        ? { kind: "outdated", build: own, current, checked: verdict.checked }
+                        : verdict;
+                }
+            }
+            if (!current) return judge(null, null, files);
+            return judge(current, await manifest(current).catch(() => null), files);
         },
         forget: () => manifests.clear()
     };

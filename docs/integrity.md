@@ -38,6 +38,7 @@ They slow down the honest reader and stop no one who controls the machine.
 | A compromised build on GitHub Actions | Build, sign and publish changed code | No. The signature is genuine. The Rekor log makes it public and auditable after the fact |
 | Someone who controls the browser or the computer (malware, a hostile extension) | Anything | No. Nothing running inside a machine can prove that machine is honest |
 | A host that answers with a build stamp no manifest exists for | Downgrade the result to "cannot verify" | Shown as "cannot verify", never as "verified" |
+| A host that serves changed code under an older build's stamp | Have it judged against a manifest that does not list the change | Yes. Each file is held to the signed manifest of the build the page names, and a change, or a file that build never had, is "changed". A genuine older build is "earlier version": not a downgrade defence |
 
 ## What is built and signed
 
@@ -68,9 +69,14 @@ cosign verify-blob manifests/<stamp>.json \
 ## Who checks
 
 **The browser extension.** On a page of a Polaris server the person added, it
-asks the server for its build stamp, fetches that build's manifest from GitHub (not
-from the server), hashes every script, stylesheet and WebAssembly file the page
-loaded from its own origin, and compares. Three outcomes:
+fetches from GitHub (not from the server) the manifest of the build the page
+itself was served by, hashes every script, stylesheet and WebAssembly file the
+page loaded from its own origin, and compares. The page names its build in
+`<meta name="polaris-build">` (the root layout); a page without the tag is held to
+the build its first check was judged against. The server's current stamp
+(`/api/version`) is what the page is judged against when the two agree, when
+the page names none, and when GitHub has no manifest for the build the page
+names - a made-up build is never a quieter answer than none. Four outcomes:
 
 - **Verified** - every file matches.
 - **Cannot verify** - the server has no build stamp (a source build), or no
@@ -79,6 +85,12 @@ loaded from its own origin, and compares. Three outcomes:
 - **Changed** - a file differs from the manifest, or the page loaded one the
   manifest does not list. The extension covers the page with a warning, empties
   its password fields, makes them read-only and stops keystrokes reaching them.
+- **Earlier version** - every file matches the manifest of the page's own build,
+  and the server now runs a newer one: a tab left open across an update, or the
+  offline copy the service worker kept. A quiet notice offers a reload; nothing is
+  blocked and nothing reloads by itself, since a form may be half filled in. A
+  changed file on such a page is still **Changed** against its own build's
+  manifest (docs/bugs/BUG-0039).
 
 The check runs on Chromium browsers (`dashboard/apps/extension/src/entrypoints/integrity.ts`,
 registered on every saved server). Firefox's manifest v2 build cannot register a

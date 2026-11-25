@@ -20,6 +20,13 @@
  * device when its account signs out of this browser.
  */
 
+/**
+ * The epoch a conversation's migrated plain history is sealed under
+ * (`legacy-migration.ts`): above any epoch an MLS group reaches (Postgres
+ * bigint max).
+ */
+export const LEGACY_EPOCH = 9223372036854775807n;
+
 const PREFIX = "polaris-mls-history/";
 const WRAP = "wrap";
 const KEYS = "keys";

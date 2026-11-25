@@ -434,6 +434,10 @@
             "label": "Vulnerabilidad grave en una imagen activa",
             "description": "Un análisis halló una vulnerabilidad crítica o alta nueva en una imagen de tus servidores."
         },
+        "securityUpdates": {
+            "label": "Actualizaciones de servidor",
+            "description": "Polaris activó las actualizaciones de seguridad automáticas de un servidor, o un servidor necesita reiniciarse para terminarlas."
+        },
         "placesAlert": {
             "label": "Ha saltado una alerta tuya",
             "description": "Ha pasado algo de lo que preguntaba una de tus alertas."

@@ -12,8 +12,9 @@ export { MAX_FILES, readFiles } from "@polaris/core/integrity";
 
 const checker = createIntegrityChecker();
 
-/** The verdict for a page of `origin`. */
-export const checkPage = (origin: string, files: Parameters<typeof checker.check>[1]) => checker.check(origin, files);
+/** The verdict for a page of `origin`, judged against the build the page names. */
+export const checkPage = (origin: string, files: Parameters<typeof checker.check>[1], build?: unknown) =>
+    checker.check(origin, files, build);
 
 /** The match pattern a page script is registered on for a server's origin.
  *  Without the port, which match patterns do not take; the worker checks the

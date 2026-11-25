@@ -3289,6 +3289,29 @@
             "title": "Passwords that never leave the browser",
             "summary": "{total, plural, =0 {No account signs in with a password yet.} other {{moved} of {shown} accounts with a password sign in without sending it. The rest move at their next sign-in, with nothing to do.}}"
         },
+        "chatMigration": {
+            "title": "Existing chats, sealed",
+            "summary": "{total, plural, =0 {No conversation has history from before sealed chat.} other {{cut} of {shown} conversations with earlier history are sealed. The rest move by themselves, a few every ten minutes.}}",
+            "waitingOnBackup": "Waiting for a backup of Polaris's database from the last day before any history is moved.",
+            "failed": "{count, plural, one {{shown} conversation could not be checked and stays as it was; it is tried again on the next pass.} other {{shown} conversations could not be checked and stay as they were; they are tried again on the next pass.}}",
+            "direct": "Direct message",
+            "cutAt": "Sealed {when}",
+            "stateFailed": "Could not be checked, kept as it was",
+            "stateRolledBack": "Put back as it was",
+            "rollBack": "Put back",
+            "rollBackTitle": "Put this conversation back as it was?",
+            "rollBackDescription": "Its history from before sealed chat goes back to how it was stored before, and is not moved again until you say so. Messages sent since stay sealed.",
+            "rolledBack": "{count, plural, one {{shown} message put back.} other {{shown} messages put back.}}",
+            "migrateAgain": "Seal it again",
+            "queued": "It is sealed again on the next pass.",
+            "errors": {
+                "notFound": "That conversation is not being moved.",
+                "notCut": "That conversation is not sealed yet, so there is nothing to put back.",
+                "expired": "Its copy was kept for {days} days and is gone, so it stays sealed.",
+                "notRolledBack": "That conversation was not put back, so there is nothing to seal again.",
+                "failed": "It could not be put back. Nothing was changed; try again."
+            }
+        },
         "playerAddresses": {
             "title": "Show player addresses to game server managers",
             "hint": "Off by default. Managers still allow, remove and compare addresses, shown as a code per server. Turned on, they see the real addresses players connect and sign in from."

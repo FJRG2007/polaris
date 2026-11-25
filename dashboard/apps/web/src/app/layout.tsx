@@ -12,6 +12,7 @@ import { localeDirection, themeClass } from "@polaris/core";
 import { requestCountry } from "@/lib/request-context";
 import { resolveSession } from "@/lib/session";
 import { CHUNK_RECOVERY_SCRIPT } from "@/lib/stale-build";
+import { buildStamp } from "@/lib/build-stamp";
 import { INPUT_MODALITY_SCRIPT } from "@/lib/input-modality";
 import { getClient, getLocale, getTranslations } from "@/lib/i18n/request";
 import { pickMessages } from "@/lib/i18n/translate";
@@ -96,6 +97,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         requestCountry().catch(() => null)
     ]);
 
+    const build = buildStamp();
+
     return (
         <html
             lang={locale}
@@ -113,6 +116,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <script dangerouslySetInnerHTML={{ __html: CHUNK_RECOVERY_SCRIPT }} />
                 {/* A tap from a key, so a focus ring follows only the keyboard - see input-modality.ts. */}
                 <script dangerouslySetInnerHTML={{ __html: INPUT_MODALITY_SCRIPT }} />
+                {/* The build that served this document, which the code check in the
+                    desktop app and the extension judges the page against - a tab
+                    left open across an update is that build, not the server's new
+                    one (packages/core/src/integrity-guard.ts). */}
+                {build ? <meta name="polaris-build" content={build} /> : null}
             </head>
             <body>
                 {/* What the desktop app's window is dragged by on a page with no

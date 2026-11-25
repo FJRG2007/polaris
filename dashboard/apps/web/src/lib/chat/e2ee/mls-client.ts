@@ -42,7 +42,7 @@
  */
 
 import type { MlsBody } from "./schemas";
-import type { MlsHistoryKeyStore } from "./mls-history-keys";
+import { LEGACY_EPOCH, type MlsHistoryKeyStore } from "./mls-history-keys";
 import * as content from "@polaris/chat-crypto/message-content";
 
 /** The hybrid ML-KEM-768 + X25519 suite (polaris_core::mls). */
@@ -59,6 +59,8 @@ const HISTORY_KEY_KIND = 1;
 const ENVELOPES_PER_PUT = 100;
 /** Member pages a committer reads (100 members each): a conversation's first 10,000 people. */
 const MEMBER_PAGES = 100;
+/** How often one run asks whether a conversation's migrated history still has members to be sealed to. */
+const LEGACY_SHARE_MS = 10 * 60 * 1000;
 /** Accounts per `roster` request. */
 const ROSTER_PAGE = 1_000;
 const ACCOUNT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -264,6 +266,8 @@ export class MlsDevice {
     private readonly scope: string;
     /** History keys this run holds, by `${channelId}/${epoch}` (the persisted ones load on first use). */
     private readonly historyKeys = new Map<string, Uint8Array>();
+    /** When this run last passed each conversation's migrated history on, by channel. */
+    private readonly legacyShared = new Map<string, number>();
 
     private constructor(
         private readonly options: MlsDeviceOptions,
@@ -409,6 +413,7 @@ export class MlsDevice {
      * newcomer can still join by its own external commit.
      */
     async reconcile(channelId: string): Promise<void> {
+        await this.shareLegacyKey(channelId);
         const roster = this.rosterAccounts(this.requireGroup(channelId));
         if (!roster.length) return;
         const leaves = this.leafAddresses(this.requireGroup(channelId)).filter((address) => address !== this.address);
@@ -873,6 +878,40 @@ export class MlsDevice {
         }
         for (let at = 0; at < envelopes.length; at += ENVELOPES_PER_PUT)
             await this.send({ op: "put-history-keys", channelId, epoch: epoch.toString(), envelopes: envelopes.slice(at, at + ENVELOPES_PER_PUT) });
+    }
+
+    /**
+     * Pass the conversation's migrated history on (`legacy-migration.ts`): the
+     * server sealed its key to the members who had an account key at the time
+     * and then forgot it, so a member whose account key came later has nothing
+     * to open that history with until a member who holds it seals it to them.
+     * The server lists who is still missing it, and only to a holder. Best
+     * effort and at most every `LEGACY_SHARE_MS` per conversation: the next
+     * send tries again.
+     */
+    async shareLegacyKey(channelId: string, now = Date.now()): Promise<number> {
+        const last = this.legacyShared.get(channelId);
+        if (last !== undefined && now - last < LEGACY_SHARE_MS) return 0;
+        this.legacyShared.set(channelId, now);
+        try {
+            const answer = await this.send({ op: "legacy-key-gaps", channelId });
+            const gaps = (answer.accountKeys ?? []) as { userId: string; hpkePublicKey: string }[];
+            const others = gaps.filter((gap) => gap.userId !== this.options.userId);
+            if (!others.length) return 0;
+            const key = await this.historyKey(channelId, LEGACY_EPOCH);
+            if (!key) return 0;
+            const envelopes: { recipient: string; envelope: string }[] = [];
+            for (const gap of others) {
+                const binding = { recipient: gap.userId, conversationId: channelId, epoch: LEGACY_EPOCH };
+                envelopes.push({ recipient: gap.userId, envelope: toText(await content.sealHistoryKey(fromText(gap.hpkePublicKey), key, binding)) });
+            }
+            for (let at = 0; at < envelopes.length; at += ENVELOPES_PER_PUT)
+                await this.send({ op: "put-history-keys", channelId, epoch: LEGACY_EPOCH.toString(), envelopes: envelopes.slice(at, at + ENVELOPES_PER_PUT) });
+            return envelopes.length;
+        } catch (caught) {
+            console.warn("polaris: a conversation's migrated history could not be passed on:", caught);
+            return 0;
+        }
     }
 
     /** Drop the member's copy of a group, if it holds one. */

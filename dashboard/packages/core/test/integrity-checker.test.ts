@@ -79,3 +79,71 @@ describe("shared integrity checker", () => {
         expect(readFiles(Array.from({ length: 5_000 }, () => ({ path: "/a.js", digest: A })))).toBeNull();
     });
 });
+
+describe("a page judged against its own build (BUG-0039)", () => {
+    const OLD = createHash("sha256").update("previous build").digest("hex").slice(0, 16);
+    const UNKNOWN = createHash("sha256").update("no such build").digest("hex").slice(0, 16);
+    const C = `sha256-${createHash("sha256").update("c").digest("base64")}`;
+    // The previous build had a chunk the current one no longer serves.
+    const OLD_MANIFEST = {
+        schema: 1,
+        build: OLD,
+        prefixes: ["/_next/static/"],
+        files: { "/_next/static/chunks/a.js": A, "/_next/static/chunks/97829.old.js": C }
+    };
+    const updated = () =>
+        fetcher({
+            "/api/version": json({ build: STAMP }),
+            [`${STAMP}.json`]: json(MANIFEST),
+            [`${OLD}.json`]: json(OLD_MANIFEST)
+        });
+    const oldChunk = { path: "/_next/static/chunks/97829.old.js", digest: C };
+
+    it("calls a genuine page of the previous build outdated, not changed", async () => {
+        const checker = createIntegrityChecker(updated());
+        // Without the page's build this is the false alarm the owner saw.
+        expect(await checker.check(ORIGIN, [oldChunk])).toMatchObject({ kind: "changed", build: STAMP });
+        expect(await checker.check(ORIGIN, [oldChunk], OLD)).toEqual({ kind: "outdated", build: OLD, current: STAMP, checked: 1 });
+    });
+
+    it("still warns about a changed file in the current build", async () => {
+        const verdict = await createIntegrityChecker(updated()).check(ORIGIN, [{ path: "/_next/static/chunks/a.js", digest: B }], STAMP);
+        expect(verdict).toEqual({ kind: "changed", build: STAMP, paths: ["/_next/static/chunks/a.js"] });
+    });
+
+    it("still warns about a changed file on a page that claims an older build", async () => {
+        const checker = createIntegrityChecker(updated());
+        expect(await checker.check(ORIGIN, [{ ...oldChunk, digest: B }], OLD)).toEqual({
+            kind: "changed",
+            build: OLD,
+            paths: ["/_next/static/chunks/97829.old.js"]
+        });
+        // A file the old build never had, under a prefix it owns whole.
+        expect(await checker.check(ORIGIN, [oldChunk, { path: "/_next/static/chunks/extra.js", digest: A }], OLD)).toMatchObject({
+            kind: "changed",
+            paths: ["/_next/static/chunks/extra.js"]
+        });
+    });
+
+    it("judges a page naming a build with no manifest against the server's build", async () => {
+        const checker = createIntegrityChecker(updated());
+        expect(await checker.check(ORIGIN, [oldChunk], UNKNOWN)).toMatchObject({ kind: "changed", build: STAMP });
+        expect(await checker.check(ORIGIN, [{ path: "/_next/static/chunks/a.js", digest: A }], UNKNOWN)).toEqual({
+            kind: "verified",
+            build: STAMP,
+            checked: 1
+        });
+        // Not a stamp at all: as a page that names none.
+        expect(await checker.check(ORIGIN, [oldChunk], "../../etc")).toMatchObject({ kind: "changed", build: STAMP });
+    });
+
+    it("cannot verify when its own build's manifest cannot be fetched", async () => {
+        const fetch = fetcher({ "/api/version": json({ build: STAMP }), [`${STAMP}.json`]: json(MANIFEST), [`${OLD}.json`]: new Error("offline") });
+        expect(await createIntegrityChecker(fetch).check(ORIGIN, [oldChunk], OLD)).toEqual({ kind: "unverifiable", reason: "no-manifest" });
+    });
+
+    it("verifies the offline copy against its own build when the server answers no build", async () => {
+        const fetch = fetcher({ "/api/version": new Error("down"), [`${OLD}.json`]: json(OLD_MANIFEST) });
+        expect(await createIntegrityChecker(fetch).check(ORIGIN, [oldChunk], OLD)).toEqual({ kind: "verified", build: OLD, checked: 1 });
+    });
+});

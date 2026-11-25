@@ -68,7 +68,14 @@
             "12": "Cada 12 horas",
             "24": "Cada día",
             "168": "Cada semana"
-        }
+        },
+        "window": "Las actualizaciones se instalan cada noche hacia las 04:00, hora del servidor.",
+        "waiting": "{count, plural, =0 {Al día.} one {# actualización pendiente ({security} de seguridad).} other {# actualizaciones pendientes ({security} de seguridad).}}",
+        "restartNeeded": "Hace falta reiniciar para terminarlas.",
+        "restartAt": "Se reinicia el {when}.",
+        "restart": "Reiniciar 04:30",
+        "restartCancel": "Cancelar reinicio",
+        "offByHand": "Desactivadas a mano el {when}. Polaris no las reactiva."
     },
     "images": {
         "hint": "Comprueba la imagen en ejecución de cada app en busca de vulnerabilidades conocidas y lista su software.",
@@ -215,5 +222,15 @@
         "updateImage": "Usa una versión más nueva de esta imagen y vuelve a analizar.",
         "updateDeps": "Actualiza estas dependencias en el repositorio y vuelve a desplegar.",
         "wait": "Aún no hay solución. Vuelve a analizar más tarde por si ya ha salido."
+    },
+    "updates": {
+        "armed": {
+            "title": "Actualizaciones de seguridad automáticas activas en {server}",
+            "body": "Polaris las ha activado. Se instalan cada noche hacia las 04:00; puedes desactivarlas en Escaneos de seguridad."
+        },
+        "restart": {
+            "title": "{server} necesita reiniciarse",
+            "body": "Hay actualizaciones de seguridad instaladas que necesitan un reinicio. Prográmalo para las 04:30 desde Escaneos de seguridad."
+        }
     }
 }

@@ -13,7 +13,7 @@
  */
 
 import { checkedPath, servedPath, sriDigest, type CheckedFile } from "./integrity-paths";
-import type { IntegrityVerdict } from "./integrity";
+import type { IntegrityVerdict, PageVerdict } from "./integrity";
 
 /** The warning's words, in the reader's language. */
 export interface IntegrityWords {
@@ -23,8 +23,56 @@ export interface IntegrityWords {
     readonly dismiss: string;
 }
 
+/** The words of the notice over a page of an earlier build. */
+export interface OutdatedWords {
+    readonly body: string;
+    readonly reload: string;
+    readonly later: string;
+}
+
+/** What the checker answered for files a page sent, with the words to show it in. */
+export interface GuardReply {
+    readonly verdict: PageVerdict;
+    readonly words: IntegrityWords;
+    readonly outdated: OutdatedWords;
+}
+
 const WARNING_ID = "polaris-integrity-warning";
+const OUTDATED_ID = "polaris-integrity-outdated";
+/** The tag the web app's root layout puts the build that served the document in. */
+const BUILD_META = 'meta[name="polaris-build"]';
 let blocked = false;
+
+/** The build this document says it was served by, or null when it names none. */
+export function documentBuild(): string | null {
+    const value = document.querySelector<HTMLMetaElement>(BUILD_META)?.content ?? "";
+    return /^[0-9a-f]{16}$/.test(value) ? value : null;
+}
+
+/**
+ * Check the page's code now and each time it loads more. Every check names the
+ * build the page belongs to - the one the document says served it, else the
+ * one its first check was judged against - so a chunk an old page loads after
+ * the server was updated is judged against that page's own build, never against
+ * the newer build the server runs by then (docs/bugs/BUG-0039).
+ */
+export function watchPageCode(ask: (files: CheckedFile[], build: string | null) => Promise<GuardReply | null>): void {
+    const sent = new Set<string>();
+    let build = documentBuild();
+    const check = async (): Promise<void> => {
+        const paths = loadedPaths(sent);
+        if (paths.length === 0) return;
+        for (const path of paths) sent.add(path);
+        const reply = await ask(await hashPaths(paths), build).catch(() => null);
+        if (!reply) return;
+        const verdict = reply.verdict;
+        if (verdict.kind !== "unverifiable") build ??= verdict.build;
+        if (verdict.kind === "changed") warnChanged(verdict, reply.words);
+        else if (verdict.kind === "outdated") offerReload(reply.outdated);
+    };
+    void check();
+    onNewFiles(() => void check());
+}
 
 /** The paths of the files of code the page loaded from its own origin, minus `skip`. */
 export function loadedPaths(skip: ReadonlySet<string> = new Set()): string[] {
@@ -79,6 +127,7 @@ export function onNewFiles(run: () => void, settleMs = 400): void {
 export function warnChanged(verdict: Extract<IntegrityVerdict, { kind: "changed" }>, words: IntegrityWords): void {
     blockPasswords();
     document.getElementById(WARNING_ID)?.remove();
+    document.getElementById(OUTDATED_ID)?.remove();
     const host = document.createElement("div");
     host.id = WARNING_ID;
     host.style.cssText = "position:fixed;inset:0;z-index:2147483647;";
@@ -123,6 +172,48 @@ export function warnChanged(verdict: Extract<IntegrityVerdict, { kind: "changed"
     shadow.append(backdrop);
     document.documentElement.append(host);
     dismiss.focus();
+}
+
+/**
+ * A quiet notice that the page is genuine code of an earlier build. Never a
+ * reload of its own: this cannot see a form being filled in, and the page's own
+ * update prompt reloads when nothing would be lost. Shown once per page.
+ */
+export function offerReload(words: OutdatedWords): void {
+    if (document.getElementById(OUTDATED_ID) || document.getElementById(WARNING_ID)) return;
+    const host = document.createElement("div");
+    host.id = OUTDATED_ID;
+    host.style.cssText = "position:fixed;right:16px;bottom:16px;left:16px;z-index:2147483646;display:flex;justify-content:flex-end;pointer-events:none;";
+    const shadow = host.attachShadow({ mode: "closed" });
+    const panel = document.createElement("div");
+    panel.setAttribute("role", "status");
+    panel.style.cssText = `
+        box-sizing: border-box; width: min(380px, 100%); pointer-events: auto;
+        border: 1px solid hsl(225 10% 22%); border-radius: 10px; padding: 12px;
+        background: hsl(225 11% 9%); color: hsl(220 14% 96%);
+        font: 13px/1.45 ui-sans-serif, system-ui, sans-serif; box-shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+        display: flex; flex-direction: column; gap: 8px;
+    `;
+    const body = document.createElement("p");
+    body.style.cssText = "margin:0;";
+    body.textContent = words.body;
+    const actions = document.createElement("div");
+    actions.style.cssText = "display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;";
+    const button = (label: string, run: () => void): HTMLButtonElement => {
+        const element = document.createElement("button");
+        element.type = "button";
+        element.textContent = label;
+        element.style.cssText = `
+            border: 1px solid hsl(225 10% 22%); border-radius: 8px; padding: 6px 12px;
+            background: hsl(225 11% 13%); color: inherit; font: inherit; cursor: pointer;
+        `;
+        element.addEventListener("click", run);
+        return element;
+    };
+    actions.append(button(words.later, () => host.remove()), button(words.reload, () => location.reload()));
+    panel.append(body, actions);
+    shadow.append(panel);
+    document.documentElement.append(host);
 }
 
 /** Whether a field takes a secret: a password, or one marked as a key. */
