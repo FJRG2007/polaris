@@ -18,7 +18,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { BadgeCheck, Copy, RotateCw, ScanLine } from "lucide-react";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import * as peerKeys from "@/lib/chat/e2ee/peer-keys";
-import { QrScanDialog, type QrScanCopy } from "@/components/qr-scan-dialog";
+import { QrScanPanel, type QrScanCopy } from "@/components/qr-scan-dialog";
 import { Button, Skeleton, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PairSafety } from "@/lib/chat/e2ee/account-key-client";
@@ -42,6 +42,7 @@ export function usePeerVerified(ownId: string, peerId: string, digits: string | 
 
 export function SafetyNumberView({ channelId, peerId, peerName }: { channelId: string; peerId: string; peerName: string }) {
     const t = useTranslations("chat");
+    const tc = useTranslations("common");
     const toast = useToast();
     const key = `${channelId}:${peerId}`;
     const [safety, setSafety] = useState<PairSafety | null>(() => known.get(key) ?? null);
@@ -122,6 +123,25 @@ export function SafetyNumberView({ channelId, peerId, peerName }: { channelId: s
         notPicture: t("info.safetyScanNotPicture")
     };
 
+    // The scanner takes this view's place, inside whatever dialog or panel holds
+    // it, rather than opening a second modal over it.
+    if (scanning)
+        return (
+            <div className="flex flex-col gap-3 px-3 py-3">
+                <p className="text-sm font-medium">{scanCopy.title}</p>
+                <QrScanPanel
+                    open
+                    copy={scanCopy}
+                    acceptsText={(text) => text.startsWith(QR_PREFIX)}
+                    onFound={scanned}
+                    onDone={() => setScanning(false)}
+                />
+                <Button variant="outline" size="sm" className="self-start" onClick={() => setScanning(false)}>
+                    {tc("actions.cancel")}
+                </Button>
+            </div>
+        );
+
     return (
         <div className="flex flex-col gap-4 px-3 py-3">
             <p className="text-sm text-muted-foreground">{t("info.safetyHint", { name: peerName })}</p>
@@ -175,13 +195,6 @@ export function SafetyNumberView({ channelId, peerId, peerName }: { channelId: s
                     {verified ? t("info.safetyUnverify") : t("info.safetyMarkVerified")}
                 </Button>
             ) : null}
-            <QrScanDialog
-                open={scanning}
-                copy={scanCopy}
-                acceptsText={(text) => text.startsWith(QR_PREFIX)}
-                onFound={scanned}
-                onOpenChange={setScanning}
-            />
         </div>
     );
 }

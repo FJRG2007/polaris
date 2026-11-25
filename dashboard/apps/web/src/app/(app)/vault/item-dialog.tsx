@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import { useVaultSession } from "./vault-session";
 import { useVaultCollections } from "./use-vault-collections";
 import { PasswordGenerator, generate } from "@/components/password-generator";
-import { QrScanDialog } from "./qr-scan";
+import { QrScanPanel, useQrScanTitle } from "./qr-scan";
 import { RecoveryCodes } from "./recovery-codes";
 import { PasswordState } from "@/components/password-state";
 import {
@@ -162,6 +162,7 @@ export function ItemDialog({
 }) {
     const t = useTranslations("vault");
     const tc = useTranslations("common");
+    const scanTitle = useQrScanTitle();
     const locale = useLocale();
     const problem = (said: string | null): string | null => {
         if (!said) return null;
@@ -458,8 +459,32 @@ export function ItemDialog({
     const managed = managedFieldNames(draft);
 
     return (
-        <Dialog open={item !== null} onOpenChange={(open) => !open && onClose()}>
+        <Dialog open={item !== null} onOpenChange={(open) => !open && (scanning ? setScanning(false) : onClose())}>
             <DialogContent>
+                {/* The scanner takes this dialog's place while it runs: one modal at a time. */}
+                {scanning ? (
+                    <div className="flex flex-col gap-4">
+                        <DialogHeader>
+                            <DialogTitle>{scanTitle}</DialogTitle>
+                        </DialogHeader>
+                        <QrScanPanel
+                            onFound={(value) => {
+                                // Whatever the square said, as it said it. An otpauth link
+                                // carries the issuer, the digits and the period as well as
+                                // the secret, and throwing those away to keep the secret
+                                // alone would break a site that uses eight digits.
+                                patch({ login: { ...draft.login, totp: value.trim() } });
+                            }}
+                            onDone={() => setScanning(false)}
+                        />
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setScanning(false)}>
+                                {tc("actions.cancel")}
+                            </Button>
+                        </DialogFooter>
+                    </div>
+                ) : (
+                <>
                 <DialogHeader>
                     <DialogTitle>{draft.id ? t("item.editTitle") : t("item.newTitle")}</DialogTitle>
                     <DialogDescription>{t("item.description")}</DialogDescription>
@@ -1439,21 +1464,9 @@ export function ItemDialog({
                         {tc("actions.save")}
                     </Button>
                 </DialogFooter>
+                </>
+                )}
             </DialogContent>
-
-            {/* On top of this one rather than inside it: a camera preview in a
-                form that already scrolls is a camera nobody can aim. */}
-            <QrScanDialog
-                open={scanning}
-                onOpenChange={setScanning}
-                onFound={(value) => {
-                    // Whatever the square said, as it said it. An otpauth link
-                    // carries the issuer, the digits and the period as well as
-                    // the secret, and throwing those away to keep the secret
-                    // alone would break a site that uses eight digits.
-                    patch({ login: { ...draft.login, totp: value.trim() } });
-                }}
-            />
         </Dialog>
     );
 }

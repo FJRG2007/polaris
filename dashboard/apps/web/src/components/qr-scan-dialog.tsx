@@ -46,6 +46,11 @@ export interface QrScanCopy {
     readonly notPicture: string;
 }
 
+/**
+ * The scanner in a dialog of its own. A screen that is itself a dialog (or sits
+ * in one) shows `QrScanPanel` in place of its own content instead, so only one
+ * modal is ever open.
+ */
 export function QrScanDialog({
     open,
     copy,
@@ -55,12 +60,40 @@ export function QrScanDialog({
 }: {
     open: boolean;
     copy: QrScanCopy;
+    acceptsText: (text: string) => boolean;
+    onFound: (value: string) => void;
+    onOpenChange: (open: boolean) => void;
+}) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{copy.title}</DialogTitle>
+                </DialogHeader>
+                <QrScanPanel open={open} copy={copy} acceptsText={acceptsText} onFound={onFound} onDone={() => onOpenChange(false)} />
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/** The scanner itself: camera, pasted screenshot or chosen picture. */
+export function QrScanPanel({
+    open,
+    copy,
+    acceptsText,
+    onFound,
+    onDone
+}: {
+    /** Whether the scanner is showing; the camera and the paste listener run only then. */
+    open: boolean;
+    copy: QrScanCopy;
     /** Whether pasted text is itself the value (a link offered beside the square). */
     acceptsText: (text: string) => boolean;
     /** What the code said, verbatim. The caller decides whether it is the kind
      *  of link it wanted. */
     onFound: (value: string) => void;
-    onOpenChange: (open: boolean) => void;
+    /** Called once a code was read: the caller closes or swaps the scanner away. */
+    onDone: () => void;
 }) {
     const video = useRef<HTMLVideoElement>(null);
     const file = useRef<HTMLInputElement>(null);
@@ -110,7 +143,7 @@ export function QrScanDialog({
                 if (!found?.data) return;
                 window.clearInterval(timer);
                 onFound(found.data);
-                onOpenChange(false);
+                onDone();
             }, SCAN_INTERVAL_MS);
         };
 
@@ -120,7 +153,7 @@ export function QrScanDialog({
             window.clearInterval(timer);
             for (const track of stream?.getTracks() ?? []) track.stop();
         };
-        // `onFound` and `onOpenChange` are the caller's own closures and change
+        // `onFound` and `onDone` are the caller's own closures and change
         // on its every render; restarting the camera for that would restart it
         // constantly.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,7 +195,7 @@ export function QrScanDialog({
                 return;
             }
             onFound(found.data);
-            onOpenChange(false);
+            onDone();
         } catch {
             setError(copy.notPicture);
         } finally {
@@ -198,77 +231,70 @@ export function QrScanDialog({
             if (text && acceptsText(text)) {
                 event.preventDefault();
                 onFound(text);
-                onOpenChange(false);
+                onDone();
             }
         };
         window.addEventListener("paste", onPaste);
         return () => window.removeEventListener("paste", onPaste);
-        // `onFound` and `onOpenChange` are the caller's closures and change on
+        // `onFound` and `onDone` are the caller's closures and change on
         // its every render; rebinding for that would be rebinding constantly.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{copy.title}</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-3">
-                    <p className="text-sm text-muted-foreground">
-                        {copy.intro}
-                    </p>
+        <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground">
+                {copy.intro}
+            </p>
 
-                    {scanning ? (
-                        <video
-                            ref={video}
-                            playsInline
-                            muted
-                            className="aspect-video w-full rounded-md border border-border bg-black object-cover"
-                        />
-                    ) : null}
+            {scanning ? (
+                <video
+                    ref={video}
+                    playsInline
+                    muted
+                    className="aspect-video w-full rounded-md border border-border bg-black object-cover"
+                />
+            ) : null}
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            type="button"
-                            variant={scanning ? "secondary" : "primary"}
-                            onClick={() => setScanning((was) => !was)}
-                        >
-                            <Camera className="size-4 shrink-0" />
-                            {scanning ? copy.stop : copy.start}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            disabled={reading}
-                            onClick={() => file.current?.click()}
-                        >
-                            {reading ? (
-                                <Loader2 className="size-4 shrink-0 animate-spin" />
-                            ) : (
-                                <ImageUp className="size-4 shrink-0" />
-                            )}
-                            {copy.upload}
-                        </Button>
-                    </div>
+            <div className="flex flex-wrap gap-2">
+                <Button
+                    type="button"
+                    variant={scanning ? "secondary" : "primary"}
+                    onClick={() => setScanning((was) => !was)}
+                >
+                    <Camera className="size-4 shrink-0" />
+                    {scanning ? copy.stop : copy.start}
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    disabled={reading}
+                    onClick={() => file.current?.click()}
+                >
+                    {reading ? (
+                        <Loader2 className="size-4 shrink-0 animate-spin" />
+                    ) : (
+                        <ImageUp className="size-4 shrink-0" />
+                    )}
+                    {copy.upload}
+                </Button>
+            </div>
 
-                    <input
-                        ref={file}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(event) => {
-                            const picture = event.target.files?.[0];
-                            // Cleared first, so choosing the same file twice
-                            // after a failure still counts as a change.
-                            event.target.value = "";
-                            if (picture) void readPicture(picture);
-                        }}
-                    />
-                </div>
-            </DialogContent>
-        </Dialog>
+            <input
+                ref={file}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                    const picture = event.target.files?.[0];
+                    // Cleared first, so choosing the same file twice
+                    // after a failure still counts as a change.
+                    event.target.value = "";
+                    if (picture) void readPicture(picture);
+                }}
+            />
+        </div>
     );
 }
