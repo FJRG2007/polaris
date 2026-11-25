@@ -278,6 +278,9 @@ export function syncRefusal(item: SyncItem, reach: SyncReach): SyncRefusal | nul
         case "service.add":
             // A service comes with its variables, so adding one copies values.
             if (!target.has("service.create")) return "needsCreate";
+            // And its volumes, which adding one by hand would take managing.
+            if ((item.carries?.volumes ?? 0) > 0 && !target.has("volumes.manage"))
+                return "needsVolumes";
             if ((item.carries?.variables ?? 0) === 0) return null;
             if (!target.has("variables.write")) return "needsVariables";
             return readsSource ? null : "needsSourceVariables";

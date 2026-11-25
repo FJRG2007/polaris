@@ -26,6 +26,8 @@ import type { EnvironmentGlance } from "@/lib/deploy/project-glance";
 import { ProjectGlanceBar, useProjectGlance } from "./project-glance-bar";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { StagedChangesBanner, StagedChangesProvider } from "./staged-changes";
+import { SyncDialog } from "./settings/sync-dialog";
+import { ArrowLeftRight } from "lucide-react";
 import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "./new-environment-dialog";
 import { Button, cn, Dialog, DialogContent, DialogHeader, DialogTitle, Input, ScrollRow, Select } from "@polaris/ui";
 
@@ -53,12 +55,15 @@ export function ProjectShell({
     projects,
     staged,
     canManage,
+    syncEnvironmentIds = [],
     children
 }: {
     project: ShellProject;
     projects: { id: string; name: string }[];
     staged: StagedChangeView[];
     canManage: boolean;
+    /** Environments the reader may sync between: deploy rights in each. */
+    syncEnvironmentIds?: readonly string[];
     children: ReactNode;
 }) {
     const router = useRouter();
@@ -76,6 +81,8 @@ export function ProjectShell({
         project.environments.find((environment) => environment.id === requested) ?? defaultEnv ?? null;
 
     const [showNewProject, setShowNewProject] = useState(false);
+
+    const [syncing, setSyncing] = useState(false);
     const [showNewEnv, setShowNewEnv] = useState(false);
     const glanceByEnvironment = useProjectGlance(project.id, project.glance ?? NO_GLANCE);
     const glance = active ? glanceByEnvironment[active.id] : undefined;
@@ -132,6 +139,26 @@ export function ProjectShell({
         />
     );
 
+    // Railway puts Sync beside the environment switcher; so does this, for the
+    // environments the reader may sync, disabled with why when there is no
+    // second one.
+    const syncable = project.environments.filter((environment) => syncEnvironmentIds.includes(environment.id));
+    const canSync = active !== null && syncEnvironmentIds.includes(active.id);
+    const syncButton = canSync ? (
+        <Button
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0"
+            disabled={syncable.length < 2}
+            onClick={() => setSyncing(true)}
+            title={syncable.length < 2 ? t("shell.syncNeedsTwo") : t("shell.syncHint")}
+            aria-label={t("shell.sync")}
+        >
+            <ArrowLeftRight className="size-4 shrink-0" />
+            <span className="hidden sm:inline">{t("shell.sync")}</span>
+        </Button>
+    ) : null;
+
     return (
         <StagedChangesProvider projectId={project.id} initial={staged}>
         <div className="flex w-full flex-col gap-4">
@@ -144,13 +171,21 @@ export function ProjectShell({
                     {projectSelect}
                     <span className="text-muted-foreground/40">/</span>
                     {environmentSelect}
+                    {syncButton}
                 </span>
             </HeaderPortal>
 
             <div className="flex items-center gap-2 md:hidden under-tb-md:flex">
                 {projectSelect}
                 {environmentSelect}
+                {syncButton}
             </div>
+
+            <SyncDialog
+                environments={syncable}
+                environment={syncing && active ? active : null}
+                onClose={() => setSyncing(false)}
+            />
 
             {canManage && active && (
                 <StagedChangesBanner

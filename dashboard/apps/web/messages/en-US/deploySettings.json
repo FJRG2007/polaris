@@ -148,7 +148,10 @@
         "stageNamed": "What {name} is for",
         "promote": "Promote",
         "promoteNamed": "Promote {name}",
-        "promoteNeedsTwo": "Add another environment to promote into"
+        "promoteNeedsTwo": "Add another environment to promote into",
+        "sync": "Sync with another",
+        "syncNamed": "Sync {name}",
+        "syncNeedsTwo": "Needs another environment you can deploy to"
     },
     "sections": {
         "title": "Project settings",
@@ -472,5 +475,79 @@
         "cancel": "Cancel",
         "save": "Save",
         "runsFailed": "Could not read the recent runs"
+    },
+    "sync": {
+        "title": "Sync {name}",
+        "direction": "Direction",
+        "pull": "Pull from",
+        "push": "Push to",
+        "pullHint": "Changes made in {from} are brought into {to}.",
+        "pushHint": "Changes made in {from} are sent to {to}.",
+        "loadFailed": "Could not read what would change.",
+        "shared": "Shared variables and networking",
+        "cannotDeploy": "You cannot deploy to that environment, so you cannot sync into it.",
+        "pickSomething": "Pick at least one change.",
+        "inSync": "{to} already matches {from}. There is nothing to sync.",
+        "selectAll": "Select all",
+        "selectNone": "Select none",
+        "status": {
+            "new": "New",
+            "edited": "Edited",
+            "removed": "Removed"
+        },
+        "refusals": {
+            "needsCreate": "You cannot add services here.",
+            "needsDelete": "You cannot remove services here.",
+            "needsConfigure": "You cannot change how services here are built and run.",
+            "needsVariables": "You cannot edit variables here.",
+            "needsSourceVariables": "You cannot read the variables where this comes from.",
+            "needsVolumes": "You cannot manage volumes here.",
+            "needsSettings": "You cannot change this project's settings."
+        },
+        "keptVolumes": "Kept as they are, with their data: {names}.",
+        "notCopied": "Domains are never copied. A new volume starts empty, and no data moves between environments.",
+        "deployNow": "Deploy the changed services now",
+        "deployNowHint": "Each changed service is deployed again once the changes are in.",
+        "stageHint": "The changes wait in the changeset until somebody deploys them.",
+        "partly": "Some changes did not go in. The rest did; try again to finish:",
+        "apply": "{count, plural, one {Apply # change} other {Apply # changes}}",
+        "stage": "{count, plural, one {Stage # change} other {Stage # changes}}",
+        "lines": {
+            "add": "Add this service",
+            "addDetail": "With its settings, {variables, plural, one {# variable} other {# variables}} and {volumes, plural, one {# empty volume} other {# empty volumes}}",
+            "remove": "Remove this service",
+            "removeDetail": "Goes to the changeset for review. Its volumes keep their data.",
+            "fromTo": "{from} -> {to}",
+            "unset": "not set",
+            "volume": "Volume {name}",
+            "volumeAdded": "New and empty, mounted at {path}",
+            "network": "Private networking",
+            "hidden": "value hidden"
+        },
+        "fields": {
+            "source": "Source",
+            "build": "Build and start settings",
+            "healthcheck": "Health check",
+            "deployBranch": "Branch",
+            "autoDeploy": "Deploy on push",
+            "waitForCi": "Wait for CI",
+            "commitFilter": "Commit filter",
+            "watchPaths": "Watched paths",
+            "replicas": "Replicas",
+            "resources": "Resources",
+            "restart": "Restart policy",
+            "privateNetwork": "Private networking",
+            "variableGroups": "Shared variable groups"
+        },
+        "networkModes": {
+            "shared": "Shared network",
+            "environment": "Own network",
+            "links": "Linked services only"
+        },
+        "changes": {
+            "added": "Added",
+            "changed": "Changed",
+            "removed": "Removed"
+        }
     }
 }

@@ -21,7 +21,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, ConfirmDeleteDialog, Input, Select } from "@polaris/ui";
 import { NewEnvironmentDialog } from "../new-environment-dialog";
 import { PromoteDialog, PromotionHistory } from "./promote-dialog";
-import { ArrowUpRight, Check, Pencil, Plus, Star, Trash2, X } from "lucide-react";
+import { SyncDialog } from "./sync-dialog";
+import { ArrowLeftRight, ArrowUpRight, Check, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { ENVIRONMENT_STAGES, type EnvironmentStage } from "@polaris/core";
 import {
     renameEnvironmentAction,
@@ -54,6 +55,7 @@ export function EnvironmentsSection({
     const [creating, setCreating] = useState(false);
     const [promoting, setPromoting] = useState<ProjectEnvironmentView | null>(null);
     const [promotions, setPromotions] = useState(0);
+    const [syncing, setSyncing] = useState<ProjectEnvironmentView | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const display = useDisplayFormat();
@@ -225,6 +227,24 @@ export function EnvironmentsSection({
                                     variant="ghost"
                                     size="icon"
                                     disabled={reachable.size < 2}
+                                    onClick={() => setSyncing(environment)}
+                                    aria-label={t("environments.syncNamed", {
+                                        name: environment.name
+                                    })}
+                                    title={
+                                        reachable.size < 2
+                                            ? t("environments.syncNeedsTwo")
+                                            : t("environments.sync")
+                                    }
+                                >
+                                    <ArrowLeftRight className="size-4" />
+                                </Button>
+                            )}
+                            {reachable.has(environment.id) && renaming !== environment.id && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={reachable.size < 2}
                                     onClick={() => setPromoting(environment)}
                                     aria-label={t("environments.promoteNamed", {
                                         name: environment.name
@@ -329,6 +349,12 @@ export function EnvironmentsSection({
                     setPromoting(null);
                     setPromotions((count) => count + 1);
                 }}
+            />
+
+            <SyncDialog
+                environments={settings.environments.filter((one) => reachable.has(one.id))}
+                environment={syncing}
+                onClose={() => setSyncing(null)}
             />
 
             <NewEnvironmentDialog

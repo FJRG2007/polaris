@@ -22,7 +22,11 @@
         "promoteCannotDeploy": "You cannot deploy to that environment, so you cannot promote into it.",
         "promoteCannotCopyData": "You cannot manage the databases in that environment, so its data cannot be replaced. Leave the data out and try again.",
         "promoteBusy": "{target} is already being promoted into. Wait for that to finish.",
-        "promoteNothingInCommon": "{target} has nothing in common with {source} to promote."
+        "promoteNothingInCommon": "{target} has nothing in common with {source} to promote.",
+        "syncFailed": "Could not sync the environment",
+        "syncNotAllowed": "You are not allowed to apply any of the picked changes.",
+        "syncNothing": "There is nothing left to sync. The environments already match.",
+        "syncCannotDeploy": "You cannot deploy to that environment, so you cannot sync into it."
     },
     "service": {
         "templateUnknown": "That template is not in the list",

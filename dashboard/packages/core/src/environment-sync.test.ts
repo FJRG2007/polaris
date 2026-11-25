@@ -195,6 +195,16 @@ describe("permissions", () => {
         expect(sync.syncRefusal(adds, { source: EVERYTHING, target: EVERYTHING })).toBeNull();
     });
 
+    it("adds a service with volumes only for someone who may manage volumes", () => {
+        const adds = sync.diffEnvironments(
+            snapshot([service("new", { volumes: [{ name: "data", mountPath: "/data" }] })]),
+            snapshot([])
+        ).items[0]!;
+        const without = EVERYTHING.filter((one) => one !== "volumes.manage");
+        expect(sync.syncRefusal(adds, { source: EVERYTHING, target: without })).toBe("needsVolumes");
+        expect(sync.syncRefusal(adds, { source: EVERYTHING, target: EVERYTHING })).toBeNull();
+    });
+
     it("applies everything picked when every capability is held", () => {
         const result = sync.selectSyncItems(diff, ids, { source: EVERYTHING, target: EVERYTHING });
         expect(result.refused).toEqual([]);

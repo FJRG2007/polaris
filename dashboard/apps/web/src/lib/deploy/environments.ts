@@ -23,7 +23,7 @@
  * pointed, which is the one way a clone can reach back into production.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import { slugify } from "@polaris/deploy";
 import { copyWafRule } from "../waf-service";
 import { setSetting } from "../setting-store";
@@ -195,93 +195,21 @@ export async function cloneEnvironment(
             ids.set(database.id, created.id);
         }
 
-        // Cycle: the deploy service reaches this module.
-        const { createApplication } = await import("@/lib/deploy-service");
-        const { createVolume } = await import("@/lib/deploy-volume-service");
         const withheldByService: { applicationId: string; keys: string[] }[] = [];
         for (const application of source.applications) {
-            const repositoryBuilt =
-                application.sourceType === "dockerfile" || application.sourceType === "nixpacks";
-            const created = await createApplication(ownerId, {
-                environmentId: environment.id,
-                targetId: application.targetId,
-                name: application.name,
-                sourceType: application.sourceType,
-                sourceConfig: JSON.parse(application.sourceConfig) as Record<string, unknown>,
-                // A clone given a branch follows it; that is what it is for. One
-                // without a branch deploys the way its original does.
-                autoDeploy: Boolean(branch) && repositoryBuilt ? true : application.autoDeploy,
-                deployBranch: branch ? null : application.deployBranch,
-                keepReleases: false,
-                // As open or as closed as the one it copies: a clone of a service
-                // reached only through the edge must not come up on the machine's
-                // own address.
-                publishPort: application.publishPort
-            });
-            ids.set(application.id, created.id);
-            // The copy takes on its original's limits, so it is held to the
-            // organization's caps on what those reserve.
-            await quota.assertOrgReservation(
-                () => quota.orgIdOfEnvironment(environment.id),
-                { cpus: 0, memoryMb: 0 },
+            const copied = await copyApplicationInto(
+                application,
                 {
-                    cpus: quotas.reservationOf(application.cpuLimit, application.replicas),
-                    memoryMb: quotas.reservationOf(application.memoryLimitMb, application.replicas)
+                    environmentId: environment.id,
+                    environmentSlug: slug,
+                    projectSlug: source.project.slug,
+                    branch
                 },
-                { applicationId: created.id }
-            );
-            await prisma.application.update({
-                where: { id: created.id },
-                data: {
-                    buildConfig: application.buildConfig,
-                    healthcheck: application.healthcheck,
-                    replicas: application.replicas,
-                    cpuLimit: application.cpuLimit,
-                    memoryLimitMb: application.memoryLimitMb,
-                    commitFilter: application.commitFilter,
-                    watchPaths: application.watchPaths,
-                    waitForCi: application.waitForCi,
-                    // The edge settings and whether the port is open come over too:
-                    // a copy that answered on a port its original keeps closed, or
-                    // without the original's rate limits, is not a copy.
-                    publishPort: application.publishPort,
-                    publishPortChosen: application.publishPortChosen,
-                    edgeConfig: application.edgeConfig
-                }
-            });
-            // And its firewall: every clone gets a public address, and a preview
-            // of a service behind a login must not be the way around it.
-            await copyWafRule("application", application.id, created.id);
-            const own = await copyScopeValues(
-                { scopeType: "application", scopeId: application.id },
-                { scopeType: "application", scopeId: created.id },
+                ownerId,
                 { secrets }
             );
-            // The copy reads the same variable groups; a preview skips any
-            // group holding a secret, the way it is not given the service's own.
-            const linked = await copyGroupLinks(application.id, created.id, { secrets });
-            withheldByService.push({
-                applicationId: created.id,
-                keys: [...new Set([...own.withheld, ...linked.withheld])]
-            });
-            for (const volume of application.volumes) {
-                await createVolume(ownerId, {
-                    applicationId: created.id,
-                    name: volume.name,
-                    mountPath: volume.mountPath,
-                    kind: volume.kind as "volume" | "bind" | "nas",
-                    // A named volume is namespaced by the clone's own project already.
-                    // A path is not, so the clone gets one of its own beside the
-                    // original's rather than writing into it.
-                    ...(volume.kind === "volume"
-                        ? {}
-                        : {
-                              source: `polaris/deploy/${source.project.slug}/${slug}/${application.slug}/${slugify(volume.name)}`
-                          }),
-                    ...(volume.connectionId ? { connectionId: volume.connectionId } : {}),
-                    ...(volume.sizeLimit ? { sizeLimit: volume.sizeLimit } : {})
-                });
-            }
+            ids.set(application.id, copied.id);
+            withheldByService.push({ applicationId: copied.id, keys: copied.withheld });
         }
 
         await prisma.environment.update({
@@ -312,6 +240,111 @@ export async function cloneEnvironment(
         await discardClone(environment.id, ownerId);
         throw error;
     }
+}
+
+/** A service as `copyApplicationInto` reads it. */
+type CopiedApplication = Prisma.ApplicationGetPayload<{ include: { volumes: true } }>;
+
+/**
+ * Copy one service into another environment of its project: its settings, its
+ * firewall, its variables and variable groups, and its volumes as definitions -
+ * each copy gets a volume of its own, never the original's data. Domains are
+ * not copied. Nothing is deployed. Answers the secrets it was not given.
+ */
+export async function copyApplicationInto(
+    application: CopiedApplication,
+    into: {
+        environmentId: string;
+        environmentSlug: string;
+        projectSlug: string;
+        branch: string | null;
+    },
+    ownerId: string,
+    options: { secrets: boolean }
+): Promise<{ id: string; withheld: string[] }> {
+    // Cycle: the deploy service reaches this module.
+    const { createApplication } = await import("@/lib/deploy-service");
+    const { createVolume } = await import("@/lib/deploy-volume-service");
+    const repositoryBuilt =
+        application.sourceType === "dockerfile" || application.sourceType === "nixpacks";
+    const created = await createApplication(ownerId, {
+        environmentId: into.environmentId,
+        targetId: application.targetId,
+        name: application.name,
+        sourceType: application.sourceType,
+        sourceConfig: JSON.parse(application.sourceConfig) as Record<string, unknown>,
+        // A clone given a branch follows it; that is what it is for. One
+        // without a branch deploys the way its original does.
+        autoDeploy: Boolean(into.branch) && repositoryBuilt ? true : application.autoDeploy,
+        deployBranch: into.branch ? null : application.deployBranch,
+        keepReleases: false,
+        // As open or as closed as the one it copies: a clone of a service
+        // reached only through the edge must not come up on the machine's
+        // own address.
+        publishPort: application.publishPort
+    });
+    // The copy takes on its original's limits, so it is held to the
+    // organization's caps on what those reserve.
+    await quota.assertOrgReservation(
+        () => quota.orgIdOfEnvironment(into.environmentId),
+        { cpus: 0, memoryMb: 0 },
+        {
+            cpus: quotas.reservationOf(application.cpuLimit, application.replicas),
+            memoryMb: quotas.reservationOf(application.memoryLimitMb, application.replicas)
+        },
+        { applicationId: created.id }
+    );
+    await prisma.application.update({
+        where: { id: created.id },
+        data: {
+            buildConfig: application.buildConfig,
+            healthcheck: application.healthcheck,
+            replicas: application.replicas,
+            cpuLimit: application.cpuLimit,
+            memoryLimitMb: application.memoryLimitMb,
+            commitFilter: application.commitFilter,
+            watchPaths: application.watchPaths,
+            waitForCi: application.waitForCi,
+            // The edge settings and whether the port is open come over too:
+            // a copy that answered on a port its original keeps closed, or
+            // without the original's rate limits, is not a copy.
+            publishPort: application.publishPort,
+            publishPortChosen: application.publishPortChosen,
+            edgeConfig: application.edgeConfig
+        }
+    });
+    // And its firewall: every clone gets a public address, and a preview
+    // of a service behind a login must not be the way around it.
+    await copyWafRule("application", application.id, created.id);
+    const own = await copyScopeValues(
+        { scopeType: "application", scopeId: application.id },
+        { scopeType: "application", scopeId: created.id },
+        { secrets: options.secrets }
+    );
+    // The copy reads the same variable groups; a preview skips any
+    // group holding a secret, the way it is not given the service's own.
+    const linked = await copyGroupLinks(application.id, created.id, {
+        secrets: options.secrets
+    });
+    for (const volume of application.volumes) {
+        await createVolume(ownerId, {
+            applicationId: created.id,
+            name: volume.name,
+            mountPath: volume.mountPath,
+            kind: volume.kind as "volume" | "bind" | "nas",
+            // A named volume is namespaced by the clone's own project already.
+            // A path is not, so the clone gets one of its own beside the
+            // original's rather than writing into it.
+            ...(volume.kind === "volume"
+                ? {}
+                : {
+                      source: `polaris/deploy/${into.projectSlug}/${into.environmentSlug}/${application.slug}/${slugify(volume.name)}`
+                  }),
+            ...(volume.connectionId ? { connectionId: volume.connectionId } : {}),
+            ...(volume.sizeLimit ? { sizeLimit: volume.sizeLimit } : {})
+        });
+    }
+    return { id: created.id, withheld: [...new Set([...own.withheld, ...linked.withheld])] };
 }
 
 /**
