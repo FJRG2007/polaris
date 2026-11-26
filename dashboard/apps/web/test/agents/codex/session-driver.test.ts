@@ -31,6 +31,7 @@ function harness(options: {
     const vendorIds: string[] = [];
     const started: (readonly string[])[] = [];
     const drafts: (readonly [string, string] | "end")[] = [];
+    const ended: string[] = [];
     const deps: CodexDriverDeps = {
         session: async () => ({
             workdir: "/work",
@@ -56,6 +57,9 @@ function harness(options: {
             asked.push(prompt);
             return options.answer ?? "allow";
         },
+        turnEnded: async (id) => {
+            ended.push(id);
+        },
         touch: () => undefined,
         drafts: () => ({ set: (id, text) => drafts.push([id, text]), end: () => drafts.push("end") }),
         log: () => undefined,
@@ -63,7 +67,7 @@ function harness(options: {
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, Math.min(ms, 10)))
     };
     const driver = new CodexSessionDriver("session-1", deps);
-    return { driver, pipe, rows, events, asked, vendorIds, started, drafts };
+    return { driver, pipe, rows, events, asked, vendorIds, started, drafts, ended };
 }
 
 async function until(check: () => boolean, ms = 8_000): Promise<void> {
@@ -273,6 +277,23 @@ describe("CodexSessionDriver against a fake app-server on stdio", () => {
         expect(rows.at(-1)).toMatchObject({ kind: "marker", subject: "interrupted" });
         expect(events.at(-1)?.kind).toBe("turn.end");
         driver.close();
+    });
+
+    it("sends the next queued message once a completed turn is recorded, and holds it after a failed one", async () => {
+        const done = harness();
+        await done.driver.prompt("run tests");
+        await until(() => done.ended.length > 0);
+        expect(done.ended).toEqual(["session-1"]);
+        expect(done.events.at(-1)?.kind).toBe("turn.end");
+        done.driver.close();
+
+        const failed = harness();
+        await failed.driver.prompt("break");
+        await until(() => !failed.driver.busy);
+        await failed.driver.settled();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(failed.ended).toEqual([]);
+        failed.driver.close();
     });
 
     it("reports a failed turn in Polaris's words", async () => {

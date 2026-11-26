@@ -194,6 +194,22 @@ export function acpStopCommand(stateDir: string, session = commands.TMUX_SESSION
 }
 
 /**
+ * Signal the protocol agent's processes - everything under its window's
+ * launch script, parent before child - for a Stop the agent did not honour:
+ * `INT` first, the way Ctrl+C stops it in a terminal, then `TERM`. The launch
+ * script itself is left, so it records the exit and the pipe reports it.
+ */
+export function acpSignalCommand(signal: "INT" | "TERM", session = commands.TMUX_SESSION): string {
+    return [
+        `p="$(tmux list-panes -t ${shellQuote(`${session}:${ACP_WINDOW}`)} -F '#{pane_pid}' 2>/dev/null | head -n 1)"`,
+        'case "$p" in ""|*[!0-9]*) exit 0 ;; esac',
+        'under() { for c in $(ps -o pid= --ppid "$1" 2>/dev/null); do echo "$c"; under "$c"; done; }',
+        'kids="$(under "$p")"',
+        `if [ -n "$kids" ]; then kill -${signal} $kids 2>/dev/null || true; fi`
+    ].join("\n");
+}
+
+/**
  * Stop the agent the session's terminal holds, for a session moving to Chat, so
  * two agents never work in one checkout. With a runner: the running turn is
  * stopped as Stop does it (`interruptTurnCommand`) and the interface window,

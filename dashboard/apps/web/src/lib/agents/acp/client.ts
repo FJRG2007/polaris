@@ -16,6 +16,7 @@
 
 import * as acp from "@agentclientprotocol/sdk";
 import { z } from "zod";
+import type { ElicitationReply } from "./elicitation";
 
 /** How long a setup request (initialize, a new or loaded session, a mode) may
  *  take before the agent is treated as not answering. A prompt has none: a
@@ -30,8 +31,14 @@ export interface AcpHandlers {
      * cancel it. Anything that is not one of the offered ids is cancelled.
      */
     onPermission(request: acp.RequestPermissionRequest, signal: AbortSignal): Promise<string | null>;
+    /**
+     * A form the agent puts to the person (`elicitation/create`): Claude
+     * Code's AskUserQuestion (`elicitation.ts`). Without a handler, or when it
+     * throws, the form is cancelled.
+     */
+    onElicitation?(request: unknown, signal: AbortSignal): Promise<ElicitationReply>;
     /** A handler that threw: logged by the caller, never shown to anybody. */
-    onHandlerError?(what: "update" | "permission", error: unknown): void;
+    onHandlerError?(what: "update" | "permission" | "elicitation", error: unknown): void;
 }
 
 export interface AcpClient {
@@ -75,10 +82,15 @@ export function supportsSteering(init: acp.InitializeResponse): boolean {
     return Boolean(steering && typeof steering === "object" && (steering as Record<string, unknown>).supported === true);
 }
 
-/** What Polaris tells the agent it can do. */
+/**
+ * What Polaris tells the agent it can do. Form elicitation is what makes
+ * Claude Code's adapter keep AskUserQuestion: without it the tool is
+ * disallowed and the agent cannot ask the person anything in Chat.
+ */
 export const CLIENT_CAPABILITIES: acp.ClientCapabilities = {
     fs: { readTextFile: false, writeTextFile: false },
-    terminal: false
+    terminal: false,
+    elicitation: { form: {} }
 };
 
 /** The answer to a permission request for an option id, or a cancellation
@@ -112,6 +124,15 @@ export function connectAcp(stream: acp.Stream, handlers: AcpHandlers): AcpClient
             } catch (error) {
                 handlers.onHandlerError?.("permission", error);
                 return permissionOutcome(params, null);
+            }
+        })
+        .onRequest(acp.methods.client.elicitation.create, async ({ params, signal }) => {
+            if (!handlers.onElicitation) return { action: "cancel" };
+            try {
+                return await handlers.onElicitation(params, signal);
+            } catch (error) {
+                handlers.onHandlerError?.("elicitation", error);
+                return { action: "cancel" };
             }
         });
 

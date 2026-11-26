@@ -224,9 +224,10 @@ describe.each(AGENTS)("recorded %s conversation through the driver", (cli) => {
             ["agent", "result", "12 passed"],
             ["agent", "text", "All green."]
         ]);
-        // The approval puts the session back to working; the call's own row
-        // then reports its step, start and end, as a hook does in a terminal.
-        expect(events).toEqual(["prompt", "permission", "tool.start", "tool.start", "tool.end", "turn.end"]);
+        // The call's own row reports its step first, as ACP sends the call
+        // before asking; the approval then puts the session back to working,
+        // in the order they arrived, as a hook does in a terminal.
+        expect(events).toEqual(["prompt", "tool.start", "permission", "tool.start", "tool.end", "turn.end"]);
         expect(driver.busy).toBe(false);
         driver.close();
     });

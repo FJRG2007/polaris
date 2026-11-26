@@ -20,6 +20,8 @@ import { NO_DRAFTS, type DraftSink } from "../session-drafts";
 import type * as acp from "@agentclientprotocol/sdk";
 import { connectAcp, supportsSteering, type AcpClient } from "./client";
 import type { HistoryRow } from "../transcript-decoders";
+import type { PermissionStatus } from "../session-permissions";
+import { elicitationQuestions, elicitationReply, type ElicitationReply } from "./elicitation";
 import { acpModeFor, type AcpBinding } from "./providers";
 import { pipeStream, type PipeIo, type PipeStreamOptions } from "./transport";
 
@@ -51,6 +53,18 @@ export interface DriverDeps {
     ): Promise<unknown>;
     recordVendorId(sessionId: string, vendorSessionId: string): Promise<void>;
     permission(sessionId: string): (request: acp.RequestPermissionRequest, signal: AbortSignal) => Promise<string | null>;
+    /** Put a question to the person as the session's prompt card; resolves
+     *  to their answer. Without it a question form is cancelled. */
+    ask?(
+        sessionId: string,
+        request: { tool: string; detail: string; input: { questions: unknown[] }; carriesReason: boolean },
+        signal: AbortSignal
+    ): Promise<{ status: PermissionStatus; answer?: unknown }>;
+    /** Signal the agent's processes, for a Stop it did not honour. */
+    signal?(sessionId: string, signal: "INT" | "TERM"): Promise<unknown>;
+    /** A turn ended well - one Polaris sent or one the agent started itself:
+     *  the session's next queued message goes now. */
+    turnEnded?(sessionId: string): Promise<unknown>;
     touch(sessionId: string): void;
     /** Where the message being written is sent while it grows
      *  (`session-drafts.ts`); none when absent. */
@@ -61,6 +75,10 @@ export interface DriverDeps {
     /** How long a freshly started agent may take to appear on its pipe. */
     startWaitMs?: number;
     sleep?: (ms: number) => Promise<void>;
+    /** Overrides of the timings below, for tests. */
+    cycleQuietMs?: number;
+    cycleIdleMs?: number;
+    stopGraceMs?: number;
 }
 
 const STEP_DETAIL_CHARS = 200;
@@ -137,6 +155,28 @@ export async function waitForAgent(
     }
 }
 
+/** What a turn that lost its agent reports: the next message starts the
+ *  agent again on the same conversation (`session/load`). */
+export const AGENT_EXITED = "The agent's process ended. Send a message to start it again.";
+
+/** How long the agent's own activity may go quiet, with no step it started
+ *  still open, before that activity counts as a finished turn. */
+const CYCLE_QUIET_MS = 5_000;
+/** How long it may go quiet with a step still open. */
+const CYCLE_IDLE_MS = 120_000;
+/** Between a Stop and each harder way of stopping: `INT`, `TERM`, then the
+ *  connection closed. */
+const STOP_GRACE_MS = 3_000;
+/** How long a question the agent asked waits for the person. Longer than a
+ *  hook's permission prompt: nothing on the machine times the form out. */
+export const ASK_WAIT_MS = 30 * 60_000;
+
+/** Updates that are the agent at work, as opposed to its bookkeeping
+ *  (modes, commands, usage). */
+const ACTIVITY = new Set(["agent_message_chunk", "agent_thought_chunk", "tool_call", "tool_call_update", "plan"]);
+
+type SessionEvent = { kind: core.AgentSessionEventKind; detail: string; subject: string; };
+
 interface Connection {
     client: AcpClient;
     acpSessionId: string;
@@ -149,10 +189,29 @@ interface Connection {
     steering: boolean;
 }
 
+/**
+ * Work the agent started on its own, with no prompt of Polaris's open: Claude
+ * Code wakes when a background task or a Monitor it armed reports, and runs a
+ * turn nobody sent. ACP v1 has no end for it (the adapter reports foreground
+ * state only to v2 clients), so it ends when the agent goes quiet.
+ */
+interface Cycle {
+    /** Tool calls the cycle started and has not finished. */
+    readonly open: Set<string>;
+    timer: ReturnType<typeof setTimeout> | null;
+}
+
 export class AcpSessionDriver {
     private connection: Connection | null = null;
     private opening: Promise<Connection> | null = null;
     private turn: Promise<void> | null = null;
+    private cycle: Cycle | null = null;
+    /** Set by a Stop until the turn it stopped has ended. */
+    private stopping = false;
+    private stopTimers: ReturnType<typeof setTimeout>[] = [];
+    /** Requests (a permission, a question) waiting on the person: the agent's
+     *  silence meanwhile is not the end of its work. */
+    private asking = 0;
     /** The summary the next prompt carries after a refused `session/load`. */
     private carried: string | null = null;
     /** Stored rows, in order, so a turn's closing rows land after its last update. */
@@ -167,15 +226,21 @@ export class AcpSessionDriver {
         this.draft = deps.drafts?.(sessionId) ?? NO_DRAFTS;
     }
 
-    /** Whether a turn is running. */
+    /** Whether a turn is running, Polaris's or one the agent started itself. */
     get busy(): boolean {
-        return this.turn !== null;
+        return this.turn !== null || this.cycle !== null;
     }
 
     /** Send a message. Returns once the agent has it; the turn runs on. */
     async prompt(text: string): Promise<void> {
+        // A turn being stopped is over for the person: the message waits for
+        // the agent to let go of it (bounded by the stop's escalation).
+        if (this.turn && this.stopping) await this.turn;
         if (this.turn) throw new AcpRefusal("The agent is still on the last message. Stop it or wait for it to finish.");
         const connection = await this.connect();
+        // The agent's own work is taken over by this turn, as the adapter
+        // does: its end is this turn's end.
+        this.dropCycle();
         await this.deps.recordEvents(this.sessionId, [{ kind: "prompt", detail: "", subject: "" }]);
         const carried = this.carried;
         this.carried = null;
@@ -188,23 +253,45 @@ export class AcpSessionDriver {
 
     /**
      * Deliver a message into the running turn, the way the agent's own CLI
-     * takes one typed while it works. False when no turn of this driver's is
-     * running or the agent cannot take one; the caller queues the message.
+     * takes one typed while it works. False when no turn is running here or
+     * the agent cannot take one; the caller queues the message.
      */
     async steer(text: string): Promise<boolean> {
         const connection = this.connection;
-        if (!this.turn || !connection?.steering) return false;
+        if (!this.busy || this.stopping || !connection?.steering) return false;
         return (await connection.client.steer(connection.acpSessionId, text)) === "injected";
     }
 
-    /** Stop the running turn, if there is one. */
+    /**
+     * Stop whatever the agent is running. `session/cancel` is a notification
+     * the agent may take its time over (or never honour), so the session
+     * leaves "working" at once, and a turn not ended a few seconds later is
+     * stopped harder: `INT` to the agent's processes, then `TERM`, then the
+     * connection closed - the next message starts it again on the same
+     * conversation.
+     */
     async cancel(): Promise<boolean> {
         // A driver that did not start the turn (the dashboard restarted or
         // updated mid-turn) still asks: session/cancel stops whatever the
         // agent is running in the session, whoever sent it.
         const connection = this.connection ?? (await this.connect().catch(() => null));
         if (!connection) return false;
-        await connection.client.cancel(connection.acpSessionId);
+        // All before the first wait, so the turn's own end (the agent may
+        // answer the cancel at once) finds it stopping and lands after.
+        const turn = this.turn;
+        let recorded: Promise<unknown>;
+        if (!turn && this.cycle) recorded = this.endCycle(connection, "cancelled");
+        else {
+            if (turn && !this.stopping) {
+                this.stopping = true;
+                this.escalate(turn);
+            }
+            recorded = this.recordChained([{ kind: "turn.end", detail: "", subject: "" }]);
+        }
+        await connection.client.cancel(connection.acpSessionId).catch((error: unknown) => {
+            this.deps.log(`${this.sessionId}: session/cancel did not reach the agent`, error);
+        });
+        await recorded;
         return true;
     }
 
@@ -221,6 +308,8 @@ export class AcpSessionDriver {
     close(): void {
         this.closedByUs = true;
         this.draft.end();
+        this.dropCycle();
+        this.clearStop();
         this.connection?.client.close();
         this.connection = null;
     }
@@ -260,30 +349,36 @@ export class AcpSessionDriver {
             onUpdate: (notification) => {
                 if (!connection || connection.replaying) return;
                 if (notification.sessionId !== connection.acpSessionId) return;
-                const rows = connection.normalizer.push(notification.update);
+                const update = notification.update;
+                // Activity with no prompt open is the agent's own turn.
+                if (!this.turn && ACTIVITY.has(update.sessionUpdate)) this.noteCycle(connection, update);
+                const rows = connection.normalizer.push(update);
                 if (rows.length > 0) this.store(rows);
                 const steps = stepEvents(rows, connection.normalizer);
                 // After the rows, so a page woken by the event finds the step.
-                if (steps.length > 0) this.recordSteps(steps);
+                // Not for a turn being stopped: the session already left it.
+                if (steps.length > 0 && !this.stopping) this.recordSteps(steps);
                 const draft = connection.normalizer.draft();
                 if (draft) this.draft.set(draft.id, draft.text);
                 else this.draft.end();
-                if (notification.update.sessionUpdate === "current_mode_update") return;
+                if (update.sessionUpdate === "current_mode_update") return;
                 // A chunk that completed nothing changed nothing stored: the
                 // draft carries it, and a page need not read the session again.
-                if (notification.update.sessionUpdate === "agent_message_chunk" && rows.length === 0) return;
+                if (update.sessionUpdate === "agent_message_chunk" && rows.length === 0) return;
                 this.deps.touch(this.sessionId);
             },
-            onPermission: async (request, signal) => {
-                const ask = this.deps.permission(this.sessionId);
-                const tool = (request.toolCall.title?.trim() || request.toolCall.kind || "tool").slice(0, 80);
-                await this.deps.recordEvents(this.sessionId, [{ kind: "permission", detail: tool, subject: tool }]);
-                const chosen = await ask(request, signal);
-                // Back to working once answered: the `permission` event left
-                // the session waiting, and the call's own row said so before.
-                await this.deps.recordEvents(this.sessionId, [{ kind: "tool.start", detail: "", subject: tool }]);
-                return chosen;
-            },
+            onPermission: (request, signal) =>
+                this.asked(async () => {
+                    const ask = this.deps.permission(this.sessionId);
+                    const tool = (request.toolCall.title?.trim() || request.toolCall.kind || "tool").slice(0, 80);
+                    await this.recordChained([{ kind: "permission", detail: tool, subject: tool }]);
+                    const chosen = await ask(request, signal);
+                    // Back to working once answered: the `permission` event left
+                    // the session waiting, and the call's own row said so before.
+                    if (!this.stopping) await this.recordChained([{ kind: "tool.start", detail: "", subject: tool }]);
+                    return chosen;
+                }),
+            onElicitation: (request, signal) => this.elicited(request, signal),
             onHandlerError: (what, error) => this.deps.log(`${this.sessionId}: the ${what} handler failed`, error)
         });
 
@@ -330,19 +425,148 @@ export class AcpSessionDriver {
 
         const ready = connection;
         this.connection = ready;
-        void client.closed.then(() => {
+        void client.closed.then(async () => {
             if (this.connection === ready) this.connection = null;
-            if (!this.closedByUs) this.deps.log(`${this.sessionId}: the connection to the agent ended`);
+            if (this.closedByUs) return;
+            this.deps.log(`${this.sessionId}: the connection to the agent ended`);
+            // The agent's own work died with it. A prompt's turn ends through
+            // its rejected request (`endTurn`).
+            if (this.cycle && !this.turn) await this.endCycle(ready, "failed");
         });
         return ready;
     }
 
-    private recordSteps(
-        events: readonly { kind: core.AgentSessionEventKind; detail: string; subject: string }[]
-    ): void {
+    /** A question form from the agent, put to the person as the session's
+     *  AskUserQuestion card and answered in the adapter's fields. */
+    private async elicited(request: unknown, signal: AbortSignal): Promise<ElicitationReply> {
+        const questions = elicitationQuestions(request);
+        if (!questions || !this.deps.ask) return { action: "cancel" };
+        return this.asked(async () => {
+            const tool = "AskUserQuestion";
+            await this.recordChained([{ kind: "question", detail: questions[0]!.question.slice(0, STEP_DETAIL_CHARS), subject: tool }]);
+            const answered = await this.deps.ask!(
+                this.sessionId,
+                {
+                    tool,
+                    detail: questions.map((question) => question.question).join("\n").slice(0, STEP_DETAIL_CHARS),
+                    input: { questions },
+                    // One question takes a message sent instead as its
+                    // "Other" answer; several are skipped and the message follows.
+                    carriesReason: questions.length === 1
+                },
+                signal
+            );
+            if (!this.stopping) await this.recordChained([{ kind: "tool.start", detail: "", subject: tool }]);
+            return elicitationReply(questions, answered.status, answered.answer);
+        });
+    }
+
+    /** Run a request that waits on the person, holding off the end of the
+     *  agent's own work meanwhile. */
+    private async asked<T>(work: () => Promise<T>): Promise<T> {
+        this.asking += 1;
+        if (this.cycle?.timer) clearTimeout(this.cycle.timer);
+        try {
+            return await work();
+        } finally {
+            this.asking -= 1;
+            const connection = this.connection;
+            if (this.cycle && connection) this.armCycle(connection, this.cycle);
+        }
+    }
+
+    /** Activity with no prompt open: start (or keep alive) the agent's own turn. */
+    private noteCycle(connection: Connection, update: acp.SessionUpdate): void {
+        const cycle = (this.cycle ??= { open: new Set(), timer: null });
+        if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
+            const done = update.status === "completed" || update.status === "failed";
+            if (done) cycle.open.delete(update.toolCallId);
+            else if (update.sessionUpdate === "tool_call") cycle.open.add(update.toolCallId);
+        }
+        this.armCycle(connection, cycle);
+    }
+
+    private armCycle(connection: Connection, cycle: Cycle): void {
+        if (cycle.timer) clearTimeout(cycle.timer);
+        cycle.timer = null;
+        if (this.asking > 0) return;
+        const wait =
+            cycle.open.size === 0
+                ? (this.deps.cycleQuietMs ?? CYCLE_QUIET_MS)
+                : (this.deps.cycleIdleMs ?? CYCLE_IDLE_MS);
+        cycle.timer = setTimeout(() => {
+            if (this.cycle === cycle) void this.endCycle(connection, "end");
+        }, wait);
+    }
+
+    private dropCycle(): void {
+        if (this.cycle?.timer) clearTimeout(this.cycle.timer);
+        this.cycle = null;
+    }
+
+    /** The end of the agent's own turn, recorded the way a prompt's is. */
+    private async endCycle(connection: Connection, how: "end" | "cancelled" | "failed"): Promise<void> {
+        if (!this.cycle) return;
+        this.dropCycle();
+        const rows = connection.normalizer.finish(how === "cancelled" ? "cancelled" : undefined);
+        this.draft.end();
+        if (rows.length > 0) this.store(rows);
+        await this.recordChained([
+            how === "failed"
+                ? { kind: "turn.failed", detail: AGENT_EXITED, subject: "" }
+                : { kind: "turn.end", detail: "", subject: "" }
+        ]);
+        if (how !== "failed") this.ended();
+    }
+
+    /** A Stop the agent has not honoured yet, made harder step by step. */
+    private escalate(turn: Promise<void>): void {
+        const grace = this.deps.stopGraceMs ?? STOP_GRACE_MS;
+        const still = () => this.turn === turn;
+        const steps: (() => unknown)[] = [
+            () => this.deps.signal?.(this.sessionId, "INT"),
+            () => this.deps.signal?.(this.sessionId, "TERM"),
+            // Whatever is left of it: the turn ends with the connection, and
+            // the next message starts the agent again.
+            () => this.connection?.client.close(new Error("The agent did not stop."))
+        ];
+        steps.forEach((step, index) => {
+            this.stopTimers.push(
+                setTimeout(() => {
+                    if (!still()) return;
+                    this.deps.log(`${this.sessionId}: the agent did not stop, stopping it harder (${index + 1})`);
+                    void Promise.resolve()
+                        .then(step)
+                        .catch((error: unknown) => this.deps.log(`${this.sessionId}: the agent was not signalled`, error));
+                }, grace * (index + 1))
+            );
+        });
+    }
+
+    private clearStop(): void {
+        for (const timer of this.stopTimers) clearTimeout(timer);
+        this.stopTimers = [];
+        this.stopping = false;
+    }
+
+    /** A turn ended well: what the session does next (the queue) is the deps'. */
+    private ended(): void {
+        if (!this.deps.turnEnded) return;
+        void Promise.resolve()
+            .then(() => this.deps.turnEnded!(this.sessionId))
+            .catch((error: unknown) => this.deps.log(`${this.sessionId}: the turn's end was not followed up`, error));
+    }
+
+    /** Events in the order of the rows before them. */
+    private recordChained(events: readonly SessionEvent[]): Promise<unknown> {
         this.stored = this.stored
             .then(() => this.deps.recordEvents(this.sessionId, events))
-            .catch((error: unknown) => this.deps.log(`${this.sessionId}: step events were not recorded`, error));
+            .catch((error: unknown) => this.deps.log(`${this.sessionId}: session events were not recorded`, error));
+        return this.stored;
+    }
+
+    private recordSteps(events: readonly SessionEvent[]): void {
+        void this.recordChained(events);
     }
 
     private store(rows: readonly HistoryRow[]): void {
@@ -355,24 +579,35 @@ export class AcpSessionDriver {
         // The response can overtake the last updates' handlers by a microtask;
         // a macrotask lets every one of them run first.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        const rows = connection.normalizer.finish(stopReason);
+        const stopped = this.stopping;
+        // A request rejected because the connection ended: the agent is gone.
+        const lost =
+            error !== null &&
+            (await Promise.race([
+                connection.client.closed.then(() => true),
+                new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 0))
+            ]));
+        const rows = connection.normalizer.finish(stopped ? "cancelled" : stopReason);
         this.draft.end();
         if (rows.length > 0) this.store(rows);
-        await this.stored;
+        // From here on, activity is the agent's own (`noteCycle`), and its
+        // events land after this turn's end.
         this.turn = null;
-        if (error !== null) {
+        this.clearStop();
+        let event: SessionEvent | null = null;
+        if (stopped) {
+            // Recorded when the Stop was pressed.
+            if (error !== null) this.deps.log(`${this.sessionId}: the stopped turn ended with an error`, error);
+        } else if (error !== null) {
             this.deps.log(`${this.sessionId}: the turn failed`, error);
-            await this.deps
-                .recordEvents(this.sessionId, [{ kind: "turn.failed", detail: "The agent stopped before it answered.", subject: "" }])
-                .catch(() => undefined);
-            return;
+            event = { kind: "turn.failed", detail: lost ? AGENT_EXITED : "The agent stopped before it answered.", subject: "" };
+        } else if (stopReason === "refusal") {
+            event = { kind: "turn.failed", detail: "The agent declined to carry on.", subject: "" };
+        } else {
+            event = { kind: "turn.end", detail: "", subject: "" };
         }
-        await this.deps
-            .recordEvents(this.sessionId, [
-                stopReason === "refusal"
-                    ? { kind: "turn.failed", detail: "The agent declined to carry on.", subject: "" }
-                    : { kind: "turn.end", detail: "", subject: "" }
-            ])
-            .catch(() => undefined);
+        await (event ? this.recordChained([event]) : this.stored);
+        // A failed turn holds the queue, as a hook-reported one does.
+        if (!event || event.kind === "turn.end") this.ended();
     }
 }

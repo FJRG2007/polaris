@@ -95,8 +95,9 @@ describe("questions and plans", () => {
     });
 
     it("tells the agent why a question or plan was set aside by a message", () => {
+        const two = [questions[0]!, { ...questions[0]!, question: "Which bundler?" }];
         const reason = (tool: string, answer: unknown) =>
-            (asks.askDecision(tool, "deny", { questions }, answer) as {
+            (asks.askDecision(tool, "deny", { questions: two }, answer) as {
                 hookSpecificOutput: { permissionDecisionReason: string };
             }).hookSpecificOutput.permissionDecisionReason;
         expect(reason("AskUserQuestion", { feedback: "Use Svelte" })).toBe(
@@ -109,6 +110,22 @@ describe("questions and plans", () => {
         expect(reason("ExitPlanMode", { byMessage: true })).toBe(
             "The user wants you to keep planning and sent a new message instead."
         );
+    });
+
+    it("takes a message sent at a single question as its Other answer", () => {
+        expect(asks.askDecision("AskUserQuestion", "deny", { questions }, { feedback: "Use Svelte" })).toEqual({
+            hookSpecificOutput: {
+                hookEventName: "PreToolUse",
+                permissionDecision: "allow",
+                updatedInput: { questions, answers: { "Which framework?": "Use Svelte" } }
+            }
+        });
+        // Without words of its own, a skip stays a skip.
+        expect(
+            (asks.askDecision("AskUserQuestion", "deny", { questions }, { byMessage: true }) as {
+                hookSpecificOutput: { permissionDecision: string };
+            }).hookSpecificOutput.permissionDecision
+        ).toBe("deny");
     });
 
     it("refuses what does not fit the schema", () => {

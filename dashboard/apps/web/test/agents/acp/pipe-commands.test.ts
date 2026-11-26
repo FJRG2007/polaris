@@ -10,6 +10,7 @@ import {
     ACP_WRITE_BYTES,
     acpLaunchCommand,
     acpReadCommand,
+    acpSignalCommand,
     acpWriteCommand,
     conversationHandBackCommand,
     HAND_BACK_INTERACTIVE,
@@ -151,6 +152,31 @@ describe("terminalAgentStopCommand", () => {
         expect(command).toContain('case "$p" in ""|*[!0-9]*) exit 0 ;; esac');
         expect(command).toContain('kill -TERM $kids');
         expect(command).not.toContain("kill -TERM $p");
+    });
+});
+
+describe("acpSignalCommand", () => {
+    it("signals every process under the protocol agent's window, never the window's own script", () => {
+        const command = acpSignalCommand("INT");
+        expect(command).toContain(`tmux list-panes -t 'polaris-agent:${ACP_WINDOW}'`);
+        expect(command).toContain('case "$p" in ""|*[!0-9]*) exit 0 ;; esac');
+        expect(command).toContain("kill -INT $kids");
+        expect(command).not.toContain("kill -INT $p");
+        expect(command).not.toContain("kill-window");
+    });
+
+    it("escalates with the signal it is given, in the session it is given", () => {
+        const command = acpSignalCommand("TERM", "other");
+        expect(command).toContain(`tmux list-panes -t 'other:${ACP_WINDOW}'`);
+        expect(command).toContain("kill -TERM $kids");
+        expect(command).not.toContain("kill -INT");
+    });
+
+    it.skipIf(!hasSh())("is a script sh reads, and does nothing where the window is gone", () => {
+        execFileSync("sh", ["-n", "-c", acpSignalCommand("INT")]);
+        // No tmux server, or no such window: an empty pane id ends it quietly.
+        const output = execFileSync("sh", ["-c", acpSignalCommand("TERM", "polaris-test-none")], { encoding: "utf8" });
+        expect(output).toBe("");
     });
 });
 

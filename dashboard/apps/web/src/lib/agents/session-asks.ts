@@ -246,6 +246,15 @@ export function askDecision(
     const out = (decision: Record<string, unknown>) => ({
         hookSpecificOutput: { hookEventName: "PreToolUse", ...decision }
     });
+    // A message sent at a single question is its "Other" answer, the way
+    // Claude Code takes what is typed at its question.
+    const asked = Array.isArray(input.questions) ? (input.questions as unknown[]) : [];
+    const only = asked.length === 1 ? questionSchema.safeParse(asked[0]) : null;
+    if (status === "deny" && tool === "AskUserQuestion" && given.feedback && only?.success)
+        return out({
+            permissionDecision: "allow",
+            updatedInput: { ...input, answers: { [only.data.question]: given.feedback } }
+        });
     if (status === "deny")
         return out({
             permissionDecision: "deny",

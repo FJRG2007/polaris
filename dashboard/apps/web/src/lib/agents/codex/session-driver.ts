@@ -67,6 +67,8 @@ export interface CodexDriverDeps {
     recordVendorId(sessionId: string, vendorSessionId: string): Promise<void>;
     /** Put a request to the person; resolves to their answer. */
     ask(sessionId: string, prompt: { tool: string; detail: string }, signal: AbortSignal): Promise<PermissionStatus>;
+    /** A turn completed: the session's next queued message goes now. */
+    turnEnded?(sessionId: string): Promise<unknown>;
     touch(sessionId: string): void;
     /** Where the message being written is sent while it grows
      *  (`session-drafts.ts`); none when absent. */
@@ -381,5 +383,11 @@ export class CodexSessionDriver {
             return;
         }
         await this.deps.recordEvents(this.sessionId, [{ kind: "turn.end", detail: "", subject: "" }]).catch(() => undefined);
+        // After the state is idle, so the queue's next message is taken as a
+        // new turn. A failed turn holds the queue, as a hook-reported one does.
+        if (this.deps.turnEnded)
+            void Promise.resolve()
+                .then(() => this.deps.turnEnded!(this.sessionId))
+                .catch((error: unknown) => this.deps.log(`${this.sessionId}: the turn's end was not followed up`, error));
     }
 }

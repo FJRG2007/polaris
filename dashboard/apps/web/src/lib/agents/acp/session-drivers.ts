@@ -6,7 +6,7 @@
  * the first.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { acpBinding, usesAppServer } from "./providers";
 import { CODEX_APP_SERVER_ARGV } from "../codex/protocol";
@@ -16,7 +16,8 @@ import { storeHistoryRows } from "../session-history";
 import { sessionPermissionHandler } from "./approvals";
 import { shellQuote } from "../session-hooks";
 import { noteChatConversation, runInSession, sessionAcpPipe, startAcpAgent } from "../session-runtime";
-import { AcpSessionDriver, type DriverDeps } from "./session-driver";
+import { acpSignalCommand } from "./pipe-commands";
+import { AcpSessionDriver, ASK_WAIT_MS, type DriverDeps } from "./session-driver";
 import { awaitPermission, openPermissionRequest } from "../session-permissions";
 import { CodexSessionDriver, type CodexDriverDeps } from "../codex/session-driver";
 import { handoffFor } from "../session-handoff-service";
@@ -35,6 +36,22 @@ async function summaryForRefusedResume(sessionId: string): Promise<string | null
     const { note } = await handoffFor(session, { kind: "restore", targetCli: session.cli, withFile: false });
     await addSessionMessage(sessionId, "system", RESUME_REFUSED_NOTICE);
     return note;
+}
+
+/**
+ * What follows a Chat turn's end, as the hook ingest does for a terminal
+ * session's `turn.end` (`session-hook-ingest.ts`): the account's turn is
+ * counted, then the queue's next message goes, or the goal is judged. Loaded
+ * when used: the queue reaches back into the runtime that holds these drivers.
+ */
+async function afterTurnEnd(sessionId: string): Promise<void> {
+    const [{ noteTurnFinished }, { deliverNextQueued }, { judgeSessionGoal }] = await Promise.all([
+        import("../account-rotation"),
+        import("../session-prompt-queue"),
+        import("../session-goal")
+    ]);
+    await noteTurnFinished(sessionId);
+    if (!(await deliverNextQueued(sessionId))) await judgeSessionGoal(sessionId);
 }
 
 const deps: DriverDeps = {
@@ -69,6 +86,20 @@ const deps: DriverDeps = {
         await noteChatConversation(sessionId, vendorSessionId);
     },
     permission: (sessionId) => sessionPermissionHandler(sessionId),
+    async ask(sessionId, request, signal) {
+        const id = await openPermissionRequest(sessionId, {
+            tool: request.tool,
+            detail: request.detail,
+            suggestions: null,
+            input: request.input as Prisma.InputJsonValue,
+            carriesReason: request.carriesReason
+        });
+        return awaitPermission(id, sessionId, ASK_WAIT_MS, signal);
+    },
+    async signal(sessionId, signal) {
+        await runInSession(sessionId, acpSignalCommand(signal));
+    },
+    turnEnded: afterTurnEnd,
     touch: touchSession,
     drafts: sessionDrafts,
     log(message, error) {
@@ -104,6 +135,7 @@ const codexDeps: CodexDriverDeps = {
         const id = await openPermissionRequest(sessionId, { ...prompt, suggestions: null });
         return (await awaitPermission(id, sessionId, undefined, signal)).status;
     },
+    turnEnded: afterTurnEnd,
     touch: touchSession,
     drafts: sessionDrafts,
     log: deps.log
