@@ -135,3 +135,54 @@ describe("key log tree", () => {
         expect(await log.verifyHead(head, new Uint8Array(32).fill(9))).toBe(false);
     });
 });
+
+describe("key log hand-over", () => {
+    const pairs = async (count: number) =>
+        Promise.all(
+            Array.from({ length: count }, async () => {
+                const pair = (await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"])) as CryptoKeyPair;
+                return { pair, publicKey: new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey)) };
+            })
+        );
+    const at = (treeSize: number) => ({ treeSize, timestamp: 1_790_000_000_000 + treeSize, rootHash: new Uint8Array(32).fill(treeSize) });
+    async function handover(from: { pair: CryptoKeyPair; publicKey: Uint8Array }, to: Uint8Array, treeSize: number): Promise<log.KeyHandover> {
+        const unsigned = { fromKey: from.publicKey, toKey: to, head: at(treeSize) };
+        const message = log.handoverMessage(unsigned) as Uint8Array<ArrayBuffer>;
+        return { ...unsigned, signature: new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, from.pair.privateKey, message)) };
+    }
+
+    it("follows a chain of signed hand-overs from the pinned key to the current one", async () => {
+        const [a, b, c] = await pairs(3);
+        const chain = [await handover(a!, b!.publicKey, 4), await handover(b!, c!.publicKey, 9)];
+        const followed = await log.followHandovers(a!.publicKey, c!.publicKey, chain);
+        expect(followed.kind).toBe("linked");
+        expect(followed.kind !== "broken" && followed.links.map((l) => l.head.treeSize)).toEqual([4, 9]);
+        // Links before the pinned key are history this browser never needed.
+        expect((await log.followHandovers(b!.publicKey, c!.publicKey, chain)).kind).toBe("linked");
+    });
+
+    it("refuses a forged, altered or incomplete chain", async () => {
+        const [a, b, c, mallory] = await pairs(4);
+        const good = await handover(a!, b!.publicKey, 4);
+        expect((await log.followHandovers(a!.publicKey, c!.publicKey, [good])).kind).toBe("broken");
+        expect((await log.followHandovers(a!.publicKey, b!.publicKey, [await handover(mallory!, b!.publicKey, 4)])).kind).toBe("broken");
+        const forged = { ...(await handover(mallory!, b!.publicKey, 4)), fromKey: a!.publicKey };
+        expect((await log.followHandovers(a!.publicKey, b!.publicKey, [forged])).kind).toBe("broken");
+        expect((await log.followHandovers(a!.publicKey, b!.publicKey, [{ ...good, head: at(5) }])).kind).toBe("broken");
+        expect((await log.followHandovers(a!.publicKey, b!.publicKey, [{ ...good, toKey: c!.publicKey }])).kind).toBe("broken");
+        expect((await log.followHandovers(a!.publicKey, b!.publicKey, [])).kind).toBe("broken");
+    });
+
+    it("tells a replacement the old key never signed apart, and never calls it linked", async () => {
+        const [a, b, c] = await pairs(3);
+        const reset: log.KeyHandover = { fromKey: a!.publicKey, toKey: b!.publicKey, head: at(4), signature: null };
+        const followed = await log.followHandovers(a!.publicKey, c!.publicKey, [reset, await handover(b!, c!.publicKey, 9)]);
+        expect(followed.kind).toBe("reset");
+        expect((await log.verifyHandover(reset))).toBe(false);
+    });
+
+    it("is the same key with no chain at all", async () => {
+        const [a] = await pairs(1);
+        expect((await log.followHandovers(a!.publicKey, a!.publicKey, [])).kind).toBe("linked");
+    });
+});

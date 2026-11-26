@@ -260,3 +260,74 @@ export async function verifyConsistency(
     }
     return same(fr, firstRoot) && same(sr, secondRoot) && sn === 0;
 }
+
+const HANDOVER_LABEL = "polaris/chat-e2ee/key-log/v1/handover";
+
+/**
+ * One change of the log's signing key: the old key signs the new one together
+ * with the head the log had when it changed, so a browser that pinned the old
+ * key can move to the new one on the old key's word alone (the way a CT log's
+ * operator would announce a key rollover, here made checkable). `signature`
+ * is null when the old key was gone - the server could no longer read it -
+ * and the change is only the server's claim: a reset, never followed silently.
+ */
+export interface KeyHandover {
+    /** Raw Ed25519 public keys, 32 bytes each. */
+    readonly fromKey: Uint8Array;
+    readonly toKey: Uint8Array;
+    readonly head: Pick<TreeHead, "treeSize" | "timestamp" | "rootHash">;
+    readonly signature: Uint8Array | null;
+}
+
+/** What a hand-over's signature covers: both keys and the head at the change. */
+export function handoverMessage(handover: Pick<KeyHandover, "fromKey" | "toKey" | "head">): Uint8Array {
+    const { head } = handover;
+    if (!Number.isSafeInteger(head.timestamp) || head.timestamp < 0) throw new RangeError("A head's timestamp is a whole number of ms");
+    return canonical(HANDOVER_LABEL, handover.fromKey, handover.toKey, head.treeSize, String(head.timestamp), head.rootHash);
+}
+
+/** Whether `handover` carries a valid signature by its own `fromKey`; false for a reset. */
+export async function verifyHandover(handover: KeyHandover): Promise<boolean> {
+    const { fromKey, toKey, head, signature } = handover;
+    if (!signature || fromKey.length !== 32 || toKey.length !== 32 || signature.length !== 64 || head.rootHash.length !== HASH_BYTES) return false;
+    try {
+        const key = await crypto.subtle.importKey("raw", owned(fromKey), { name: "Ed25519" }, false, ["verify"]);
+        return await crypto.subtle.verify({ name: "Ed25519" }, key, owned(signature), owned(handoverMessage(handover)));
+    } catch {
+        return false;
+    }
+}
+
+export type HandoverChain =
+    /** Every step signed by the key before it. `links` are the steps taken, oldest first. */
+    | { readonly kind: "linked"; readonly links: ReadonlyArray<KeyHandover> }
+    /** It reaches the current key, but at least one step was a reset the old key never signed. */
+    | { readonly kind: "reset"; readonly links: ReadonlyArray<KeyHandover> }
+    /** It does not reach the current key from the pinned one, or a signature does not hold. */
+    | { readonly kind: "broken" };
+
+/**
+ * Walks `chain` (oldest first, as the server lists it) from the key this
+ * browser pinned to the key the log signs with now. Steps before the pinned
+ * key are skipped; from it on, each step must start at the key the one before
+ * ended on and carry that key's signature (or none at all: a reset). The
+ * heads of the steps taken are returned so the caller can check each one is a
+ * prefix of the current tree - a hand-over to a forked log is still a fork.
+ */
+export async function followHandovers(pinned: Uint8Array, current: Uint8Array, chain: ReadonlyArray<KeyHandover>): Promise<HandoverChain> {
+    if (same(pinned, current)) return { kind: "linked", links: [] };
+    const start = chain.findIndex((link) => same(link.fromKey, pinned));
+    if (start < 0) return { kind: "broken" };
+    let key = pinned;
+    let reset = false;
+    const links: KeyHandover[] = [];
+    for (const link of chain.slice(start)) {
+        if (!same(link.fromKey, key)) return { kind: "broken" };
+        if (link.signature === null) reset = true;
+        else if (!(await verifyHandover(link))) return { kind: "broken" };
+        links.push(link);
+        key = link.toKey;
+    }
+    if (!same(key, current)) return { kind: "broken" };
+    return reset ? { kind: "reset", links } : { kind: "linked", links };
+}
