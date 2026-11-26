@@ -2,7 +2,7 @@
  * Sealed chat in a real browser: the chat's sealed-chat module, bundled as the
  * dashboard ships it, with the WebAssembly MLS binding and IndexedDB, in
  * headless Chromium, against the real delivery route (over the in-memory
- * tables). Two accounts in one conversation send and open each other's
+ * tables, and the account key log as `FakeKeyLog` answers it). Two accounts in one conversation send and open each other's
  * messages; both pages are closed and reopened, and the new pages open every
  * message again from what the browser kept and still send.
  *
@@ -16,6 +16,7 @@ import { readFile } from "node:fs/promises";
 import { join, normalize, sep } from "node:path";
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { FakeKeyLog } from "./support/fake-key-log";
 
 type Row = Record<string, unknown>;
 
@@ -71,15 +72,19 @@ describe.skipIf(!runnable)("sealed chat in headless Chromium", () => {
     let base = "";
     let browser: import("playwright").Browser;
     const keys = new Map<string, number[]>();
+    // The log a device asks before it seals a history key to a key the server handed out.
+    let keyLog: FakeKeyLog;
 
     beforeAll(async () => {
         process.env.POLARIS_INTERNAL_CHAT_E2EE = "1";
         state.members = new Set([`${ALICE}:${CHANNEL}`, `${BOB}:${CHANNEL}`]);
         const accountKeys = await import("@polaris/chat-crypto/account-key");
+        keyLog = await FakeKeyLog.create();
         for (const userId of [ALICE, BOB]) {
             const ak = accountKeys.generateAccountKey();
             const { signPublicKey, hpkePublicKey } = await accountKeys.accountPublicKeys(ak);
             (state.tables.chatAccountKey ??= []).push({ userId, akVersion: 1, signPublicKey: Buffer.from(signPublicKey), hpkePublicKey: Buffer.from(hpkePublicKey) });
+            await keyLog.append({ userId, akVersion: 1, signPublicKey, hpkePublicKey });
             keys.set(userId, [...ak]);
         }
         const { build } = await import("esbuild");
@@ -114,11 +119,18 @@ describe.skipIf(!runnable)("sealed chat in headless Chromium", () => {
                     const type = file.endsWith(".wasm") ? "application/wasm" : file.endsWith(".js") ? "text/javascript" : "application/json";
                     return void res.writeHead(200, { "content-type": type }).end(await readFile(file));
                 }
-                if (url.pathname === "/api/e2ee/mls" && req.method === "POST") {
+                const user = /(?:^|; )who=([^;]+)/.exec(req.headers.cookie ?? "")?.[1];
+                const body = async () => {
                     const chunks: Buffer[] = [];
                     for await (const chunk of req) chunks.push(chunk as Buffer);
-                    const user = /(?:^|; )who=([^;]+)/.exec(req.headers.cookie ?? "")?.[1];
-                    const request = new Request(`${base}/api/e2ee/mls`, { method: "POST", headers: { "content-type": String(req.headers["content-type"]) }, body: Buffer.concat(chunks) });
+                    return Buffer.concat(chunks);
+                };
+                if (url.pathname === "/api/e2ee/key-log" && req.method === "POST") {
+                    const answer = await keyLog.answer(user ?? "", JSON.parse((await body()).toString("utf8")));
+                    return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
+                }
+                if (url.pathname === "/api/e2ee/mls" && req.method === "POST") {
+                    const request = new Request(`${base}/api/e2ee/mls`, { method: "POST", headers: { "content-type": String(req.headers["content-type"]) }, body: await body() });
                     const response = await who.run(user ?? "", () => handleMls(request));
                     return void res.writeHead(response.status, { "content-type": "application/json" }).end(Buffer.from(await response.arrayBuffer()));
                 }
