@@ -25,7 +25,8 @@ vi.mock("@/app/(app)/account/privacy/actions", () => ({
 vi.mock("@/app/(app)/chat/actions", () => ({
     messageRequestCountAction: async () => ({ count: 0 }),
     voicePresenceAction: async () => ({ inRoom: {} }),
-    searchPeopleAction: async () => ({ people: [] })
+    searchPeopleAction: async () => ({ people: [] }),
+    conversationsElsewhereAction: async () => ({ chats: [] })
 }));
 
 const refresh = vi.fn();

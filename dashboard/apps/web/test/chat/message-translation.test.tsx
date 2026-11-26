@@ -150,7 +150,7 @@ describe("Translate on a message", () => {
         render(<Row />, { wrapper: MessagesWrapper });
 
         await user.click(screen.getByRole("button", { name: "Translate" }));
-        expect(translate).toHaveBeenCalledWith("Hola a todos", "en");
+        expect(translate).toHaveBeenCalledWith("Hola a todos", "en", { deviceOnly: false });
         expect(await screen.findByText("Hello everyone")).toBeDefined();
         expect(screen.queryByText("Hola a todos")).toBeNull();
         expect(screen.getByText("Translated from Spanish")).toBeDefined();

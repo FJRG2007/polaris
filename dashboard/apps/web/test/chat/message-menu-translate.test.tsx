@@ -107,7 +107,7 @@ describe("Translate in the message menu", () => {
         menu();
         await open();
         await userEvent.click(await screen.findByText("Translate"));
-        expect(translate).toHaveBeenCalledWith("Bonjour", "en");
+        expect(translate).toHaveBeenCalledWith("Bonjour", "en", { deviceOnly: false });
 
         await open();
         await waitFor(() => expect(screen.getByText("Show original")).toBeTruthy());
