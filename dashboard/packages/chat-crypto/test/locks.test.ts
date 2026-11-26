@@ -251,9 +251,12 @@ describe("hybrid envelope (X-Wing HPKE)", () => {
 describe("pitfalls this phase answers (design 11.1)", () => {
     it("item 12: no Math.random anywhere in the package", async () => {
         const dir = join(__dirname, "..", "src");
-        for (const name of await readdir(dir)) {
-            const source = await readFile(join(dir, name), "utf8");
-            expect(source, name).not.toMatch(/Math\.random/);
+        const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+        const files = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".ts"));
+        expect(files.length).toBeGreaterThan(0);
+        for (const file of files) {
+            const source = await readFile(join(file.parentPath, file.name), "utf8");
+            expect(source, file.name).not.toMatch(/Math\.random/);
         }
     });
 
