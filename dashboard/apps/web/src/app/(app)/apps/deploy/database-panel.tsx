@@ -11,6 +11,7 @@
  */
 
 import * as core from "@polaris/core";
+import { SIDE_PANEL } from "./side-panel";
 import { CopyRow } from "./deploy-view";
 import { LikelyCause } from "./likely-cause";
 import * as actions from "./database-actions";
@@ -198,7 +199,8 @@ export function DatabaseManageDialog({
             <DialogContent
                 data-service-panel=""
                 className={cn(
-                    "right-0 left-auto top-0 flex bg-background h-full max-h-none translate-x-0 translate-y-0 flex-col gap-4 overflow-y-auto overscroll-contain rounded-none rounded-l-xl border-y-0 border-r-0 data-[state=open]:slide-in-from-right-4",
+                    SIDE_PANEL,
+                    "gap-4 overflow-y-auto overscroll-contain",
                     full
                         ? "w-full max-w-none"
                         : "w-full max-w-none sm:w-[920px] sm:max-w-[calc(100vw-2rem)]"
