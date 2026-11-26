@@ -61,6 +61,10 @@ const ENVELOPES_PER_PUT = 100;
 const MEMBER_PAGES = 100;
 /** How often one run asks whether a conversation's migrated history still has members to be sealed to. */
 const LEGACY_SHARE_MS = 10 * 60 * 1000;
+/** Pages of server-sealed epochs `shareLegacyKey` passes on per turn. */
+const GAP_PAGES = 4;
+/** A member missing a server-sealed key, as `legacy-key-gaps` names them. */
+type KeyGap = { userId: string; hpkePublicKey: string };
 /** Accounts per `roster` request. */
 const ROSTER_PAGE = 1_000;
 /**
@@ -992,37 +996,55 @@ export class MlsDevice {
     }
 
     /**
-     * Pass the conversation's migrated history on (`legacy-migration.ts`): the
-     * server sealed its key to the members who had an account key at the time
-     * and then forgot it, so a member whose account key came later has nothing
-     * to open that history with until a member who holds it seals it to them.
-     * The server lists who is still missing it, and only to a holder. Best
-     * effort and at most every `LEGACY_SHARE_MS` per conversation: the next
-     * send tries again.
+     * Pass on the keys the server sealed and then forgot: the conversation's
+     * migrated history (`legacy-migration.ts`) and each sweep of its clear
+     * reactions and votes (`annotation-sweep.ts`). The server sealed each to the
+     * members who had an account key at the time, so a member whose account key
+     * came later has nothing to open that history, or those reactions and votes,
+     * with until a member who holds the key seals it to them. The server lists
+     * who is still missing which, a page of epochs at a time and only to a
+     * holder. Best effort, at most `GAP_PAGES` pages and every `LEGACY_SHARE_MS`
+     * per conversation: the next send goes on. Envelopes already there are
+     * kept, so sealing one twice changes nothing.
      */
     async shareLegacyKey(channelId: string, now = Date.now()): Promise<number> {
         const last = this.legacyShared.get(channelId);
         if (last !== undefined && now - last < LEGACY_SHARE_MS) return 0;
         this.legacyShared.set(channelId, now);
+        let shared = 0;
         try {
-            const answer = await this.send({ op: "legacy-key-gaps", channelId });
-            const gaps = (answer.accountKeys ?? []) as { userId: string; hpkePublicKey: string }[];
-            const others = gaps.filter((gap) => gap.userId !== this.options.userId);
-            if (!others.length) return 0;
-            const key = await this.historyKey(channelId, LEGACY_EPOCH);
-            if (!key) return 0;
-            const envelopes: { recipient: string; envelope: string }[] = [];
-            for (const gap of others) {
-                const binding = { recipient: gap.userId, conversationId: channelId, epoch: LEGACY_EPOCH };
-                envelopes.push({ recipient: gap.userId, envelope: toText(await content.sealHistoryKey(fromText(gap.hpkePublicKey), key, binding)) });
+            let upTo: string | undefined;
+            for (let page = 0; page < GAP_PAGES; page++) {
+                const answer = await this.send({ op: "legacy-key-gaps", channelId, ...(upTo === undefined ? {} : { upTo }) });
+                // An older server answers the migrated history's gaps alone.
+                const epochs = Array.isArray(answer.epochs)
+                    ? (answer.epochs as { epoch: string; accountKeys: KeyGap[] }[])
+                    : [{ epoch: LEGACY_EPOCH.toString(), accountKeys: (answer.accountKeys ?? []) as KeyGap[] }];
+                for (const entry of epochs) shared += await this.sealKeyGaps(channelId, BigInt(entry.epoch), entry.accountKeys);
+                if (typeof answer.next !== "string" || answer.next === upTo) break;
+                upTo = answer.next;
             }
-            for (let at = 0; at < envelopes.length; at += ENVELOPES_PER_PUT)
-                await this.send({ op: "put-history-keys", channelId, epoch: LEGACY_EPOCH.toString(), envelopes: envelopes.slice(at, at + ENVELOPES_PER_PUT) });
-            return envelopes.length;
+            return shared;
         } catch (caught) {
             console.warn("polaris: a conversation's migrated history could not be passed on:", caught);
-            return 0;
+            return shared;
         }
+    }
+
+    /** Seal the key of one server-sealed epoch to the members missing it; 0 when this device cannot open it. */
+    private async sealKeyGaps(channelId: string, epoch: bigint, gaps: readonly KeyGap[]): Promise<number> {
+        const others = gaps.filter((gap) => gap.userId !== this.options.userId);
+        if (!others.length) return 0;
+        const key = await this.historyKey(channelId, epoch);
+        if (!key) return 0;
+        const envelopes: { recipient: string; envelope: string }[] = [];
+        for (const gap of others) {
+            const binding = { recipient: gap.userId, conversationId: channelId, epoch };
+            envelopes.push({ recipient: gap.userId, envelope: toText(await content.sealHistoryKey(fromText(gap.hpkePublicKey), key, binding)) });
+        }
+        for (let at = 0; at < envelopes.length; at += ENVELOPES_PER_PUT)
+            await this.send({ op: "put-history-keys", channelId, epoch: epoch.toString(), envelopes: envelopes.slice(at, at + ENVELOPES_PER_PUT) });
+        return envelopes.length;
     }
 
     /** Drop the member's copy of a group, if it holds one. */

@@ -1035,4 +1035,30 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         const daveFirst = await open(DAVE, "dave-desk-1", new MemoryStore(), new Map(), through(DAVE), daveKey);
         expect(await daveFirst.historyKey(CHANNEL, 1n)).toEqual(epochOne);
     });
+
+    it("names who is missing each key the server sealed and forgot, to a holder only, a page of epochs at a time", async () => {
+        const { LEGACY_EPOCH, SWEEP_EPOCH_TOP } = await import("@/lib/chat/e2ee/mls-history-keys");
+        const hold = (recipient: string, epoch: bigint) => (state.tables.chatHistoryKey ??= []).push({ channelId: CHANNEL, epoch, recipient, envelope: Buffer.alloc(8, 1) });
+        (state.tables.chatAccountKey ??= []).push({ userId: BOB, akVersion: 1, signPublicKey: Buffer.alloc(32, 2), hpkePublicKey: Buffer.alloc(32, 3) });
+        hold(ALICE, LEGACY_EPOCH);
+        // Ten sweeps Alice holds; Bob came after all but the last, which he already holds; an MLS epoch is not the server's.
+        for (let at = 0n; at < 10n; at++) hold(ALICE, SWEEP_EPOCH_TOP - at);
+        hold(BOB, SWEEP_EPOCH_TOP - 9n);
+        hold(ALICE, 3n);
+        const first = await call({ op: "legacy-key-gaps", channelId: CHANNEL });
+        expect(first.status).toBe(200);
+        const named = (body: Record<string, unknown>) => (body.epochs as { epoch: string; accountKeys: { userId: string }[] }[]).map((entry) => [entry.epoch, entry.accountKeys.map((k) => k.userId)]);
+        expect(named(first.body)).toEqual([[LEGACY_EPOCH.toString(), [BOB]], ...Array.from({ length: 7 }, (_, at) => [(SWEEP_EPOCH_TOP - BigInt(at)).toString(), [BOB]])]);
+        // What an older browser reads: the migrated history's gaps alone.
+        expect((first.body.accountKeys as { userId: string }[]).map((k) => k.userId)).toEqual([BOB]);
+        expect(first.body.next).toBe((SWEEP_EPOCH_TOP - 7n).toString());
+        const second = await call({ op: "legacy-key-gaps", channelId: CHANNEL, upTo: first.body.next });
+        expect(named(second.body)).toEqual([[(SWEEP_EPOCH_TOP - 7n).toString(), [BOB]], [(SWEEP_EPOCH_TOP - 8n).toString(), [BOB]]]);
+        expect(second.body.accountKeys).toEqual([]);
+        expect(second.body.next).toBeNull();
+        // Somebody in the conversation holding none of those keys learns nothing at all.
+        state.members.add(`${EVE}:${CHANNEL}`);
+        expect((await call({ op: "legacy-key-gaps", channelId: CHANNEL }, EVE)).body).toEqual({ accountKeys: [], epochs: [], next: null });
+        expect((await call({ op: "legacy-key-gaps", channelId: CHANNEL, upTo: "x" })).status).toBe(400);
+    });
 });

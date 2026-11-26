@@ -162,11 +162,27 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
             });
         }
         case "legacy-key-gaps": {
-            // Only a member who holds the migrated history's key can pass it on; anybody else learns nothing.
-            if (!(await delivery.holdsHistoryKey(body.channelId, LEGACY_EPOCH, userId))) return json({ accountKeys: [] });
+            // Only a member who holds a key the server sealed and forgot can pass it on; anybody else learns nothing.
+            // A page of such epochs, highest (the migration's) first, sharing one budget of gaps: an epoch the budget
+            // cut short is answered again from `next`, by when the caller has sealed to the ones it was given.
+            const epochs = await delivery.serverSealedEpochs(body.channelId, userId, body.upTo === undefined ? undefined : BigInt(body.upTo));
+            if (!epochs.length) return json({ accountKeys: [], epochs: [], next: null });
             const audience = ((await conversationAudience({ id: userId }, body.channelId)) ?? []).filter((id) => id !== userId).sort();
-            const gaps = await delivery.legacyKeyGaps(body.channelId, LEGACY_EPOCH, audience);
-            return json({ accountKeys: gaps.map((k) => ({ userId: k.userId, hpkePublicKey: text(k.hpkePublicKey) })) });
+            const answered: { epoch: string; accountKeys: { userId: string; hpkePublicKey: string }[] }[] = [];
+            let budget = delivery.MAX_CLAIM_USERS;
+            let next: string | null = epochs.length === delivery.GAP_EPOCHS && epochs[epochs.length - 1]! > 0n ? (epochs[epochs.length - 1]! - 1n).toString() : null;
+            for (const epoch of epochs) {
+                const gaps = await delivery.legacyKeyGaps(body.channelId, epoch, audience, budget);
+                if (gaps.length) answered.push({ epoch: epoch.toString(), accountKeys: gaps.map((k) => ({ userId: k.userId, hpkePublicKey: text(k.hpkePublicKey) })) });
+                budget -= gaps.length;
+                if (budget <= 0) {
+                    next = epoch.toString();
+                    break;
+                }
+            }
+            // `accountKeys`: the migrated history's gaps alone, what older callers read.
+            const legacy = answered.find((entry) => entry.epoch === LEGACY_EPOCH.toString());
+            return json({ accountKeys: legacy?.accountKeys ?? [], epochs: answered, next });
         }
         case "roster": {
             // The people on the conversation's list reach it; anybody else named (a member the

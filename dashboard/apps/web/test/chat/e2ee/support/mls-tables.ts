@@ -22,15 +22,30 @@ export function memoryPrisma(state: MemoryTablesState) {
             if (key === "AND") return (want as Row[]).every((w) => matches(row, w));
             if (key === "userId_device" || key === "channelId_service") return matches(row, want as Row);
             if (want && typeof want === "object" && !(want instanceof Uint8Array)) {
-                const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint; not?: unknown };
+                const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint; lte?: bigint; not?: unknown };
                 if (cond.in) return cond.in.some((value) => same(row[key], value));
                 if ("not" in cond) return !same(row[key] ?? null, cond.not);
-                if (cond.gt !== undefined) return (row[key] as bigint) > cond.gt;
-                if (cond.gte !== undefined) return (row[key] as bigint) >= cond.gte;
-                if (cond.lt !== undefined) return (row[key] as bigint) < cond.lt;
+                const value = row[key] as bigint;
+                if (cond.gt !== undefined || cond.gte !== undefined || cond.lt !== undefined || cond.lte !== undefined)
+                    return (
+                        (cond.gt === undefined || value > cond.gt) &&
+                        (cond.gte === undefined || value >= cond.gte) &&
+                        (cond.lt === undefined || value < cond.lt) &&
+                        (cond.lte === undefined || value <= cond.lte)
+                    );
             }
             return same(row[key] ?? null, want);
         });
+    // A single-column numeric `orderBy` is honoured; anything else keeps the rows in the order they were written.
+    const ordered = (found: Row[], orderBy: unknown): Row[] => {
+        const entries = orderBy && typeof orderBy === "object" && !Array.isArray(orderBy) ? Object.entries(orderBy as Row) : [];
+        if (entries.length !== 1) return found;
+        const [column, direction] = entries[0]!;
+        const numeric = (value: unknown) => typeof value === "bigint" || typeof value === "number";
+        if (!found.every((r) => numeric(r[column]))) return found;
+        const sign = direction === "desc" ? -1 : 1;
+        return [...found].sort((a, b) => ((a[column] as bigint) < (b[column] as bigint) ? -sign : (a[column] as bigint) > (b[column] as bigint) ? sign : 0));
+    };
     const table = (name: string, keys: string[]) => {
         const rows = () => (state.tables[name] ??= []);
         const unique = (data: Row) => {
@@ -45,10 +60,8 @@ export function memoryPrisma(state: MemoryTablesState) {
         return {
             findUnique: async ({ where }: { where: Row }) => rows().find((r) => matches(r, where)) ?? null,
             findFirst: async ({ where }: { where: Row }) => rows().find((r) => matches(r, where)) ?? null,
-            findMany: async ({ where, take }: { where: Row; take?: number }) =>
-                rows()
-                    .filter((r) => matches(r, where))
-                    .slice(0, take ?? Infinity),
+            findMany: async ({ where, take, orderBy }: { where: Row; take?: number; orderBy?: unknown }) =>
+                ordered(rows().filter((r) => matches(r, where)), orderBy).slice(0, take ?? Infinity),
             count: async ({ where }: { where: Row }) => rows().filter((r) => matches(r, where)).length,
             create: async ({ data }: { data: Row }) => {
                 unique(data);

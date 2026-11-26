@@ -86,6 +86,7 @@ import { legacyKeyGaps } from "@/lib/chat/e2ee/mls-delivery";
 import * as content from "@polaris/chat-crypto/message-content";
 import { accountHpkeKeyPair, accountPublicKeys, generateAccountKey } from "@polaris/chat-crypto/account-key";
 import { LEGACY_EPOCH, MIGRATION_DEVICE, migrateAgain, purgeRollbackCopies, rollBackConversation } from "@/lib/chat/e2ee/legacy-migration";
+import { SWEEP_EPOCH_TOP } from "@/lib/chat/e2ee/mls-history-keys";
 
 const CHANNEL = "0192f000-0000-7000-8000-000000000001";
 const NOW = new Date("2026-11-25T12:00:00Z");
@@ -171,6 +172,10 @@ describe("purging the plain copies", () => {
     });
 });
 
+// The device's own helper, so a stand-in `this` seals the way a device does.
+const sealKeyGaps = (MlsDevice.prototype as unknown as { sealKeyGaps: unknown }).sealKeyGaps;
+const share = (MlsDevice.prototype as unknown as { shareLegacyKey: (c: string, now: number) => Promise<number> }).shareLegacyKey;
+
 describe("passing the migrated history on", () => {
     it("lists members with an account key and no envelope, only up to the limit", async () => {
         db.historyKeys.push({ channelId: CHANNEL, epoch: LEGACY_EPOCH, recipient: "u1" });
@@ -189,13 +194,13 @@ describe("passing the migrated history on", () => {
         const device = {
             legacyShared: new Map<string, number>(),
             options: { userId: "u1" },
+            sealKeyGaps,
             historyKey: vi.fn(async () => historyKey),
             send: vi.fn(async (body: Record<string, unknown>) => {
                 sent.push(body);
                 return body.op === "legacy-key-gaps" ? { accountKeys: [{ userId: "u1", hpkePublicKey: "x" }, { userId: "u2", hpkePublicKey: b64(late.publicKey) }] } : { ok: true };
             })
         };
-        const share = (MlsDevice.prototype as unknown as { shareLegacyKey: (c: string, now: number) => Promise<number> }).shareLegacyKey;
         await expect(share.call(device, CHANNEL, 1000)).resolves.toBe(1);
         const put = sent.find((b) => b.op === "put-history-keys") as { epoch: string; envelopes: { recipient: string; envelope: string }[] };
         expect(put.epoch).toBe(LEGACY_EPOCH.toString());
@@ -207,9 +212,55 @@ describe("passing the migrated history on", () => {
     });
 
     it("asks for no key and seals nothing when nobody is missing it", async () => {
-        const device = { legacyShared: new Map(), options: { userId: "u1" }, historyKey: vi.fn(), send: vi.fn(async () => ({ accountKeys: [] })) };
-        const share = (MlsDevice.prototype as unknown as { shareLegacyKey: (c: string, now: number) => Promise<number> }).shareLegacyKey;
+        const device = { legacyShared: new Map(), options: { userId: "u1" }, sealKeyGaps, historyKey: vi.fn(), send: vi.fn(async () => ({ accountKeys: [] })) };
         await expect(share.call(device, CHANNEL, 0)).resolves.toBe(0);
         expect(device.historyKey).not.toHaveBeenCalled();
+    });
+});
+
+describe("passing each sweep's key on", () => {
+    it("seals every server-sealed epoch it is named, page after page, each under its own epoch, and only keys it holds", async () => {
+        const lateKey = generateAccountKey();
+        const late = { publicKey: (await accountPublicKeys(lateKey)).hpkePublicKey, privateKey: (await accountHpkeKeyPair(lateKey)).privateKey };
+        const keys = new Map<bigint, Uint8Array>([[SWEEP_EPOCH_TOP, content.newHistoryKey()], [SWEEP_EPOCH_TOP - 8n, content.newHistoryKey()]]);
+        const sent: Record<string, unknown>[] = [];
+        const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64url");
+        const gap = [{ userId: "u2", hpkePublicKey: b64(late.publicKey) }];
+        const pages: Record<string, unknown>[] = [
+            // A key this device has no copy of (TOP - 1) is skipped: nothing is sealed for it.
+            { accountKeys: [], epochs: [{ epoch: SWEEP_EPOCH_TOP.toString(), accountKeys: gap }, { epoch: (SWEEP_EPOCH_TOP - 1n).toString(), accountKeys: gap }], next: (SWEEP_EPOCH_TOP - 7n).toString() },
+            { accountKeys: [], epochs: [{ epoch: (SWEEP_EPOCH_TOP - 8n).toString(), accountKeys: gap }], next: null }
+        ];
+        const device = {
+            legacyShared: new Map<string, number>(),
+            options: { userId: "u1" },
+            sealKeyGaps,
+            historyKey: vi.fn(async (_channel: string, epoch: bigint) => keys.get(epoch) ?? null),
+            send: vi.fn(async (body: Record<string, unknown>) => {
+                sent.push(body);
+                return body.op === "legacy-key-gaps" ? pages.shift()! : { ok: true };
+            })
+        };
+        await expect(share.call(device, CHANNEL, 1000)).resolves.toBe(2);
+        const asks = sent.filter((b) => b.op === "legacy-key-gaps");
+        expect(asks.map((b) => b.upTo)).toEqual([undefined, (SWEEP_EPOCH_TOP - 7n).toString()]);
+        const puts = sent.filter((b) => b.op === "put-history-keys") as { epoch: string; envelopes: { recipient: string; envelope: string }[] }[];
+        expect(puts.map((p) => p.epoch)).toEqual([SWEEP_EPOCH_TOP.toString(), (SWEEP_EPOCH_TOP - 8n).toString()]);
+        for (const put of puts) {
+            const epoch = BigInt(put.epoch);
+            const opened = await content.openHistoryKey(late.privateKey, new Uint8Array(Buffer.from(put.envelopes[0]!.envelope, "base64url")), { recipient: "u2", conversationId: CHANNEL, epoch });
+            expect(opened).toEqual(keys.get(epoch));
+        }
+    });
+
+    it("stops at a page that answers the cursor it was asked with, and after four pages", async () => {
+        const again = { accountKeys: [], epochs: [], next: "5" };
+        const device = { legacyShared: new Map(), options: { userId: "u1" }, sealKeyGaps, historyKey: vi.fn(), send: vi.fn(async (body: Record<string, unknown>) => (body.upTo === "5" ? again : { ...again, next: "5" })) };
+        await expect(share.call(device, CHANNEL, 0)).resolves.toBe(0);
+        expect(device.send).toHaveBeenCalledTimes(2);
+        let n = 100;
+        const endless = { legacyShared: new Map(), options: { userId: "u1" }, sealKeyGaps, historyKey: vi.fn(), send: vi.fn(async () => ({ accountKeys: [], epochs: [], next: String(n--) })) };
+        await expect(share.call(endless, CHANNEL, 0)).resolves.toBe(0);
+        expect(endless.send).toHaveBeenCalledTimes(4);
     });
 });

@@ -18,6 +18,7 @@
 import { prisma } from "@polaris/db";
 import { getSetting } from "@/lib/setting-store";
 import { POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID } from "@/lib/chat/service-ids";
+import { SWEEP_EPOCH_FLOOR } from "./mls-history-keys";
 
 export const MAX_KEY_PACKAGES_PER_DEVICE = 100;
 export const MAX_CLAIM_USERS = 100;
@@ -377,6 +378,26 @@ export async function putHistoryKeys(
 export async function holdsHistoryKey(channelId: string, epoch: bigint, recipient: string): Promise<boolean> {
     const row = await prisma.chatHistoryKey.findUnique({ where: { channelId_epoch_recipient: { channelId, epoch, recipient } }, select: { recipient: true } });
     return row !== null;
+}
+
+/** Server-sealed epochs `serverSealedEpochs` answers per call. */
+export const GAP_EPOCHS = 8;
+
+/**
+ * The epochs at or below `upTo` whose history key the server sealed and then
+ * forgot that `recipient` holds an envelope of, highest first, at most
+ * `limit`: the migration's (`LEGACY_EPOCH`) and each annotation sweep's
+ * (`SWEEP_EPOCH_FLOOR` .. `SWEEP_EPOCH_TOP`, which sit right below it). Only a
+ * holder can pass such a key on, since nobody else, the server included, has it.
+ */
+export async function serverSealedEpochs(channelId: string, recipient: string, upTo?: bigint, limit = GAP_EPOCHS): Promise<bigint[]> {
+    const rows = await prisma.chatHistoryKey.findMany({
+        where: { channelId, recipient, epoch: upTo === undefined ? { gte: SWEEP_EPOCH_FLOOR } : { gte: SWEEP_EPOCH_FLOOR, lte: upTo } },
+        orderBy: { epoch: "desc" },
+        select: { epoch: true },
+        take: limit
+    });
+    return rows.map((row) => row.epoch);
 }
 
 /** Audience ids `legacyKeyGaps` checks per round trip. */
