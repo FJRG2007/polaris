@@ -10,12 +10,13 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("electron", () => ({
     app: { on: vi.fn(), dock: { setIcon: vi.fn() } },
     BrowserWindow: { getAllWindows: () => [] },
-    nativeImage: { createFromDataURL: vi.fn(), createFromPath: vi.fn() },
+    nativeImage: { createFromDataURL: vi.fn(), createFromPath: vi.fn(), createFromBuffer: vi.fn() },
+    shell: { readShortcutLink: vi.fn(), writeShortcutLink: vi.fn() },
     Menu: {},
     Tray: vi.fn()
 }));
 
-const { appIconSchema, icoOf, iconFor, markSeasonFor, readStoredReports, reportOf, squirrelAppId, storedReports } = await import("../../src/main/app-icon");
+const { appIconSchema, icoOf, iconFor, markSeasonFor, readStoredReports, reportOf, servedReportOf, squirrelAppId, storedReports } = await import("../../src/main/app-icon");
 const { DEFAULT_SEASON_CALENDAR } = await import("../../../../dashboard/packages/core/src/seasons");
 
 const WINTER_PNG = "data:image/png;base64,V0lOVEVS";
@@ -88,6 +89,34 @@ describe("iconFor", () => {
 
     it("keeps a host's last word when its page goes away", () => {
         expect(reportOf("https://a.example.test", { png: null, host: "x" }, at)).toBeNull();
+    });
+});
+
+describe("the icon a host serves, read by the app (BUG-0049)", () => {
+    const official = reportOf("https://b.example.test", { png: WINTER_PNG, host: "x", calendar: DEFAULT_SEASON_CALENDAR, icons: { winter: WINTER_PNG } }, at)!;
+    const served = servedReportOf("https://a.example.test", undefined, { season: "winter", png: WINTER_PNG }, at)!;
+
+    it("dresses the app for a host whose page never reported", () => {
+        expect(iconFor([served], NOW)).toBe(WINTER_PNG);
+        expect(markSeasonFor([served], GAP)).toBe("winter");
+        // It outranks a page from before calendars, and survives a restart.
+        const old = reportOf("https://c.example.test", { png: OLD_PNG }, at)!;
+        expect(iconFor([old, served], NOW)).toBe(WINTER_PNG);
+        expect(iconFor(readStoredReports(storedReports([served], NOW)), NOW)).toBe(WINTER_PNG);
+    });
+
+    it("never overrules a page that reported its calendar", () => {
+        expect(servedReportOf(official.host, official, { season: "halloween", png: HALLOWEEN_PNG }, at)).toBeNull();
+        const off = reportOf("https://d.example.test", { png: null, host: "x", calendar: null }, at)!;
+        expect(iconFor([off, served], NOW)).toBeNull();
+    });
+
+    it("goes plain again once the host serves the plain icon, and keeps an old page's picture", () => {
+        const cleared = servedReportOf(served.host, served, null, at)!;
+        expect(iconFor([cleared], NOW)).toBeNull();
+        expect(servedReportOf("https://e.example.test", undefined, null, at)).toBeNull();
+        const old = reportOf("https://c.example.test", { png: OLD_PNG }, at)!;
+        expect(servedReportOf(old.host, old, { season: "winter", png: WINTER_PNG }, at)?.legacy).toBe(OLD_PNG);
     });
 });
 

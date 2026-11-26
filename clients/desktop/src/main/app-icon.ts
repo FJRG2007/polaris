@@ -16,6 +16,10 @@
  * dashboard has loaded - which the splash, the address form and a sign-in page
  * never do (BUG-0034). On Windows the settled icon is also written there as an
  * .ico, the file the taskbar button and the notification area read.
+ *
+ * A host whose page never reports - one from before pages did, or a window
+ * left on a sign-in page - is still read: the app asks the host which icon it
+ * serves (`served-icon.ts`) and wears that while no host reports a calendar.
  */
 
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -25,6 +29,8 @@ import { app, BrowserWindow, nativeImage, type NativeImage } from "electron";
 import { appIconSeason, officialSeasonOn } from "../../../../dashboard/packages/core/src/app-icon-season";
 import { SEASONS, type Season, type SeasonCalendar } from "../../../../dashboard/packages/core/src/seasons";
 import { setTrayImage } from "./tray";
+import { syncShortcutIcons } from "./shortcut-icon";
+import { fetchServedIcon } from "./served-icon";
 
 /** A PNG drawn by the page: 256 pixels square. */
 const PNG = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/;
@@ -56,6 +62,9 @@ export interface Report {
     readonly icons: Partial<Record<Season, string>>;
     /** What a page that predates calendars asked for. */
     readonly legacy: string | null;
+    /** The season the host's own icons were found in, when the app read them
+     *  itself rather than a page reporting (`reportServedIcon`). */
+    readonly served?: Season;
     readonly at: number;
 }
 
@@ -72,6 +81,7 @@ const storedSchema = z
                         calendar: calendarSchema.nullable().optional(),
                         icons: z.partialRecord(z.enum(SEASONS), png),
                         legacy: png.nullable(),
+                        served: z.enum(SEASONS).optional(),
                         at: z.number().int().nonnegative()
                     })
                     .strict()
@@ -103,16 +113,25 @@ function fresh(all: readonly Report[], now: Date): Report[] {
         .sort((a, b) => (a.host < b.host ? -1 : a.host > b.host ? 1 : 0));
 }
 
+/** The first host, in the stable order, whose own icons were read in a season. */
+function servedBy(ordered: readonly Report[]): (Report & { readonly served: Season; }) | null {
+    const found = ordered.find((report) => report.served && report.icons[report.served]);
+    return found?.served ? { ...found, served: found.served } : null;
+}
+
 /**
  * The PNG every window wears for these reports on `now`: the settled season's
  * mark from whichever host drew it, or - only while no host reports a calendar
- * - what a page from before that asked for. Null is the shipped icon. Pure.
+ * - the dressed icon a host serves, then what a page from before calendars
+ * asked for. Null is the shipped icon. Pure.
  */
 export function iconFor(all: readonly Report[], now: Date): string | null {
     const ordered = fresh(all, now);
     const season = appIconSeason(ordered, now);
     if (season) return ordered.find((report) => report.icons[season])?.icons[season] ?? null;
     if (ordered.some((report) => report.calendar !== undefined)) return null;
+    const served = servedBy(ordered);
+    if (served) return served.icons[served.served] ?? null;
     return ordered.find((report) => report.legacy)?.legacy ?? null;
 }
 
@@ -124,7 +143,7 @@ export function iconFor(all: readonly Report[], now: Date): string | null {
  */
 export function markSeasonFor(all: readonly Report[], now: Date): Season | null {
     const ordered = fresh(all, now);
-    if (!ordered.some((report) => report.calendar !== undefined)) return officialSeasonOn(now);
+    if (!ordered.some((report) => report.calendar !== undefined)) return servedBy(ordered)?.served ?? officialSeasonOn(now);
     return appIconSeason(ordered, now);
 }
 
@@ -141,13 +160,30 @@ export function reportOf(origin: string, icon: AppIcon, at: number): Report | nu
     return { host: origin, calendar: icon.calendar, icons: icon.icons ?? {}, legacy: null, at };
 }
 
+/**
+ * What the app read of a host's own icons, as the report it stands for; null
+ * where it changes nothing. A host whose page reported a calendar keeps that
+ * report: the page knows its operator's dates, the manifest only today's. A
+ * host serving the plain icon clears what was read of it before. Pure.
+ */
+export function servedReportOf(
+    origin: string,
+    existing: Report | undefined,
+    served: { readonly season: Season; readonly png: string; } | null,
+    at: number
+): Report | null {
+    if (existing && existing.calendar !== undefined) return null;
+    if (!served) return existing?.served ? { ...existing, icons: {}, served: undefined, at } : null;
+    return { host: origin, calendar: undefined, icons: { [served.season]: served.png }, legacy: existing?.legacy ?? null, served: served.season, at };
+}
+
 /** The reports a stored file holds; none for a file that is missing or does not read. Pure. */
 export function readStoredReports(raw: string | null): Report[] {
     if (!raw) return [];
     try {
         const parsed = storedSchema.safeParse(JSON.parse(raw));
         if (!parsed.success) return [];
-        return parsed.data.reports.map((report) => ({ ...report, calendar: report.calendar }));
+        return parsed.data.reports.map((report) => ({ ...report, calendar: report.calendar, served: report.served }));
     } catch {
         return [];
     }
@@ -218,6 +254,30 @@ export function restoreAppIcon(): void {
 export function reportAppIcon(origin: string, icon: AppIcon): void {
     const report = reportOf(origin, icon, Date.now());
     if (report) reports.set(origin, report);
+    watch();
+    settle();
+    persist();
+}
+
+/**
+ * Ask a host which icon it serves and wear it while no page of it reports a
+ * calendar. A host that cannot be reached, or answers with something that is
+ * not its manifest, changes nothing.
+ */
+export async function learnServedIcon(fetcher: (url: string, init: RequestInit) => Promise<Response>, origin: string): Promise<void> {
+    const served = await fetchServedIcon(fetcher, origin);
+    if (served === undefined) return;
+    let png: string | null = null;
+    if (served) {
+        const image = nativeImage.createFromBuffer(served.png);
+        if (image.isEmpty()) return;
+        const dataUrl = image.resize({ width: 256, height: 256, quality: "best" }).toDataURL();
+        if (!appIconSchema.shape.png.safeParse(dataUrl).success) return;
+        png = dataUrl;
+    }
+    const report = servedReportOf(origin, reports.get(origin), served && png ? { season: served.season, png } : null, Date.now());
+    if (!report) return;
+    reports.set(origin, report);
     watch();
     settle();
     persist();
@@ -370,7 +430,12 @@ function setIcons(window: BrowserWindow | null, icon: AppIcon): void {
     }
     if (process.platform === "win32") {
         const key = image ? icon.png! : null;
-        if (!ico || ico.png !== key) ico = { png: key, file: writeTaskbarIcon(image) };
+        if (!ico || ico.png !== key) {
+            ico = { png: key, file: writeTaskbarIcon(image) };
+            // The button of a window that carries the app's id is drawn from the
+            // shortcut that carries it, so the shortcuts wear the season too.
+            syncShortcutIcons(image ? ico.file : null);
+        }
     }
     const file = process.platform === "win32" ? ico?.file ?? null : null;
     if (window && !window.isDestroyed()) {

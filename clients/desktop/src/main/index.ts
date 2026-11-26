@@ -46,7 +46,7 @@ import { CHANNELS, type AddressCheck, type HostStatus, type Outcome } from "@/sh
 import { allowPermission } from "./permissions";
 import * as hostTransfer from "./host-transfer";
 import { handledSquirrelEvent } from "./squirrel";
-import { restoreAppIcon } from "./app-icon";
+import { learnServedIcon, restoreAppIcon } from "./app-icon";
 import { closeOnceShown } from "./window-front";
 import { installScreenShare } from "./screen-share";
 import { installTray } from "./tray";
@@ -465,6 +465,8 @@ function openMain(url: string): void {
             closeConnect();
         }
         if (!offline) {
+            // The icon the Polaris serves, for a page of it that never says (`app-icon.ts`).
+            void learnServedIcon((url, init) => window.webContents.session.fetch(url, init), current);
             // Online on the usual address: learn, or refresh, where else it answers,
             // so the next outage - or a start without internet - can use it.
             if (!alternate) failoverFor(current);

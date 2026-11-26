@@ -58,3 +58,4 @@ Security findings are not kept here; they live in
 | BUG-0046 | An installed game disappears from the launcher while its store updates it | Desktop | Fixed, watching | clients/desktop/src/main/launcher-stores.ts | 2026-11-26 |
 | BUG-0047 | The live preview's "Open in new tab" opens a window that cannot be moved or resized | Desktop | Fixed, watching | clients/desktop/src/main/windows.ts | 2026-11-26 |
 | BUG-0048 | Opening a page from the launcher shows "Application error" and drops the call on screen | Desktop | Fixed, watching | clients/desktop/src/main/page-router.ts | 2026-11-25 |
+| BUG-0049 | Polaris desktop does not show the Christmas icon of the winter season | Desktop | Fixed, watching | clients/desktop/src/main/shortcut-icon.ts | 2026-11-26 |
