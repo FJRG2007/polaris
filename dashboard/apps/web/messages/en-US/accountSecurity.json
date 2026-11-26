@@ -212,6 +212,21 @@
             "stopNamed": "Stop remembering {device}",
             "stopThis": "Stop remembering this device"
         },
+        "sealed": {
+            "title": "Encrypted chat devices",
+            "description": "Each of these can read your encrypted chats. Remove one you no longer use or do not recognize.",
+            "device": "Device {code}",
+            "thisBrowser": "This browser",
+            "added": "Added",
+            "lastUsed": "last used",
+            "empty": "No device reads your encrypted chats now.",
+            "remove": "Remove from encrypted chats",
+            "removeNamed": "Remove device {code} from encrypted chats",
+            "removeTitle": "Remove this device from encrypted chats?",
+            "removeDescription": "Device {code} stops receiving your encrypted chats. If it is still signed in, also end its session above, or it joins again as a new device.",
+            "removeConfirm": "Remove it",
+            "removeFailed": "The device could not be removed. Try again."
+        },
         "app": {
             "title": "Sign out {app} on {name}?",
             "description": "It stops working at its next request and has to be connected again from that device.",

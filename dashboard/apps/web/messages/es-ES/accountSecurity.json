@@ -212,6 +212,21 @@
             "stopNamed": "Dejar de recordar {device}",
             "stopThis": "Dejar de recordar este dispositivo"
         },
+        "sealed": {
+            "title": "Dispositivos del chat cifrado",
+            "description": "Cada uno puede leer tus chats cifrados. Quita el que ya no uses o no reconozcas.",
+            "device": "Dispositivo {code}",
+            "thisBrowser": "Este navegador",
+            "added": "Añadido",
+            "lastUsed": "último uso",
+            "empty": "Ningún dispositivo lee ahora tus chats cifrados.",
+            "remove": "Quitar de los chats cifrados",
+            "removeNamed": "Quitar el dispositivo {code} de los chats cifrados",
+            "removeTitle": "¿Quitar este dispositivo de los chats cifrados?",
+            "removeDescription": "El dispositivo {code} deja de recibir tus chats cifrados. Si sigue con la sesión iniciada, cierra también su sesión arriba o volverá como dispositivo nuevo.",
+            "removeConfirm": "Quitarlo",
+            "removeFailed": "No se ha podido quitar el dispositivo. Inténtalo de nuevo."
+        },
         "app": {
             "title": "¿Cerrar {app} en {name}?",
             "description": "Deja de funcionar en su próxima petición y hay que volver a conectarlo.",

@@ -32,6 +32,8 @@ import {
 } from "@/lib/device-sessions/device-block";
 import { pinDeviceSession, revokeDeviceSession } from "@/lib/device-sessions/sessions";
 import { pinExtensionSession, revokeExtensionSession } from "@/lib/extension/sessions";
+import { retireDevice } from "@/lib/chat/e2ee/mls-delivery";
+import { deviceId as sealedDeviceIdSchema } from "@/lib/chat/e2ee/schemas";
 import {
     decideLoginApproval,
     revokeDeviceSessions,
@@ -154,6 +156,37 @@ export async function forgetTrustedDeviceAction(id: unknown): Promise<{ error?: 
         return refuse("errors.deviceForgotten");
     }
     await recordAudit({ actorId: user.id, action: "account.2fa.trusted-device-revoked" });
+    revalidatePath("/account/sessions");
+    return {};
+}
+
+/**
+ * Take one device out of the account's encrypted chats: its record and key
+ * packages go, and every conversation drops it at the next member's send - the
+ * same as that browser signing out. It does not end the browser's session; a
+ * browser still signed in joins again as a new device (and the account is told),
+ * which is why the card says to end its session too. Gated like every other
+ * move that reaches another device. The screen never offers this browser's own
+ * row; sent anyway, it only costs this browser a fresh registration.
+ */
+export async function removeSealedDeviceAction(device: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const parsed = sealedDeviceIdSchema.safeParse(device);
+    if (!parsed.success) return refuse("errors.unknownDevice");
+    const known = await prisma.mlsDevice.findUnique({
+        where: { userId_device: { userId: user.id, device: parsed.data } },
+        select: { device: true }
+    });
+    if (!known) return refuse("errors.unknownDevice");
+    await retireDevice(user.id, parsed.data);
+    await recordAudit({
+        actorId: user.id,
+        action: "account.chat-device.removed",
+        targetType: "chat-device",
+        targetId: parsed.data
+    });
     revalidatePath("/account/sessions");
     return {};
 }

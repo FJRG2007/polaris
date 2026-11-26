@@ -47,6 +47,19 @@ export function browserDeviceId(userId: string): string {
 }
 
 /**
+ * This browser's device id for the account when it already has one, without
+ * making one: the sessions page marks the row it is open on, and a page that
+ * only reads must not add a device. Null when storage is unreadable.
+ */
+export function existingBrowserDeviceId(userId: string): string | null {
+    try {
+        return localStorage.getItem(DEVICE_NOTE + userId);
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Open (and register) this browser's device for the signed-in account. With
  * `account` (the account key's HPKE pair) it seals and opens history keys for
  * the account too.

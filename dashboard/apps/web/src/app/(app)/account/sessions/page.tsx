@@ -20,6 +20,8 @@ import { listDeviceSessions } from "@/lib/device-sessions/sessions";
 import { listBlockedDevices } from "@/lib/device-sessions/device-block";
 import { listExtensionSessions } from "@/lib/extension/sessions";
 import { listTrustedDeviceRows, listUserSessions } from "@/lib/session-directory";
+import { prisma } from "@polaris/db";
+import { SealedDevicesCard } from "./sealed-devices-card";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +31,7 @@ export default async function SessionsPage() {
     // The apps as well as the browsers. A client is a different credential from a
     // session and was listed only under the vault, so somebody who connected the
     // extension and came here to check found no trace of it.
-    const [sessions, trusted, extensions, clients, terminals, pinLength, blockedDevices] =
+    const [sessions, trusted, extensions, clients, terminals, pinLength, blockedDevices, sealedDevices] =
         await Promise.all([
         listUserSessions(user.id, user.sessionId),
         listTrustedDeviceRows(user.id),
@@ -42,7 +44,17 @@ export default async function SessionsPage() {
         // So approving a sign-in checks the PIN on its last digit.
         getUserSecurity(user.id).then((security) => security.pinLength),
         // The devices this account refused, each with its Unblock.
-        listBlockedDevices(user.id)
+        listBlockedDevices(user.id),
+        // The devices in its encrypted chats, each with its Remove. Bounded: an
+        // account with more than this has a problem the first page already shows.
+        prisma.mlsDevice
+            .findMany({
+                where: { userId: user.id },
+                select: { device: true, createdAt: true, lastSeenAt: true },
+                orderBy: { lastSeenAt: "desc" },
+                take: 100
+            })
+            .catch(() => [])
     ]);
 
     // One browser, one row. A vault client let in under a connection is that
@@ -74,6 +86,16 @@ export default async function SessionsPage() {
                 pinLength={pinLength}
                 blockedDevices={blockedDevices}
             />
+            {sealedDevices.length > 0 ? (
+                <SealedDevicesCard
+                    userId={user.id}
+                    devices={sealedDevices.map((row) => ({
+                        device: row.device,
+                        createdAt: row.createdAt.toISOString(),
+                        lastSeenAt: row.lastSeenAt.toISOString()
+                    }))}
+                />
+            ) : null}
         </div>
     );
 }

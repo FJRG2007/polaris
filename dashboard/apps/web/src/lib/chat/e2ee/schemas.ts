@@ -92,7 +92,7 @@ const mlsBytes = base64Url(1, 1024 * 1024);
 /** The two suites polaris_core::mls speaks: hybrid 0x004F and RFC 9420's 0x0001. */
 const ciphersuite = z.union([z.literal(0x004f), z.literal(0x0001)]);
 /** A device id: what the device made for itself, never an address or a path. */
-const deviceId = z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/);
+export const deviceId = z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/);
 const epoch = z.string().regex(/^\d{1,19}$/);
 const channelId = z.string().uuid();
 /** `${userId}/${device}`, as the delivery service addresses a device. */
