@@ -27,6 +27,15 @@
  */
 export const LEGACY_EPOCH = 9223372036854775807n;
 
+/**
+ * The epochs the server's sweep of clear reactions and votes in sealed
+ * conversations seals under (`annotation-sweep.ts`), one fresh key per run,
+ * counted down from just below `LEGACY_EPOCH`: also above any epoch a group
+ * reaches, and never the legacy one, whose key the server no longer has.
+ */
+export const SWEEP_EPOCH_TOP = LEGACY_EPOCH - 1n;
+export const SWEEP_EPOCH_FLOOR = LEGACY_EPOCH - 1_000n;
+
 const PREFIX = "polaris-mls-history/";
 const WRAP = "wrap";
 const KEYS = "keys";

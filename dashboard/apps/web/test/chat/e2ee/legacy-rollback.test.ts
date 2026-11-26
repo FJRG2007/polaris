@@ -77,6 +77,9 @@ vi.mock("@polaris/db", () => {
     return { Prisma: { DbNull: null }, prisma };
 });
 vi.mock("@/lib/chat/access", () => ({ conversationAudience: vi.fn() }));
+// The swept reactions and votes are put back by their own module (annotation-sweep.test.ts).
+const annotations = vi.hoisted(() => ({ restoreAnnotations: vi.fn(async () => ({ restored: 0, kept: 0 })) }));
+vi.mock("@/lib/chat/e2ee/annotation-rollback", () => annotations);
 
 import { MlsDevice } from "@/lib/chat/e2ee/mls-client";
 import { legacyKeyGaps } from "@/lib/chat/e2ee/mls-delivery";
@@ -118,6 +121,14 @@ describe("rolling a migrated conversation back", () => {
         expect(db.migration.get(CHANNEL)).toMatchObject({ state: "rolledBack", reason: "keptEdited" });
         // No row is the migrator's seal any more: the legacy key envelopes go.
         expect(db.historyKeys).toHaveLength(0);
+    });
+
+    it("leaves a restored message's swept reaction copies to the annotation restore, and runs it", async () => {
+        cutConversation();
+        db.copies.push({ kind: "reaction", id: "r1", messageId: "m1", channelId: CHANNEL, body: "{}", createdAt: NOW });
+        await rollBackConversation(CHANNEL, NOW);
+        expect(db.copies.map((c) => c.id)).toEqual(["m2", "r1"]);
+        expect(annotations.restoreAnnotations).toHaveBeenCalledWith(CHANNEL);
     });
 
     it("keeps the legacy key while a migrated row is still sealed under it", async () => {

@@ -157,6 +157,7 @@ export async function registerNode(): Promise<void> {
     // process only, so two dashboards never seal the same conversation at once.
     void whenAlone(async () => {
         const { runLegacyMigration } = await import("./lib/chat/e2ee/legacy-migration");
+        const { runAnnotationSweep } = await import("./lib/chat/e2ee/annotation-sweep");
         let running = false;
         const pass = async () => {
             if (running) return;
@@ -165,6 +166,12 @@ export async function registerNode(): Promise<void> {
                 await runLegacyMigration();
             } catch (error) {
                 console.error("polaris: the chat history migration pass failed:", error);
+            }
+            // Then the clear reactions and votes left in sealed conversations, the ones just cut included.
+            try {
+                await runAnnotationSweep();
+            } catch (error) {
+                console.error("polaris: the sealed conversations' reaction and vote sweep failed:", error);
             } finally {
                 running = false;
             }

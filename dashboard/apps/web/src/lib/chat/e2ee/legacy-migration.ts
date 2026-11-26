@@ -39,6 +39,7 @@ import { accountPublicKeys, putHistoryKeys } from "./mls-delivery";
 import { encodeSealedContent, decodeSealedContent, type SealedContent } from "./sealed-chat";
 
 import { LEGACY_EPOCH } from "./mls-history-keys";
+import { restoreAnnotations } from "./annotation-rollback";
 
 export { LEGACY_EPOCH };
 /** What a migrated row names as its device. */
@@ -105,7 +106,7 @@ export async function sealVersion(historyKey: Uint8Array, signer: Signer, bindin
 }
 
 /** The people the conversation is said to; null when nobody is left to ask on behalf of. */
-async function audienceOf(channelId: string): Promise<string[] | null> {
+export async function audienceOf(channelId: string): Promise<string[] | null> {
     const member = await prisma.chatChannelMember.findFirst({ where: { channelId }, select: { userId: true }, orderBy: { userId: "asc" } });
     const owner = member
         ? null
@@ -114,18 +115,18 @@ async function audienceOf(channelId: string): Promise<string[] | null> {
     return actor ? await conversationAudience({ id: actor }, channelId) : null;
 }
 
-/** Seal `HK` to every member account that has a key; how many it was sealed to. */
-async function sealToMembers(channelId: string, audience: readonly string[], historyKey: Uint8Array): Promise<number> {
+/** Seal `HK` (of `epoch`, the legacy one by default) to every member account that has a key; how many it was sealed to. */
+export async function sealToMembers(channelId: string, audience: readonly string[], historyKey: Uint8Array, epoch: bigint = LEGACY_EPOCH): Promise<number> {
     let sealedTo = 0;
     for (let at = 0; at < audience.length; at += KEY_PAGE) {
         const keys = await accountPublicKeys(audience.slice(at, at + KEY_PAGE));
         const envelopes = await Promise.all(
             keys.map(async (key) => ({
                 recipient: key.userId,
-                envelope: await content.sealHistoryKey(new Uint8Array(key.hpkePublicKey), historyKey, { recipient: key.userId, conversationId: channelId, epoch: LEGACY_EPOCH })
+                envelope: await content.sealHistoryKey(new Uint8Array(key.hpkePublicKey), historyKey, { recipient: key.userId, conversationId: channelId, epoch })
             }))
         );
-        if (envelopes.length) await putHistoryKeys(channelId, LEGACY_EPOCH, envelopes);
+        if (envelopes.length) await putHistoryKeys(channelId, epoch, envelopes);
         sealedTo += envelopes.length;
     }
     return sealedTo;
@@ -457,7 +458,7 @@ export async function rollBackConversation(channelId: string, now = new Date()):
         after = page[page.length - 1]!.messageId;
         const ids = page.map((m) => m.messageId);
         const copies = await prisma.chatMigrationRollback.findMany({
-            where: { channelId, messageId: { in: ids } },
+            where: { channelId, messageId: { in: ids }, kind: { in: ["message", "edit"] } },
             select: { id: true, kind: true, messageId: true, body: true, translation: true }
         });
         for (const messageId of ids) {
@@ -471,13 +472,16 @@ export async function rollBackConversation(channelId: string, now = new Date()):
                 if (!back.count) return false;
                 for (const edit of own.filter((copy) => copy.kind === "edit"))
                     await tx.chatMessageEdit.updateMany({ where: { id: edit.id, messageId, e2eeDevice: MIGRATION_DEVICE, body: "" }, data: { ...unsealed, body: edit.body } });
-                await tx.chatMigrationRollback.deleteMany({ where: { messageId } });
+                // The message's own copies only: its swept reactions and votes are put back below.
+                await tx.chatMigrationRollback.deleteMany({ where: { messageId, kind: { in: ["message", "edit"] } } });
                 return true;
             });
             if (done) restored++;
             else kept++;
         }
     }
+    // The reactions and votes the sweep sealed, back in the clear where nobody has changed them since.
+    await restoreAnnotations(channelId);
     const stillSealed = await prisma.chatMessage.count({ where: { channelId, e2eeDevice: MIGRATION_DEVICE }, take: 1 });
     if (!stillSealed) await prisma.chatHistoryKey.deleteMany({ where: { channelId, epoch: LEGACY_EPOCH } });
     await prisma.chatMigration.update({ where: { channelId }, data: { state: "rolledBack", reason: kept ? "keptEdited" : null, signKey: null } });
