@@ -266,7 +266,7 @@ async function tell(reading: DiskReading, freed: number | "busy" | null): Promis
                 body: t(body),
                 audience: "admins",
                 actionRequired: true,
-                href: "/apps/servers"
+                href: `/apps/servers/${encodeURIComponent(reading.machine)}`
             });
         })
     );

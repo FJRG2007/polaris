@@ -66,3 +66,4 @@ Security findings are not kept here; they live in
 | BUG-0058 | A Polar Code chat stays on "working" after the agent's own turn, and Stop does not end it | Polar | Fixed, watching | dashboard/apps/web/src/lib/agents/acp/session-driver.ts | 2026-11-26 |
 | BUG-0059 | Polar's Automatic answers on free models, or not at all, while the person's own providers work | Polar | Fixed, watching | dashboard/apps/web/src/lib/polar/models.ts | 2026-11-25 |
 | BUG-0060 | Opening the vault fires a passkey prompt in the browser while handing the page to the desktop app | Vault | Fixed, watching | dashboard/apps/web/src/components/open-in-app.tsx | 2026-11-26 |
+| BUG-0061 | Security and system notifications open a page that says nothing about them | Notifications | Fixed, watching | dashboard/packages/core/src/schemas/notifications.ts | 2026-11-26 |

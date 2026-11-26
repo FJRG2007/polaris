@@ -23,6 +23,7 @@
 import { recordAudit } from "@/lib/audit-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { hostVolumes, removeHostVolume } from "./host-volumes";
+import { LOCAL_MACHINE } from "./image-store-lock";
 import { notifyOperators } from "@/lib/notifications/operators";
 import { translatorFor } from "@/lib/i18n/translate";
 import { DEFAULT_LOCALE } from "@polaris/core";
@@ -105,7 +106,7 @@ export async function removeLeftoverVolumes(): Promise<RemovedVolume[]> {
             event: "server.space",
             ...say(translatorFor(DEFAULT_LOCALE, "notices")),
             say,
-            href: "/apps/servers"
+            href: `/apps/servers/${LOCAL_MACHINE}`
         });
     }
     return removed;

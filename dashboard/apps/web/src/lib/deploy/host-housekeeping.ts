@@ -37,7 +37,7 @@ import { notify } from "@/lib/notifications/dispatch";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { diskFullness, localDisk } from "@/lib/deploy/local-disk";
 import { hostSpace, reclaimHostSpace } from "@/lib/deploy/host-space";
-import { ImageStoreBusy } from "@/lib/deploy/image-store-lock";
+import { ImageStoreBusy, LOCAL_MACHINE } from "@/lib/deploy/image-store-lock";
 import {
     reclaimServerSpace,
     serverDiskFullness,
@@ -243,7 +243,7 @@ async function warn(fullness: number, freed: number): Promise<void> {
                     body: freed > 0 ? t("disk.freedBody") : t("disk.nothingFreedBody"),
                     audience: "admins",
                     actionRequired: true,
-                    href: "/apps/servers"
+                    href: `/apps/servers/${LOCAL_MACHINE}`
                 });
             })
         );

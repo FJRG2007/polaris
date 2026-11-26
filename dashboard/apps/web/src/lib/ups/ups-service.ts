@@ -1034,7 +1034,7 @@ async function sendReport(row: UpsRow, now: number): Promise<void> {
                 title: words("ups.report.ready.title", { name: row.name }),
                 body: words("ups.report.ready.body", { file: `${upsData.DRIVE_FOLDER}/${name}` }),
                 audience: "admins",
-                href: "/drive",
+                href: await upsData.driveFolderHref(userId),
                 metadata: { upsId: row.id }
             }).catch(() => undefined);
         }

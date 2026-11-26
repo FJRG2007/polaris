@@ -164,7 +164,7 @@ export async function requestAccountRecovery(input: {
         event: "account.recovery",
         ...say(translatorFor(DEFAULT_LOCALE, "notices")),
         say,
-        href: "/admin/users",
+        href: `/admin/users/${encodeURIComponent(userId)}/security`,
         level: "warning",
         actionRequired: true
     });

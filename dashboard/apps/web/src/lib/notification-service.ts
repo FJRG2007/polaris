@@ -10,6 +10,7 @@
 
 import { prisma } from "@polaris/db";
 import { shelfFilter } from "@/lib/shelf";
+import { eventFallbackHref, notificationEvent } from "@polaris/core";
 import type { NotificationLevel } from "@polaris/core";
 
 export type { NotificationLevel };
@@ -144,6 +145,16 @@ interface NotificationRow {
     repeatCount?: number;
 }
 
+/**
+ * Where a row opens. A row written without a link, or before every kind had
+ * one, opens its kind's page rather than nothing.
+ */
+function rowHref(row: Pick<NotificationRow, "type" | "href">): string | null {
+    if (row.href) return row.href;
+    const event = notificationEvent(row.type);
+    return event ? eventFallbackHref(event) : null;
+}
+
 function toView(row: NotificationRow, names: ReadonlyMap<string, string>): NotificationView {
     const personId = personIn(row.metadata);
     const name = personId ? names.get(personId) : undefined;
@@ -152,7 +163,7 @@ function toView(row: NotificationRow, names: ReadonlyMap<string, string>): Notif
         type: row.type,
         title: row.title,
         body: row.body,
-        href: row.href,
+        href: rowHref(row),
         level: (LEVELS.has(row.level) ? row.level : "info") as NotificationLevel,
         audience: (AUDIENCES.has(row.audience) ? row.audience : "you") as NotificationAudience,
         audienceLabel: row.audienceLabel,

@@ -66,6 +66,13 @@ const PENDING_EVERY_MS = 60 * 1000;
 /** A longer wait than any outage worth waiting for, so the owner is told in the end. */
 const PENDING_GIVE_UP_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** The drop point an upload arrived at, or the list when it is not known. */
+function dropPointHref(request: Pick<ScanRequest, "dropPointId">): string {
+    return request.dropPointId
+        ? `/drive/drop-points/${encodeURIComponent(request.dropPointId)}`
+        : "/drive/drop-points";
+}
+
 export interface ScanRequest {
     driver: StorageDriver;
     connectionId: string;
@@ -78,6 +85,8 @@ export interface ScanRequest {
     /** The drop point owner who gets alerted. */
     ownerId: string;
     dropPointTitle: string;
+    /** The drop point it arrived at, which its alerts open. */
+    dropPointId?: string;
     submissionId: string;
     size: number;
 }
@@ -259,7 +268,7 @@ export async function scanDropPointUpload(request: ScanRequest): Promise<ScanOut
                 dropPoint: request.dropPointTitle,
                 detail
             }),
-            href: "/drive/drop-points",
+            href: dropPointHref(request),
             metadata: { connectionId: request.connectionId, submissionId: request.submissionId }
         });
         return { scanned: true, blocked: false, verdict: "error", action: "none", detail };
@@ -322,7 +331,7 @@ async function enforce(
             title: alert.title,
             body: alert.body,
             actionRequired: detected,
-            href: verdict.permalink ?? "/drive/drop-points",
+            href: verdict.permalink ?? dropPointHref(request),
             metadata: {
                 connectionId: request.connectionId,
                 submissionId: request.submissionId,
@@ -379,7 +388,7 @@ async function finishPendingScan(
                   size: true,
                   status: true,
                   submittedByUserId: true,
-                  request: { select: { ownerId: true, title: true } }
+                  request: { select: { id: true, ownerId: true, title: true } }
               }
           })
         : null;
@@ -410,6 +419,7 @@ async function finishPendingScan(
             fileName: submission.fileName,
             ownerId: submission.request.ownerId,
             dropPointTitle: submission.request.title,
+            dropPointId: submission.request.id,
             submissionId: pending.submissionId,
             size: Number(submission.size)
         };

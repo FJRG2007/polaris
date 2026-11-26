@@ -137,6 +137,13 @@ export interface NotificationEventInfo {
     /** One line under the label on the settings row. */
     description: string;
     level: NotificationLevel;
+    /**
+     * The page an alert of this kind opens: where the reader acts on it, as a
+     * route pattern ("/tasks/t/[taskId]"). A call site fills the brackets in
+     * its own `href`; one that gives none falls back to this when it names no
+     * item, so no alert ever opens on nothing.
+     */
+    target: string;
     /** Always reaches the bell, whatever the rule says. */
     critical?: boolean;
     /**
@@ -163,6 +170,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Deploy failed",
         description: "A build or deploy of a service or database did not come up.",
         level: "danger",
+        target: "/apps/deploy/[projectId]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -171,6 +179,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Deploy succeeded",
         description: "A service or database finished deploying and is serving.",
         level: "success",
+        target: "/apps/deploy/[projectId]",
         defaults: { inapp: false, email: false }
     },
     {
@@ -179,6 +188,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A scheduled job failed",
         description: "A service's scheduled command failed on its last try, or ran out of time.",
         level: "danger",
+        target: "/apps/deploy/[projectId]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -187,6 +197,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A project automation failed",
         description: "One of a project's automations stopped on an action that did not work.",
         level: "danger",
+        target: "/apps/deploy/[projectId]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -195,6 +206,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A project automation told you something",
         description: "A step in one of a project's automations asked to let you know.",
         level: "info",
+        target: "/apps/deploy/[projectId]",
         // On: nobody writes "tell me" into an automation hoping not to be told.
         unreadWhenViewing: true,
         defaults: { inapp: true, email: false }
@@ -205,6 +217,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A domain stopped serving",
         description: "A domain pointed at one of your services stopped answering.",
         level: "danger",
+        target: "/admin/domains",
         // Mail on by default, and deliberately so: this one is noticed by whoever is
         // looking at the site, and the owner is usually not.
         defaults: { inapp: true, email: true }
@@ -215,6 +228,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A domain started serving again",
         description: "A domain that had stopped answering is reachable again.",
         level: "success",
+        target: "/admin/domains",
         defaults: { inapp: true, email: false }
     },
     {
@@ -224,6 +238,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "The storage a service keeps its volumes on stopped answering, and Polaris could not reconnect it.",
         level: "danger",
+        target: "/apps/deploy/[projectId]",
         // Mail on, like a domain that stopped serving: the service keeps running,
         // so nothing on screen turns red, and the first to notice is its users.
         defaults: { inapp: true, email: true }
@@ -235,6 +250,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A service's volumes answer again, or Polaris reconnected them and restarted it.",
         level: "success",
+        target: "/apps/deploy/[projectId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -244,6 +260,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "What an organization you run spent this month reached 80% of its budget, or went past it.",
         level: "warning",
+        target: "/account/organizations/[slug]/billing",
         // Mail on: whoever set a budget wants to hear about it before the month
         // is over, and the bell is not where anybody watches spending.
         defaults: { inapp: true, email: true }
@@ -254,6 +271,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Assigned a task",
         description: "Somebody put a task in your name, or a rule did.",
         level: "info",
+        target: "/tasks/t/[taskId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -262,6 +280,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A task sent to you",
         description: "Somebody sent you a task to look at.",
         level: "info",
+        target: "/tasks/t/[taskId]",
         // Mail is on by default here alone among the task events: a person chose
         // to send this to you, so it should reach you off the app as well.
         defaults: { inapp: true, email: true }
@@ -272,6 +291,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Comment on your work",
         description: "A comment on a task you are assigned to or watching.",
         level: "info",
+        target: "/tasks/t/[taskId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -280,6 +300,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Mentioned by name",
         description: "Somebody wrote your name into a task, a comment or a page.",
         level: "info",
+        target: "/tasks/t/[taskId]",
         // Being named is a direct address rather than activity on something you
         // follow, so it reaches you off the app the way a shared task does.
         defaults: { inapp: true, email: true }
@@ -290,6 +311,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Task reminder",
         description: "A reminder you set on a task, and work falling due today.",
         level: "warning",
+        target: "/tasks/t/[taskId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -298,6 +320,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Event reminder",
         description: "A reminder set on an event or a task in your calendars.",
         level: "info",
+        target: "/calendar/e/[id]",
         // Mail stays off here: a reminder can ask for mail itself (an email
         // alarm), and those are sent whatever this rule says.
         defaults: { inapp: true, email: false }
@@ -308,6 +331,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Alarm or timer went off",
         description: "An alarm or a timer you set in Calendar's Time area went off.",
         level: "warning",
+        target: "/calendar/time",
         // Somebody set it to be interrupted at that moment. Mail arrives too
         // late to be the ring, so it stays off unless they choose it.
         defaults: { inapp: true, email: false }
@@ -318,6 +342,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Invitation",
         description: "Somebody invited you to an event, or changed or cancelled one you are in.",
         level: "info",
+        target: "/calendar/e/[id]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -326,6 +351,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Invitation answered",
         description: "Somebody accepted, declined or answered maybe to an event you organized.",
         level: "info",
+        target: "/calendar/e/[id]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -334,6 +360,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Calendar shared with you",
         description: "Somebody shared one of their calendars with you or with a team you are in.",
         level: "info",
+        target: "/calendar",
         defaults: { inapp: true, email: false }
     },
     {
@@ -342,6 +369,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "New booking",
         description: "Somebody booked, moved or cancelled time on one of your booking pages.",
         level: "info",
+        target: "/calendar/booking/[id]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -350,6 +378,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Proposal answered",
         description: "Somebody voted on the times of a meeting you proposed.",
         level: "info",
+        target: "/calendar/proposals/[id]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -359,6 +388,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A calendar you linked from Google, Microsoft or a CalDAV server refused Polaris or could not be reached.",
         level: "warning",
+        target: "/calendar/settings/accounts",
         defaults: { inapp: true, email: false }
     },
     {
@@ -367,6 +397,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Alarm fired",
         description: "A watched service, domain or resource breached its condition.",
         level: "danger",
+        target: "/watch/[kind]/[id]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -375,6 +406,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Issue assigned to you",
         description: "Somebody handed you an error to look into in Telemetry.",
         level: "info",
+        target: "/telemetry/[project]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -383,6 +415,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "New issue in Telemetry",
         description: "An alert rule saw a fault a project had never reported before.",
         level: "warning",
+        target: "/telemetry/[project]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -391,6 +424,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Issue happening often",
         description: "An alert rule saw a fault reported more times than it allows.",
         level: "danger",
+        target: "/telemetry/[project]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -399,6 +433,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Resolved issue came back",
         description: "An alert rule saw a fault marked resolved happen again.",
         level: "warning",
+        target: "/telemetry/[project]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -407,6 +442,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Alarm cleared",
         description: "A watched target came back within its condition.",
         level: "success",
+        target: "/watch/[kind]/[id]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -415,6 +451,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Traffic spike or drop",
         description: "A site you follow in Analytics passed the visitor count you set.",
         level: "info",
+        target: "/analytics",
         defaults: { inapp: true, email: false }
     },
     {
@@ -423,6 +460,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Analytics summary",
         description: "A site's visitors and views for the week or month you chose.",
         level: "info",
+        target: "/analytics",
         defaults: { inapp: true, email: false }
     },
     {
@@ -432,6 +470,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A daily check found a domain you manage open to spoofing, about to expire, or newly misconfigured.",
         level: "warning",
+        target: "/admin/domains/security",
         // Mail on: the whole point is that nobody is looking at the domain when it
         // changes, and the bell is only seen by whoever opens Polaris.
         defaults: { inapp: true, email: true }
@@ -443,6 +482,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A scan found a new critical or high vulnerability in an image one of your servers runs.",
         level: "danger",
+        target: "/apps/servers/security",
         // The bell only: each finding rings once, on the scan that first finds it.
         defaults: { inapp: true, email: false }
     },
@@ -453,6 +493,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "Polaris turned automatic security updates on for a server, or a server needs a restart to finish them.",
         level: "warning",
+        target: "/apps/servers/security",
         defaults: { inapp: true, email: false }
     },
     {
@@ -461,6 +502,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A server without a firewall",
         description: "A server has no firewall on, and the review of what turning it on would close waits on you.",
         level: "warning",
+        target: "/apps/servers/security",
         defaults: { inapp: true, email: false }
     },
     {
@@ -469,6 +511,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A server that takes passwords",
         description: "A server still lets anyone try a password over SSH, and turning that off waits on you.",
         level: "warning",
+        target: "/apps/servers/security",
         defaults: { inapp: true, email: false }
     },
     {
@@ -477,6 +520,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Sign-in waiting for approval",
         description: "Someone signed in to your account and needs approving.",
         level: "warning",
+        target: "/account/sessions",
         critical: true,
         defaults: { inapp: true, email: true }
     },
@@ -486,6 +530,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Someone locked out of their account",
         description: "A request to reset a password is waiting for a decision.",
         level: "warning",
+        target: "/admin/users/[id]/security",
         critical: true,
         defaults: { inapp: true, email: true }
     },
@@ -495,6 +540,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A session was opened",
         description: "Your account was signed in to, and from where.",
         level: "info",
+        target: "/account/sessions",
         // The bell rather than mail: on an account used daily this fires every
         // morning, and an alert that arrives that often stops being read.
         defaults: { inapp: true, email: false }
@@ -505,6 +551,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A session ended",
         description: "A device was signed out, by you or by something else.",
         level: "info",
+        target: "/account/sessions",
         defaults: { inapp: true, email: false }
     },
     {
@@ -517,6 +564,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // was holding a session that was not theirs. It goes everywhere it can
         // and it is not something an account is allowed to switch off quietly.
         level: "danger",
+        target: "/account/sessions",
         critical: true,
         defaults: { inapp: true, email: true }
     },
@@ -529,6 +577,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // An account shutting itself down means its owner believes somebody else
         // is in it. Whatever else an administrator has muted, they hear this.
         level: "warning",
+        target: "/admin/safety",
         critical: true,
         defaults: { inapp: true, email: true }
     },
@@ -543,6 +592,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // mailing it as well would be mailing somebody about something they are
         // about to see anyway.
         level: "info",
+        target: "/account/connections",
         defaults: { inapp: true, email: false }
     },
     {
@@ -555,6 +605,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Friend requests",
         description: "Somebody asked to be added, or answered a request you sent.",
         level: "info",
+        target: "/account/friends",
         defaults: { inapp: true, email: false }
     },
     {
@@ -566,6 +617,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // one thing in Chat that is worth finding out about after the fact,
         // which is why it is the only thing in Chat that reaches the bell at all.
         level: "warning",
+        target: "/chat/c/[channelId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -577,6 +629,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // question, and a question nobody hears about is a refusal by another
         // name - so it reaches the bell, quietly.
         level: "info",
+        target: "/chat/c/[channelId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -588,6 +641,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // people who run it can give; a queue nobody hears about is a door
         // that never opens.
         level: "info",
+        target: "/chat/s/[spaceId]/requests",
         defaults: { inapp: true, email: false }
     },
     {
@@ -598,6 +652,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // Asked for by the reader, at a time they chose: it is the point of the
         // feature that it reaches them, so it is on the bell by default.
         level: "info",
+        target: "/chat/c/[channelId]/[messageId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -609,6 +664,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Organization invitations",
         description: "You were invited to an organization, or somebody accepted yours.",
         level: "info",
+        target: "/account/organizations",
         // Mail as well, unlike a friend request: nothing happens until this one
         // is answered, and an invitation that expires unseen in a bell nobody
         // opened is an invitation that was never sent.
@@ -620,6 +676,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Account security changed",
         description: "A password, a second factor, a passkey, a key or a sign-in rule changed.",
         level: "warning",
+        target: "/account/security",
         // Critical, and mailed by default: this is the alert that tells somebody
         // their account is being taken over, and it is the first thing whoever
         // took it would otherwise turn off.
@@ -633,6 +690,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A token you linked ran out or was withdrawn, and what it was doing has stopped.",
         level: "danger",
+        target: "/account/connections",
         // Mailed by default, and for the same reason the key expiry is: nobody
         // watches the bell for a thing that has not happened yet, and the first
         // sign otherwise is a deploy failing at the clone for a reason that
@@ -648,6 +706,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // Not danger: nothing has broken and nothing has been taken away. What is
         // waiting is a consent only the account's owner can give.
         level: "warning",
+        target: "/account/connections",
         // The bell is enough. Nothing stops working while this is outstanding, so
         // mailing it would be mailing somebody about a feature they may not use.
         defaults: { inapp: true, email: false }
@@ -658,6 +717,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "An AI provider key is about to expire",
         description: "A key you gave an end date runs out within the week.",
         level: "warning",
+        target: "/polar/settings/providers",
         // Mail on by default: the whole point of setting the date is being told
         // before the day it stops working, and nobody watches the bell for that.
         defaults: { inapp: true, email: true }
@@ -668,6 +728,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "An AI provider key expired",
         description: "A key reached its end date and is no longer used by anything.",
         level: "danger",
+        target: "/polar/settings/providers",
         defaults: { inapp: true, email: true }
     },
     {
@@ -676,6 +737,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Something arrived at a drop point",
         description: "A file or a piece of text was sent to one of your drop points.",
         level: "info",
+        target: "/drive/drop-points/[id]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -684,6 +746,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Malware in an upload",
         description: "A file sent to one of your drop points was flagged.",
         level: "danger",
+        target: "/drive/drop-points/[id]",
         critical: true,
         defaults: { inapp: true, email: true }
     },
@@ -693,6 +756,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Upload could not be scanned",
         description: "The scanner did not finish. The file was kept.",
         level: "info",
+        target: "/drive/drop-points/[id]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -701,6 +765,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A camera saw something",
         description: "Somebody, a vehicle, an animal or a parcel came into view of a camera.",
         level: "info",
+        target: "/places/events",
         // Off, and deliberately. A camera pointed at a room somebody works in
         // sees them all day, and every one of those is already written down in
         // Places. An alert is how you ask to be told about the few that matter,
@@ -713,6 +778,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "An alert you wrote went off",
         description: "Something one of your alerts asked about happened.",
         level: "warning",
+        target: "/places/events",
         defaults: { inapp: true, email: false }
     },
     {
@@ -721,6 +787,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A camera was interfered with",
         description: "A camera reported being covered, moved or unplugged.",
         level: "warning",
+        target: "/places/events",
         defaults: { inapp: true, email: false }
     },
     {
@@ -729,6 +796,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A camera stopped answering",
         description: "A camera went quiet, or came back after being quiet.",
         level: "warning",
+        target: "/places/events",
         // On, unlike a sighting. Nothing else reports this: a camera that has
         // stopped looks exactly like a quiet night, so the one place it can be
         // noticed is here.
@@ -741,6 +809,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A connection's key was refused, or its plan at the maker ran out, so its devices stopped responding.",
         level: "warning",
+        target: "/places/devices/accounts",
         // On: every device on the account stops at once, and from the house it
         // only looks like a button that does nothing.
         defaults: { inapp: true, email: false }
@@ -751,6 +820,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A litter box bin is full",
         description: "A litter box filled its waste bin and needs emptying.",
         level: "warning",
+        target: "/places/devices",
         // On: a full bin stops the box cleaning, and nothing else says so.
         defaults: { inapp: true, email: false }
     },
@@ -760,6 +830,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A litter box is low on litter",
         description: "A litter box is running out of litter.",
         level: "info",
+        target: "/places/devices",
         defaults: { inapp: true, email: false }
     },
     {
@@ -768,6 +839,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A litter box stopped on a fault",
         description: "A litter box reported an error and may have stopped working.",
         level: "warning",
+        target: "/places/devices",
         defaults: { inapp: true, email: false }
     },
     {
@@ -776,6 +848,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "An automation told you something",
         description: "A step in one of your automations asked to let you know.",
         level: "info",
+        target: "/places/devices/automations/[id]",
         // On: nobody writes "tell me" into an automation hoping not to be told.
         unreadWhenViewing: true,
         defaults: { inapp: true, email: false }
@@ -787,6 +860,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "Polaris freed everything nothing was using and the disk is still nearly full.",
         level: "warning",
+        target: "/apps/servers/[serverId]",
         // On, and it means it. By the time this is raised the automatic
         // housekeeping has already run and not been enough, so what is left is
         // data only a person can decide about - and the next thing that happens
@@ -799,6 +873,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A server is behaving unusually",
         description: "A server's CPU, memory, disk or traffic moved far from what it usually is.",
         level: "warning",
+        target: "/apps/servers/insights",
         // In the bell only: an unusual hour is worth a look, not a mail, and a
         // busy machine can have several of them in a day.
         defaults: { inapp: true, email: false }
@@ -809,6 +884,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A server's disk will fill soon",
         description: "At the rate it has been growing, a server's disk fills within two weeks.",
         level: "warning",
+        target: "/apps/servers/insights",
         defaults: { inapp: true, email: false }
     },
     {
@@ -817,6 +893,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "The power went out",
         description: "A UPS is running on its battery.",
         level: "danger",
+        target: "/places/ups/[upsId]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -825,6 +902,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "The power is back",
         description: "A UPS that was on battery runs from the mains again.",
         level: "success",
+        target: "/places/ups/[upsId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -834,6 +912,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A UPS on battery is about to run out, and the machines it protects may be shut down.",
         level: "danger",
+        target: "/places/ups/[upsId]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -842,6 +921,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A UPS battery test finished",
         description: "The result of a battery self-test.",
         level: "info",
+        target: "/places/ups/[upsId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -850,6 +930,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A UPS battery needs replacing",
         description: "A UPS reports that its battery is worn out.",
         level: "warning",
+        target: "/places/ups/[upsId]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -858,6 +939,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A machine did not shut down",
         description: "A UPS ran low and Polaris could not power off a machine it protects.",
         level: "danger",
+        target: "/places/ups/[upsId]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -866,6 +948,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A UPS is shutting machines down",
         description: "The battery ran low and the protected machines are being shut down.",
         level: "danger",
+        target: "/places/ups/[upsId]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -874,6 +957,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A UPS is overloaded",
         description: "A UPS is asked for more power than it can give.",
         level: "danger",
+        target: "/places/ups/[upsId]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -882,6 +966,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A UPS stopped answering",
         description: "Polaris cannot read a UPS any more.",
         level: "warning",
+        target: "/places/ups/[upsId]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -890,6 +975,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A UPS answers again",
         description: "A UPS that had stopped answering can be read again.",
         level: "success",
+        target: "/places/ups/[upsId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -898,6 +984,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A UPS corrected the power",
         description: "A UPS is trimming or boosting the voltage, on bypass, calibrating or off.",
         level: "warning",
+        target: "/places/ups/[upsId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -906,6 +993,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A UPS report is ready",
         description: "A scheduled UPS report was saved to your drive.",
         level: "info",
+        target: "/drive",
         defaults: { inapp: true, email: false }
     },
     {
@@ -914,6 +1002,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Mail matched a rule",
         description: "A message arrived at a mail server you run and matched one of its rules.",
         level: "info",
+        target: "/mail-server/[id]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -922,6 +1011,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A mail server needs attention",
         description: "A mail server you run stopped answering, or answers again.",
         level: "warning",
+        target: "/mail-server/[id]",
         defaults: { inapp: true, email: true }
     },
     {
@@ -931,6 +1021,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A mailbox you connected refused its password or authorization, and Polaris paused checking it until you update it.",
         level: "warning",
+        target: "/mail/settings/accounts",
         // Said once per refusal, not once per check: the mailbox stays paused
         // until its owner fixes it, and the notice in Mail says the rest.
         defaults: { inapp: true, email: false }
@@ -942,6 +1033,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A delivery report came back about something you sent, saying it never reached the address it was for.",
         level: "warning",
+        target: "/mail/t/[threadId]",
         // On, and it means it. A bounce arrives as an ordinary message from a
         // mail system, with a subject nobody reads, filed next to a newsletter -
         // so the ordinary outcome of one is that nobody notices, and the sender
@@ -955,6 +1047,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "The outgoing server refused a message for good, or refused it for some of the people it was for.",
         level: "warning",
+        target: "/mail/drafts",
         // On. Said once, when Polaris gives up rather than on every attempt:
         // past this point the message sits in Drafts waiting for a person.
         defaults: { inapp: true, email: false }
@@ -966,6 +1059,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "Your mail is going out, but the mail server would not keep a copy of it in your Sent folder.",
         level: "warning",
+        target: "/mail/settings/accounts",
         // On, and said at most once a day per mailbox: what is missing is the
         // reader's own record of what they sent, and nothing else would ever
         // tell them - they would find out by looking for a message they know
@@ -978,6 +1072,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Network needs attention",
         description: "Something outside Polaris is stopping your services being reached.",
         level: "warning",
+        target: "/admin/domains",
         defaults: { inapp: true, email: false }
     },
     {
@@ -986,6 +1081,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "An address stopped answering",
         description: "One of the addresses this Polaris is reachable at went down, or came back.",
         level: "warning",
+        target: "/admin/domains",
         defaults: { inapp: true, email: false }
     },
     {
@@ -994,6 +1090,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "The internet goes down",
         description: "Polaris lost its connection, or the DNS server stopped answering.",
         level: "warning",
+        target: "/watch/connectivity",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1002,6 +1099,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "The internet comes back",
         description: "The connection works again, with how long it was gone.",
         level: "success",
+        target: "/watch/connectivity",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1010,6 +1108,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Your public IP changes",
         description: "The address your connection has on the internet changed.",
         level: "warning",
+        target: "/watch/connectivity",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1018,6 +1117,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Polaris is unreachable from outside",
         description: "The public name no longer points at your connection.",
         level: "warning",
+        target: "/admin/domains/remote-access",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1026,6 +1126,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "An integration needs attention",
         description: "A service somebody tried to connect an account of refused the authorization.",
         level: "warning",
+        target: "/admin/integrations",
         // Mail on by default: the person who hit this cannot fix it and the
         // operator is not watching the bell of a service nobody could connect.
         defaults: { inapp: true, email: true }
@@ -1039,6 +1140,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // On, mail included: from this moment every upload lands somewhere the
         // operator did not choose, and nothing else would ever say so.
         level: "warning",
+        target: "/admin/storage",
         defaults: { inapp: true, email: true }
     },
     {
@@ -1050,6 +1152,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // Info, but with mail: the fix that stops it happening again is a
         // reservation in the router, which only a person can make.
         level: "info",
+        target: "/admin/storage",
         defaults: { inapp: true, email: true }
     },
     {
@@ -1059,6 +1162,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A storage pool lost its protection or is nearly full, a disk is failing or running hot, or a backup failed or did not run.",
         level: "warning",
+        target: "/admin/storage",
         defaults: { inapp: true, email: true }
     },
     {
@@ -1067,6 +1171,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Message from an automation",
         description: "A Notify step in one of your automations sent you a message.",
         level: "info",
+        target: "/automations/[id]",
         unreadWhenViewing: true,
         defaults: { inapp: true, email: false }
     },
@@ -1076,6 +1181,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Update available",
         description: "A new Polaris build is published and ready to install.",
         level: "info",
+        target: "/admin/updates",
         offBell: true,
         defaults: { inapp: false, email: true }
     },
@@ -1086,6 +1192,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A session stopped on a question or a permission prompt and is waiting for an answer.",
         level: "warning",
+        target: "/polar",
         // On the bell and not in the mail: running an agent in the background is
         // the whole reason to want this, and a question asked twice in an hour
         // is two emails nobody wanted.
@@ -1099,6 +1206,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A background run failed",
         description: "An agent run started by a trigger or from Polaris failed.",
         level: "danger",
+        target: "/automations/code-review/runs",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1108,6 +1216,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "An agent run started by a trigger or from Polaris finished without a problem.",
         level: "success",
+        target: "/automations/code-review/runs",
         // Off: a trigger fires on every pull request, and a bell row for each one
         // that went fine is noise. The run is still listed under Agents.
         defaults: { inapp: false, email: false }
@@ -1119,6 +1228,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A session failed, stopped reporting, or its agent exited without anybody pressing Stop.",
         level: "warning",
+        target: "/polar",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1128,6 +1238,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A session wants to run something and can be allowed or denied from the notification on your devices.",
         level: "warning",
+        target: "/polar",
         // The prompt itself goes to devices only: the session's "needs you" notice
         // is the one on the bell, so this switch decides the Allow/Deny push.
         defaults: { inapp: true, email: false }
@@ -1138,6 +1249,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Checks failed on a session's pull request",
         description: "A check on the pull request a session opened finished with a failure.",
         level: "danger",
+        target: "/polar",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1146,6 +1258,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A session's pull request is ready",
         description: "A session's pull request was opened or marked ready for review.",
         level: "info",
+        target: "/polar",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1154,6 +1267,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A session's pull request was merged",
         description: "The pull request a session opened was merged.",
         level: "success",
+        target: "/polar",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1163,6 +1277,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A session ended with commits or changes Polaris could not push, so it kept them for you.",
         level: "danger",
+        target: "/polar",
         // Mailed: until somebody pushes or discards it, that work exists in one
         // container and nowhere else.
         defaults: { inapp: true, email: true }
@@ -1174,6 +1289,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "One of your webhooks failed five deliveries in a row, so Polaris stopped sending to it.",
         level: "warning",
+        target: "/automations/webhooks",
         // Mailed by default: whatever reads that endpoint has stopped hearing
         // from Polaris, and nothing else will say so.
         defaults: { inapp: true, email: true }
@@ -1184,6 +1300,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Update installed on its own",
         description: "A scheduled or automatic update ran, and how it went.",
         level: "success",
+        target: "/admin/updates",
         defaults: { inapp: true, email: true }
     },
     {
@@ -1192,6 +1309,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "An app has an update",
         description: "A newer release of an installed app is published, and what changed.",
         level: "info",
+        target: "/admin/apps/[appId]",
         // In the bell: an app's update is announced once per release, and the
         // one that waits on a person (new permissions, automatic updates off)
         // is the reason to have it at all.
@@ -1203,6 +1321,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "An app updated on its own",
         description: "An app took its newest release by itself, or went back when it failed.",
         level: "success",
+        target: "/admin/apps/[appId]",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1212,6 +1331,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "A message an administrator of this instance sent to you or a group you are in.",
         level: "info",
+        target: "/home",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1221,6 +1341,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description:
             "An urgent message from an administrator, such as an outage. Always reaches the bell.",
         level: "danger",
+        target: "/home",
         // Critical by the administrator's choice: it is the one way to reach
         // everybody about an outage, so quiet hours and a muted rule do not hold it.
         critical: true,
@@ -1234,6 +1355,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // Only the bell: the person was in Polaris a moment ago, and an answer
         // they walked away from is not worth a mail.
         level: "info",
+        target: "/polar",
         defaults: { inapp: true, email: false }
     },
     // Alerts other systems post to an automation's alert address (lib/alerts). One event per
@@ -1245,6 +1367,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Alerts: minimum",
         description: "An alert posted at the lowest severity. Kept on the bell, silently.",
         level: "info",
+        target: "/automations",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1253,6 +1376,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Alerts: low",
         description: "An alert posted at low severity.",
         level: "info",
+        target: "/automations",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1261,6 +1385,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Alerts: normal",
         description: "An alert posted at the normal severity.",
         level: "info",
+        target: "/automations",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1269,6 +1394,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Alerts: high",
         description: "An alert posted at high severity.",
         level: "warning",
+        target: "/automations",
         defaults: { inapp: true, email: false }
     },
     {
@@ -1277,6 +1403,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Alerts: urgent",
         description: "An urgent alert. Reaches you through quiet hours.",
         level: "danger",
+        target: "/automations",
         critical: true,
         defaults: { inapp: true, email: false }
     }
@@ -1287,6 +1414,24 @@ const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]
 /** The catalogue entry for an event id, or null when nothing declares it. */
 export function notificationEvent(id: string): NotificationEventInfo | null {
     return EVENT_BY_ID.get(id) ?? null;
+}
+
+/**
+ * The page an alert of this kind opens when its call site named none: the
+ * event's target up to its first item segment, which is the list that item
+ * sits in. A one-letter segment before the item ("/tasks/t/[taskId]") only
+ * marks the item's kind, so the list is the page above it ("/tasks").
+ */
+export function eventFallbackHref(event: Pick<NotificationEventInfo, "target">): string {
+    const segments: string[] = [];
+    for (const segment of event.target.split("/").filter(Boolean)) {
+        if (segment.startsWith("[")) {
+            if (segments.length > 1 && segments.at(-1)?.length === 1) segments.pop();
+            break;
+        }
+        segments.push(segment);
+    }
+    return `/${segments.join("/")}`;
 }
 
 /**

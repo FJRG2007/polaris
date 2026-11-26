@@ -32,6 +32,7 @@ import {
 import { destinationSummary, recordDestinationResult, resolveDestination } from "./destinations";
 import {
     clearsMinLevel,
+    eventFallbackHref,
     heldByQuietHours,
     holdMuted,
     holdSchedule,
@@ -468,6 +469,7 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
         console.error(`polaris: refusing to raise undeclared notification event "${input.event}"`);
         return { inapp: "refused" };
     }
+    input = { ...input, href: input.href || eventFallbackHref(event) };
     const level = input.level ?? event.level;
 
     let rule: NotificationRule;
@@ -621,6 +623,7 @@ export async function pushNotice(
 ): Promise<boolean> {
     const event = notificationEvent(input.event);
     if (!event) return false;
+    input = { ...input, href: input.href || eventFallbackHref(event) };
     try {
         const rule = resolveRule(await getNotificationPreferences(input.userId), input.event);
         if (!rule.inapp) return false;
@@ -647,6 +650,7 @@ export async function pushNotice(
 export async function emailNotice(input: NotifyInput): Promise<DeliveryOutcome> {
     const event = notificationEvent(input.event);
     if (!event) return { status: "skipped", detail: "Undeclared event." };
+    input = { ...input, href: input.href || eventFallbackHref(event) };
     const held = await heldNow(input.userId, input.event, event.critical === true);
     if (held) {
         const outcome: DeliveryOutcome = { status: "skipped", detail: held };
@@ -667,6 +671,7 @@ export async function deliverToDestination(
 ): Promise<DeliveryOutcome> {
     const event = notificationEvent(input.event);
     if (!event) return { status: "skipped", detail: "Undeclared event." };
+    input = { ...input, href: input.href || eventFallbackHref(event) };
     const held = await heldNow(input.userId, input.event, event.critical === true);
     if (held) {
         const summary = await destinationSummary(input.userId, destinationId);

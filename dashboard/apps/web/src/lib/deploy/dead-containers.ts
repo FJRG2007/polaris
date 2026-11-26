@@ -232,7 +232,7 @@ export async function reapDeadContainers(now = new Date()): Promise<number> {
         event: "server.space",
         ...say(translatorFor(DEFAULT_LOCALE, "notices")),
         say,
-        href: "/apps/servers"
+        href: `/apps/servers/${LOCAL_MACHINE}`
     }).catch(() => undefined);
     return count;
 }

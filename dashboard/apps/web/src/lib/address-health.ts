@@ -365,7 +365,7 @@ async function sweepAddress(
                 title: t("address.tunnelGoneTitle"),
                 body: t("address.tunnelGoneBody", { url: address.url })
             })),
-            href: "/admin/settings"
+            href: "/admin/domains"
         });
         return null;
     }
@@ -460,7 +460,7 @@ async function tellPass(news: PassNews, anyUp: boolean): Promise<void> {
             const base = {
                 userId,
                 event: "network.address",
-                href: "/admin/settings",
+                href: "/admin/domains",
                 audience: "admins" as const
             };
             if (news.down.length > 0) {

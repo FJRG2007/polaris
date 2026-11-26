@@ -178,6 +178,7 @@ export async function PUT(
             fileName: storedName,
             ownerId: fileRequest.ownerId,
             dropPointTitle: fileRequest.title,
+            dropPointId: fileRequest.id,
             submissionId: submission.id,
             size: Number(stat.size)
         });

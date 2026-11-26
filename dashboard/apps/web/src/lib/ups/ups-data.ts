@@ -412,6 +412,12 @@ async function* utf8Chunks(content: string | AsyncIterable<string>) {
     for await (const chunk of content) yield Buffer.from(chunk, "utf8");
 }
 
+/** Where the folder `saveToDrive` writes into opens in Drive, for this person. */
+export async function driveFolderHref(userId: string): Promise<string> {
+    const drive = await ensurePersonalDrive(userId);
+    return `/drive?c=${encodeURIComponent(drive.id)}&p=${encodeURIComponent(DRIVE_FOLDER)}`;
+}
+
 /** Write a text file into this person's own drive, under `UPS/`. */
 export async function saveToDrive(
     userId: string,
