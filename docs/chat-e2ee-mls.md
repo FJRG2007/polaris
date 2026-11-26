@@ -1031,7 +1031,7 @@ Verified: unit tests (`apps/web/test/chat/e2ee/sealed-polls.test.ts`,
 `test/chat/polls.test.ts`, `poll-card.test.tsx`, `poll-dialog.test.tsx`). Not
 run in a browser yet.
 
-## Sealed reactions (built 2026-11-26, not run)
+## Sealed reactions (built 2026-11-26)
 
 In a sealed conversation a reaction is sealed in the reactor's browser and the
 counts are made in each member's browser. The server no longer learns who put
@@ -1129,10 +1129,12 @@ replaced by the person's own set - and putting them back would be leaking
 them again. If wanted later: the admin card lists conversations swept but
 never migrated, with an action calling `restoreAnnotations`.
 
-Verified: nothing run yet (code only, round 33). Tests written:
-`apps/web/test/chat/e2ee/sealed-reactions.test.ts` (sets, server rules, the
-counts and the take-back), `annotation-sweep.test.ts` (sweep, rerun,
-superseded rows, rollback), `legacy-rollback.test.ts`.
+Verified (round 34, unit tests run):
+`apps/web/test/chat/e2ee/sealed-reactions.test.ts` (sets of every size, server
+rules, the counts and the take-back), `annotation-sweep.test.ts` (sweep,
+larger sets, rerun, superseded rows, rollback), `legacy-rollback.test.ts`,
+`mls-delivery.test.ts`, `test/instance-transfer/round-trip.test.ts`. Not
+exercised: a browser, a real PostgreSQL.
 
 ## Migration of existing chats (built 2026-11-25)
 
