@@ -75,11 +75,40 @@ async function treeSize(db: Pick<typeof prisma, "chatKeyLogEntry"> = prisma): Pr
     return last ? last.index + 1 : 0;
 }
 
+/** Another append holds the log's lock: retried, never waited on inside the transaction. */
+class LogBusy extends Error {}
+
+/**
+ * Appends under a lock taken with `pg_try_advisory_xact_lock`, never a blocking
+ * wait: a wait would count against the transaction's timeout and, under heavy
+ * contention, end as Prisma's opaque "transaction already closed" after 5 s
+ * with the lock still queued. Here a busy lock ends the transaction at once
+ * and is retried after a short, jittered backoff - at most `LOCK_ATTEMPTS`
+ * times, about 1.5 s in all - and the transaction itself is bounded
+ * explicitly (`TRANSACTION`), so contention costs a bounded delay and, past
+ * it, a 503 the browser retries, never a connection held on a queue.
+ */
+const LOCK_ATTEMPTS = 6;
+const TRANSACTION = { maxWait: 2_000, timeout: 5_000 } as const;
+const backoff = (attempt: number) => new Promise((settle) => setTimeout(settle, 25 * 2 ** attempt * (0.5 + Math.random())));
+
 /** Appends `entry` unless its (account, version) is already logged. True when it was appended. */
 export async function appendEntry(entry: log.KeyLogEntry): Promise<boolean> {
     const leaf = await log.entryLeafHash(entry);
+    for (let attempt = 1; ; attempt++) {
+        try {
+            return await appendOnce(entry, leaf);
+        } catch (error) {
+            if (!(error instanceof LogBusy) || attempt >= LOCK_ATTEMPTS) throw error;
+            await backoff(attempt);
+        }
+    }
+}
+
+async function appendOnce(entry: log.KeyLogEntry, leaf: Uint8Array): Promise<boolean> {
     return prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('polaris.chat.key-log'))`;
+        const [lock] = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtext('polaris.chat.key-log')) AS "locked"`;
+        if (!lock?.locked) throw new LogBusy("The key log is busy");
         const existing = await tx.chatKeyLogEntry.findUnique({
             where: { userId_akVersion: { userId: entry.userId, akVersion: entry.akVersion } },
             select: { index: true }
@@ -98,7 +127,7 @@ export async function appendEntry(entry: log.KeyLogEntry): Promise<boolean> {
         });
         await tx.chatKeyLogNode.createMany({ data: nodes.map((n) => ({ level: n.level, index: n.index, hash: Buffer.from(n.hash) })) });
         return true;
-    });
+    }, TRANSACTION);
 }
 
 /** Appends the current published key of each account that has one and is not logged yet. */

@@ -16,7 +16,8 @@ const state = vi.hoisted(() => ({
     nodes: [] as Row[],
     accountKeys: [] as Row[],
     reach: new Map<string, Set<string>>(),
-    user: { id: "" } as { id: string } | null
+    user: { id: "" } as { id: string } | null,
+    busy: 0
 }));
 
 vi.mock("@polaris/db", () => {
@@ -62,8 +63,10 @@ vi.mock("@polaris/db", () => {
         },
         chatAccountKey: { findMany: async ({ where: w }: { where: Row }) => state.accountKeys.filter((r) => where(r, w)) },
         $executeRaw: async () => 0,
-        $queryRaw: async (_strings: TemplateStringsArray, levels: number[], indexes: number[]) =>
-            state.nodes.filter((n) => levels.some((level, i) => level === n.level && indexes[i] === n.index)),
+        $queryRaw: async (strings: TemplateStringsArray, levels: number[], indexes: number[]) => {
+            if (strings.join("").includes("pg_try_advisory_xact_lock")) return [{ locked: state.busy-- <= 0 }];
+            return state.nodes.filter((n) => levels.some((level, i) => level === n.level && indexes[i] === n.index));
+        },
         $transaction: async <T,>(run: (tx: unknown) => Promise<T>) => run(client)
     };
     return { prisma: client, Prisma: {} };
@@ -115,6 +118,7 @@ beforeEach(() => {
     state.nodes.length = 0;
     state.accountKeys.length = 0;
     state.reach.clear();
+    state.busy = 0;
     state.user = { id: ALICE };
     const { privateKey } = generateKeyPairSync("ed25519");
     const jwk = createPublicKey(privateKey).export({ format: "jwk" }) as { x: string };
@@ -129,6 +133,15 @@ describe("key log server", () => {
         expect(state.entries.map((r) => [r.index, r.userId])).toEqual([[0, ALICE], [1, BOB]]);
         // Two leaves and the subtree over both.
         expect(state.nodes.map((n) => `${n.level}:${n.index}`).sort()).toEqual(["0:0", "0:1", "1:0"]);
+    });
+
+    it("retries a busy lock instead of waiting on it, and gives up after a bounded number of tries", async () => {
+        state.busy = 2;
+        expect(await keyLog.appendEntry(entry(ALICE, 1))).toBe(true);
+        expect(state.entries).toHaveLength(1);
+        state.busy = 100;
+        await expect(keyLog.appendEntry(entry(BOB, 2))).rejects.toThrow("busy");
+        expect(state.entries).toHaveLength(1);
     });
 
     it("answers proofs that verify under a signed head, and appends a key published before the log", async () => {
