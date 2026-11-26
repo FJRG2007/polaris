@@ -25,11 +25,14 @@ const ENCODERS: usize = 3;
 const POWER_BIT: u8 = 0x01;
 
 /// Pressing or releasing a knob nudges its encoder by a few counts
-/// (New-Hera-lunx measured 1-4). Movements this small, in the reports right
-/// after a knob's press changed, are that nudge and not a turn.
+/// (New-Hera-lunx measured 1-4; a real unit through the SDK, 2026-11-26: 1
+/// while held, then 3 and 2 in the two reports after the release). Movements
+/// this small, in the reports right after a knob's press changed, are that
+/// nudge and not a turn.
 pub const PRESS_JITTER_COUNTS: i32 = 4;
-/// How many reports after a press change the nudge is filtered for. Reports
-/// come every 3-16 ms, so this is well under a tenth of a second.
+/// How many reports after a press change the nudge is filtered for. HID
+/// reports come every 3-16 ms, so this is well under a tenth of a second; the
+/// SDK reports only changes, and the measured nudge still fell within two.
 pub const PRESS_JITTER_REPORTS: u8 = 3;
 
 /// Which bit of byte 1 each knob press uses, knob 1 first. The hardware's bit

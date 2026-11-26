@@ -9,7 +9,10 @@
 //!
 //! Layouts are read from the DLL's own code (its input dispatch at
 //! `0x180016ee0`) and from CataclysmX/New-Hera-lunx (`docs/protocol/inputs.md`,
-//! `docs/re/dll-map.md`).
+//! `docs/re/dll-map.md`), and confirmed against a real unit's callbacks
+//! (`tests/fixtures/sdk-states.txt`): every knob counts up clockwise on its own
+//! encoder, one callback per change (about every 16 ms while a knob turns),
+//! and the encoders start at arbitrary absolute values, so only deltas count.
 
 use crate::report::{Report, BUTTON_BITS, DEFAULT_KNOB_BITS};
 use crate::{PRODUCT_ID, VENDOR_ID};
@@ -34,14 +37,18 @@ const INFO_PRODUCT: usize = 0x20e;
 
 /// Which bit of the SDK's button word each knob press uses, knob 1 first.
 ///
-/// UNCONFIRMED: this order is New-Hera-lunx's (`inputs.md`), not measured by
-/// Polaris through the SDK yet, and the HID route measured another order for
-/// the same byte ([`DEFAULT_KNOB_BITS`]). Correct it after the owner's probe
-/// run (probe5) if the presses land on the wrong knobs.
+/// Confirmed on a real unit (firmware 1.40, SDK 0x153) on 2026-11-26: each
+/// knob pressed alone, in order, set exactly these bits, the order the
+/// printed numbers follow (the HID route's byte is ordered otherwise,
+/// [`DEFAULT_KNOB_BITS`]). The callbacks are in
+/// `tests/fixtures/sdk-states.txt`, and agree with New-Hera-lunx's
+/// `inputs.md`.
 pub const SDK_KNOB_BITS: [u32; 4] = [0x0001, 0x0002, 0x0004, 0x0008];
-/// The four lit buttons, button 1 first.
+/// The four lit buttons, button 1 first. Confirmed by the same run.
 pub const SDK_BUTTON_BITS: [u32; 4] = [0x0010, 0x0020, 0x0040, 0x0080];
-/// The power button.
+/// The power button, past the low byte: the reason the word is read whole.
+/// Confirmed by the same run (one click: 0x100 set, then cleared, and the
+/// screen-state byte at `+0x5C` went from 0xBC to 0xD0).
 pub const SDK_POWER_BIT: u32 = 0x0100;
 
 fn u32_at(bytes: &[u8], at: usize) -> u32 {

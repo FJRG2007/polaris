@@ -323,12 +323,32 @@ Stream Control is not running:
    the session alive (its 500 ms keep-alive).
 4. The callback `int cb(int handle, const HSM_INPUT*, void* user)` hands over a
    0x60-byte state: `+0x00` u32 time, `+0x04` u32 buttons, `+0x0C` four i16
-   encoders, `+0x1C`/`+0x3C` VU floats, `+0x5C` screen state. Button bits
-   (New-Hera-lunx, not yet confirmed through the SDK here): knob presses
-   0x01-0x08, lit buttons 0x10-0x80, power 0x100. Each is moved to the HID
-   layout's bit, so both routes share one decoder, its 16-bit wrap and the
-   press-jitter filter (a press nudges its encoder by 1-4 counts).
+   encoders, `+0x1C`/`+0x3C` VU floats, `+0x5C` screen state. Button bits:
+   knob presses 1-4 are 0x01/0x02/0x04/0x08, lit buttons 1-4 0x10/0x20/0x40/0x80,
+   power 0x100. Each is moved to the HID layout's bit, so both routes share one
+   decoder, its 16-bit wrap and the press-jitter filter.
 5. The SDK calls back only on a change, so the first state is preceded by a
    baseline with nothing held.
 
-Not exercised against a device from the development machine.
+Measured on a real unit (firmware 1.40, SDK 0x153) on 2026-11-26 with a
+standalone probe that makes the same calls; the callbacks are kept verbatim in
+`crates/polaris-stream100/tests/fixtures/sdk-states.txt` and replayed by
+`tests/sdk_states.rs`:
+
+- Callbacks arrive on the SDK's own thread on every change; the calling thread
+  needs no message loop (1350 callbacks, 0 window messages).
+- Every knob counts up clockwise on its own encoder (`+0x0C` + 2 x knob). A
+  slow turn is one count per callback; a fast one up to 8 (once 21) per callback,
+  about every 16 ms. The encoders start at arbitrary absolute values (e.g.
+  -4992), so only the 16-bit-wrapped delta from the first state counts.
+- The button bits above, each control pressed alone in order. Power is one
+  click that sets and clears 0x100; the screen-state byte went 0xBC -> 0xD0.
+- A knob press nudged knob 1 by 1 count twice as the finger landed, 1 while
+  held, and 3 then 2 in the two callbacks after the release; knobs 2-4 did
+  not move. The filter drops the held and release nudges; the two before the
+  switch closes are far below one volume step and dropped as a partial step.
+- The log has no detent marker, so it does not measure counts per detent; the
+  HID route's 48 is kept.
+
+The Polaris add-on itself has not been run against the device; only the probe
+has.
