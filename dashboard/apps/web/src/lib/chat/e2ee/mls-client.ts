@@ -618,6 +618,86 @@ export class MlsDevice {
             forum?: { tagIds: readonly string[] };
         } = {}
     ): Promise<string> {
+        const seal = await this.sealCurrent(channelId, plaintext, options.clientKey ?? crypto.randomUUID());
+        const answer = await this.send({
+            op: "send-sealed",
+            channelId,
+            device: this.options.device,
+            clientKey: seal.clientKey,
+            parentId: options.parentId ?? null,
+            replyToId: options.replyToId ?? null,
+            ...(options.uploads?.length ? { uploads: [...options.uploads] } : {}),
+            ...(options.poll ? { poll: options.poll } : {}),
+            ...(options.forum ? { forum: { tagIds: [...options.forum.tagIds] } } : {}),
+            epoch: seal.epoch,
+            senderLeaf: seal.senderLeaf,
+            ciphertext: seal.ciphertext,
+            signature: seal.signature
+        });
+        return String(answer.id);
+    }
+
+    /**
+     * Seal a chat message the way `sendSealed` does and store it to be sent at
+     * `sendAt` (`schedule-sealed`). Answers the waiting row's id.
+     */
+    async scheduleSealed(
+        channelId: string,
+        plaintext: Uint8Array,
+        options: { clientKey?: string; parentId?: string | null; replyToId?: string | null; uploads?: readonly string[]; sendAt: string }
+    ): Promise<string> {
+        const seal = await this.sealCurrent(channelId, plaintext, options.clientKey ?? crypto.randomUUID());
+        const answer = await this.send({
+            op: "schedule-sealed",
+            channelId,
+            device: this.options.device,
+            clientKey: seal.clientKey,
+            parentId: options.parentId ?? null,
+            replyToId: options.replyToId ?? null,
+            ...(options.uploads?.length ? { uploads: [...options.uploads] } : {}),
+            sendAt: options.sendAt,
+            epoch: seal.epoch,
+            senderLeaf: seal.senderLeaf,
+            ciphertext: seal.ciphertext,
+            signature: seal.signature
+        });
+        return String(answer.id);
+    }
+
+    /**
+     * Seal one of this account's scheduled messages again at the
+     * conversation's current epoch (`reseal-scheduled`), bound to the same
+     * message id; `stored` is what the server holds now. Answers false when it
+     * does not open on this device, which leaves it waiting as it was.
+     */
+    async resealScheduled(channelId: string, scheduledId: string, stored: SealedStored): Promise<boolean> {
+        const plaintext = await this.openStored(channelId, stored);
+        if (!plaintext) return false;
+        const seal = await this.sealCurrent(channelId, plaintext, stored.clientKey);
+        if (seal.epoch === stored.epoch) return true;
+        await this.send({
+            op: "reseal-scheduled",
+            channelId,
+            device: this.options.device,
+            scheduledId,
+            epoch: seal.epoch,
+            senderLeaf: seal.senderLeaf,
+            ciphertext: seal.ciphertext,
+            signature: seal.signature
+        });
+        return true;
+    }
+
+    /** Open one of this account's sealed scheduled messages (null when it does not open here). */
+    async openScheduled(channelId: string, stored: SealedStored): Promise<Uint8Array | null> {
+        return this.openStored(channelId, stored);
+    }
+
+    /**
+     * The group brought up to date, then `plaintext` sealed under its current
+     * epoch's history key and signed by this device, bound to `clientKey`.
+     */
+    private async sealCurrent(channelId: string, plaintext: Uint8Array, clientKey: string): Promise<{ clientKey: string; epoch: string; senderLeaf: number; ciphertext: string; signature: string }> {
         this.requireGroup(channelId);
         await this.pull(channelId);
         await this.reconcile(channelId);
@@ -626,26 +706,10 @@ export class MlsDevice {
         const key = await this.historyKey(channelId, epoch);
         // Never sent in the clear instead: the caller shows the send as failed.
         if (!key) throw new Error("this device holds no history key for the conversation's current epoch");
-        const clientKey = options.clientKey ?? crypto.randomUUID();
         const binding = { conversationId: channelId, epoch, messageId: clientKey, senderLeaf: this.member.ownLeaf(groupId) };
         const ciphertext = await content.sealMessage(key, binding, plaintext);
         const signature = this.member.signContent(await content.messageSignaturePayload(binding, ciphertext));
-        const answer = await this.send({
-            op: "send-sealed",
-            channelId,
-            device: this.options.device,
-            clientKey,
-            parentId: options.parentId ?? null,
-            replyToId: options.replyToId ?? null,
-            ...(options.uploads?.length ? { uploads: [...options.uploads] } : {}),
-            ...(options.poll ? { poll: options.poll } : {}),
-            ...(options.forum ? { forum: { tagIds: [...options.forum.tagIds] } } : {}),
-            epoch: epoch.toString(),
-            senderLeaf: binding.senderLeaf,
-            ciphertext: toText(ciphertext),
-            signature: toText(signature)
-        });
-        return String(answer.id);
+        return { clientKey, epoch: epoch.toString(), senderLeaf: binding.senderLeaf, ciphertext: toText(ciphertext), signature: toText(signature) };
     }
 
     /**

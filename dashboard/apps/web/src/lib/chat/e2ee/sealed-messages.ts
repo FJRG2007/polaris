@@ -79,8 +79,15 @@ export class SealedRefusal extends Error {
 
 const owned = (value: Uint8Array): Uint8Array<ArrayBuffer> => new Uint8Array(value);
 
-/** Store one sealed message for `userId`; answers the message id (the stored one on a repeat). */
-export async function sendSealed(userId: string, input: SealedSend): Promise<string> {
+/** What a device sealed and signed for one message, checked the same way wherever it is taken. */
+export type SealedSeal = Pick<SealedSend, "channelId" | "device" | "clientKey" | "epoch" | "senderLeaf" | "ciphertext" | "signature">;
+
+/**
+ * The device is `userId`'s own, the conversation's group exists and is at
+ * least at the seal's epoch, and the signature verifies under the key the
+ * server holds for the device. Answers that key and the group's epoch.
+ */
+export async function verifySeal(userId: string, input: SealedSeal): Promise<{ signatureKey: Uint8Array; groupEpoch: bigint }> {
     const [device, group] = await Promise.all([
         prisma.mlsDevice.findUnique({ where: { userId_device: { userId, device: input.device } }, select: { signatureKey: true } }),
         prisma.mlsGroup.findUnique({ where: { channelId: input.channelId }, select: { epoch: true } })
@@ -91,6 +98,18 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
     const binding = { conversationId: input.channelId, epoch: input.epoch, messageId: input.clientKey, senderLeaf: input.senderLeaf };
     const signatureKey = new Uint8Array(device.signatureKey);
     if (!(await content.verifyMessageSignature(signatureKey, binding, input.ciphertext, input.signature))) throw new SealedRefusal("badSignature");
+    return { signatureKey, groupEpoch: group.epoch };
+}
+
+/**
+ * Store one sealed message for `userId`; answers the message id (the stored one on a repeat).
+ *
+ * `preclaimed` is a scheduled message's sealed files, claimed when it was
+ * scheduled (`scheduled.ts`): they are not claimed again, and a send that
+ * fails leaves their bytes, since the waiting row still names them.
+ */
+export async function sendSealed(userId: string, input: SealedSend, preclaimed?: readonly StoredAttachment[]): Promise<string> {
+    const { signatureKey } = await verifySeal(userId, input);
     const service = serviceKind(userId);
     // A poll carries no files, and is asked by a person.
     if (input.poll && (service || input.uploads?.length)) throw new SealedRefusal("pollRefused");
@@ -100,13 +119,13 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
         if (input.uploads?.length) throw new SealedRefusal("filesRefused");
         return postAsService(service, input, signatureKey);
     }
-    if (input.uploads?.length) {
+    if (input.uploads?.length || preclaimed?.length) {
         // A retry of a send that landed answers the stored message: its uploads were claimed by it.
         const already = await prisma.chatMessage.findFirst({ where: { authorId: userId, clientKey: input.clientKey }, select: { id: true } });
         if (already) return already.id;
     }
-    const files = input.uploads?.length ? await sealedFiles(userId, input.channelId, input.uploads) : [];
-    const id = await sendClaimed(files, () => messages.send(
+    const files = preclaimed ?? (input.uploads?.length ? await sealedFiles(userId, input.channelId, input.uploads) : []);
+    const id = await sendClaimed(preclaimed ? [] : files, () => messages.send(
         { id: userId },
         { channelId: input.channelId, body: "", clientKey: input.clientKey, parentId: input.parentId ?? null },
         files,
@@ -147,7 +166,7 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
  * attach, files allowed here, and no more than the conversation takes. A
  * plain upload is never claimed here, nor a sealed one by the plain send.
  */
-async function sealedFiles(userId: string, channelId: string, uploads: readonly string[]): Promise<StoredAttachment[]> {
+export async function sealedFiles(userId: string, channelId: string, uploads: readonly string[]): Promise<StoredAttachment[]> {
     const rules = await rulesForChannel(channelId);
     if (!(await can(userId, "chat.attach")) || rules.maxAttachments === 0 || uploads.length > rules.maxAttachments) throw new SealedRefusal("filesRefused");
     try {

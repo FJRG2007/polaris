@@ -132,7 +132,8 @@
         "schedule": {
             "noDate": "Elige una fecha y una hora",
             "tooSoon": "Elige una hora dentro de al menos un minuto",
-            "tooFar": "Elige una hora dentro del próximo año"
+            "tooFar": "Elige una hora dentro del próximo año",
+            "sealedKeysChanged": "Las claves del chat cambiaron tras programarlo. Abre el chat para sellarlo otra vez."
         },
         "tooManyMentions": "Aquí un mensaje puede mencionar hasta a {count} personas. Divídelo o usa @everyone.",
         "repeatedMessage": "Acabas de enviar ese mismo mensaje varias veces. Espera un momento.",

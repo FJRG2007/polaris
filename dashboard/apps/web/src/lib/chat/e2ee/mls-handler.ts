@@ -293,6 +293,42 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
             });
             return json({ id });
         }
+        case "schedule-sealed": {
+            const { scheduleSealed } = await import("@/lib/chat/scheduled");
+            const id = await scheduleSealed(
+                { id: userId },
+                {
+                    channelId: body.channelId,
+                    device: body.device,
+                    clientKey: body.clientKey,
+                    parentId: body.parentId,
+                    replyToId: body.replyToId,
+                    ...(body.uploads ? { uploads: body.uploads } : {}),
+                    sendAt: body.sendAt,
+                    epoch: BigInt(body.epoch),
+                    senderLeaf: body.senderLeaf,
+                    ciphertext: bytes(body.ciphertext),
+                    signature: bytes(body.signature)
+                }
+            );
+            return json({ id });
+        }
+        case "reseal-scheduled": {
+            const { resealScheduled } = await import("@/lib/chat/scheduled");
+            await resealScheduled(
+                { id: userId },
+                {
+                    id: body.scheduledId,
+                    channelId: body.channelId,
+                    device: body.device,
+                    epoch: BigInt(body.epoch),
+                    senderLeaf: body.senderLeaf,
+                    ciphertext: bytes(body.ciphertext),
+                    signature: bytes(body.signature)
+                }
+            );
+            return json({ ok: true });
+        }
         case "edit-sealed": {
             const editedAt = await sealed.editSealed(userId, {
                 channelId: body.channelId,

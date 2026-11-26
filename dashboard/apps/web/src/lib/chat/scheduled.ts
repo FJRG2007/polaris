@@ -21,6 +21,14 @@
  * bytes go to storage now and what is kept here is exactly what an attachment
  * row keeps, which makes sending the same call the live path makes.
  *
+ * In a sealed conversation the message is sealed in the writer's browser when
+ * it is scheduled (docs/chat-e2ee-mls.md, "Sealed scheduled messages"): the
+ * row keeps what `send-sealed` would take and an empty body, its sealed files
+ * are claimed at once, and it goes through `sendSealed`. It goes only while the
+ * conversation is still at the epoch it was sealed in - after a member is
+ * removed, a key they hold must not seal anything new - and the writer's
+ * device seals it again at the new epoch whenever it opens the conversation.
+ *
  * Server-only.
  */
 
@@ -30,6 +38,7 @@ import * as core from "@polaris/core";
 import { removeStoredFiles, type StoredAttachment } from "./attachments";
 import { refuseRoomMention } from "./room-mentions";
 import { ChatAccessError, requirePostable, type ChatActor } from "./access";
+import * as sealed from "./e2ee/sealed-messages";
 
 /** One waiting message, as the screen that lists them draws it. */
 export interface ScheduledMessageView {
@@ -45,18 +54,45 @@ export interface ScheduledMessageView {
     /** Why it did not go, for one the sweep could not send. Null for everything
      *  still waiting, which is nearly all of them. */
     readonly failure: string | null;
+    /** A sealed one: what its writer's device opens it from (`body` is empty), the
+     *  fields of `SealedStored`. Null when the device that sealed it is gone. */
+    readonly sealed?: ScheduledSeal | null;
+    /** A sealed one whose conversation has moved past the epoch it was sealed in:
+     *  it does not go until the writer's device seals it again. */
+    readonly resealDue?: boolean;
 }
 
-function view(row: {
+/** A sealed scheduled message as its writer's device opens it (base64url fields). */
+export interface ScheduledSeal {
+    readonly clientKey: string;
+    readonly device: string;
+    readonly epoch: string;
+    readonly senderLeaf: number;
+    readonly ciphertext: string;
+    readonly signature: string;
+    readonly signatureKey: string;
+}
+
+const text = (value: Uint8Array) => Buffer.from(value).toString("base64url");
+
+interface ListedRow {
     id: string;
     channelId: string;
     body: string;
     sendAt: Date;
     replyToId: string | null;
     failure: string | null;
+    clientKey: string | null;
+    e2eeCiphertext: Uint8Array | null;
+    e2eeEpoch: bigint | null;
+    e2eeSenderLeaf: number | null;
+    e2eeDevice: string | null;
+    e2eeSignature: Uint8Array | null;
     files: { name: string; contentType: string }[];
-}): ScheduledMessageView {
-    return {
+}
+
+function view(row: ListedRow, signatureKeys: ReadonlyMap<string, Uint8Array>, groupEpoch: bigint | null): ScheduledMessageView {
+    const base = {
         id: row.id,
         channelId: row.channelId,
         body: row.body,
@@ -64,6 +100,23 @@ function view(row: {
         files: row.files.map((file) => ({ name: file.name, contentType: file.contentType })),
         replying: row.replyToId !== null,
         failure: row.failure
+    };
+    if (row.e2eeCiphertext === null || row.e2eeEpoch === null || !row.clientKey || !row.e2eeDevice || !row.e2eeSignature || row.e2eeSenderLeaf === null) return base;
+    const signatureKey = signatureKeys.get(row.e2eeDevice);
+    return {
+        ...base,
+        sealed: signatureKey
+            ? {
+                  clientKey: row.clientKey,
+                  device: row.e2eeDevice,
+                  epoch: row.e2eeEpoch.toString(),
+                  senderLeaf: row.e2eeSenderLeaf,
+                  ciphertext: text(row.e2eeCiphertext),
+                  signature: text(row.e2eeSignature),
+                  signatureKey: text(signatureKey)
+              }
+            : null,
+        resealDue: groupEpoch !== null && row.e2eeEpoch !== groupEpoch
     };
 }
 
@@ -154,10 +207,123 @@ export async function listScheduled(
             sendAt: true,
             replyToId: true,
             failure: true,
+            clientKey: true,
+            e2eeCiphertext: true,
+            e2eeEpoch: true,
+            e2eeSenderLeaf: true,
+            e2eeDevice: true,
+            e2eeSignature: true,
             files: { select: { name: true, contentType: true } }
         }
     });
-    return rows.map(view);
+    const devices = [...new Set(rows.flatMap((row) => (row.e2eeDevice ? [row.e2eeDevice] : [])))];
+    if (!devices.length) return rows.map((row) => view(row, new Map(), null));
+    // The writer's own devices only: the key a seal verifies under, as `read-sealed` hands it.
+    const [keys, group] = await Promise.all([
+        prisma.mlsDevice.findMany({ where: { userId: actor.id, device: { in: devices } }, select: { device: true, signatureKey: true } }),
+        prisma.mlsGroup.findUnique({ where: { channelId }, select: { epoch: true } })
+    ]);
+    const signatureKeys = new Map(keys.map((key) => [key.device, new Uint8Array(key.signatureKey)]));
+    return rows.map((row) => view(row, signatureKeys, group?.epoch ?? null));
+}
+
+/** What a device sealed for a message it schedules (validated by `mlsBody`, op `schedule-sealed`). */
+export interface SealedSchedule extends sealed.SealedSeal {
+    parentId?: string | null;
+    replyToId?: string | null;
+    /** Sealed files staged for it; claimed now, sent with it. */
+    uploads?: readonly string[];
+    sendAt: string;
+}
+
+/**
+ * Write a sealed one down for later. The seal is checked as a live sealed send
+ * checks it, and at the conversation's current epoch only - the device brought
+ * the group up to date before sealing. A repeat with the same `clientKey`
+ * answers the row already written.
+ */
+export async function scheduleSealed(actor: ChatActor, input: SealedSchedule): Promise<string> {
+    await requirePostable(actor, input.channelId);
+    const sendAt = new Date(input.sendAt);
+    const problem = core.scheduleProblem(sendAt);
+    if (problem) throw new ChatAccessError({ key: `errors.schedule.${problem}` });
+    const already = await prisma.chatScheduledMessage.findFirst({
+        where: { channelId: input.channelId, authorId: actor.id, clientKey: input.clientKey },
+        select: { id: true }
+    });
+    if (already) return already.id;
+    const { groupEpoch } = await sealed.verifySeal(actor.id, input);
+    if (input.epoch !== groupEpoch) throw new sealed.SealedRefusal("olderEpoch");
+
+    const files = input.uploads?.length ? await sealed.sealedFiles(actor.id, input.channelId, input.uploads) : [];
+    try {
+        const row = await prisma.chatScheduledMessage.create({
+            data: {
+                channelId: input.channelId,
+                authorId: actor.id,
+                body: "",
+                parentId: input.parentId ?? null,
+                replyToId: input.replyToId ?? null,
+                sendAt,
+                clientKey: input.clientKey,
+                e2eeCiphertext: new Uint8Array(input.ciphertext),
+                e2eeEpoch: input.epoch,
+                e2eeSenderLeaf: input.senderLeaf,
+                e2eeDevice: input.device,
+                e2eeSignature: new Uint8Array(input.signature),
+                files: {
+                    create: files.map((file) => ({
+                        // The upload's id, which the seal names.
+                        ...(file.id ? { id: file.id } : {}),
+                        sealed: true,
+                        name: file.name,
+                        size: BigInt(file.size),
+                        contentType: file.contentType,
+                        connectionId: file.connectionId,
+                        path: file.path
+                    }))
+                }
+            },
+            select: { id: true }
+        });
+        return row.id;
+    } catch (caught) {
+        // Claimed and then not kept: the bytes would belong to nobody.
+        if (files.length) await removeStoredFiles(files).catch((error: unknown) => console.error("chat: sealed scheduled files were not removed:", error));
+        throw caught;
+    }
+}
+
+/** A sealed scheduled message sealed again by its writer's device at the conversation's current epoch. */
+export type SealedReseal = Omit<sealed.SealedSeal, "clientKey"> & { id: string };
+
+/**
+ * Take the new seal of one of the actor's sealed scheduled messages: the same
+ * message id, the conversation's current epoch, no older than the one it
+ * replaces. A row the sweep set aside because the epoch moved is waiting
+ * again, and goes at the next pass if its hour has passed.
+ */
+export async function resealScheduled(actor: ChatActor, input: SealedReseal): Promise<void> {
+    const row = await prisma.chatScheduledMessage.findFirst({
+        where: { id: input.id, authorId: actor.id, channelId: input.channelId },
+        select: { id: true, clientKey: true, e2eeEpoch: true }
+    });
+    if (!row || !row.clientKey || row.e2eeEpoch === null) throw new ChatAccessError({ key: "errors.scheduledMissing" });
+    const { groupEpoch } = await sealed.verifySeal(actor.id, { ...input, clientKey: row.clientKey });
+    if (input.epoch !== groupEpoch || input.epoch < row.e2eeEpoch) throw new sealed.SealedRefusal("olderEpoch");
+    // Only over the seal it was read at: two tabs sealing it again cannot both land.
+    await prisma.chatScheduledMessage.updateMany({
+        where: { id: row.id, e2eeEpoch: row.e2eeEpoch },
+        data: {
+            e2eeCiphertext: new Uint8Array(input.ciphertext),
+            e2eeEpoch: input.epoch,
+            e2eeSenderLeaf: input.senderLeaf,
+            e2eeDevice: input.device,
+            e2eeSignature: new Uint8Array(input.signature),
+            failure: null,
+            failedAt: null
+        }
+    });
 }
 
 /** Everything this person has waiting, anywhere. What the rail counts. */
@@ -232,8 +398,16 @@ const rowForSending = {
     parentId: true,
     replyToId: true,
     forwarded: true,
+    clientKey: true,
+    e2eeCiphertext: true,
+    e2eeEpoch: true,
+    e2eeSenderLeaf: true,
+    e2eeDevice: true,
+    e2eeSignature: true,
     files: {
         select: {
+            id: true,
+            sealed: true,
             name: true,
             size: true,
             contentType: true,
@@ -260,7 +434,15 @@ interface SendableRow {
     parentId: string | null;
     replyToId: string | null;
     forwarded: boolean;
+    clientKey: string | null;
+    e2eeCiphertext: Uint8Array | null;
+    e2eeEpoch: bigint | null;
+    e2eeSenderLeaf: number | null;
+    e2eeDevice: string | null;
+    e2eeSignature: Uint8Array | null;
     files: {
+        id: string;
+        sealed: boolean;
         name: string;
         size: bigint;
         contentType: string;
@@ -288,6 +470,7 @@ interface SendableRow {
  * nothing deletes.
  */
 async function deliver(row: SendableRow): Promise<void> {
+    if (row.e2eeCiphertext !== null) return deliverSealed(row);
     const attachments: StoredAttachment[] = row.files.map((file) => ({
         name: file.name,
         size: Number(file.size),
@@ -316,6 +499,53 @@ async function deliver(row: SendableRow): Promise<void> {
         },
         attachments,
         row.replyToId ? { messageId: row.replyToId, forwarded: row.forwarded } : null
+    );
+    await prisma.chatScheduledMessage.delete({ where: { id: row.id } });
+}
+
+/**
+ * A sealed one: sent as its writer's device sealed it, through `sendSealed`,
+ * with the files claimed when it was scheduled. Only at the epoch it was sealed
+ * in: a later epoch means the conversation's keys changed - usually somebody
+ * left or was removed - and a key they still hold must not seal a message that
+ * appears after they are gone. It waits for the writer's device to seal it
+ * again (`resealScheduled`).
+ */
+async function deliverSealed(row: SendableRow): Promise<void> {
+    if (row.e2eeEpoch === null || !row.clientKey || !row.e2eeDevice || !row.e2eeSignature || row.e2eeSenderLeaf === null || row.e2eeCiphertext === null) {
+        throw new Error("a sealed scheduled message is missing part of its seal");
+    }
+    const group = await prisma.mlsGroup.findUnique({ where: { channelId: row.channelId }, select: { epoch: true } });
+    if (!group || group.epoch !== row.e2eeEpoch) throw new ChatAccessError({ key: "errors.schedule.sealedKeysChanged" });
+    const files: StoredAttachment[] = row.files.map((file) => ({
+        id: file.id,
+        sealed: true,
+        name: file.name,
+        size: Number(file.size),
+        contentType: file.contentType,
+        connectionId: file.connectionId,
+        path: file.path,
+        spoiler: false,
+        borrowed: false,
+        durationMs: null,
+        waveform: null,
+        posterPath: null,
+        posterConnectionId: null
+    }));
+    await sealed.sendSealed(
+        row.authorId,
+        {
+            channelId: row.channelId,
+            device: row.e2eeDevice,
+            clientKey: row.clientKey,
+            parentId: row.parentId,
+            replyToId: row.replyToId,
+            epoch: row.e2eeEpoch,
+            senderLeaf: row.e2eeSenderLeaf,
+            ciphertext: new Uint8Array(row.e2eeCiphertext),
+            signature: new Uint8Array(row.e2eeSignature)
+        },
+        files
     );
     await prisma.chatScheduledMessage.delete({ where: { id: row.id } });
 }

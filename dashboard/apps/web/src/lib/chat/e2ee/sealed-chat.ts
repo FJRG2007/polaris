@@ -270,6 +270,52 @@ export async function sendSealedMessage(input: SealedSendInput): Promise<string>
 }
 
 /**
+ * Seal one message now and have the server send it at `sendAt`
+ * (docs/chat-e2ee-mls.md, "Sealed scheduled messages"); answers the waiting
+ * row's id. Text and files only, as a plain scheduled message.
+ */
+export async function scheduleSealedMessage(input: Omit<SealedSendInput, "pollRules" | "forumTags" | "poll" | "title"> & { sendAt: string }): Promise<string> {
+    const mls = await device();
+    await mls.ensureGroup(input.channelId);
+    const content = contentOf(input);
+    return mls.scheduleSealed(input.channelId, encodeSealedContent(content), {
+        clientKey: input.clientKey,
+        parentId: input.parentId ?? null,
+        replyToId: input.replyToId ?? null,
+        ...(content.files ? { uploads: content.files.map((file) => file.id) } : {}),
+        sendAt: input.sendAt
+    });
+}
+
+/** Open this account's sealed scheduled messages; answers what each opened to (null for one that did not), by row id. */
+export async function openScheduled(channelId: string, rows: readonly { readonly id: string; readonly sealed: SealedStored }[]): Promise<ReadonlyMap<string, SealedContent | null>> {
+    const out = new Map<string, SealedContent | null>();
+    if (!rows.length) return out;
+    const mls = await device();
+    for (const row of rows) {
+        const opened = await mls.openScheduled(channelId, row.sealed).catch(() => null);
+        out.set(row.id, opened ? decodeSealedContent(opened) : null);
+    }
+    return out;
+}
+
+/**
+ * Seal these scheduled messages again at the conversation's current epoch, so
+ * they still go after its keys changed. Answers how many were sealed again; one
+ * that does not open on this device is left as it was.
+ */
+export async function resealScheduled(channelId: string, rows: readonly { readonly id: string; readonly sealed: SealedStored }[]): Promise<number> {
+    if (!rows.length) return 0;
+    const mls = await device();
+    await mls.ensureGroup(channelId);
+    let done = 0;
+    for (const row of rows) {
+        if (await mls.resealScheduled(channelId, row.id, row.sealed).catch((caught: unknown) => (console.warn("polaris: a scheduled message was not sealed again:", caught), false))) done += 1;
+    }
+    return done;
+}
+
+/**
  * How a failed sealed send reads to the outbox: refused when the server
  * answered it with a refusal, else unreachable (sent again later). Never sent
  * in the clear instead.

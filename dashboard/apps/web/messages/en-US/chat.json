@@ -132,7 +132,8 @@
         "schedule": {
             "noDate": "Pick a date and a time",
             "tooSoon": "Pick a time at least a minute from now",
-            "tooFar": "Pick a time within the next year"
+            "tooFar": "Pick a time within the next year",
+            "sealedKeysChanged": "This chat's keys changed after you scheduled it. Open the chat to seal it again."
         },
         "tooManyMentions": "One message can mention up to {count} people here. Split it up, or use @everyone.",
         "repeatedMessage": "You have just sent that same message several times. Give it a moment.",

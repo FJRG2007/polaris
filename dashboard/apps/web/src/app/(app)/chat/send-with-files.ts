@@ -77,6 +77,8 @@ export interface FilesMessage {
     readonly beforePost?: () => void;
     /** A new post in a sealed forum: its title goes inside the seal, its tags beside it. */
     readonly forum?: { readonly title: string; readonly tagIds: readonly string[] };
+    /** Sealed only: written now and sent by the server at this time (`scheduleSealedMessage`). */
+    readonly sendAt?: string;
 }
 
 /**
@@ -261,7 +263,7 @@ export async function sendWithFiles(message: FilesMessage): Promise<"sent" | Exc
  * the server reads, so it carries a sealed copy. Files sent to be seen once
  * are not sealed yet, so a message carrying them is not sent at all.
  */
-async function sendSealedWithFiles(message: FilesMessage): Promise<"sent" | Exclude<SendOutcome, void>> {
+export async function sendSealedWithFiles(message: FilesMessage): Promise<"sent" | Exclude<SendOutcome, void>> {
     const { channelId, body, track, report, notUploaded } = message;
     if ((message.viewOnce ?? []).length > 0) return { error: message.notSent };
     const fromDrive = message.fromDrive ?? [];
@@ -314,6 +316,18 @@ async function sendSealedWithFiles(message: FilesMessage): Promise<"sent" | Excl
     message.beforePost?.();
     const fields = message.fields ?? {};
     try {
+        if (message.sendAt) {
+            await sealedChat.scheduleSealedMessage({
+                channelId,
+                body,
+                clientKey: crypto.randomUUID(),
+                parentId: fields.parentId ?? null,
+                replyToId: fields.replyToId ?? null,
+                files: refs,
+                sendAt: message.sendAt
+            });
+            return "sent";
+        }
         const id = await sealedChat.sendSealedMessage({
             channelId,
             body,

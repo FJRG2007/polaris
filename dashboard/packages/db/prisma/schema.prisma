@@ -12053,6 +12053,16 @@ model ChatScheduledMessage {
     // and to the words they wrote.
     failure    String?
     failedAt   DateTime?
+    // Sealed in the writer's browser (docs/chat-e2ee-mls.md, "Sealed scheduled
+    // messages"): `body` is empty and these are what `send-sealed` would have
+    // taken, kept until it goes. `clientKey` is the message id the seal is bound
+    // to. All null for a plain one.
+    clientKey      String? @db.Uuid
+    e2eeCiphertext Bytes?
+    e2eeEpoch      BigInt?
+    e2eeSenderLeaf Int?
+    e2eeDevice     String?
+    e2eeSignature  Bytes?
 
     channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
     author  User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
@@ -12120,6 +12130,9 @@ model ChatScheduledFile {
     width        Int?
     height       Int?
     thumbhash    String?
+    // A sealed file of a sealed scheduled message: the row's id is its upload's,
+    // which the seal names, and its key is inside the seal.
+    sealed       Boolean  @default(false)
     createdAt    DateTime @default(now())
 
     scheduled ChatScheduledMessage @relation(fields: [scheduledId], references: [id], onDelete: Cascade)

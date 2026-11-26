@@ -256,6 +256,32 @@ export const mlsBody = z.discriminatedUnion("op", [
         ciphertext: base64Url(17, 256 * 1024),
         signature: base64Url(64, 64)
     }),
+    // A sealed message written now and sent later: what `send-sealed` takes (no poll, no forum post) and when it goes.
+    z.object({
+        op: z.literal("schedule-sealed"),
+        channelId,
+        device: deviceId,
+        clientKey: z.string().uuid(),
+        parentId: z.string().uuid().nullable().optional(),
+        replyToId: z.string().uuid().nullable().optional(),
+        uploads: z.array(z.string().uuid()).min(1).max(25).optional(),
+        sendAt: core.chatScheduleSchema.shape.sendAt,
+        epoch,
+        senderLeaf: z.number().int().min(0).max(0xffffffff),
+        ciphertext: base64Url(17, 256 * 1024),
+        signature: base64Url(64, 64)
+    }),
+    // One of the caller's sealed scheduled messages sealed again at the conversation's current epoch.
+    z.object({
+        op: z.literal("reseal-scheduled"),
+        channelId,
+        device: deviceId,
+        scheduledId: z.string().uuid(),
+        epoch,
+        senderLeaf: z.number().int().min(0).max(0xffffffff),
+        ciphertext: base64Url(17, 256 * 1024),
+        signature: base64Url(64, 64)
+    }),
     z.object({ op: z.literal("read-sealed"), channelId, messageIds: z.array(z.string().uuid()).min(1).max(100) })
 ]);
 export type MlsBody = z.infer<typeof mlsBody>;
