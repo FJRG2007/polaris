@@ -128,6 +128,51 @@ describe("peer key memory", () => {
             });
         });
 
+        describe("recovery custodians", () => {
+            const CUSTODIAN = "0190a1b2-0000-7000-8000-0000000000b1";
+            const OTHER = "0190a1b2-0000-7000-8000-0000000000b2";
+            const bytes = (n: number) => new Uint8Array(32).fill(n);
+            let own = 0;
+
+            async function logWith(...entries: Array<{ userId: string; akVersion: number; hpke: number }>) {
+                stubStorage();
+                const fake = await FakeKeyLog.create();
+                for (const e of entries) await fake.append({ userId: e.userId, akVersion: e.akVersion, signPublicKey: bytes(9), hpkePublicKey: bytes(e.hpke) });
+                const ownId = `custodian-check-${++own}`;
+                const bodies: unknown[] = [];
+                vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+                    const body = JSON.parse(init.body as string);
+                    bodies.push(body);
+                    return Response.json(await fake.answer(ownId, body));
+                });
+                return { ownId, bodies };
+            }
+
+            it("vouches only when every custodian's key is the logged one at that version, asking in the recovery scope", async () => {
+                const { ownId, bodies } = await logWith({ userId: CUSTODIAN, akVersion: 1, hpke: 2 }, { userId: OTHER, akVersion: 3, hpke: 4 });
+                expect(await keyLog.vouchedCustodians(ownId, [{ userId: CUSTODIAN, akVersion: 1, hpkePublicKey: bytes(2) }, { userId: OTHER, akVersion: 3, hpkePublicKey: bytes(4) }])).toBe(true);
+                expect(bodies[0]).toMatchObject({ op: "proofs", recovery: true, userIds: [CUSTODIAN, OTHER] });
+            });
+
+            it("fails closed on a substituted key, a missing account, another version or no answer", async () => {
+                const substituted = await logWith({ userId: CUSTODIAN, akVersion: 1, hpke: 2 });
+                expect(await keyLog.vouchedCustodians(substituted.ownId, [{ userId: CUSTODIAN, akVersion: 1, hpkePublicKey: bytes(7) }])).toBe(false);
+                expect(keyLog.logProblem(substituted.ownId)).toBe("inclusion");
+
+                const missing = await logWith({ userId: CUSTODIAN, akVersion: 1, hpke: 2 });
+                expect(await keyLog.vouchedCustodians(missing.ownId, [{ userId: CUSTODIAN, akVersion: 1, hpkePublicKey: bytes(2) }, { userId: OTHER, akVersion: 1, hpkePublicKey: bytes(2) }])).toBe(false);
+
+                const rotated = await logWith({ userId: CUSTODIAN, akVersion: 2, hpke: 5 });
+                expect(await keyLog.vouchedCustodians(rotated.ownId, [{ userId: CUSTODIAN, akVersion: 1, hpkePublicKey: bytes(2) }])).toBe(false);
+                expect(keyLog.logProblem(rotated.ownId)).toBeNull();
+
+                stubStorage();
+                vi.stubGlobal("fetch", async () => new Response("{}", { status: 503 }));
+                expect(await keyLog.vouchedCustodians("custodian-check-down", [{ userId: CUSTODIAN, akVersion: 1, hpkePublicKey: bytes(2) }])).toBe(false);
+                expect(await keyLog.vouchedCustodians("custodian-check-down", [])).toBe(false);
+            });
+        });
+
         it("stores per account and tells subscribers", () => {
             stubStorage();
             let calls = 0;

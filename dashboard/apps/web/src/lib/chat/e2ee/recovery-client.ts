@@ -10,6 +10,7 @@
 
 import type { KeysBody } from "./schemas";
 import * as policy from "./recovery-policy";
+import * as keyLog from "./key-log-client";
 import * as recovery from "@polaris/chat-crypto/recovery";
 import { fromText, toText } from "./base64url";
 
@@ -18,6 +19,8 @@ const DB = "polaris-chat-recovery";
 const STORE = "requester";
 /** At most one share check per tab in this long: the state read is a few rows, but the MLS device asks often. */
 const REFRESH_MS = 10 * 60 * 1000;
+/** A log that could not vouch for a custodian is asked again sooner: usually a rotation in between. */
+const RETRY_MS = 60 * 1000;
 
 export interface RecoveryState {
     readonly scope: string;
@@ -87,10 +90,20 @@ export async function refreshShares(ownerId: string, accountKey: Uint8Array, akV
         lastRefresh = Date.now();
         const state = await recoveryState();
         if (!state || !policy.needsSplit(akVersion, state, state.shares) || state.custodians.length === 0) return;
+        const custodians = state.custodians.map((c) => ({
+            userId: c.userId,
+            akVersion: c.akVersion,
+            hpkePublicKey: fromText(c.hpkePublicKey)
+        }));
+        // Fail closed: a share sealed to a key the log does not hold could be the server's own.
+        if (!(await keyLog.vouchedCustodians(ownerId, custodians))) {
+            lastRefresh = Date.now() - REFRESH_MS + RETRY_MS;
+            return;
+        }
         const splitId = crypto.randomUUID();
         const shares = await recovery.splitAccountKey(
             accountKey,
-            state.custodians.map((c) => ({ userId: c.userId, akVersion: c.akVersion, hpkePublicKey: fromText(c.hpkePublicKey) })),
+            custodians,
             state.threshold,
             { ownerId, akVersion, splitId }
         );

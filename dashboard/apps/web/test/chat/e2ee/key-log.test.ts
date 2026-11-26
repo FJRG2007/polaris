@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
     accountKeys: [] as Row[],
     handovers: [] as Row[],
     reach: new Map<string, Set<string>>(),
+    peers: new Set<string>(),
     user: { id: "" } as { id: string } | null,
     busy: 0
 }));
@@ -125,6 +126,7 @@ vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true 
 vi.mock("@/lib/chat/access", () => ({
     channelAccess: async (user: { id: string }, channelId: string) => state.reach.get(channelId)?.has(user.id) ?? false
 }));
+vi.mock("@/lib/chat/e2ee/recovery-service", () => ({ recoveryPeers: async () => new Set(state.peers) }));
 
 import * as keyLog from "@/lib/chat/e2ee/key-log";
 import * as log from "@polaris/chat-crypto/key-log";
@@ -164,6 +166,7 @@ beforeEach(() => {
     state.accountKeys.length = 0;
     state.handovers = [];
     state.reach.clear();
+    state.peers.clear();
     state.busy = 0;
     state.user = { id: ALICE };
     const { privateKey } = generateKeyPairSync("ed25519");
@@ -295,8 +298,27 @@ describe("key log route", () => {
         expect(outside.entries).toEqual([]);
     });
 
+    it("answers the recovery scope only for the caller's recovery peers, with proofs under the signed head", async () => {
+        await keyLog.appendEntry(entry(BOB, 2));
+        await keyLog.appendEntry(entry(CAROL, 3));
+        state.peers.add(BOB);
+        const response = await handleKeyLog(request({ op: "proofs", recovery: true, userIds: [BOB, CAROL] }));
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as {
+            entries: { userId: string; index: number; proof: string[] }[];
+            head: { treeSize: number };
+        };
+        expect(body.entries.map((e) => e.userId)).toEqual([BOB]);
+        expect(body.head.treeSize).toBe(2);
+        state.peers.clear();
+        const none = (await (await handleKeyLog(request({ op: "proofs", recovery: true, userIds: [BOB] }))).json()) as { entries: unknown[] };
+        expect(none.entries).toEqual([]);
+    });
+
     it("refuses a malformed body and a missing session", async () => {
         expect((await handleKeyLog(request({ op: "proofs", userIds: [] }))).status).toBe(400);
+        expect((await handleKeyLog(request({ op: "proofs", recovery: true, channelId: CHANNEL, userIds: [BOB] }))).status).toBe(400);
+        expect((await handleKeyLog(request({ op: "proofs", recovery: false, userIds: [BOB] }))).status).toBe(400);
         expect((await handleKeyLog(request({ op: "own", extra: 1 }))).status).toBe(400);
         state.user = null;
         expect((await handleKeyLog(request({ op: "own" }))).status).toBe(401);

@@ -90,6 +90,9 @@ const answerSchema = z.object({
 
 type Answer = z.input<typeof answerSchema>;
 
+/** What a browser asks the route: proofs in a conversation, for recovery, of itself, or its own entries. */
+type LogAsk = { op: "proofs"; userIds: string[]; channelId?: string; recovery?: true } | { op: "own" };
+
 export function readSeen(ownId: string): SeenHead | null {
     try {
         const raw = window.localStorage.getItem(PREFIX + ownId);
@@ -232,7 +235,7 @@ const queues = new Map<string, Promise<unknown>>();
  * larger would be remembered - the other fork's entries accepted unchecked
  * against it.
  */
-export function askLog(ownId: string, body: { op: "proofs"; userIds: string[]; channelId?: string } | { op: "own" }): Promise<LogCheck> {
+export function askLog(ownId: string, body: LogAsk): Promise<LogCheck> {
     const run = (queues.get(ownId) ?? Promise.resolve()).then(() => askOnce(ownId, body));
     const settled = run.catch(() => undefined);
     queues.set(ownId, settled);
@@ -242,7 +245,7 @@ export function askLog(ownId: string, body: { op: "proofs"; userIds: string[]; c
     return run;
 }
 
-async function askOnce(ownId: string, body: { op: "proofs"; userIds: string[]; channelId?: string } | { op: "own" }): Promise<LogCheck> {
+async function askOnce(ownId: string, body: LogAsk): Promise<LogCheck> {
     const seen = readSeen(ownId);
     let answer: Answer;
     try {
@@ -329,6 +332,33 @@ export async function vouchedAccounts(
     const freshByUser = new Map(fresh.map((key) => [key.userId, key]));
     // A key no longer served (they left, or removed it) is not a contradiction; one still served and still different is.
     if (differing.some((userId) => freshByUser.has(userId) && !servedMatches(latest.get(userId), freshByUser.get(userId)!))) report(ownId, "inclusion");
+    return vouched;
+}
+
+/**
+ * Whether the log vouches for every one of these recovery custodians' keys at
+ * exactly the version served (the `recovery` scope of the route). Anything
+ * short of that - the log not answering, an answer that fails its checks, an
+ * account missing, another version or another key - is `false`: a share is
+ * never sealed to a key the log does not hold. A key the log contradicts while
+ * the version agrees is reported; a different version is a rotation between
+ * the two asks and is only retried later.
+ */
+export async function vouchedCustodians(
+    ownId: string,
+    custodians: ReadonlyArray<{ userId: string; akVersion: number; hpkePublicKey: Uint8Array }>
+): Promise<boolean> {
+    if (!custodians.length) return false;
+    const check = await askLog(ownId, { op: "proofs", recovery: true, userIds: custodians.map((c) => c.userId) });
+    if (check.kind !== "verified") return false;
+    const byUser = new Map(check.entries.map((e) => [e.userId, e]));
+    let vouched = true;
+    for (const custodian of custodians) {
+        const entry = byUser.get(custodian.userId);
+        if (entry && entry.akVersion === custodian.akVersion && equal(entry.hpkePublicKey, custodian.hpkePublicKey)) continue;
+        vouched = false;
+        if (entry && entry.akVersion === custodian.akVersion) report(ownId, "inclusion");
+    }
     return vouched;
 }
 

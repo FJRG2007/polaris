@@ -90,6 +90,25 @@ async function custodiansOf(userId: string) {
     return { scope, orgName, ...chosen };
 }
 
+/**
+ * The accounts whose logged keys this one may ask the key log for under the
+ * `recovery` scope: its custodians now, the custodians its stored shares were
+ * sealed to, and the accounts whose shares it holds. Nothing the recovery
+ * state does not already show it.
+ */
+export async function recoveryPeers(userId: string): Promise<Set<string>> {
+    const [wanted, sealedTo, heldFor] = await Promise.all([
+        custodiansOf(userId),
+        prisma.chatRecoveryShare.findMany({ where: { ownerId: userId }, select: { custodianId: true }, take: 16 }),
+        prisma.chatRecoveryShare.findMany({ where: { custodianId: userId }, select: { ownerId: true }, take: 500 })
+    ]);
+    return new Set([
+        ...wanted.custodians.map((custodian) => custodian.userId),
+        ...sealedTo.map((share) => share.custodianId),
+        ...heldFor.map((share) => share.ownerId)
+    ]);
+}
+
 const SHARE_SELECT = {
     custodianId: true,
     custodianAkVersion: true,

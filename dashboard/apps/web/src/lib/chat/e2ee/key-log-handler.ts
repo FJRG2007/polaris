@@ -6,7 +6,10 @@
  *   With a `channelId`, only accounts that reach a conversation the caller
  *   reaches are answered - anybody else is left out, exactly as one without a
  *   key, the rule `account-keys` follows - so it tells nobody who exists or who
- *   set up encryption. Without one, only the caller's own account.
+ *   set up encryption. With `recovery: true` instead, only the caller's
+ *   recovery custodians and the accounts whose shares the caller holds
+ *   (`recoveryPeers`): what the caller's browser checks before it seals a
+ *   share to anybody. Without either, only the caller's own account.
  * - `own`: every entry of the caller's own account, for its browsers to
  *   monitor.
  *
@@ -21,6 +24,7 @@ import { chatE2eeEnabled } from "./flag";
 import { NextResponse } from "next/server";
 import { backgroundUser } from "@/lib/session";
 import { channelAccess } from "@/lib/chat/access";
+import { recoveryPeers } from "./recovery-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -36,12 +40,13 @@ export const keyLogBody = z.discriminatedUnion("op", [
     z.object({
         op: z.literal("proofs"),
         channelId: z.string().uuid().optional(),
+        recovery: z.literal(true).optional(),
         userIds: z.array(z.string().uuid()).min(1).max(PROOF_PAGE),
         since,
         logKey
     }).strict(),
     z.object({ op: z.literal("own"), since, logKey }).strict()
-]);
+]).refine((body) => body.op !== "proofs" || !(body.channelId && body.recovery), { message: "One scope at a time" });
 
 export type KeyLogBody = z.infer<typeof keyLogBody>;
 
@@ -115,6 +120,10 @@ async function answer(userId: string, body: KeyLogBody): Promise<keyLog.LogAnswe
     if (body.op === "own") return keyLog.ownEntries(userId, seen);
     const distinct = [...new Set(body.userIds)];
     const { channelId } = body;
+    if (body.recovery) {
+        const peers = await recoveryPeers(userId);
+        return keyLog.keyProofs(distinct.filter((id) => peers.has(id)), seen);
+    }
     if (!channelId) return keyLog.keyProofs(distinct.filter((id) => id === userId), seen);
     const callerReaches = await channelAccess({ id: userId }, channelId);
     const reach = callerReaches ? await Promise.all(distinct.map((id) => channelAccess({ id }, channelId))) : [];
