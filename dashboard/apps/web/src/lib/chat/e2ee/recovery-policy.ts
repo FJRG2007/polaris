@@ -21,6 +21,18 @@ export const PASSWORD_RECOVERED = "account.password.recovered";
 /** "org:<id>" for an organisation's administrators, "instance" for the instance's. */
 export type RecoveryScope = `org:${string}` | "instance";
 
+/**
+ * The organisation an account's recovery belongs to: the one it joined or
+ * created first (its earliest membership or ownership), or none.
+ */
+export function firstOrg(
+    membership: { orgId: string; createdAt: Date } | null | undefined,
+    owned: { id: string; createdAt: Date } | null | undefined
+): string | null {
+    if (membership && owned) return membership.createdAt <= owned.createdAt ? membership.orgId : owned.id;
+    return membership?.orgId ?? owned?.id ?? null;
+}
+
 export interface CustodianKey {
     readonly userId: string;
     readonly akVersion: number;

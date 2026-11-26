@@ -188,3 +188,28 @@ export async function recoveryKeyPair(seed: Uint8Array): Promise<{ privateKey: C
         ikm.fill(0);
     }
 }
+
+/** What an `ORK`'s seed shares are bound to: owner `ork:<id>`, version 1, the key id as the split. */
+export function recoveryKeyBinding(keyId: string): ShareBinding {
+    return { ownerId: `ork:${keyId}`, akVersion: 1, splitId: keyId };
+}
+
+/**
+ * Create a scope's `ORK` in a custodian's browser: a fresh seed, its public
+ * key, and the seed split `threshold` of `custodians.length` to the custodians'
+ * account keys (checked against the key log by the caller). The seed is zeroed
+ * before this returns; nobody holds it whole afterwards.
+ */
+export async function createRecoveryKey(
+    keyId: string,
+    custodians: ReadonlyArray<Custodian>,
+    threshold: number
+): Promise<{ publicKey: Uint8Array; shares: SealedShare[] }> {
+    const seed = crypto.getRandomValues(new Uint8Array(ACCOUNT_KEY_BYTES));
+    try {
+        const { publicKey } = await recoveryKeyPair(seed);
+        return { publicKey, shares: await splitAccountKey(seed, custodians, threshold, recoveryKeyBinding(keyId)) };
+    } finally {
+        seed.fill(0);
+    }
+}

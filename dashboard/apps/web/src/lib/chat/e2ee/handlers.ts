@@ -191,6 +191,8 @@ export async function handleSignIn(request: Request): Promise<Response> {
             case "recovery-approve":
             case "recovery-decline":
             case "recovery-complete":
+            case "recovery-key-state":
+            case "put-recovery-key":
                 return await recoveryOp(user.id, body);
         }
     } catch (caught) {
@@ -373,7 +375,7 @@ export async function handleKeys(request: Request): Promise<Response> {
 
 type RecoveryBody = Extract<
     KeysBody,
-    { op: "recovery-state" | "put-recovery-shares" | "recovery-own" | "recovery-open" | "recovery-inbox" | "recovery-approve" | "recovery-decline" | "recovery-complete" }
+    { op: "recovery-state" | "put-recovery-shares" | "recovery-own" | "recovery-open" | "recovery-inbox" | "recovery-approve" | "recovery-decline" | "recovery-complete" | "recovery-key-state" | "put-recovery-key" }
 >;
 
 /** The quorum recovery ops, each scoped to the signed-in account. */
@@ -444,5 +446,22 @@ async function recoveryOp(userId: string, body: RecoveryBody): Promise<NextRespo
         case "recovery-complete":
             await recovery.completeRequest(userId, body.requestId);
             return json({ completed: true });
+        case "recovery-key-state": {
+            const scopes = await recovery.recoveryKeyState(userId);
+            return json({
+                scopes: scopes.map((entry) => ({
+                    ...entry,
+                    custodians: entry.custodians.map((c) => ({ userId: c.userId, akVersion: c.akVersion, hpkePublicKey: text(c.hpkePublicKey) }))
+                }))
+            });
+        }
+        case "put-recovery-key":
+            return json(
+                await recovery.putRecoveryKey(userId, {
+                    ...body,
+                    hpkePublicKey: bytes(body.hpkePublicKey),
+                    shares: body.shares.map((share) => ({ ...share, envelope: bytes(share.envelope) }))
+                })
+            );
     }
 }

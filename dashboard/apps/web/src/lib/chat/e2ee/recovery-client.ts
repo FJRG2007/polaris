@@ -88,6 +88,7 @@ export async function refreshShares(ownerId: string, accountKey: Uint8Array, akV
     try {
         if (Date.now() - lastRefresh < REFRESH_MS) return;
         lastRefresh = Date.now();
+        await ensureRecoveryKeys(ownerId);
         const state = await recoveryState();
         if (!state || !policy.needsSplit(akVersion, state, state.shares) || state.custodians.length === 0) return;
         const custodians = state.custodians.map((c) => ({
@@ -119,6 +120,45 @@ export async function refreshShares(ownerId: string, accountKey: Uint8Array, akV
         console.error("polaris: recovery shares could not be refreshed:", caught);
     } finally {
         accountKey.fill(0);
+    }
+}
+
+export interface RecoveryKeyScope {
+    readonly scope: string;
+    readonly orgName: string | null;
+    readonly threshold: number;
+    readonly custodians: ReadonlyArray<{ userId: string; akVersion: number; hpkePublicKey: string }>;
+    readonly key: { id: string; current: boolean } | null;
+}
+
+/**
+ * As a custodian, create the organisation recovery key of every scope that has
+ * none: a fresh seed split to the scope's custodians, each checked against the
+ * key log first, exactly as an account's own shares are. A scope whose key no
+ * longer matches its custodians is left alone: splitting that seed again needs
+ * a quorum to rebuild it, which is not built. Never throws.
+ */
+export async function ensureRecoveryKeys(userId: string): Promise<void> {
+    try {
+        const scopes = (await post<{ scopes: RecoveryKeyScope[] }>({ op: "recovery-key-state" }))?.scopes ?? [];
+        for (const entry of scopes) {
+            if (entry.key || entry.custodians.length === 0) continue;
+            const custodians = entry.custodians.map((c) => ({ userId: c.userId, akVersion: c.akVersion, hpkePublicKey: fromText(c.hpkePublicKey) }));
+            // Fail closed, as for an account's shares: a key the log does not hold could be the server's own.
+            if (!(await keyLog.vouchedCustodians(userId, custodians))) continue;
+            const id = crypto.randomUUID();
+            const created = await recovery.createRecoveryKey(id, custodians, entry.threshold);
+            await post({
+                op: "put-recovery-key",
+                id,
+                scope: entry.scope,
+                hpkePublicKey: toText(created.publicKey),
+                threshold: entry.threshold,
+                shares: created.shares.map((share) => ({ ...share, envelope: toText(share.envelope) }))
+            });
+        }
+    } catch (caught) {
+        console.error("polaris: an organisation recovery key could not be created:", caught);
     }
 }
 

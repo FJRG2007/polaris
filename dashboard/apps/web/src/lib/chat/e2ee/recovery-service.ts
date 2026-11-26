@@ -55,13 +55,13 @@ async function scopeOf(userId: string): Promise<{ scope: policy.RecoveryScope; o
             select: { id: true, createdAt: true }
         })
     ]);
-    const orgId =
-        membership && owned
-            ? membership.createdAt <= owned.createdAt
-                ? membership.orgId
-                : owned.id
-            : (membership?.orgId ?? owned?.id ?? null);
-    if (!orgId) return { scope: "instance", orgName: null, candidates: await usersWithPermission("users.manage") };
+    return candidatesFor(policy.firstOrg(membership, owned));
+}
+
+/** A scope's candidate custodians in order: the organisation's owner and admins, or the instance's. */
+async function candidatesFor(orgId: string | null): Promise<{ scope: policy.RecoveryScope; orgName: string | null; candidates: string[] }> {
+    const instance = async () => ({ scope: "instance" as const, orgName: null, candidates: await usersWithPermission("users.manage") });
+    if (!orgId) return instance();
     const org = await prisma.organization.findUnique({
         where: { id: orgId },
         select: {
@@ -70,7 +70,7 @@ async function scopeOf(userId: string): Promise<{ scope: policy.RecoveryScope; o
             members: { where: { role: "admin" }, orderBy: { createdAt: "asc" }, select: { userId: true }, take: 20 }
         }
     });
-    if (!org) return { scope: "instance", orgName: null, candidates: await usersWithPermission("users.manage") };
+    if (!org) return instance();
     return {
         scope: `org:${orgId}`,
         orgName: org.name,
@@ -78,37 +78,72 @@ async function scopeOf(userId: string): Promise<{ scope: policy.RecoveryScope; o
     };
 }
 
-async function custodiansOf(userId: string) {
-    const { scope, orgName, candidates } = await scopeOf(userId);
+/** The keyed custodians among `candidates` and the threshold, never `ownerId` itself. */
+async function chosenAmong(ownerId: string, candidates: readonly string[]) {
     const ids = candidates.slice(0, 50);
     const keys = await prisma.chatAccountKey.findMany({
         where: { userId: { in: ids } },
         select: { userId: true, akVersion: true, hpkePublicKey: true }
     });
     const byId = new Map(keys.map((key) => [key.userId, key]));
-    const chosen = policy.chooseCustodians<CustodianRow>(
-        userId,
+    return policy.chooseCustodians<CustodianRow>(
+        ownerId,
         ids.map((id) => byId.get(id))
     );
-    return { scope, orgName, ...chosen };
+}
+
+async function custodiansOf(userId: string) {
+    const { scope, orgName, candidates } = await scopeOf(userId);
+    return { scope, orgName, ...(await chosenAmong(userId, candidates)) };
+}
+
+/**
+ * The scopes this account is one of the chosen custodians of: the
+ * organisations it owns or administers (at most 20) and the instance when it
+ * holds `users.manage`. Each with its custodians and threshold, as for an
+ * account; the owner id is the scope itself, so nobody is left out of it.
+ */
+export async function custodianScopes(userId: string) {
+    const [owned, administered, instanceAdmins] = await Promise.all([
+        prisma.organization.findMany({ where: { ownerId: userId }, orderBy: { createdAt: "asc" }, select: { id: true }, take: 20 }),
+        prisma.organizationMember.findMany({ where: { userId, role: "admin" }, orderBy: { createdAt: "asc" }, select: { orgId: true }, take: 20 }),
+        usersWithPermission("users.manage")
+    ]);
+    const orgIds = [...new Set([...owned.map((org) => org.id), ...administered.map((member) => member.orgId)])].slice(0, 20);
+    const scopes = await Promise.all([
+        ...orgIds.map((orgId) => candidatesFor(orgId)),
+        ...(instanceAdmins.includes(userId) ? [candidatesFor(null)] : [])
+    ]);
+    const chosen = await Promise.all(
+        scopes.map(async ({ scope, orgName, candidates }) => ({ scope, orgName, ...(await chosenAmong(`ork:${scope}`, candidates)) }))
+    );
+    const seen = new Set<string>();
+    return chosen.filter((entry) => {
+        if (seen.has(entry.scope) || !entry.custodians.some((custodian) => custodian.userId === userId)) return false;
+        seen.add(entry.scope);
+        return true;
+    });
 }
 
 /**
  * The accounts whose logged keys this one may ask the key log for under the
  * `recovery` scope: its custodians now, the custodians its stored shares were
- * sealed to, and the accounts whose shares it holds. Nothing the recovery
- * state does not already show it.
+ * sealed to, the accounts whose shares it holds, and its fellow custodians of
+ * every scope's organisation recovery key. Nothing the recovery state does not
+ * already show it.
  */
 export async function recoveryPeers(userId: string): Promise<Set<string>> {
-    const [wanted, sealedTo, heldFor] = await Promise.all([
+    const [wanted, sealedTo, heldFor, scopes] = await Promise.all([
         custodiansOf(userId),
         prisma.chatRecoveryShare.findMany({ where: { ownerId: userId }, select: { custodianId: true }, take: 16 }),
-        prisma.chatRecoveryShare.findMany({ where: { custodianId: userId }, select: { ownerId: true }, take: 500 })
+        prisma.chatRecoveryShare.findMany({ where: { custodianId: userId }, select: { ownerId: true }, take: 500 }),
+        custodianScopes(userId)
     ]);
     return new Set([
         ...wanted.custodians.map((custodian) => custodian.userId),
         ...sealedTo.map((share) => share.custodianId),
-        ...heldFor.map((share) => share.ownerId)
+        ...heldFor.map((share) => share.ownerId),
+        ...scopes.flatMap((scope) => scope.custodians.map((custodian) => custodian.userId))
     ]);
 }
 
@@ -402,6 +437,108 @@ export async function declineRequest(custodianId: string, requestId: string, now
     });
     if (declined) await tell(request.userId, "chat_recovery_declined", "chat_recovery_declined_body");
     return { declined };
+}
+
+/**
+ * The organisation recovery key (`ORK`) of each scope this account is a
+ * custodian of: the custodians and threshold a new one would be split to, and
+ * the live key if there is one (`current` when its shares still match those
+ * custodians). A custodian's browser creates the key where there is none.
+ */
+export async function recoveryKeyState(userId: string) {
+    const scopes = await custodianScopes(userId);
+    if (scopes.length === 0) return [];
+    const keys = await prisma.chatRecoveryKey.findMany({
+        where: { scope: { in: scopes.map((scope) => scope.scope) }, retiredAt: null },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, scope: true, threshold: true, shares: { select: { custodianId: true, custodianAkVersion: true }, take: 16 } },
+        take: 100
+    });
+    return scopes.map((entry) => {
+        const live = keys.find((key) => key.scope === entry.scope) ?? null;
+        const current =
+            live !== null &&
+            live.threshold === entry.threshold &&
+            live.shares.length === entry.custodians.length &&
+            entry.custodians.every((custodian) =>
+                live.shares.some((share) => share.custodianId === custodian.userId && share.custodianAkVersion === custodian.akVersion)
+            );
+        return {
+            scope: entry.scope,
+            orgName: entry.orgName,
+            threshold: entry.threshold,
+            custodians: entry.custodians,
+            key: live ? { id: live.id, current } : null
+        };
+    });
+}
+
+/**
+ * Store a scope's first `ORK`: its public key and its seed's shares, one per
+ * custodian, only from one of those custodians and only if the split matches
+ * the policy now. Two custodians creating at once both succeed here; the older
+ * key stays live and the newer is retired at once, so a scope has one.
+ */
+export async function putRecoveryKey(
+    userId: string,
+    input: {
+        id: string;
+        scope: string;
+        hpkePublicKey: Uint8Array;
+        threshold: number;
+        shares: ReadonlyArray<{ custodianId: string; custodianAkVersion: number; envelope: Uint8Array }>;
+    },
+    now = new Date()
+): Promise<{ kept: boolean }> {
+    const wanted = (await custodianScopes(userId)).find((entry) => entry.scope === input.scope);
+    if (!wanted) throw new RecoveryRefusal("notFound");
+    const matches =
+        wanted.threshold === input.threshold &&
+        input.shares.length === wanted.custodians.length &&
+        wanted.custodians.every((custodian) =>
+            input.shares.some(
+                (share) =>
+                    share.custodianId === custodian.userId &&
+                    share.custodianAkVersion === custodian.akVersion &&
+                    share.envelope.length <= MAX_SHARE_BYTES
+            )
+        );
+    if (!matches) throw new RecoveryRefusal("stale");
+    const existing = await prisma.chatRecoveryKey.findFirst({ where: { scope: input.scope, retiredAt: null }, select: { id: true } });
+    if (existing) throw new RecoveryRefusal("stale");
+    await prisma.$transaction([
+        prisma.chatRecoveryKey.create({
+            data: {
+                id: input.id,
+                scope: input.scope,
+                hpkePublicKey: Buffer.from(input.hpkePublicKey),
+                threshold: input.threshold,
+                createdById: userId
+            }
+        }),
+        prisma.chatRecoveryKeyShare.createMany({
+            data: input.shares.map((share) => ({
+                keyId: input.id,
+                custodianId: share.custodianId,
+                custodianAkVersion: share.custodianAkVersion,
+                envelope: Buffer.from(share.envelope)
+            }))
+        })
+    ]);
+    const live = await prisma.chatRecoveryKey.findMany({
+        where: { scope: input.scope, retiredAt: null },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { id: true },
+        take: 2
+    });
+    const kept = live[0]?.id === input.id;
+    if (!kept) await prisma.chatRecoveryKey.updateMany({ where: { id: input.id }, data: { retiredAt: now } });
+    await recordAudit({
+        actorId: userId,
+        action: "chat.recovery.key-created",
+        metadata: { keyId: input.id, scope: input.scope, threshold: input.threshold, custodians: input.shares.length, kept }
+    });
+    return { kept };
 }
 
 /** The requester's browser holds its key again: close the request, drop the released shares. */

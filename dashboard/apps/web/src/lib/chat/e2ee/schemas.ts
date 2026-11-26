@@ -106,7 +106,21 @@ export const keysBody = z.discriminatedUnion("op", [
     z.object({ op: z.literal("recovery-inbox") }),
     z.object({ op: z.literal("recovery-approve"), requestId: z.string().uuid(), envelope: recoveryEnvelope }),
     z.object({ op: z.literal("recovery-decline"), requestId: z.string().uuid() }),
-    z.object({ op: z.literal("recovery-complete"), requestId: z.string().uuid() })
+    z.object({ op: z.literal("recovery-complete"), requestId: z.string().uuid() }),
+    // The organisation recovery key of each scope this account is a custodian
+    // of, and storing a scope's first one (its seed split like an account key).
+    z.object({ op: z.literal("recovery-key-state") }),
+    z.object({
+        op: z.literal("put-recovery-key"),
+        id: z.string().uuid(),
+        scope: z.string().regex(/^(instance|org:[0-9a-f-]{36})$/),
+        hpkePublicKey: z.string().length(1622).regex(BASE64URL),
+        threshold: z.number().int().min(1).max(3),
+        shares: z
+            .array(z.object({ custodianId: z.string().uuid(), custodianAkVersion: akVersion, envelope: recoveryEnvelope }))
+            .min(1)
+            .max(3)
+    })
 ]);
 export type KeysBody = z.infer<typeof keysBody>;
 

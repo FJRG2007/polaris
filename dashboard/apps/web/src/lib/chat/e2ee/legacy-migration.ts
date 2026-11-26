@@ -36,6 +36,7 @@ import { prisma, Prisma } from "@polaris/db";
 import { conversationAudience } from "@/lib/chat/access";
 import * as content from "@polaris/chat-crypto/message-content";
 import { accountPublicKeys, putHistoryKeys } from "./mls-delivery";
+import { liveRecoveryKeysFor, recoveryRecipient } from "./recovery-keys";
 import { encodeSealedContent, decodeSealedContent, type SealedContent } from "./sealed-chat";
 
 import { LEGACY_EPOCH } from "./mls-history-keys";
@@ -130,6 +131,34 @@ export async function sealToMembers(channelId: string, audience: readonly string
         sealedTo += envelopes.length;
     }
     return sealedTo;
+}
+
+/**
+ * Seal `HK` also to the organisation recovery key (`ORK`) of every scope a
+ * member with no account key belongs to (recipient `ork:<id>`), so their
+ * history survives even if nobody who holds `HK` ever meets them again. An
+ * addition to the members' copies, never instead of them: a conversation where
+ * nobody has an account key still waits, because sealing it only to an `ORK`
+ * would lock its members out until a quorum opened it. How many it sealed to.
+ */
+export async function sealToRecoveryKeys(channelId: string, audience: readonly string[], historyKey: Uint8Array, epoch: bigint = LEGACY_EPOCH): Promise<number> {
+    const keyless: string[] = [];
+    for (let at = 0; at < audience.length; at += KEY_PAGE) {
+        const page = audience.slice(at, at + KEY_PAGE);
+        const keyed = new Set((await accountPublicKeys(page)).map((key) => key.userId));
+        keyless.push(...page.filter((userId) => !keyed.has(userId)));
+    }
+    const recoveryKeys = new Map<string, Uint8Array>();
+    for (let at = 0; at < keyless.length; at += KEY_PAGE)
+        for (const key of await liveRecoveryKeysFor(keyless.slice(at, at + KEY_PAGE))) recoveryKeys.set(key.id, key.hpkePublicKey);
+    const envelopes = await Promise.all(
+        [...recoveryKeys].map(async ([id, publicKey]) => {
+            const recipient = recoveryRecipient(id);
+            return { recipient, envelope: await content.sealHistoryKey(publicKey, historyKey, { recipient, conversationId: channelId, epoch }) };
+        })
+    );
+    if (envelopes.length) await putHistoryKeys(channelId, epoch, envelopes);
+    return envelopes.length;
 }
 
 /** Undo an interrupted run: its rows still hold their plain text, so clearing the seal loses nothing. */
@@ -294,6 +323,7 @@ export async function migrateConversation(channelId: string): Promise<MigrationO
     try {
         // Sealed to the members before anything is sealed under it: a crash in between leaves envelopes, never orphaned rows.
         if (!(await sealToMembers(channelId, audience, historyKey))) return settle("pending", "noAccountKey");
+        await sealToRecoveryKeys(channelId, audience, historyKey);
         const signer = await newSigner();
         await prisma.chatMigration.update({ where: { channelId }, data: { state: "converting", reason: null, signKey: owned(signer.publicKey) } });
 

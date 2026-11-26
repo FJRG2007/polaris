@@ -125,4 +125,22 @@ describe("organisation recovery key", () => {
         expect(await openHybrid(first.privateKey, envelope, "history-key", ["c", 1, "ork:x"])).toEqual(hk);
         await expect(recovery.recoveryKeyPair(new Uint8Array(16))).rejects.toThrow(RangeError);
     });
+
+    it("creates an ORK whose seed any quorum of custodians rebuilds into the same pair", async () => {
+        const shamir = await import("../src/shamir");
+        const holders = await Promise.all(["k1", "k2", "k3"].map(async (userId) => ({ userId, pair: await recovery.requesterKeyPair() })));
+        const custodians = holders.map((h) => ({ userId: h.userId, akVersion: 1, hpkePublicKey: h.pair.publicKey }));
+        const created = await recovery.createRecoveryKey("key-1", custodians, 2);
+        expect(created.shares.map((s) => s.custodianId)).toEqual(["k1", "k2", "k3"]);
+        const binding = recovery.recoveryKeyBinding("key-1");
+        const opened = await Promise.all(
+            [0, 2].map((i) => recovery.openShare(holders[i]!.pair.privateKey, created.shares[i]!.envelope, binding, holders[i]!.userId, 1))
+        );
+        const seed = await shamir.combine(opened);
+        expect((await recovery.recoveryKeyPair(seed)).publicKey).toEqual(created.publicKey);
+        // A share is bound to its key id: opening it as another key fails.
+        await expect(
+            recovery.openShare(holders[0]!.pair.privateKey, created.shares[0]!.envelope, recovery.recoveryKeyBinding("key-2"), "k1", 1)
+        ).rejects.toThrow();
+    });
 });

@@ -19,6 +19,8 @@ const db = vi.hoisted(() => ({
     requests: [] as Row[],
     approvals: [] as Row[],
     audits: [] as Row[],
+    keys: [] as Row[],
+    keyShares: [] as Row[],
     admins: [] as string[],
     told: [] as Array<{ userId: string; title: string }>,
     recorded: [] as Row[],
@@ -51,7 +53,9 @@ vi.mock("@polaris/db", () => {
             }
             return value === want;
         });
-    const sorted = (rows: Row[], orderBy?: Record<string, "asc" | "desc">) => {
+    type Order = Record<string, "asc" | "desc"> | Array<Record<string, "asc" | "desc">>;
+    const sorted = (rows: Row[], order?: Order) => {
+        const orderBy = Array.isArray(order) ? order[0] : order;
         if (!orderBy) return rows;
         const [[field, dir]] = Object.entries(orderBy) as [[string, "asc" | "desc"]];
         const n = (v: unknown) => (v instanceof Date ? v.getTime() : (v as number));
@@ -61,7 +65,7 @@ vi.mock("@polaris/db", () => {
         findFirst: async ({ where, orderBy }: { where?: Row; orderBy?: Record<string, "asc" | "desc"> }) =>
             sorted(rows().filter((r) => matches(r, where)), orderBy)[0] ?? null,
         findUnique: async ({ where }: { where: Row }) => rows().find((r) => matches(r, where)) ?? null,
-        findMany: async ({ where, orderBy, take }: { where?: Row; orderBy?: Record<string, "asc" | "desc">; take?: number }) =>
+        findMany: async ({ where, orderBy, take }: { where?: Row; orderBy?: Order; take?: number }) =>
             sorted(rows().filter((r) => matches(r, where)), orderBy).slice(0, take ?? Infinity),
         count: async ({ where }: { where?: Row }) => rows().filter((r) => matches(r, where)).length,
         create: async ({ data }: { data: Row }) => {
@@ -105,6 +109,15 @@ vi.mock("@polaris/db", () => {
         accountRecovery: table(() => db.recoveries),
         auditLog: table(() => db.audits),
         chatRecoveryRequest: table(() => db.requests),
+        chatRecoveryKey: {
+            ...table(() => db.keys),
+            findMany: async (args: { where?: Row; orderBy?: Order; take?: number }) =>
+                (await table(() => db.keys).findMany(args)).map((key) => ({
+                    ...key,
+                    shares: db.keyShares.filter((share) => share.keyId === key.id)
+                }))
+        },
+        chatRecoveryKeyShare: table(() => db.keyShares),
         chatRecoveryApproval: table(
             () => db.approvals,
             (a, b) => a.requestId === b.requestId && a.custodianId === b.custodianId
@@ -159,7 +172,7 @@ function adminApproved(daysAgo = 1) {
 }
 
 beforeEach(() => {
-    for (const list of [db.members, db.orgs, db.accountKeys, db.shares, db.recoveries, db.requests, db.approvals, db.audits, db.admins, db.told, db.recorded])
+    for (const list of [db.members, db.orgs, db.accountKeys, db.shares, db.recoveries, db.requests, db.approvals, db.audits, db.keys, db.keyShares, db.admins, db.told, db.recorded])
         list.length = 0;
     db.seq = 0;
 });
@@ -334,5 +347,73 @@ describe("approvals and declines", () => {
         expect(db.requests.find((r) => r.id === id)?.status).toBe("completed");
         expect(db.approvals).toHaveLength(0);
         await expect(service.completeRequest("ana", id)).rejects.toMatchObject({ code: "notFound" });
+    });
+});
+
+describe("the organisation recovery key", () => {
+    const KEY_ID = "0190a000-0000-7000-8000-000000000001";
+    const orkInput = (id = KEY_ID, change: Record<string, unknown> = {}) => ({
+        id,
+        scope: "org:acme",
+        hpkePublicKey: bytes(1216),
+        threshold: 2,
+        shares: ["own", "a1", "a2"].map((custodianId) => ({ custodianId, custodianAkVersion: 1, envelope: bytes(64) })),
+        ...change
+    });
+
+    it("lists the scopes an account is a custodian of, with no key yet", async () => {
+        acme();
+        expect(await service.recoveryKeyState("ana")).toEqual([]);
+        const [entry] = await service.recoveryKeyState("a2");
+        expect(entry).toMatchObject({ scope: "org:acme", threshold: 2, key: null });
+        expect(entry!.custodians.map((c) => c.userId)).toEqual(["own", "a1", "a2"]);
+    });
+
+    it("stores the first key from a custodian, and reports it current until the custodians change", async () => {
+        acme();
+        expect(await service.putRecoveryKey("a1", orkInput(), NOW)).toEqual({ kept: true });
+        expect(db.keyShares).toHaveLength(3);
+        expect((await service.recoveryKeyState("own"))[0]!.key).toEqual({ id: KEY_ID, current: true });
+        db.accountKeys.find((k) => k.userId === "a2")!.akVersion = 2;
+        expect((await service.recoveryKeyState("own"))[0]!.key).toEqual({ id: KEY_ID, current: false });
+        // A second key for the same scope is refused while one is live.
+        await expect(service.putRecoveryKey("own", orkInput("0190a000-0000-7000-8000-000000000002", {
+            shares: ["own", "a1", "a2"].map((custodianId) => ({ custodianId, custodianAkVersion: custodianId === "a2" ? 2 : 1, envelope: bytes(64) }))
+        }), NOW)).rejects.toMatchObject({ code: "stale" });
+    });
+
+    it("refuses a non-custodian and a split that does not match the policy", async () => {
+        acme();
+        await expect(service.putRecoveryKey("ana", orkInput(), NOW)).rejects.toMatchObject({ code: "notFound" });
+        await expect(service.putRecoveryKey("a1", orkInput(KEY_ID, { threshold: 1 }), NOW)).rejects.toMatchObject({ code: "stale" });
+        await expect(service.putRecoveryKey("a1", orkInput(KEY_ID, { shares: orkInput().shares.slice(0, 2) }), NOW)).rejects.toMatchObject({
+            code: "stale"
+        });
+        expect(db.keys).toHaveLength(0);
+    });
+
+    it("keeps one live key when two custodians create at once", async () => {
+        acme();
+        const results = await Promise.allSettled([
+            service.putRecoveryKey("own", orkInput(), NOW),
+            service.putRecoveryKey("a1", orkInput("0190a000-0000-7000-8000-000000000002"), NOW)
+        ]);
+        expect(db.keys.filter((k) => !k.retiredAt)).toHaveLength(1);
+        expect(results.filter((r) => r.status === "fulfilled" && r.value.kept)).toHaveLength(1);
+    });
+
+    it("makes fellow custodians of the key, the caller included, key-log peers", async () => {
+        acme();
+        // a1's own custodians are own and a2; the key adds a1 itself.
+        const peers = await service.recoveryPeers("a1");
+        expect([...peers].sort()).toEqual(["a1", "a2", "own"]);
+    });
+
+    it("finds the live key of the scope each keyless account belongs to", async () => {
+        acme();
+        await service.putRecoveryKey("a1", orkInput(), NOW);
+        const { liveRecoveryKeysFor } = await import("@/lib/chat/e2ee/recovery-keys");
+        expect((await liveRecoveryKeysFor(["ana", "stranger"])).map((k) => k.id)).toEqual([KEY_ID]);
+        expect(await liveRecoveryKeysFor(["stranger"])).toEqual([]);
     });
 });
