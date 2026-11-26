@@ -119,8 +119,12 @@ describe("the sealed reaction set", () => {
         expect(await openRow({ messageId: MESSAGE, userId: ALICE, ...one })).toEqual(["👍"]);
     });
 
-    it("refuses more than the cap and does not open moved to another message or person", async () => {
-        expect(() => content.encodeReactions(Array.from({ length: 21 }, (_, at) => String(at)))).toThrow(RangeError);
+    it("holds what fits its fixed size, refuses more, and does not open moved to another message or person", async () => {
+        const wide = Array.from({ length: 30 }, (_, at) => String(at).padEnd(80, "x"));
+        expect(content.reactionsFit(wide.slice(0, 25))).toBe(true);
+        expect(content.decodeReactions(content.encodeReactions(wide.slice(0, 25)))).toEqual(wide.slice(0, 25));
+        expect(() => content.encodeReactions(wide)).toThrow(RangeError);
+        expect(() => content.encodeReactions(["x".repeat(256)])).toThrow(RangeError);
         const set = await sealedSet(ALICE, ["🎉"]);
         expect(await openRow({ messageId: OTHER, userId: ALICE, ...set })).toBeNull();
         expect(await openRow({ messageId: MESSAGE, userId: BOB, ...set })).toBeNull();

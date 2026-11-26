@@ -32,6 +32,7 @@ vi.mock("@polaris/db", () => {
     };
     const matches = (row: Row, where: Row): boolean =>
         Object.entries(where).every(([key, want]) => {
+            if (key === "NOT") return !(want as Row[]).some((w) => matches(row, w));
             if (relations[key] && want && typeof want === "object") {
                 const related = relations[key]!(row);
                 return related !== undefined && matches(related, want as Row);
@@ -230,9 +231,32 @@ describe("sweeping a sealed conversation's clear reactions and votes", () => {
         expect(db.historyKeys).toHaveLength(0);
     });
 
-    it("seals each emoji once and only what a set holds: at most 20, none over 100 bytes", () => {
+    it("seals a person's emoji each once and all of them, or none when they do not fit one set", () => {
         const many = Array.from({ length: 25 }, (_, at) => `e${at}`);
-        expect(sealableEmoji(["👍", "👍", "x".repeat(101), ...many])).toEqual(["👍", ...many.slice(0, 19)]);
+        // More than the 20 a set once held, and one of 101 bytes: all carried.
+        expect(sealableEmoji(["👍", "👍", "x".repeat(101), ...many])).toEqual(["👍", "x".repeat(101), ...many]);
+        expect(sealableEmoji(["x".repeat(256)])).toBeNull();
+        expect(sealableEmoji(Array.from({ length: 30 }, (_, at) => `${at}`.padEnd(80, "x")))).toBeNull();
+        // The longest a clear reaction can be (a space's emoji token) fits 27 to a set.
+        const token = (at: number) => `<a:${"n".repeat(30)}${String(at).padStart(2, "0")}:0192f000-0000-7000-8000-0000000000${String(at).padStart(2, "0")}>`;
+        expect(sealableEmoji(Array.from({ length: 27 }, (_, at) => token(at)))).toHaveLength(27);
+    });
+
+    it("leaves a person whose emoji on a message do not fit one set in the clear, untouched, and seals everybody else", async () => {
+        const wide = Array.from({ length: 30 }, (_, at) => `${at}`.padEnd(80, "x"));
+        db.reactions.push(...wide.map((emoji, at) => ({ id: `wide-${at}`, messageId: M1, userId: U2, emoji, createdAt: new Date(10 + at) })));
+        await expect(sweepConversation(CHANNEL)).resolves.toBe("kept");
+        // U2's rows (the earlier one too) stay where they were and are drawn as before; nothing of theirs went to a copy that expires.
+        expect(db.reactions.map((r) => r.id).sort()).toEqual([R(3), ...wide.map((_, at) => `wide-${at}`)].sort());
+        expect(db.copies.filter((c) => c.kind === "reaction").map((c) => c.id).sort()).toEqual([R(1), R(2)]);
+        expect(db.sets.map((s) => s.userId)).toEqual([U1]);
+        // The next run finds only them and changes nothing, nor spends a sweep epoch on them.
+        const epochs = new Set(db.historyKeys.map((k) => k.epoch)).size;
+        await expect(sweepConversation(CHANNEL)).resolves.toBe("kept");
+        expect(db.reactions).toHaveLength(31);
+        expect(db.sets).toHaveLength(1);
+        expect(new Set(db.historyKeys.map((k) => k.epoch)).size).toBe(epochs);
+        expect(db.sweptKeys).toHaveLength(1);
     });
 });
 

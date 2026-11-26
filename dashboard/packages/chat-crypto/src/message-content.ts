@@ -329,11 +329,32 @@ export interface ReactionsBinding {
 }
 
 const REACTIONS_VERSION = 1;
-/** Emoji one person may have on one message. */
-export const REACTIONS_MAX = 20;
-/** The longest emoji (or custom emoji token) a set holds, in UTF-8 bytes. */
-export const REACTION_MAX_BYTES = 100;
+/**
+ * Emoji one person may have on one message: as many as fit the fixed-size
+ * plaintext (`reactionsFit`), and never more than its count byte holds. The
+ * clear path never capped a person's emoji on a message, so a set holds what
+ * fits rather than a round number: every person's clear reactions the sweep
+ * (`annotation-sweep.ts`) finds carry over whole unless they come to more than
+ * `REACTIONS_PLAINTEXT_BYTES`, some 400 ordinary emoji or 27 of a space's own.
+ */
+export const REACTIONS_MAX = 255;
+/** The longest emoji (or custom emoji token) a set holds, in UTF-8 bytes: what its length byte holds. */
+export const REACTION_MAX_BYTES = 255;
 const REACTIONS_PLAINTEXT_BYTES = 2048;
+const REACTIONS_HEADER_BYTES = 2;
+
+/** Whether one person's emoji (each once) seal as one set: none empty or too long, and all of them within the plaintext. */
+export function reactionsFit(emoji: readonly string[]): boolean {
+    const unique = [...new Set(emoji)];
+    if (unique.length > REACTIONS_MAX) return false;
+    let size = REACTIONS_HEADER_BYTES;
+    for (const one of unique) {
+        const bytes = new TextEncoder().encode(one).length;
+        if (bytes === 0 || bytes > REACTION_MAX_BYTES) return false;
+        size += 1 + bytes;
+    }
+    return size <= REACTIONS_PLAINTEXT_BYTES;
+}
 /** The size of every sealed reaction set. */
 export const SEALED_REACTIONS_BYTES = 1 + REACTIONS_PLAINTEXT_BYTES + TAG_BYTES;
 
@@ -347,14 +368,13 @@ function reactionsInfo(binding: ReactionsBinding): Uint8Array<ArrayBuffer> {
 /** A set of emoji as the fixed-size plaintext of a sealed reaction set; duplicates are kept once. */
 export function encodeReactions(emoji: readonly string[]): Uint8Array {
     const unique = [...new Set(emoji)];
-    if (unique.length > REACTIONS_MAX) throw new RangeError(`A person has at most ${REACTIONS_MAX} reactions on a message`);
+    if (!reactionsFit(unique)) throw new RangeError("Those reactions do not fit one sealed set");
     const out = new Uint8Array(REACTIONS_PLAINTEXT_BYTES);
     out[0] = REACTIONS_VERSION;
     out[1] = unique.length;
-    let at = 2;
+    let at = REACTIONS_HEADER_BYTES;
     for (const one of unique) {
         const bytes = new TextEncoder().encode(one);
-        if (bytes.length === 0 || bytes.length > REACTION_MAX_BYTES) throw new RangeError("A reaction is 1-100 bytes");
         out[at] = bytes.length;
         out.set(bytes, at + 1);
         at += 1 + bytes.length;
@@ -366,14 +386,14 @@ export function encodeReactions(emoji: readonly string[]): Uint8Array {
 export function decodeReactions(bytes: Uint8Array): string[] | null {
     if (bytes.length !== REACTIONS_PLAINTEXT_BYTES || bytes[0] !== REACTIONS_VERSION) return null;
     const count = bytes[1]!;
-    if (count > REACTIONS_MAX) return null;
     const out: string[] = [];
-    let at = 2;
+    let at = REACTIONS_HEADER_BYTES;
     const decoder = new TextDecoder("utf-8", { fatal: true });
     try {
         for (let n = 0; n < count; n += 1) {
+            if (at >= bytes.length) return null;
             const length = bytes[at]!;
-            if (length === 0 || length > REACTION_MAX_BYTES || at + 1 + length > bytes.length) return null;
+            if (length === 0 || at + 1 + length > bytes.length) return null;
             out.push(decoder.decode(bytes.subarray(at + 1, at + 1 + length)));
             at += 1 + length;
         }
