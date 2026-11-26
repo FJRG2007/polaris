@@ -1198,9 +1198,15 @@ export function PolarChat({
         !(lastAnswer?.role === "assistant" && answered(lastAnswer.parts as never))
             ? chat.error
             : null;
+    // Stop pressed, the answer not ended yet: the button says "Stopping...".
+    const [stopping, setStopping] = useState(false);
+    useEffect(() => {
+        if (!busy) setStopping(false);
+    }, [busy]);
     const stopTurn = () => {
+        setStopping(true);
         setStopped(chat.messages.at(-1)?.id ?? null);
-        void stopAnswer();
+        void stopAnswer().catch(() => setStopping(false));
     };
     const waitingApproval = chat.messages
         .at(-1)
@@ -2842,7 +2848,9 @@ export function PolarChat({
                     disabled: !choice || files.some(stillStaging),
                     sendLabel: t("actions.send"),
                     stopLabel: t("actions.stop"),
-                    onStop: stopTurn
+                    onStop: stopTurn,
+                    stopping,
+                    stoppingLabel: t("actions.stopping")
                 }}
             />
         </div>

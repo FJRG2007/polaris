@@ -129,6 +129,8 @@ export function PolarComposer({
         sendLabel: string;
         stopLabel: string;
         onStop: () => void;
+        stopping?: boolean;
+        stoppingLabel?: string;
     };
     /** Whether an answer is streaming in, which the border shows. */
     streaming?: boolean;

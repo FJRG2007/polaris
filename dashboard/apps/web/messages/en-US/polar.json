@@ -135,6 +135,7 @@
         "more": "More actions",
         "close": "Close Polar",
         "stop": "Stop",
+        "stopping": "Stopping...",
         "send": "Send (Enter)",
         "edit": "Edit message",
         "resend": "Send again",

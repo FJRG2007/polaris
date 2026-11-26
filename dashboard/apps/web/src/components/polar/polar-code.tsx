@@ -1820,15 +1820,22 @@ function CodeThread({
         });
     };
 
+    // Stop pressed, the turn not ended yet: the Stop button says "Stopping..."
+    // until the session leaves working, as Claude Code and Codex do.
+    const [stopping, setStopping] = useState(false);
     /** Interrupt the agent's turn: `/stop`, and the Stop on a running subagent. */
     const stopTurn = () => {
         setError(null);
+        setStopping(true);
         startTransition(() => {
             void runAction(
                 () => postCode<{ error?: string }>("/api/polar/code/interrupt", { sessionId }),
                 setError
             ).then((result) => {
-                if (result?.error) setError(result.error);
+                if (result?.error) {
+                    setError(result.error);
+                    setStopping(false);
+                }
                 read();
             });
         });
@@ -2014,6 +2021,9 @@ function CodeThread({
     // draws the indicator under it. A session that is only open - waiting,
     // idle - draws nothing that moves.
     const turning = live && session?.state === "working";
+    useEffect(() => {
+        if (!turning) setStopping(false);
+    }, [turning]);
     const indicator =
         live && (pending || (turning && blocks.length > 0 && blocks.at(-1)?.kind !== "work"));
     // Sending again and answering again are new turns: only for whoever may
@@ -2357,7 +2367,9 @@ function CodeThread({
                         !reply.trim() || busy || parts.uploads.uploading || parts.uploads.failed,
                     sendLabel: t("code.send"),
                     stopLabel: t("code.queue.stopTurn"),
-                    onStop: stopTurn
+                    onStop: stopTurn,
+                    stopping,
+                    stoppingLabel: t("actions.stopping")
                 }}
             />
             </div>

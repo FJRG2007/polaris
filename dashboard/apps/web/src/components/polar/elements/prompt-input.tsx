@@ -13,7 +13,7 @@
  * address) rather than the browser's own chooser.
  */
 
-import { ArrowUp, Paperclip, Square } from "lucide-react";
+import { ArrowUp, Loader2, Paperclip, Square } from "lucide-react";
 import { Button, cn, type ButtonProps } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { enterBreaksLine } from "@/lib/enter-key";
@@ -178,14 +178,28 @@ export function PromptInputSubmit({
     disabled,
     sendLabel,
     stopLabel,
-    onStop
+    onStop,
+    stopping = false,
+    stoppingLabel
 }: {
     busy: boolean;
     disabled: boolean;
     sendLabel: string;
     stopLabel: string;
     onStop: () => void;
+    /** Stop was pressed and the turn has not ended yet: the button says so
+     *  and waits, instead of offering a second Stop that does nothing new. */
+    stopping?: boolean;
+    stoppingLabel?: string;
 }) {
+    if (busy && stopping) {
+        const label = stoppingLabel ?? stopLabel;
+        return (
+            <Button type="button" variant="secondary" size="icon-sm" aria-label={label} title={label} aria-busy disabled>
+                <Loader2 className="animate-spin" />
+            </Button>
+        );
+    }
     if (busy) {
         return (
             <Button
