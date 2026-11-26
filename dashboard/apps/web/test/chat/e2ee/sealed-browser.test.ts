@@ -101,6 +101,7 @@ describe.skipIf(!runnable)("sealed chat in headless Chromium", () => {
                     name: "account-key-stand-in",
                     setup(on) {
                         on.onResolve({ filter: /account-key-client$/ }, () => ({ path: join(web, "test/chat/e2ee/support/sealed-page-account.ts") }));
+                        on.onResolve({ filter: /^@\/app\/\(app\)\/chat\/actions$/ }, () => ({ path: join(web, "test/chat/e2ee/support/sealed-page-actions.ts") }));
                     }
                 }
             ]
