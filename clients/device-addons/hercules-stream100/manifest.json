@@ -74,6 +74,19 @@
             }
         },
         {
+            "default": false,
+            "hint": {
+                "en-US": "Windows only. Replaces the Hercules driver, so no Hercules software is needed. Windows asks for permission.",
+                "es-ES": "Solo Windows. Sustituye al driver de Hercules, sin necesitar su software. Windows pide permiso."
+            },
+            "key": "polarisDriver",
+            "kind": "toggle",
+            "label": {
+                "en-US": "Polaris driver on this PC",
+                "es-ES": "Driver de Polaris en este PC"
+            }
+        },
+        {
             "default": "calls",
             "group": "knobs",
             "key": "knob1",
@@ -479,6 +492,6 @@
         }
     ],
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.7",
+    "version": "0.1.8",
     "view": "view/index.html"
 }

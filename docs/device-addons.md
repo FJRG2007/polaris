@@ -136,7 +136,14 @@ origin) and speaks `postMessage` (`apps/web/src/lib/device-addon-view.ts`):
 - `{type: "call", id, method, params}` gets `{type: "reply", id, ok, value | error}`.
   The methods are the process's own (`settings.get`, `polaris.state`,
   `polaris.action`, judged against the granted permissions) and `settings.set`
-  (`{key, value}`, checked against the declared settings), which only a view has.
+  (`{key, value}`, checked against the declared settings), which only a view has;
+  so is `driver.look`, the state of the device's own driver and why its last
+  change did not go through, which the app answers per add-on (`null` for one
+  with no driver of its own). The setup itself is a declared toggle (the Stream
+  100's `polarisDriver`): the app runs the setup when it is turned on and the
+  removal when it is turned off, keeps the new value only when that went
+  through, and brings it in line with the machine on every look. Both ship with
+  the add-on, not the dashboard.
 
 ## Ways in
 

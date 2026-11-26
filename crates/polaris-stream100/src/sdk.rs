@@ -39,8 +39,8 @@ const INFO_PRODUCT: usize = 0x20e;
 ///
 /// Confirmed on a real unit (firmware 1.40, SDK 0x153) on 2026-11-26: each
 /// knob pressed alone, in order, set exactly these bits, the order the
-/// printed numbers follow (the HID route's byte is ordered otherwise,
-/// [`DEFAULT_KNOB_BITS`]). The callbacks are in
+/// printed numbers follow, the same bits as the HID report's byte 1
+/// ([`DEFAULT_KNOB_BITS`]). The callbacks are in
 /// `tests/fixtures/sdk-states.txt`, and agree with New-Hera-lunx's
 /// `inputs.md`.
 pub const SDK_KNOB_BITS: [u32; 4] = [0x0001, 0x0002, 0x0004, 0x0008];

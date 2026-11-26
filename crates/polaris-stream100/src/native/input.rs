@@ -1,7 +1,8 @@
 //! The controller's input reports, read the way each system lets a program
 //! read them:
 //!
-//! - **Windows**: the HID API. With Windows' own drivers bound, interface 0 is
+//! - **Windows**: first Polaris' own WinUSB driver ([`super::winusb`]), which
+//!   needs no Hercules software. Without it, the HID API: with Windows' own drivers bound, interface 0 is
 //!   a HID device that Windows' HID driver holds, so it is opened as a HID
 //!   collection (read access only, shared) rather than claimed over USB. With
 //!   the Hercules driver bound there is no HID collection at all; the input
@@ -11,9 +12,10 @@
 //! - **Linux**: the USB transport ([`crate::transport`]).
 //! - **macOS**: not yet; the HID manager route is not written.
 //!
-//! Nothing here writes to the device: no output or feature report is sent.
-//! (Through the SDK, the SDK's own thread keeps its session alive while the
-//! device is open; Polaris sets nothing on it.)
+//! Through the HID API nothing is written to the device. Through WinUSB the
+//! only writes are the documented start-up reads and the keep-alive
+//! ([`crate::session`]). Through the SDK, the SDK's own thread keeps its
+//! session alive while the device is open; Polaris sets nothing on it.
 
 use crate::report::Report;
 use crate::transport::TransportError;
@@ -33,9 +35,13 @@ impl Input {
     pub fn open() -> Result<Self, TransportError> {
         #[cfg(windows)]
         return Ok(Self {
-            inner: match hid::HidInput::open() {
-                Ok(input) => Windows::Hid(input),
-                Err(TransportError::NotFound) => Windows::Sdk(super::sdk::SdkInput::open()?),
+            inner: match super::winusb::WinUsbInput::open() {
+                Ok(input) => Windows::WinUsb(input),
+                Err(TransportError::NotFound) => match hid::HidInput::open() {
+                    Ok(input) => Windows::Hid(input),
+                    Err(TransportError::NotFound) => Windows::Sdk(super::sdk::SdkInput::open()?),
+                    Err(error) => return Err(error),
+                },
                 Err(error) => return Err(error),
             },
         });
@@ -51,6 +57,7 @@ impl Input {
     pub fn next(&mut self, timeout: Duration) -> Result<Option<Report>, TransportError> {
         #[cfg(windows)]
         return match &mut self.inner {
+            Windows::WinUsb(input) => input.next(timeout),
             Windows::Hid(input) => input.next(timeout),
             Windows::Sdk(input) => input.next(timeout),
         };
@@ -61,25 +68,23 @@ impl Input {
     }
 }
 
-/// The two Windows routes: Windows' HID driver, or the Hercules SDK.
+/// The Windows routes: Polaris' WinUSB driver, Windows' HID driver, or the
+/// Hercules SDK.
 #[cfg(windows)]
 enum Windows {
+    WinUsb(super::winusb::WinUsbInput),
     Hid(hid::HidInput),
     Sdk(super::sdk::SdkInput),
 }
 
 #[cfg(windows)]
 mod hid {
+    use crate::native::winusb::interface_paths;
     use crate::report::{from_hid_read, Report, MIN_REPORT_LEN};
     use crate::transport::TransportError;
     use crate::{PRODUCT_ID, VENDOR_ID};
     use std::time::Duration;
     use windows::core::PCWSTR;
-    use windows::Win32::Devices::DeviceAndDriverInstallation::{
-        SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInterfaces, SetupDiGetClassDevsW,
-        SetupDiGetDeviceInterfaceDetailW, DIGCF_DEVICEINTERFACE, DIGCF_PRESENT,
-        SP_DEVICE_INTERFACE_DATA, SP_DEVICE_INTERFACE_DETAIL_DATA_W,
-    };
     use windows::Win32::Devices::HumanInterfaceDevice::{
         HidD_FreePreparsedData, HidD_GetAttributes, HidD_GetHidGuid, HidD_GetPreparsedData,
         HidP_GetCaps, HIDD_ATTRIBUTES, HIDP_CAPS, PHIDP_PREPARSED_DATA,
@@ -132,49 +137,11 @@ mod hid {
     /// The controller's HID collections that send input reports.
     fn collections() -> Vec<Collection> {
         let mut found = Vec::new();
-        // SAFETY: plain SetupAPI / HID calls; every buffer outlives the call
-        // that fills it and the device list is destroyed before returning.
+        // SAFETY: plain HID calls on handles this function opens; every
+        // buffer outlives the call that fills it.
         unsafe {
             let guid = HidD_GetHidGuid();
-            let Ok(set) = SetupDiGetClassDevsW(
-                Some(&guid),
-                PCWSTR::null(),
-                None,
-                DIGCF_PRESENT | DIGCF_DEVICEINTERFACE,
-            ) else {
-                return found;
-            };
-            let mut index = 0;
-            loop {
-                let mut data = SP_DEVICE_INTERFACE_DATA {
-                    cbSize: size_of::<SP_DEVICE_INTERFACE_DATA>() as u32,
-                    ..Default::default()
-                };
-                if SetupDiEnumDeviceInterfaces(set, None, &guid, index, &mut data).is_err() {
-                    break;
-                }
-                index += 1;
-                let mut needed = 0u32;
-                let _ =
-                    SetupDiGetDeviceInterfaceDetailW(set, &data, None, 0, Some(&mut needed), None);
-                if needed == 0 {
-                    continue;
-                }
-                let mut buffer = vec![0u64; (needed as usize).div_ceil(8)];
-                let detail = buffer.as_mut_ptr() as *mut SP_DEVICE_INTERFACE_DETAIL_DATA_W;
-                (*detail).cbSize = size_of::<SP_DEVICE_INTERFACE_DETAIL_DATA_W>() as u32;
-                if SetupDiGetDeviceInterfaceDetailW(set, &data, Some(detail), needed, None, None)
-                    .is_err()
-                {
-                    continue;
-                }
-                let start = std::ptr::addr_of!((*detail).DevicePath) as *const u16;
-                let mut len = 0;
-                while *start.add(len) != 0 {
-                    len += 1;
-                }
-                let mut path = std::slice::from_raw_parts(start, len).to_vec();
-                path.push(0);
+            for path in interface_paths(&guid) {
                 // No access asked: enough for attributes and capabilities.
                 let Some(handle) = open_path(&path, 0, FILE_FLAGS_AND_ATTRIBUTES(0)) else {
                     continue;
@@ -201,7 +168,6 @@ mod hid {
                     found.push(Collection { path, input_len });
                 }
             }
-            let _ = SetupDiDestroyDeviceInfoList(set);
         }
         found
     }

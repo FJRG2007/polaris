@@ -49,6 +49,12 @@ describe("a call from a view", () => {
         expect(judgeViewCall([], "settings.set", { key: "knob1", value: { nested: true } })).toEqual({ ok: false, error: "bad-params" });
     });
 
+    it("may look at its device's own driver, which the app answers per add-on, and never set it up itself", () => {
+        expect(judgeViewCall([], "driver.look", undefined)).toEqual({ ok: true, kind: "driver", action: "look" });
+        expect(judgeViewCall([], "driver.install", undefined)).toEqual({ ok: false, error: "unknown-method" });
+        expect(judgeViewCall([], "driver.remove", undefined)).toEqual({ ok: false, error: "unknown-method" });
+    });
+
     it("is judged like its process's own call otherwise", () => {
         expect(judgeViewCall([], "polaris.action", { action: "call.mic" })).toEqual({ ok: false, error: "permission" });
         expect(judgeViewCall(["polaris-actions"], "polaris.action", { action: "call.mic" })).toEqual({ ok: true, kind: "call", method: "polaris.action", params: { action: "call.mic" } });

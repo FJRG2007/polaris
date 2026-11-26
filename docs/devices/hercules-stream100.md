@@ -28,17 +28,18 @@ exists. No source code was copied from either.
 
 | Byte | Meaning |
 | --- | --- |
-| 1 | buttons. Knob presses: knob 1 `0x08`, knob 2 `0x01`, knob 3 `0x04`, knob 4 `0x02`. Lit buttons 1-4: `0x10`, `0x20`, `0x40`, `0x80` |
+| 1 | buttons. Knob presses 1-4: `0x01`, `0x02`, `0x04`, `0x08`. Lit buttons 1-4: `0x10`, `0x20`, `0x40`, `0x80` |
 | 2 | bit 0: the power button (New-Hera-lunx, `docs/protocol/inputs.md`) |
 | 3-10 | four signed 16-bit little-endian encoder positions, knob 1 to 4 |
 
 Encoder positions are absolute and wrap at 16 bits; only the difference between
 two reports means anything. One detent is 48 counts.
 
-The knob-press bit order is the one OpenStream100 calibrated on hardware. The
-Wave Link bridge assumes bits 0-3 are knobs 1-4 in order instead. The two
-disagree, so the order is a setting (`KnobMap`) with the calibrated order as
-its default, and a real-device test settles it.
+The knob-press bit order follows the printed numbers: measured on a real unit
+on 2026-11-26 (through the Hercules SDK, whose button word is bytes 1-2 of this
+report) and the order New-Hera-lunx reads from the firmware. OpenStream100's
+calibration (`0x08, 0x01, 0x04, 0x02`) did not hold. It stays a setting
+(`KnobMap`) for a unit that differs.
 
 ### Display messages (interface 1)
 
@@ -98,6 +99,39 @@ uses 0 for off and 1 for lit).
   same recording; their fields are not decoded.
 - **The `0x38` configuration**: only its first bytes are known.
 
+### Other sources checked (2026-11-26)
+
+Read as references only; no code was copied.
+
+- **cont1nuity/hercules-stream-linux** (GPL-3.0-or-later; a libusb user-space
+  driver for this device, `docs/DEVICE-IO.md` and `docs/PROTOCOL.md`). It
+  agrees on interface 0's interrupt IN `0x81` (64-byte reports, low nibble of
+  byte 1 the knob presses, high nibble the action buttons, signed 16-bit
+  counters at bytes 3/5/7/9) and on interface 1 alt 1, isochronous OUT `0x01`
+  in 952-byte packets, and on the `SM` framing (`"SM" | len u16 | CRC-16 |
+  seq u16 | ops`, CRC reflected `0x8005`, init 0, bytes 4-5 skipped; a bad CRC
+  is dropped silently). It adds what Polaris does not do yet:
+  - interface 0 also has a **bulk OUT `0x02`** for host-to-device commands;
+  - a logical frame is a `HERCULES` sync packet followed by the 952-byte
+    payload packets;
+  - the panel is woken with 32 recorded frames, and **heartbeats (op `0x00`)
+    go every ~20 ms**: when they stop the panel blanks, and heartbeats alone do
+    not repaint it (there is no framebuffer). Polaris' WinUSB keep-alive is one
+    heartbeat every 250 ms with no sync packet, enough only if input does not
+    depend on it - to be confirmed on a real unit;
+  - op `0x30` sets a channel LED, payload `[channel][state]`, 0 off, 1 on,
+    2 blink;
+  - an isochronous write to a surprise-removed device aborts the process on
+    Linux (libusb); it checks the device is still there before every write.
+  It documents no USB control transfers, so the start-up reads above
+  (`0x52`, `0x02`) come from New-Hera-lunx alone.
+- **Sam-D03/hercules-wave-link-bridge** (MIT): drives the Stream 100
+  (`VID_06F8&PID_E053`) through the SDK installed by Hercules Stream Control
+  (`C:\Program Files\Hercules\HSM Series\sdk`) and needs that software's
+  driver; nothing at the USB level. The same route as Polaris' SDK input.
+- **mixxxdj wiki, Hercules Linux Usermode Driver** (nealey/hdjd): the DJ
+  Control controllers only; the Stream 100 is not covered.
+
 ## Windows: the Hercules driver
 
 The "HSM Series drivers" package (`HercStreamMixDevice.inf`, service
@@ -146,45 +180,56 @@ What each route really takes:
    when the device asks for it in its firmware. On this machine the device's
    `usbflags` key holds no `osvc` value, so there is no evidence the firmware
    does. It has to be checked once the Hercules driver is off the device.
-4. **Zadig / libwdi.** These generate a self-signed certificate per install,
-   add it to the machine's Trusted Root and Trusted Publisher stores, sign the
-   catalog, and throw the private key away. It works, but it means adding a
-   new root to the machine's trust, done with administrator rights by a tool
-   that is not Polaris. For an audience that includes government and hospital
-   machines, that is not something Polaris does on anyone's behalf. Not offered.
+4. **Zadig / libwdi style, done by Polaris.** Approved by the owner on
+   2026-11-26 and the route Polaris offers now (next section).
 
-## Why the official software jumps the volume
+### Polaris' WinUSB driver
 
-The complaint: the volume "goes up on its own, too much, sometimes". Stream
-Control is closed source and was not disassembled, so these are the causes
-the input itself makes possible, each with its guard in
-`crates/polaris-stream100/src/encoder.rs`:
+The add-on declares a toggle, "Polaris driver on this PC" (`polarisDriver`,
+off by default). Turning it on runs the setup below and turning it off the
+removal; the desktop app (`createDriverSetting` in `addons/official.ts`) keeps
+the new value only when that went through and otherwise writes the old one back.
+The add-on's own view (`any/view/`, above the screen preview) is text only: it
+asks `driver.look` and says when the toggle is needed (another driver holds the
+controller), and why the last change did not go through. A look also brings the
+toggle in line with the machine (off once a Hercules reinstall or Windows Update
+took the device back). Nothing of it is in the dashboard. One Windows
+administrator prompt later the device is on WinUSB and Polaris reads it with
+no Hercules software at all: no Stream Control, no `hsm_api_core` DLL, no
+`HercStreamMixDevice` driver. The approach is libwdi's (studied as a reference
+only, it is LGPL), reimplemented with Windows' own tools in
+`clients/desktop/src/main/addons/hercules-driver.ts`:
 
-| Cause | Guard |
+| Step | How |
 | --- | --- |
-| A knob at rest reports a count or two back and forth; summed blindly, it creeps across a step | movements inside the dead band that reverse direction cancel; a partial step untouched for 250 ms is dropped |
-| Counts turned while the knob's app was closed are applied all at once when it reopens (OpenStream100 documents this one) | the counts are discarded whenever a knob has no target |
-| A USB stall delivers one large delta | one report never moves more than 10% |
-| Acceleration with no upper bound | bounded at 3x, and a slow turn always moves exactly the configured step |
+| INF | rendered by `renderInf`: Microsoft's WinUSB template, `Include = winusb.inf` / `Needs = WINUSB.NT`, the whole device (`USB\VID_06F8&PID_E053`, no `MI_` suffix), `DeviceInterfaceGUIDs` = `{24a30efc-7c61-4f1a-baaa-f87f84a38ce1}` (`session::DEVICE_INTERFACE_GUID`; a desktop test keeps the two equal) |
+| Where | `%ProgramData%\Polaris\stream100-driver`, re-owned by Administrators with SYSTEM/Administrators full and Users read only, reparse points removed first; a fresh `package-<guid>` folder per run |
+| Certificate | `New-SelfSignedCertificate -Type CodeSigningCert` (code-signing EKU only, `ca=false`, RSA 3072, non-exportable key), subject `CN=Polaris Stream 100 driver (this PC only), O=Polaris`, public part added to LocalMachine `Root` and `TrustedPublisher` |
+| Catalog | `New-FileCatalog -CatalogVersion 2.0`, signed with `Set-AuthenticodeSignature` (SHA-256), then the private key is deleted (`-DeleteKey`, in a `finally`), so nothing else can ever be signed with it |
+| Binding | `UpdateDriverForPlugAndPlayDevicesW` with `INSTALLFLAG_FORCE` (Hercules' package is Microsoft-signed and would outrank ours otherwise) |
+| Record | `state.json` beside it: our published `oemNN.inf`, the INF the device had before, the certificate's thumbprint |
+| Uninstall | removing the add-on runs the elevated script's `remove` first: `pnputil /delete-driver <ours> /uninstall /force`, our certificates out of `My`/`Root`/`TrustedPublisher`, the previous INF put back on the device (Hercules' package stays in the driver store, so it simply returns), `pnputil /scan-devices`. A declined prompt keeps the add-on installed |
 
-## Feature parity
+The elevated side takes nothing from the unelevated one but the action: the
+INF is inside the script, every path comes from `%ProgramData%` and
+`%SystemRoot%`. The desktop writes the script, and the elevated PowerShell
+(started through `runElevated`: an argument array, never a shell command line
+built from input) reads it once, checks its SHA-256 against the value baked
+into its own command, and runs those same bytes. Exit codes: 0 done, 1223
+declined, 10 certificate, 11 signing, 13 binding, 14 unplugged, 20 removing,
+87 integrity; each has its own sentence on the page.
 
-| Feature | Stream Control 2.05 | OpenStream100 | Wave Link bridge | Polaris |
-| --- | --- | --- | --- | --- |
-| Operating systems | Windows (other systems not checked) | Linux (macOS early) | Windows | Windows, Linux, macOS (input); see status |
-| Talks to the device | own driver | libusb, direct | Hercules SDK | direct (`nusb`), or Hercules SDK while its driver is installed |
-| Knob follows a fixed app | yes | yes | Wave Link channel | yes (pinned program) |
-| Knob follows a category (music, calls, games, browser, system) | no | no | no | yes, a Polaris call first |
-| Game detection | no | no | no | the desktop's known games and launcher stores |
-| Press to mute | yes | yes | yes | yes |
-| Jitter dead band, no banked counts, capped steps | no (see above) | dead band, no banking | detent threshold | all four guards |
-| Acceleration | unknown | no | no | bounded |
-| Lit button actions | not checked | mute, media, pages, presets | media, launch Wave Link | the Stream Deck action catalogue (call mic, deafen, hang up...) and media keys |
-| Display: mixer | yes | yes | yes | through the Hercules SDK for now |
-| Display: call participants, now playing | no | no | album art | planned |
-| Brightness | not checked | yes | no | message written, not sent yet |
-| Pages | not checked | 8 | no | not yet |
-| Firmware update | yes | no | no | no (needs the Hercules updater) |
+The add-on then reads the controller through `native::winusb`
+(`crate::session`): interface 1 to alternate setting 1, the vendor reads `0x52`
+and `0x02`, reports from `0x81`, and an `SM` keep-alive on the isochronous
+endpoint `0x01` every 250 ms (`WinUsb_WriteIsochPipeAsap`; `nusb` 0.2 has no
+isochronous transfers). Request `0xF2` (reboot to the firmware updater) and
+flash writes can never be built. The Hercules SDK route stays as the fallback
+for a PC that keeps Hercules' driver.
+
+Not exercised yet: none of this has run on a real PC; no driver or certificate
+was installed from the development machine. The owner's test steps are the
+first run.
 
 ## Status
 

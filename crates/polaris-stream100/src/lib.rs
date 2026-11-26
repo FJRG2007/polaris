@@ -18,6 +18,8 @@
 //! - [`addon`]: the same settings as the add-on page's flat fields.
 //! - [`sdk`]: the Hercules SDK's input state, as the same reports.
 //! - [`engine`]: reports in, volume changes and Polaris actions out.
+//! - [`session`]: the start-up reads and keep-alive of a plain-USB session,
+//!   and the device interface of Polaris' own WinUSB driver package.
 //!
 //! Everything above is pure. The USB transport is behind the `usb` feature;
 //! the operating system's per-app volume and the Windows ownership probe are
@@ -32,6 +34,7 @@ pub mod manifest;
 pub mod ownership;
 pub mod report;
 pub mod sdk;
+pub mod session;
 pub mod settings;
 
 #[cfg(feature = "native")]

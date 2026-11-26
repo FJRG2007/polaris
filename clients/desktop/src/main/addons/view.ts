@@ -75,15 +75,22 @@ const setSchema = z.object({ key: z.string().max(64), value: z.union([z.boolean(
 
 export type ViewVerdict =
     | { readonly ok: true; readonly kind: "set"; readonly key: string; readonly value: boolean | string | number | null; }
+    | { readonly ok: true; readonly kind: "driver"; readonly action: "look"; }
     | { readonly ok: true; readonly kind: "call"; readonly method: AddonMethod; readonly params: unknown; }
     | { readonly ok: false; readonly error: "permission" | "unknown-method" | "bad-params"; };
 
-/** Whether a call from an add-on's view goes through: `settings.set`, or what its process may call. */
+/**
+ * Whether a call from an add-on's view goes through: `settings.set`, a look
+ * at the device's own driver (`driver.look`; its setup is a declared setting,
+ * so it changes only through `settings.set` or the list around the view), or
+ * what its process may call.
+ */
 export function judgeViewCall(granted: readonly AddonPermission[], method: string, params: unknown): ViewVerdict {
     if (method === "settings.set") {
         const parsed = setSchema.safeParse(params);
         return parsed.success ? { ok: true, kind: "set", key: parsed.data.key, value: parsed.data.value } : { ok: false, error: "bad-params" };
     }
+    if (method === "driver.look") return { ok: true, kind: "driver", action: "look" };
     const verdict = judgeCall(granted, method, params);
     return verdict.ok ? { ok: true, kind: "call", method: verdict.method, params: verdict.params } : verdict;
 }

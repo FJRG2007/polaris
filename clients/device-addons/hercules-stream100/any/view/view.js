@@ -1,10 +1,17 @@
 /**
  * A preview of the Stream 100's screen, shown in a sandboxed frame on the
  * add-on's page in Polaris (docs/device-addons.md, Views): what the screen is
- * set to show, at its brightness, with the name of what each knob turns. It
- * shows, it does not ask - every control is a declared setting that Polaris
- * draws with its own components around it. The page's `hello` and `settings`
- * messages bring the look, the language and every change.
+ * set to show, at its brightness, with the name of what each knob turns. Every
+ * control is a declared setting that Polaris draws with its own components
+ * around it. The page's `hello` and `settings` messages bring the look, the
+ * language and every change.
+ *
+ * Above the preview, on Windows, a line about Polaris' own WinUSB driver: what
+ * the "Polaris driver on this PC" setting would do, and why the last change to
+ * it did not go through (`driver.look`, answered by the desktop app's
+ * `addons/official.ts`). Text only, like the rest of the view. Nothing is
+ * drawn where the app answers null (another system, or an app older than the
+ * driver setting).
  */
 
 "use strict";
@@ -37,6 +44,22 @@ const WORDS = {
         callNote: "The people in the call show here.",
         nowPlayingNote: "What is playing shows here.",
         offNote: "The screen is off.",
+        driver: {
+            needed: "To use the Stream 100 here, turn on Polaris driver on this PC. Windows asks for permission once.",
+            neededHercules: "To use the Stream 100 here, turn on Polaris driver on this PC. It replaces the Hercules driver; Stream Control stops working with it.",
+            repair: "Another driver took the Stream 100 back. Turn on Polaris driver on this PC again to use it here.",
+            unplugged: "Plug in the Stream 100 to set up its driver.",
+            installed: "Stream 100 driver is set up on this PC.",
+            failed: {
+                declined: "The change needs Windows' permission. Try again and choose Yes.",
+                unplugged: "The Stream 100 was unplugged. Plug it in and try again.",
+                certificate: "Windows did not create the driver's certificate. Try again.",
+                signing: "Windows did not accept the driver's signature. Try again.",
+                binding: "Windows did not put the driver on the Stream 100. Unplug it, plug it back in and try again.",
+                removing: "The driver could not be removed. Try again.",
+                failed: "The driver change did not finish. Try again."
+            }
+        },
         categories: { calls: "Calls", music: "Music", games: "Games", browser: "Browser", system: "System sounds", other: "Other apps", output: "Whole output", none: "Nothing" },
         displays: { mixer: "Volume of each knob", call: "People in the call", nowPlaying: "What is playing", off: "Off" }
     },
@@ -47,6 +70,22 @@ const WORDS = {
         callNote: "Aquí aparecen las personas de la llamada.",
         nowPlayingNote: "Aquí aparece lo que suena.",
         offNote: "La pantalla está apagada.",
+        driver: {
+            needed: "Para usar aquí el Stream 100, activa Driver de Polaris en este PC. Windows pide permiso una vez.",
+            neededHercules: "Para usar aquí el Stream 100, activa Driver de Polaris en este PC. Sustituye al driver de Hercules; Stream Control deja de funcionar con él.",
+            repair: "Otro driver volvió a quedarse el Stream 100. Activa otra vez Driver de Polaris en este PC para usarlo aquí.",
+            unplugged: "Conecta el Stream 100 para configurar su driver.",
+            installed: "El driver del Stream 100 está configurado en este PC.",
+            failed: {
+                declined: "El cambio necesita el permiso de Windows. Vuelve a probar y elige Sí.",
+                unplugged: "Se desconectó el Stream 100. Conéctalo y vuelve a probar.",
+                certificate: "Windows no creó el certificado del driver. Vuelve a probar.",
+                signing: "Windows no aceptó la firma del driver. Vuelve a probar.",
+                binding: "Windows no puso el driver en el Stream 100. Desconéctalo, vuelve a conectarlo y prueba otra vez.",
+                removing: "No se pudo quitar el driver. Vuelve a probar.",
+                failed: "El cambio del driver no terminó. Vuelve a probar."
+            }
+        },
         categories: { calls: "Llamadas", music: "Música", games: "Juegos", browser: "Navegador", system: "Sonidos del sistema", other: "Otras apps", output: "Toda la salida", none: "Nada" },
         displays: { mixer: "Volumen de cada rueda", call: "Personas en la llamada", nowPlaying: "Lo que suena", off: "Apagada" }
     }
@@ -83,10 +122,39 @@ function fill(text, values) {
     return text.replace(/\{(\w+)\}/g, (match, name) => (name in values ? String(values[name]) : match));
 }
 
-if (typeof module !== "undefined") module.exports = { wordsFor, readValues, tokenEntries, fill, DEFAULTS };
+const DRIVER_STATES = ["notNeeded", "installed", "needed", "repair", "unplugged"];
+const DRIVER_FAILURES = ["declined", "unplugged", "certificate", "signing", "binding", "removing", "failed"];
+
+/** The app's answer to `driver.look`, checked field by field, or null to draw nothing. */
+function readDriver(value) {
+    if (!value || typeof value !== "object" || !DRIVER_STATES.includes(value.state)) return null;
+    const failure = value.failure === undefined || value.failure === null ? null : DRIVER_FAILURES.includes(value.failure) ? value.failure : "failed";
+    return { state: value.state, hercules: value.hercules === true, installed: value.installed === true, failure };
+}
+
+/** The key under `driver` of the line to show, or null for none. */
+function driverSentence(driver) {
+    if (!driver) return null;
+    switch (driver.state) {
+        case "needed":
+            return driver.hercules ? "neededHercules" : "needed";
+        case "repair":
+            return "repair";
+        case "unplugged":
+            return driver.installed ? null : "unplugged";
+        case "installed":
+            return "installed";
+        default:
+            return null;
+    }
+}
+
+if (typeof module !== "undefined") module.exports = { wordsFor, readValues, tokenEntries, fill, readDriver, driverSentence, DEFAULTS, DRIVER_FAILURES };
 
 if (typeof document !== "undefined") {
-    const state = { words: WORDS.en, values: null };
+    const state = { words: WORDS.en, values: null, driver: null };
+    const replies = new Map();
+    let nextCall = 1;
     const parentWindow = window.parent;
     const byId = (id) => document.getElementById(id);
     // The frame is as tall as what it draws: measured from the content, never from
@@ -120,8 +188,38 @@ if (typeof document !== "undefined") {
         screen.append(note);
     }
 
+    /** One call through the page to the app; resolves with its value, or null when it refused or failed. */
+    function call(method) {
+        const id = nextCall++;
+        return new Promise((resolve) => {
+            replies.set(id, resolve);
+            parentWindow.postMessage({ type: "call", id, method }, "*");
+        });
+    }
+
+    async function lookDriver() {
+        state.driver = readDriver(await call("driver.look"));
+        draw();
+    }
+
+    function drawDriver() {
+        const words = state.words.driver;
+        const sentence = driverSentence(state.driver);
+        const reason = state.driver?.failure ?? null;
+        const box = byId("driver");
+        box.hidden = sentence === null && reason === null;
+        if (box.hidden) return;
+        const line = byId("driver-line");
+        line.hidden = sentence === null;
+        line.textContent = sentence ? words[sentence] : "";
+        const failure = byId("driver-failure");
+        failure.hidden = reason === null;
+        failure.textContent = reason ? words.failed[reason] : "";
+    }
+
     function draw() {
         const values = state.values ?? DEFAULTS;
+        drawDriver();
         byId("root").setAttribute("aria-busy", state.values === null ? "true" : "false");
         drawScreen(values);
         byId("caption").textContent = values.display === "off" ? state.words.captionOff : fill(state.words.caption, { display: state.words.displays[values.display], brightness: values.brightness });
@@ -132,7 +230,12 @@ if (typeof document !== "undefined") {
         if (event.source !== parentWindow) return;
         const message = event.data;
         if (!message || typeof message !== "object") return;
-        if (message.type === "hello") {
+        if (message.type === "reply") {
+            const resolve = replies.get(message.id);
+            if (!resolve) return;
+            replies.delete(message.id);
+            resolve(message.ok === true ? message.value : null);
+        } else if (message.type === "hello") {
             const root = document.documentElement;
             for (const [name, value] of tokenEntries(message.tokens)) root.style.setProperty(name, value);
             root.dataset.theme = message.theme === "light" ? "light" : "dark";
@@ -142,6 +245,9 @@ if (typeof document !== "undefined") {
         } else if (message.type === "settings") {
             state.values = readValues(message.values);
             draw();
+            // Settings come after ready and after every change, a driver change that did
+            // not go through included, so the driver line is looked at again each time.
+            void lookDriver();
         }
     });
 

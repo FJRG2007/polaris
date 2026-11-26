@@ -17,6 +17,8 @@ pub mod linux;
 pub mod sdk;
 #[cfg(windows)]
 pub mod windows;
+#[cfg(windows)]
+pub mod winusb;
 
 /// This system's per-app volume, opened on the calling thread.
 pub fn open() -> Result<Box<dyn AudioSessions>, AudioError> {

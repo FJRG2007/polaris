@@ -9,9 +9,10 @@ import { z } from "zod";
 import { join } from "node:path";
 import type { AddonManager } from "./manager";
 import { spawn, execFile } from "node:child_process";
-import { ADDON_PERMISSIONS } from "@polaris/core/device-addons";
 import { access, mkdir, open, rename, writeFile } from "node:fs/promises";
+import { ADDON_PERMISSIONS, type AddonSettingValue } from "@polaris/core/device-addons";
 import { createOfficialRunner, type OfficialHost, type OfficialRunner } from "./hercules-official-run";
+import { createDriverRunner, type DriverFailure, type DriverOutcome, type DriverRunner, type DriverState } from "./hercules-driver";
 
 /** The add-ons whose device ships official software Polaris knows how to find. */
 export const OFFICIAL_ADDONS = ["hercules-stream100"] as const;
@@ -84,6 +85,70 @@ export function officialRunnerFor(id: string, addonsDir: string, platform: NodeJ
         dataDir: join(addonsDir, "official", id)
     });
 }
+
+/** The Stream 100's own WinUSB driver on this machine, or null off Windows or for another add-on. */
+export function driverRunnerFor(id: string, addonsDir: string, platform: NodeJS.Platform = process.platform, host: OfficialHost = nodeOfficialHost()): DriverRunner | null {
+    if (platform !== "win32" || id !== "hercules-stream100") return null;
+    const env = process.env;
+    return createDriverRunner(host, { systemRoot: env.SystemRoot ?? env.WINDIR ?? "C:\\Windows", programData: env.ProgramData ?? "C:\\ProgramData", dataDir: join(addonsDir, "official", id) }, platform);
+}
+
+/** The Stream 100's setting for Polaris' own driver ("Polaris driver on this PC"). */
+export const DRIVER_SETTING = "polarisDriver";
+
+/** Whether the driver setting reads on: Polaris' driver holds the device, or was set up and the device is unplugged. */
+export function driverSettingOf(state: DriverState): boolean {
+    return state.state === "installed" || (state.state === "unplugged" && state.installed);
+}
+
+/**
+ * Every setting change from the page or the view goes through `set`. For the
+ * Stream 100's driver setting, on runs the driver setup and off its removal
+ * (each one Windows permission prompt), and the new value is kept only when
+ * that went through; otherwise the stored value is written back as it was, so
+ * every page holding the setting hears that it did not change, and the reason
+ * is kept for `look` (the view's `driver.look`) to show. `look` also brings the
+ * setting in line with the machine, as a Hercules reinstall or Windows Update
+ * can take the device back without Polaris doing anything.
+ */
+export function createDriverSetting(manager: Pick<AddonManager, "settings" | "setSetting">, driverFor: (id: string) => DriverRunner | null) {
+    const failures = new Map<string, DriverFailure>();
+    const busy = new Set<string>();
+    return {
+        async set(id: string, key: unknown, value: unknown): Promise<Record<string, AddonSettingValue> | null> {
+            const driver = key === DRIVER_SETTING && typeof value === "boolean" ? driverFor(id) : null;
+            if (!driver) return manager.setSetting(id, key, value);
+            // One prompt at a time: a second change while one is open keeps what is stored.
+            if (busy.has(id)) return manager.settings(id);
+            busy.add(id);
+            try {
+                const outcome: DriverOutcome = value ? await driver.install() : (await driver.installed()) ? await driver.remove() : { ok: true };
+                if (outcome.ok) {
+                    failures.delete(id);
+                    return await manager.setSetting(id, key, value);
+                }
+                failures.set(id, outcome.reason);
+                const values = await manager.settings(id);
+                return values ? await manager.setSetting(id, key, values[DRIVER_SETTING] ?? !value) : null;
+            } finally {
+                busy.delete(id);
+            }
+        },
+        async look(id: string): Promise<(DriverState & { readonly failure: DriverFailure | null }) | null> {
+            const driver = driverFor(id);
+            if (!driver) return null;
+            const state = await driver.state();
+            if (!busy.has(id)) {
+                const values = await manager.settings(id);
+                const on = driverSettingOf(state);
+                if (values && DRIVER_SETTING in values && values[DRIVER_SETTING] !== on) await manager.setSetting(id, DRIVER_SETTING, on);
+            }
+            return { ...state, failure: failures.get(id) ?? null };
+        }
+    };
+}
+
+export type DriverSetting = ReturnType<typeof createDriverSetting>;
 
 /**
  * One request from the page. `choose` carries the choice out first and

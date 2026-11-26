@@ -93,3 +93,29 @@ main {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+[hidden] {
+    display: none !important;
+}
+
+.driver {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    max-width: 480px;
+    padding: 8px 12px;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+}
+
+.driver-line {
+    min-width: 0;
+    color: hsl(var(--muted-foreground));
+    overflow-wrap: anywhere;
+}
+
+.driver-failure {
+    font-size: 12px;
+    color: hsl(var(--danger));
+}

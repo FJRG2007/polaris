@@ -1,6 +1,6 @@
 [package]
 name = "polaris-stream100"
-version = "0.1.7"
+version = "0.1.8"
 description = "Polaris' driver for the Hercules Stream 100: its USB protocol, knob handling, display frames and per-app audio categories (docs/devices/hercules-stream100.md)."
 edition.workspace = true
 rust-version.workspace = true
@@ -41,6 +41,7 @@ windows = { version = "=0.62.2", optional = true, features = [
     "Win32_Media_Audio_Endpoints",
     "Win32_Devices_DeviceAndDriverInstallation",
     "Win32_Devices_HumanInterfaceDevice",
+    "Win32_Devices_Usb",
     "Win32_Storage_FileSystem",
     "Win32_System_IO",
     "Win32_Security",

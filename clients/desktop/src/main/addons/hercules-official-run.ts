@@ -61,7 +61,7 @@ const SECRET_KEY = /(token|secret|password)/i;
 export const DECLINED = 1223;
 
 const tool = (paths: OfficialPaths, name: string) => `${paths.systemRoot}\\System32\\${name}`;
-const powershell = (paths: OfficialPaths) => `${paths.systemRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`;
+const powershell = (paths: Pick<OfficialPaths, "systemRoot">) => `${paths.systemRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`;
 export const iniPath = (paths: OfficialPaths) => join(paths.appData, "Hercules", "Stream Control", "Stream Control.ini");
 export const backupPath = (paths: OfficialPaths) => join(paths.dataDir, "official-software.json");
 
@@ -175,6 +175,17 @@ const ELEVATED_SCRIPT = [
     "catch { if ($_.Exception.InnerException.NativeErrorCode -eq 1223 -or $_.Exception.NativeErrorCode -eq 1223) { exit 1223 }; exit 1 }"
 ].join(" ");
 
+/**
+ * Runs `file` with `args` through Windows' administrator prompt and answers
+ * its exit code; [`DECLINED`] when the prompt was declined. The file and its
+ * arguments travel in the environment, never in a command line built here.
+ */
+export async function runElevated(host: Pick<OfficialHost, "run">, systemRoot: string, file: string, args: readonly string[]): Promise<number> {
+    const env: Record<string, string> = { POLARIS_FILE: file };
+    if (args.length) env.POLARIS_ARGS = args.map(quoteWindowsArg).join(" ");
+    return (await host.run(powershell({ systemRoot }), ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ELEVATED_SCRIPT], env)).code;
+}
+
 /** What the add-on keeps before it changes anything, and what "Restore" puts back. */
 const backupSchema = z.object({
     version: z.literal(1),
@@ -214,11 +225,7 @@ export interface RestoreResult {
 export function createOfficialRunner(host: OfficialHost, paths: OfficialPaths, now: () => Date = () => new Date()) {
     const reg = (args: readonly string[]) => host.run(tool(paths, "reg.exe"), args);
 
-    async function elevated(file: string, args: readonly string[]): Promise<number> {
-        const env: Record<string, string> = { POLARIS_FILE: file };
-        if (args.length) env.POLARIS_ARGS = args.map(quoteWindowsArg).join(" ");
-        return (await host.run(powershell(paths), ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ELEVATED_SCRIPT], env)).code;
-    }
+    const elevated = (file: string, args: readonly string[]) => runElevated(host, paths.systemRoot, file, args);
 
     async function running(): Promise<boolean> {
         const out = await host.run(tool(paths, "tasklist.exe"), ["/fo", "csv", "/nh", "/fi", `IMAGENAME eq ${official.STREAM_CONTROL_IMAGE}`]);

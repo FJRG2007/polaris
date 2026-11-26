@@ -35,7 +35,8 @@ function describe(error, ownership) {
     }
     // Stream Control is closed and the Hercules driver is bound, yet the native
     // module could not read through the Hercules SDK either (missing, refused,
-    // or the device did not answer it).
+    // or the device did not answer it). The add-on's view offers Polaris' own
+    // WinUSB driver, which needs no Hercules software.
     if (held.state === "herculesSdk") {
         return { state: "busy", code: "herculesDriver", detail: "Polaris could not read the Stream 100 through the Hercules software. Plug it in again, or reinstall Hercules Stream Control." };
     }

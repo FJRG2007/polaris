@@ -35,10 +35,14 @@ pub const PRESS_JITTER_COUNTS: i32 = 4;
 /// SDK reports only changes, and the measured nudge still fell within two.
 pub const PRESS_JITTER_REPORTS: u8 = 3;
 
-/// Which bit of byte 1 each knob press uses, knob 1 first. The hardware's bit
-/// order does not follow the printed knob numbers; this is the order measured
-/// on a real unit. A unit that differs is corrected with [`KnobMap`].
-pub const DEFAULT_KNOB_BITS: [u8; 4] = [0x08, 0x01, 0x04, 0x02];
+/// Which bit of byte 1 each knob press uses, knob 1 first: bits 0-3 in the
+/// printed order. Measured on a real unit on 2026-11-26 (each knob pressed
+/// alone set exactly 0x01, 0x02, 0x04, 0x08 in the word the Hercules SDK
+/// copies from bytes 1-2 of this report), and the order New-Hera-lunx's
+/// `docs/protocol/inputs.md` reads from the firmware. OpenStream100's
+/// calibration (`0x08, 0x01, 0x04, 0x02`) did not hold on that unit. A unit
+/// that differs is corrected with [`KnobMap`].
+pub const DEFAULT_KNOB_BITS: [u8; 4] = [0x01, 0x02, 0x04, 0x08];
 /// Which bit each of the four lit buttons uses, button 1 first.
 pub const BUTTON_BITS: [u8; 4] = [0x10, 0x20, 0x40, 0x80];
 

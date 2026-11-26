@@ -16,7 +16,7 @@ import { watchUsb, type UsbWatch } from "./presence";
 import { addonShortcuts, sameShortcuts, type AddonShortcuts } from "./ways-in";
 import type { AddonChild, WantedAddon } from "./supervisor";
 import { createAddonManager, type AddonManager } from "./manager";
-import { answerOfficial, officialRequestSchema, officialRunnerFor } from "./official";
+import { answerOfficial, createDriverSetting, driverRunnerFor, officialRequestSchema, officialRunnerFor } from "./official";
 import { showNotice } from "../notices";
 import { newsWords } from "./updates";
 import { callPageAction, voiceStateNow, voiceWidgetAction } from "../voice-widget";
@@ -237,6 +237,11 @@ export function registerAddonIpc(
     showPolaris: (path?: string) => void
 ): void {
     const ready = () => startDeviceAddons(showPolaris);
+    // Settings change through here so the Stream 100's driver setting sets the driver up or takes it out.
+    const driverSetting = createDriverSetting(
+        { settings: (id) => ready().settings(id), setSetting: (id, key, value) => ready().setSetting(id, key, value) },
+        (id) => driverRunnerFor(id, addonsDir())
+    );
     ipcMain.handle(CHANNELS.addonsGet, (event) => (allowed(event) ? ready().snapshot() : null));
     ipcMain.handle(CHANNELS.addonsRefresh, async (event) => {
         if (allowed(event)) await ready().refresh();
@@ -250,6 +255,14 @@ export function registerAddonIpc(
     ipcMain.handle(CHANNELS.addonsUninstall, async (event, id: unknown) => {
         const parsed = idSchema.safeParse(id);
         if (!allowed(event) || !parsed.success) return false;
+        // The Stream 100's own driver goes with it: our certificate out of the
+        // machine's stores and the driver the device had before put back. A
+        // declined prompt keeps the add-on, so nothing is left half removed.
+        const driver = driverRunnerFor(parsed.data, addonsDir());
+        if (driver && (await driver.installed())) {
+            const removed = await driver.remove();
+            if (!removed.ok) return false;
+        }
         await ready().uninstall(parsed.data);
         return true;
     });
@@ -273,9 +286,11 @@ export function registerAddonIpc(
         if (!verdict.ok) return verdict;
         try {
             if (verdict.kind === "set") {
-                const values = await running.setSetting(parsed.data, verdict.key, verdict.value);
+                const values = await driverSetting.set(parsed.data, verdict.key, verdict.value);
                 return values ? { ok: true, value: values } : { ok: false, error: "bad-params" };
             }
+            // Only the Stream 100 has a driver of its own; any other view gets null.
+            if (verdict.kind === "driver") return { ok: true, value: await driverSetting.look(parsed.data) };
             if (verdict.method === "settings.get") return { ok: true, value: await running.settings(parsed.data) };
             if (verdict.method === "polaris.state") return { ok: true, value: { call: voiceStateNow() } };
             if (verdict.method === "system.launchOfficial") return { ok: true, value: await launchOfficial(parsed.data) };
@@ -309,7 +324,6 @@ export function registerAddonIpc(
     });
     ipcMain.handle(CHANNELS.addonsSetSetting, (event, id: unknown, key: unknown, value: unknown) => {
         const parsed = idSchema.safeParse(id);
-        return allowed(event) && parsed.success ? ready().setSetting(parsed.data, key, value) : null;
+        return allowed(event) && parsed.success ? driverSetting.set(parsed.data, key, value) : null;
     });
 }
-

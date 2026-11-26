@@ -8,6 +8,10 @@
     </head>
     <body>
         <main id="root" aria-busy="true">
+            <section class="driver" id="driver" aria-live="polite" hidden>
+                <span class="driver-line" id="driver-line"></span>
+                <span class="driver-failure" id="driver-failure" role="alert" hidden></span>
+            </section>
             <div class="screen" id="screen" role="img"></div>
             <p class="caption" id="caption"></p>
         </main>

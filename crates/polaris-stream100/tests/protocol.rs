@@ -70,12 +70,12 @@ fn the_first_report_is_only_a_baseline() {
 fn presses_follow_the_measured_bit_order() {
     let mut decoder = Decoder::default();
     decoder.feed(report(0, [0; 4]));
-    // 0x01 is knob 2's press, 0x10 button 1.
+    // 0x01 is knob 1's press, 0x10 button 1.
     assert_eq!(
         decoder.feed(report(0x11, [0; 4])),
         vec![
             Event::KnobPress {
-                knob: 1,
+                knob: 0,
                 pressed: true
             },
             Event::Button {
@@ -87,7 +87,7 @@ fn presses_follow_the_measured_bit_order() {
     assert_eq!(
         decoder.feed(report(0x10, [0; 4])),
         vec![Event::KnobPress {
-            knob: 1,
+            knob: 0,
             pressed: false
         }]
     );
@@ -162,7 +162,7 @@ fn a_bad_knob_map_falls_back_to_the_measured_one() {
     assert_eq!(
         decoder.feed(report(0x08, [0; 4])),
         vec![Event::KnobPress {
-            knob: 0,
+            knob: 3,
             pressed: true
         }]
     );

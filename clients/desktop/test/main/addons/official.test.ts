@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import type { DriverRunner } from "../../../src/main/addons/hercules-driver";
 import type { OfficialRunner } from "../../../src/main/addons/hercules-official-run";
-import { answerOfficial, officialRequestSchema, officialRunnerFor } from "../../../src/main/addons/official";
+import { answerOfficial, createDriverSetting, DRIVER_SETTING, driverSettingOf, officialRequestSchema, officialRunnerFor } from "../../../src/main/addons/official";
 
 type Execute = Awaited<ReturnType<OfficialRunner["execute"]>>;
 
@@ -79,5 +80,89 @@ describe("answerOfficial", () => {
         expect(officialRequestSchema.safeParse({ kind: "choose", choice: "stop", accepted: ["root"] }).success).toBe(false);
         expect(officialRunnerFor("hercules-stream100", "/tmp", "linux")).toBeNull();
         expect(officialRunnerFor("other", "C:\\addons", "win32")).toBeNull();
+    });
+});
+
+describe("the Stream 100's driver setting", () => {
+    type Outcome = { ok: true; } | { ok: false; reason: "declined" | "removing"; };
+    type State = Awaited<ReturnType<DriverRunner["state"]>>;
+
+    function setup(options: { install?: Outcome; remove?: Outcome; installed?: boolean; state?: State; stored?: boolean; } = {}) {
+        let stored: Record<string, boolean | string> = { enabled: true, polarisDriver: options.stored ?? false };
+        const manager = {
+            settings: vi.fn(async () => ({ ...stored })),
+            setSetting: vi.fn(async (_id: string, key: unknown, value: unknown) => {
+                stored = { ...stored, [key as string]: value as boolean };
+                return { ...stored };
+            })
+        };
+        const driver = {
+            install: vi.fn(async () => options.install ?? { ok: true }),
+            remove: vi.fn(async () => options.remove ?? { ok: true }),
+            installed: vi.fn(async () => options.installed ?? false),
+            state: vi.fn(async () => options.state ?? ({ state: "needed", hercules: true } as State))
+        } as unknown as DriverRunner;
+        const setting = createDriverSetting(manager, (id) => (id === "hercules-stream100" ? driver : null));
+        return { setting, manager, driver, stored: () => stored };
+    }
+
+    it("sets the driver up when turned on, and keeps it on only when that went through", async () => {
+        const { setting, driver, stored } = setup();
+        expect(await setting.set("hercules-stream100", DRIVER_SETTING, true)).toMatchObject({ polarisDriver: true });
+        expect(driver.install).toHaveBeenCalledTimes(1);
+        expect(stored().polarisDriver).toBe(true);
+        expect((await setting.look("hercules-stream100"))?.failure).toBeNull();
+    });
+
+    it("keeps it off and says why when Windows' prompt is declined", async () => {
+        const { setting, manager, stored } = setup({ install: { ok: false, reason: "declined" } });
+        expect(await setting.set("hercules-stream100", DRIVER_SETTING, true)).toMatchObject({ polarisDriver: false });
+        expect(stored().polarisDriver).toBe(false);
+        // Written back as it was, so the pages holding the setting hear it did not change.
+        expect(manager.setSetting).toHaveBeenLastCalledWith("hercules-stream100", DRIVER_SETTING, false);
+        expect(await setting.look("hercules-stream100")).toEqual({ state: "needed", hercules: true, failure: "declined" });
+    });
+
+    it("takes the driver out when turned off, and skips the prompt when it was never set up", async () => {
+        const kept = setup({ installed: true, stored: true, state: { state: "installed" } });
+        expect(await kept.setting.set("hercules-stream100", DRIVER_SETTING, false)).toMatchObject({ polarisDriver: false });
+        expect(kept.driver.remove).toHaveBeenCalledTimes(1);
+        const never = setup({ installed: false, stored: true });
+        await never.setting.set("hercules-stream100", DRIVER_SETTING, false);
+        expect(never.driver.remove).not.toHaveBeenCalled();
+        expect(never.stored().polarisDriver).toBe(false);
+        const refused = setup({ installed: true, stored: true, remove: { ok: false, reason: "removing" } });
+        expect(await refused.setting.set("hercules-stream100", DRIVER_SETTING, false)).toMatchObject({ polarisDriver: true });
+    });
+
+    it("runs one prompt at a time", async () => {
+        let finish: (outcome: Outcome) => void = () => {};
+        const { setting, driver } = setup();
+        (driver.install as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => new Promise<Outcome>((done) => (finish = done)));
+        const first = setting.set("hercules-stream100", DRIVER_SETTING, true);
+        expect(await setting.set("hercules-stream100", DRIVER_SETTING, true)).toMatchObject({ polarisDriver: false });
+        finish({ ok: true });
+        expect(await first).toMatchObject({ polarisDriver: true });
+        expect(driver.install).toHaveBeenCalledTimes(1);
+    });
+
+    it("follows the machine: on while Polaris' driver holds the device, off once another driver took it back", async () => {
+        const repaired = setup({ stored: true, state: { state: "repair" } });
+        await repaired.setting.look("hercules-stream100");
+        expect(repaired.stored().polarisDriver).toBe(false);
+        const holding = setup({ stored: false, state: { state: "unplugged", installed: true } });
+        await holding.setting.look("hercules-stream100");
+        expect(holding.stored().polarisDriver).toBe(true);
+        expect(driverSettingOf({ state: "notNeeded" })).toBe(false);
+        expect(driverSettingOf({ state: "installed" })).toBe(true);
+    });
+
+    it("leaves every other setting and add-on to the manager", async () => {
+        const { setting, manager, driver } = setup();
+        await setting.set("hercules-stream100", "enabled", false);
+        await setting.set("other", DRIVER_SETTING, true);
+        expect(driver.install).not.toHaveBeenCalled();
+        expect(manager.setSetting).toHaveBeenCalledTimes(2);
+        expect(await setting.look("other")).toBeNull();
     });
 });

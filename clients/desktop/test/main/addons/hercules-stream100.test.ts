@@ -119,7 +119,10 @@ describe("Hercules Stream 100 add-on", () => {
         const manifest = readAddonManifest(JSON.parse(readFileSync(new URL("manifest.json", folder), "utf8")))!;
         const root = fileURLToPath(new URL("any/", folder));
         const view = createRequire(import.meta.url)(fileURLToPath(new URL("any/view/view.js", folder))) as {
-            wordsFor(locale: string): { categories: Record<string, string>; displays: Record<string, string>; caption: string };
+            wordsFor(locale: string): { categories: Record<string, string>; displays: Record<string, string>; caption: string; driver: Record<string, unknown> & { failed: Record<string, string> } };
+            readDriver(value: unknown): { state: string; hercules: boolean; installed: boolean; failure: string | null } | null;
+            driverSentence(driver: unknown): string | null;
+            DRIVER_FAILURES: readonly string[];
             readValues(values: unknown): Record<string, unknown>;
             fill(text: string, values: Record<string, unknown>): string;
             tokenEntries(tokens: unknown): Array<[string, string]>;
@@ -149,6 +152,26 @@ describe("Hercules Stream 100 add-on", () => {
             expect(Object.keys(view.wordsFor("es-ES").categories).sort()).toEqual(Object.keys(words.categories).sort());
             expect(Object.keys(view.wordsFor("es-ES")).sort()).toEqual(Object.keys(words).sort());
             expect(view.wordsFor("fr-FR")).toBe(words);
+        });
+
+        it("points at the driver setting only where the app says it is needed, in both languages", () => {
+            expect(view.readDriver(null)).toBeNull();
+            expect(view.readDriver({ state: "other" })).toBeNull();
+            expect(view.driverSentence(view.readDriver({ state: "needed", hercules: true }))).toBe("neededHercules");
+            expect(view.driverSentence(view.readDriver({ state: "needed", hercules: false }))).toBe("needed");
+            expect(view.driverSentence(view.readDriver({ state: "repair" }))).toBe("repair");
+            expect(view.driverSentence(view.readDriver({ state: "installed" }))).toBe("installed");
+            expect(view.driverSentence(view.readDriver({ state: "notNeeded" }))).toBeNull();
+            expect(view.driverSentence(view.readDriver({ state: "unplugged", installed: true }))).toBeNull();
+            expect(view.driverSentence(view.readDriver({ state: "unplugged", installed: false }))).toBe("unplugged");
+            expect(view.readDriver({ state: "needed" })?.failure).toBeNull();
+            expect(view.readDriver({ state: "needed", failure: "declined" })?.failure).toBe("declined");
+            expect(view.readDriver({ state: "needed", failure: "C:\secret" })?.failure).toBe("failed");
+            const en = view.wordsFor("en-US").driver;
+            const es = view.wordsFor("es-ES").driver;
+            expect(Object.keys(es).sort()).toEqual(Object.keys(en).sort());
+            expect(Object.keys(en.failed).sort()).toEqual([...view.DRIVER_FAILURES].sort());
+            expect(Object.keys(es.failed).sort()).toEqual([...view.DRIVER_FAILURES].sort());
         });
 
         it("reads what is stored field by field", () => {
