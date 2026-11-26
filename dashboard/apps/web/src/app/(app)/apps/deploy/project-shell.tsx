@@ -155,7 +155,8 @@ export function ProjectShell({
             aria-label={t("shell.sync")}
         >
             <ArrowLeftRight className="size-4 shrink-0" />
-            <span className="hidden sm:inline">{t("shell.sync")}</span>
+            {/* One element in the bar and on the page: it follows the bar's width, never the screen's. */}
+            <span className="under-tb-sm:hidden">{t("shell.sync")}</span>
         </Button>
     ) : null;
 
