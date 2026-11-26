@@ -155,11 +155,27 @@ export async function checkAnswer(answer: Answer, seen: SeenHead | null): Promis
     };
 }
 
-/** Asks the log and checks the answer in full against this account's memory. */
-export async function askLog(
-    ownId: string,
-    body: { op: "proofs"; userIds: string[]; channelId?: string } | { op: "own" }
-): Promise<LogCheck> {
+/** One ask at a time per account, so each answer is checked against the head the one before it left. */
+const queues = new Map<string, Promise<unknown>>();
+
+/**
+ * Asks the log and checks the answer in full against this account's memory.
+ * Asks for one account run in turn: two answers checked in parallel against
+ * the same old head could each extend it on a different fork, and only the
+ * larger would be remembered - the other fork's entries accepted unchecked
+ * against it.
+ */
+export function askLog(ownId: string, body: { op: "proofs"; userIds: string[]; channelId?: string } | { op: "own" }): Promise<LogCheck> {
+    const run = (queues.get(ownId) ?? Promise.resolve()).then(() => askOnce(ownId, body));
+    const settled = run.catch(() => undefined);
+    queues.set(ownId, settled);
+    void settled.then(() => {
+        if (queues.get(ownId) === settled) queues.delete(ownId);
+    });
+    return run;
+}
+
+async function askOnce(ownId: string, body: { op: "proofs"; userIds: string[]; channelId?: string } | { op: "own" }): Promise<LogCheck> {
     const seen = readSeen(ownId);
     let answer: Answer;
     try {
@@ -196,14 +212,15 @@ export function entryMatches(
 
 /**
  * Of the account keys the server handed out in `channelId`, the accounts whose
- * key the log vouches for (`hpkePublicKey` is what every caller has; a page of
- * at most 100). `null` when the log could not be asked; a key the log
+ * key the log vouches for (`hpkePublicKey` is what every caller has, and
+ * `signPublicKey` is compared too when given; a page of at most 100 - the
+ * route refuses more). `null` when the log could not be asked; a key the log
  * contradicts is left out and reported.
  */
 export async function vouchedAccounts(
     ownId: string,
     channelId: string,
-    served: ReadonlyArray<{ userId: string; hpkePublicKey: Uint8Array }>
+    served: ReadonlyArray<{ userId: string; hpkePublicKey: Uint8Array; signPublicKey?: Uint8Array }>
 ): Promise<Set<string> | null> {
     if (!served.length) return new Set();
     const check = await askLog(ownId, { op: "proofs", channelId, userIds: served.map((s) => s.userId) });
@@ -213,7 +230,8 @@ export async function vouchedAccounts(
     const vouched = new Set<string>();
     for (const key of served) {
         const entry = byUser.get(key.userId);
-        if (entry && equal(entry.hpkePublicKey, key.hpkePublicKey)) vouched.add(key.userId);
+        if (entry && equal(entry.hpkePublicKey, key.hpkePublicKey) && (!key.signPublicKey || equal(entry.signPublicKey, key.signPublicKey)))
+            vouched.add(key.userId);
         else report(ownId, "inclusion");
     }
     return vouched;

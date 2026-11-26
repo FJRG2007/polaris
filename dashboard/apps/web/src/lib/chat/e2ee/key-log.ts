@@ -28,7 +28,7 @@ import { storedSigningKey } from "@/lib/edge-signing-key";
 const SIGNING_SETTING = "chat.e2ee.keyLog.ed25519";
 /** A head is re-signed at least this often even when the log has not grown. */
 const HEAD_TTL_MS = 10 * 60 * 1000;
-/** An account's entries `ownEntries` answers at most: a key version per rotation. */
+/** An account's entries `ownEntries` answers at most, newest first: a key version per rotation. */
 export const OWN_ENTRIES = 64;
 
 const logSigningKey = storedSigningKey(SIGNING_SETTING);
@@ -187,7 +187,8 @@ export async function ownEntries(userId: string, since?: number): Promise<LogAns
     await ensureLogged([userId]);
     const rows = await prisma.chatKeyLogEntry.findMany({
         where: { userId },
-        orderBy: { index: "asc" },
+        // The newest first: past the cap it is old versions that go unchecked, never the current one.
+        orderBy: { index: "desc" },
         take: OWN_ENTRIES,
         select: { index: true, userId: true, akVersion: true, signPublicKey: true, hpkePublicKey: true }
     });

@@ -151,7 +151,7 @@ describe("key log server", () => {
         await keyLog.appendEntry(entry(BOB, 2));
         await keyLog.appendEntry(entry(ALICE, 3, 2));
         const own = await keyLog.ownEntries(ALICE);
-        expect(own.entries.map((e) => [e.index, e.akVersion])).toEqual([[0, 1], [2, 2]]);
+        expect(own.entries.map((e) => [e.index, e.akVersion])).toEqual([[2, 2], [0, 1]]);
         expect(await verifies(own)).toBe(true);
     });
 });

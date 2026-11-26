@@ -172,18 +172,25 @@ export async function fetchPeerKeys(channelId: string, peerId: string): Promise<
 /**
  * Fetches the keys of `peerIds` and records each one the key log vouches for
  * (`key-log-client.ts`); a key the log contradicts is never remembered, so it
- * cannot become the trusted first sight. When the log cannot be asked the key
- * is recorded as before, on first use. The fingerprints recorded, by account.
+ * cannot become the trusted first sight. When the log cannot be asked (the
+ * server decides that too) only peers this browser already knows are
+ * recorded, so a changed key still raises its notice but nobody's first sight
+ * is taken on the server's word. The fingerprints recorded, by account.
  */
 export async function checkPeers(ownId: string, channelId: string, peerIds: ReadonlyArray<string>): Promise<Map<string, string>> {
     const recorded = new Map<string, string>();
     const keys = await fetchPeersKeys(channelId, peerIds);
     if (!keys?.size) return recorded;
-    const served = [...keys].map(([userId, pair]) => ({ userId, hpkePublicKey: fromText(pair.hpkePublicKey) }));
+    const served = [...keys].map(([userId, pair]) => ({
+        userId,
+        signPublicKey: fromText(pair.signPublicKey),
+        hpkePublicKey: fromText(pair.hpkePublicKey)
+    }));
     const vouched = await keyLog.vouchedAccounts(ownId, channelId, served);
+    const known = vouched ? null : readBook(ownId);
     const now = Date.now();
     for (const [userId, pair] of keys) {
-        if (vouched && !vouched.has(userId)) continue;
+        if (vouched ? !vouched.has(userId) : !known![userId]) continue;
         recorded.set(userId, await keyFingerprint(pair.signPublicKey, pair.hpkePublicKey));
     }
     updateBook(ownId, (book) => [...recorded].reduce((next, [userId, fp]) => observePeer(next, userId, fp, now), book));
