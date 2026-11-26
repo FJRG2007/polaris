@@ -143,6 +143,45 @@ describe("moving an instance", () => {
         expect(audit.hash).toBeNull();
     });
 
+    it("carries sealed reactions and ballots, the sweep's keys, and the rollback copies with their age, byte for byte", async () => {
+        const { LEFT_BEHIND } = transfer;
+        const tablesOfChat = ["ChatReaction", "ChatSealedReaction", "ChatPollBallot", "ChatMigration", "ChatMigrationRollback", "ChatHistoryKey"];
+        for (const name of tablesOfChat) expect(LEFT_BEHIND.has(name)).toBe(false);
+        const CHANNEL = "0192f000-0000-7000-8000-000000000001";
+        const MESSAGE = "0192f000-0000-7000-8000-0000000000a1";
+        const sweep = 9223372036854775806n;
+        const copiedAt = new Date("2026-11-20T08:00:00Z");
+        const rows: Record<string, Record<string, unknown>[]> = {
+            ChatReaction: [{ id: "0192f000-0000-7000-8000-0000000000d1", messageId: MESSAGE, userId: USER, emoji: "<:party:0192f000-0000-7000-8000-0000000000f1>", createdAt: copiedAt }],
+            ChatSealedReaction: [{ messageId: MESSAGE, userId: USER, setId: "0192f000-0000-7000-8000-0000000000f2", epoch: sweep, sealed: Buffer.alloc(2077, 7), updatedAt: copiedAt }],
+            ChatPollBallot: [{ pollId: MESSAGE, userId: USER, ballotId: "0192f000-0000-7000-8000-0000000000f3", epoch: sweep, sealed: Buffer.alloc(61, 9), updatedAt: copiedAt }],
+            ChatMigration: [{ channelId: CHANNEL, state: "cut", cutAt: copiedAt, reason: null }],
+            ChatMigrationRollback: [
+                { kind: "reaction", id: "0192f000-0000-7000-8000-0000000000d2", messageId: MESSAGE, channelId: CHANNEL, body: JSON.stringify({ userId: USER, emoji: "🎉" }), translation: null, createdAt: copiedAt },
+                { kind: "vote", id: "0192f000-0000-7000-8000-0000000000e1", messageId: MESSAGE, channelId: CHANNEL, body: JSON.stringify({ userId: USER, optionId: "0192f000-0000-7000-8000-0000000000c1", superseded: true }), translation: null, createdAt: copiedAt }
+            ],
+            ChatHistoryKey: [{ channelId: CHANNEL, epoch: sweep, recipient: USER, envelope: Buffer.alloc(120, 3), createdAt: copiedAt }]
+        };
+        for (const [name, list] of Object.entries(rows)) tables.set(name, list.map((row) => ({ ...row })));
+        const { path, summary } = await exported();
+        for (const name of tablesOfChat) expect(summary.tables).toContainEqual({ name, rows: rows[name]!.length });
+        tables.clear();
+        tables.set("User", [{ id: "fresh-admin" }]);
+        useKey(TARGET_KEY);
+        await transfer.applyTransfer(path, "correct horse battery staple");
+        const { Prisma } = await import("@polaris/db");
+        // An empty JSON column is written the database's way (`Prisma.DbNull`), which reads back as null.
+        const same = (value: unknown) =>
+            value === Prisma.DbNull ? null : Buffer.isBuffer(value) || value instanceof Uint8Array ? Buffer.from(value).toString("hex") : value instanceof Date ? value.toISOString() : value;
+        for (const [name, list] of Object.entries(rows)) {
+            const landed = tables.get(name) ?? [];
+            expect(landed).toHaveLength(list.length);
+            list.forEach((row, at) => {
+                for (const [column, value] of Object.entries(row)) expect(same(landed[at]![column])).toEqual(same(value));
+            });
+        }
+    });
+
     it("carries a sealed variable only inside the sealed file, and it arrives still sealed", async () => {
         const secret = encryptSecret("sealed-value-never-in-clear", SOURCE_KEY);
         tables.set("EnvVar", [
