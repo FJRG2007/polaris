@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { convert, evaluate, quickAnswer } from "@/shared/quick-answer";
-import { DEFAULT_SEARCH_ENGINE, launcherEngineOf, matchScore, rankedMatches, SEARCH_ENGINE_IDS, topMatches, useBoost, USE_BOOST_MAX, webSearchUrl } from "@/shared/launcher";
+import { DEFAULT_SEARCH_ENGINE, LAUNCHER_QUERY_MAX, launcherEngineOf, launcherQuery, matchScore, rankedMatches, SEARCH_ENGINE_IDS, topMatches, useBoost, USE_BOOST_MAX, webSearchUrl } from "@/shared/launcher";
 import { conflictSentence, findLaunchers, likelyHolders } from "@/shared/launcher-conflicts";
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipboardProbe } from "@/shared/clipboard-history";
 import { bindingFromPress, DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator, type KeyPress } from "@/shared/launcher-hotkey";
@@ -272,5 +272,13 @@ describe("finding a program the way it is remembered", () => {
     it("keeps use from lifting letters-in-order above initials", () => {
         const key = (item: { label: string; }) => item.label;
         expect(rankedMatches("gta", programs, 5, key, new Map([["Git Bash", 1e9]])).map(key)[0]).toBe("Grand Theft Auto V");
+    });
+});
+
+describe("the text the main window opens the launcher with", () => {
+    it("is one trimmed line, capped as the page caps its own field", () => {
+        expect(launcherQuery("  quarterly\n\treport  ")).toBe("quarterly report");
+        expect(launcherQuery("")).toBe("");
+        expect(launcherQuery("a".repeat(500))).toHaveLength(LAUNCHER_QUERY_MAX);
     });
 });

@@ -70,6 +70,7 @@ const bridge: PolarisDesktop = {
     runningPrograms: () => ipcRenderer.invoke(CHANNELS.gamePrograms),
     installTool: (input) => ipcRenderer.invoke(CHANNELS.installTool, input),
     openTvInstall: () => ipcRenderer.invoke(CHANNELS.tvOpen),
+    showLauncher: (query) => ipcRenderer.invoke(CHANNELS.launcherShow, query ?? ""),
     tv: {
         state: () => ipcRenderer.invoke(CHANNELS.tvState),
         find: () => ipcRenderer.invoke(CHANNELS.tvFind),

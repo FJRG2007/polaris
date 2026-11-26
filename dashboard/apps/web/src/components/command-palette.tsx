@@ -29,7 +29,13 @@ import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
-import { OPEN_SEARCH_EVENT, requestedQuery, requestedScope } from "@/lib/search/open-search";
+import {
+    OPEN_SEARCH_EVENT,
+    openDesktopLauncher,
+    requestedQuery,
+    requestedScope,
+    requestedText
+} from "@/lib/search/open-search";
 import {
     KEY_GLYPHS,
     KeyHint,
@@ -272,8 +278,9 @@ export function CommandPalette({
 
     // The host brings the panel back up; each time is a fresh open.
     useEffect(() => {
-        host?.onOpened(() => {
+        host?.onOpened((typed) => {
             presetRef.current = null;
+            presetQueryRef.current = typed ? requestedText(typed) : null;
             setOpen(true);
             setOpenings((count) => count + 1);
         });
@@ -324,29 +331,41 @@ export function CommandPalette({
             event.preventDefault();
             // Inside Chat it is Chat's quick switcher, as it is in every chat app;
             // Backspace on the empty field widens it to everything again.
-            presetRef.current = pathname.startsWith("/chat") ? "chat" : null;
-            setOpen((value) => {
-                // Closing uses no preset, and must not leave one for the next open.
-                if (value) presetRef.current = null;
-                return !value;
-            });
+            const chat = pathname.startsWith("/chat");
+            const toggle = () => {
+                presetRef.current = chat ? "chat" : null;
+                setOpen((value) => {
+                    // Closing uses no preset, and must not leave one for the next open.
+                    if (value) presetRef.current = null;
+                    return !value;
+                });
+            };
+            // In the desktop app it is the app's launcher, the same window as its
+            // global key; an open panel is still closed by the key that opened it.
+            if (chat || open) toggle();
+            else openDesktopLauncher(null, toggle);
         }
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
-    }, [pathname, host]);
+    }, [pathname, host, open]);
 
     // Opened from a field somewhere else on the page, already narrowed.
     useEffect(() => {
         function onOpenRequest(event: Event) {
             const wanted = requestedScope(event);
             const typed = requestedQuery(event);
-            presetRef.current = wanted;
-            presetQueryRef.current = typed;
-            // Already open: the reset below does not run again, so narrow here.
-            setScope(wanted ? searchScope(wanted) : null);
-            if (typed) setQuery(typed);
-            setActive(0);
-            setOpen(true);
+            const openHere = () => {
+                presetRef.current = wanted;
+                presetQueryRef.current = typed;
+                // Already open: the reset below does not run again, so narrow here.
+                setScope(wanted ? searchScope(wanted) : null);
+                if (typed) setQuery(typed);
+                setActive(0);
+                setOpen(true);
+            };
+            // A scope (Chat's own field) is this panel's; the launcher has none.
+            if (wanted) openHere();
+            else openDesktopLauncher(typed, openHere);
         }
         window.addEventListener(OPEN_SEARCH_EVENT, onOpenRequest);
         return () => window.removeEventListener(OPEN_SEARCH_EVENT, onOpenRequest);
@@ -1062,10 +1081,12 @@ export function CommandPalette({
             <button
                 type="button"
                 data-tour="shell.search"
-                onClick={() => {
-                    presetRef.current = null;
-                    setOpen(true);
-                }}
+                onClick={() =>
+                    openDesktopLauncher(null, () => {
+                        presetRef.current = null;
+                        setOpen(true);
+                    })
+                }
                 title={hint ? t("search.buttonTitle", { hint }) : t("search.label")}
                 aria-label={t("search.label")}
                 aria-keyshortcuts={bindings.length > 0 ? bindings.map(ariaShortcut).join(" ") : undefined}

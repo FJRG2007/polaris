@@ -73,9 +73,9 @@ function Launcher() {
 
     useEffect(() => {
         void search("");
-        window.polarisLauncher.onOpened(() => {
-            setQuery("");
-            void search("");
+        window.polarisLauncher.onOpened((typed) => {
+            setQuery(typed);
+            void search(typed);
             field.current?.focus();
         });
     }, [search]);

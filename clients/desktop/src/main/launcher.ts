@@ -550,11 +550,11 @@ function create(): BrowserWindow {
  * so the panel lands in the middle of that screen, whatever its size, and grows
  * from the middle as results arrive instead of hanging from a fixed top.
  */
-function place(target: BrowserWindow): void {
+function place(target: BrowserWindow, query = ""): void {
     const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     target.setBounds(workArea);
     takeFocus(target, process.platform, "pop-up-menu");
-    target.webContents.send(LAUNCHER_CHANNELS.opened);
+    target.webContents.send(LAUNCHER_CHANNELS.opened, query);
 }
 
 /** The key's press: open the launcher, or put it away when it is in front. */
@@ -579,6 +579,29 @@ export function toggleLauncher(): void {
     made.once("ready-to-show", () => {
         if (window === made) place(made);
     });
+}
+
+/**
+ * Bring the launcher up from the main window - its header search, its search
+ * key, its "More apps" row - with what was already typed there. Never puts it
+ * away, unlike the key. False when the launcher is switched off, so the page
+ * opens its own search instead.
+ */
+export function showLauncher(query: string): boolean {
+    if (!settings.toggle("launcher")) return false;
+    void refreshIndex();
+    listedApps();
+    const origin = host?.server() ?? null;
+    if (window && !window.isDestroyed() && remote && remote !== origin) window.destroy();
+    if (window && !window.isDestroyed() && ready) {
+        place(window, query);
+        return true;
+    }
+    const made = window && !window.isDestroyed() ? window : make();
+    made.once("ready-to-show", () => {
+        if (window === made) place(made, query);
+    });
+    return true;
 }
 
 function make(): BrowserWindow {

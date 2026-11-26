@@ -47,11 +47,26 @@ export interface PolarisLauncher {
     run(id: string): Promise<boolean>;
     hide(): Promise<void>;
     clearClipboard(): Promise<void>;
-    onOpened(listener: () => void): void;
+    /** Heard on each open, with the text it opens with (empty from the key; what
+     *  the main window's search field held when it was opened from there). */
+    onOpened(listener: (query: string) => void): void;
     /** The window was put away by main (it lost focus), not by the page. */
     onHidden(listener: () => void): void;
     /** The device add-ons on this computer, as the main window's bridge answers them (the dashboard's palette only). */
     addons(): Promise<unknown>;
+}
+
+/** Longest text the main window may hand the launcher to open with, as its own field caps it. */
+export const LAUNCHER_QUERY_MAX = 200;
+
+/** Text the main window asked the launcher to open with: one line, no control characters, capped. */
+export function launcherQuery(raw: string): string {
+    return raw
+        .replace(/[\u0000-\u001f\u007f]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, LAUNCHER_QUERY_MAX)
+        .trim();
 }
 
 /** Something listed: its name, its context line and the words it is found by. */

@@ -171,8 +171,31 @@ describe("the launcher window", () => {
         expect(first().isVisible()).toBe(false);
         expect(first().webContents.send).toHaveBeenCalledWith("launcher:hidden");
         launcher.toggleLauncher();
-        expect(first().webContents.send).toHaveBeenLastCalledWith("launcher:opened");
+        expect(first().webContents.send).toHaveBeenLastCalledWith("launcher:opened", "");
         expect(first().webContents.focus).toHaveBeenCalledTimes(2);
+    });
+
+    it("opens from the main window with what was typed there, and a second ask keeps it up", async () => {
+        launcher.startLauncher({ server: () => null, showPolaris: vi.fn() });
+        await vi.advanceTimersByTimeAsync(launcher.WARM_DELAY_MS);
+        first().emit("ready-to-show");
+        expect(launcher.showLauncher("notes")).toBe(true);
+        expect(first().isVisible()).toBe(true);
+        expect(first().webContents.send).toHaveBeenLastCalledWith("launcher:opened", "notes");
+        // Unlike the key, a second ask never puts it away.
+        expect(launcher.showLauncher("")).toBe(true);
+        expect(first().isVisible()).toBe(true);
+        expect(first().webContents.send).toHaveBeenLastCalledWith("launcher:opened", "");
+    });
+
+    it("opens from the main window once it has drawn when asked during the warm-up", async () => {
+        launcher.startLauncher({ server: () => null, showPolaris: vi.fn() });
+        expect(launcher.showLauncher("deploy")).toBe(true);
+        expect(windows).toHaveLength(1);
+        expect(first().isVisible()).toBe(false);
+        first().emit("ready-to-show");
+        expect(first().isVisible()).toBe(true);
+        expect(first().webContents.send).toHaveBeenLastCalledWith("launcher:opened", "deploy");
     });
 
     it("never reads the program list on a press, only after the window is put away", async () => {

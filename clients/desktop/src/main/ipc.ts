@@ -93,7 +93,8 @@ import {
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
 import { recordPageReport } from "./perf-watch";
 import { openInPage, setRouterListening } from "./page-router";
-import { clearClipboardHistory, followClipboardKeep, launcherStatus, recordLauncherKey, setLauncherBinding } from "./launcher";
+import { launcherQuery } from "@/shared/launcher";
+import { clearClipboardHistory, followClipboardKeep, launcherStatus, recordLauncherKey, setLauncherBinding, showLauncher } from "./launcher";
 import { APP_SETTING_FEATURES, appKeyPressSchema, appOverlayGameChangeSchema, readAppSettingChange, type AppSettingChange } from "@polaris/core/app-settings";
 import { bindingFromPress } from "@/shared/launcher-hotkey";
 
@@ -556,6 +557,14 @@ export function registerIpc(host: IpcHost): void {
         if (!fromPolaris(event)) return false;
         openTvInstall();
         return true;
+    });
+
+    // The main window's search, opened in the launcher: one line of text, capped
+    // as the page's own field caps it (`OPEN_SEARCH_QUERY_MAX`).
+    ipcMain.handle(CHANNELS.launcherShow, (event, raw: unknown): boolean => {
+        const query = z.string().max(4_000).safeParse(raw ?? "");
+        if (!fromPolaris(event) || !query.success) return false;
+        return showLauncher(launcherQuery(query.data));
     });
 
     ipcMain.handle(CHANNELS.computerState, (event) => (fromPolaris(event) ? runner().snapshot() : null));

@@ -55,8 +55,9 @@ export interface SearchHost {
     readonly navigate: (href: string) => void;
     /** Put the search away. */
     readonly close: () => void;
-    /** Called each time the host brings the search back up. */
-    readonly onOpened: (listener: () => void) => void;
+    /** Called each time the host brings the search back up, with the text it
+     *  opens with (empty, or nothing from a host too old to pass one, for none). */
+    readonly onOpened: (listener: (query?: string) => void) => void;
     /** Called when the host puts the search away by itself (its window lost
      *  focus); absent from a host too old to say. */
     readonly onHidden?: (listener: () => void) => void;

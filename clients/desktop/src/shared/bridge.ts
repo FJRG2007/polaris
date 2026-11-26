@@ -138,6 +138,9 @@ export interface PolarisDesktop {
     installTool(input: InstallRequest): Promise<InstallResult>;
     /** Opens the window that installs Polaris TV on a set on this network. */
     openTvInstall(): Promise<boolean>;
+    /** Brings up the launcher (the Alt+Space window) with `query` typed in it.
+     *  False when the launcher is switched off, so the page opens its own search. */
+    showLauncher(query?: string): Promise<boolean>;
     /** The same install, driven from a dialog on the page instead of a window. */
     readonly tv: TvInstallBridge;
     /** The system's default browser, by a name of ours, or null. */
@@ -909,6 +912,7 @@ export const CHANNELS = {
     pushOpenService: "local:push-open-service",
     pushEvent: "local:push-event",
     tvOpen: "desktop:tv-open",
+    launcherShow: "desktop:launcher-show",
     tvState: "local:tv-state",
     tvFind: "local:tv-find",
     tvStart: "local:tv-start",

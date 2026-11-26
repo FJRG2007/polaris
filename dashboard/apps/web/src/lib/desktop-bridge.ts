@@ -173,6 +173,9 @@ export interface PolarisDesktop {
     readonly computer?: DesktopComputer;
     /** Absent on an app older than Polaris TV. */
     openTvInstall?(): Promise<boolean>;
+    /** Brings up the app's launcher (its Alt+Space window) with `query` typed;
+     *  false when it is switched off. Absent on an app older than that. */
+    showLauncher?(query?: string): Promise<boolean>;
     /** The install driven from a dialog. Absent on an app older than that. */
     readonly tv?: DesktopTv;
     readonly platform: string;

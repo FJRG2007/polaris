@@ -10,7 +10,7 @@ interface DesktopLauncherBridge {
     run(id: string): Promise<boolean>;
     hide(): Promise<void>;
     open(href: string): Promise<void>;
-    onOpened(listener: () => void): void;
+    onOpened(listener: (query?: unknown) => void): void;
     onHidden(listener: () => void): void;
     addons(): Promise<unknown>;
 }
@@ -55,7 +55,7 @@ export function LauncherSearch({
                 else window.location.assign(href);
             },
             close: () => void bridge?.hide?.(),
-            onOpened: (listener) => bridge?.onOpened?.(listener),
+            onOpened: (listener) => bridge?.onOpened?.((query) => listener(typeof query === "string" ? query : undefined)),
             onHidden: typeof onHidden === "function" ? (listener) => onHidden(listener) : undefined,
             addons: typeof addons === "function" ? () => addons() : undefined
         };

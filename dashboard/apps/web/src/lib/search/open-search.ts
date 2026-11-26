@@ -10,6 +10,7 @@
  */
 
 import { SEARCH_SCOPES, type SearchScope } from "@polaris/core";
+import { desktopBridge } from "@/lib/desktop-bridge";
 
 export const OPEN_SEARCH_EVENT = "polaris:open-search";
 
@@ -24,7 +25,11 @@ export function openSearch(scope: SearchScope | null = null, query?: string): vo
 /** The text an open request asked to search for, on one line and capped, or
  *  null for none or for anything that is not text. */
 export function requestedQuery(event: Event): string | null {
-    const query = (event as CustomEvent<{ query?: unknown }>).detail?.query;
+    return requestedText((event as CustomEvent<{ query?: unknown }>).detail?.query);
+}
+
+/** `query` on one line and capped, or null for none or for anything that is not text. */
+export function requestedText(query: unknown): string | null {
     if (typeof query !== "string") return null;
     const line = query
         .replace(/[\u0000-\u001f\u007f]+/g, " ")
@@ -42,4 +47,26 @@ export function requestedScope(event: Event): SearchScope | null {
     return typeof scope === "string" && (SEARCH_SCOPES as readonly string[]).includes(scope)
         ? (scope as SearchScope)
         : null;
+}
+
+/**
+ * Open the search the reader's key opens. Inside Polaris Desktop that is its
+ * launcher window - the one Alt+Space brings up, with this computer's apps,
+ * games and commands as well as Polaris - so every way into search from the
+ * window lands in the same place. In a browser, in a desktop build that
+ * predates the bridge call, or with the launcher switched off, `fallback`
+ * opens this page's own panel instead.
+ */
+export function openDesktopLauncher(query: string | null, fallback: () => void): void {
+    const show = desktopBridge()?.showLauncher;
+    if (typeof show !== "function") {
+        fallback();
+        return;
+    }
+    void show(query ?? "").then(
+        (shown) => {
+            if (!shown) fallback();
+        },
+        () => fallback()
+    );
 }

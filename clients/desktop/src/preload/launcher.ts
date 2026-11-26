@@ -16,7 +16,7 @@ const bridge: PolarisLauncher = {
     clearClipboard: () => ipcRenderer.invoke(LAUNCHER_CHANNELS.clearClipboard),
     addons: () => ipcRenderer.invoke(LAUNCHER_CHANNELS.addons),
     onOpened: (listener) => {
-        ipcRenderer.on(LAUNCHER_CHANNELS.opened, () => listener());
+        ipcRenderer.on(LAUNCHER_CHANNELS.opened, (_event, query: unknown) => listener(typeof query === "string" ? query : ""));
     },
     onHidden: (listener) => {
         ipcRenderer.on(LAUNCHER_CHANNELS.hidden, () => listener());
