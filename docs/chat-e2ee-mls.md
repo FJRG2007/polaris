@@ -482,7 +482,7 @@ share of the work, not of the code.
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
 | 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info; scanning the other person's QR in the app; the verified mark; the key-change line in the conversation (per browser, trust on first use). Built 2026-11-26, not yet run (see "Account key log"): the append-only key log (RFC 6962 tree, signed head), the browser checking the signature, consistency with the last head it saw and inclusion of every key before the QR hand-over, a safety number, a remembered peer key or a sealed history key trusts it; each account's browsers monitoring their own entries; the group form of the key-change line (first 100 members); the log's own key recorded with a signed hand-over or an unsigned reset, browsers following a signed chain and asking the user before trusting a reset key (exactly that key, still consistency-checked); a key that rotated between asks rechecked before it is reported; a dismissed notice coming back for a different problem; the append lock as a bounded try-lock. Left: no test (written, not run), typecheck or build has run on it, nor a real PostgreSQL or browser; nothing calls `rotateLogKey`, so a master key change, the only way the log key changes today, always shows the reset notice and rests on the user's judgement; no gossip between browsers and no third-party auditor, so a fork shown to one browser alone is caught only when its own later heads meet it; no non-membership proofs (own-entry monitoring trusts the server to list every entry); the pinned log key and the last head are per browser. | Yes, for "government-grade" | ~70% |
 | 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody; the instance limit on /admin/privacy ("Sealed chat devices", 7 to 90 days, shown while sealed chat is on, audited). Built 2026-11-26 (code and unit tests, not yet run in a browser or against a real Postgres): the organisation's own limit (only tighter, organisation settings, strictest of instance and every organisation applies per account), a "new device" security notice when an account with another device registers one, and a device list with remove on /account/sessions. Left: seeing the three screens rendered, the migration applied on a real database. | Yes, for post-compromise security | ~85% |
-| 9 | **Server features that read chat text**: built (2026-11-25): moderation reports of a sealed message with its files, and the sealed lines of a whole-conversation or person report, see "Sealed reports". Built 2026-11-26 (round 30): moving a whole Polaris (Settings transfer) now re-seals the bare envelopes it used to miss - the MLS store of server-run members (Polar, webhooks), the OPAQUE server setup, automation secrets - and carries each OPAQUE record's password tag as the hash it fingerprints, keyed again on arrival (before, the setup failed to open on the new instance, every OPAQUE record was deleted, and accounts whose password was set over OPAQUE could not sign in nor open their account key or sealed history). Sealed rows, `ChatHistoryKey` and account-key envelopes travel as they are, so a sealed conversation opens after the move. Not carried by the transfer at all (every file, sealed or not): attachment and Drive bytes on disk or a storage connection; a Polar change waiting for Approve is answered as gone; a Polaris database backup is not restorable from the screen and only opens on the instance with the same master key. Confirmed 2026-11-26 (round 31), see "Other places a message is shown": retention (`lib/retention-service.ts`: activity, audit log, notices) and the compliance evidence export (`lib/compliance/*`: accounts, domains, certificates, backups, bans) read no chat table at all; disappearing messages go by `expiresAt` alone, so they expire and are kept the same sealed or not; automations get "New chat message" for a sealed message with an empty body (they are told it was sent, by whom and where, not what), and post into a sealed conversation through a webhook's own MLS device; game chat shows a sealed message as "Sent a message". Left: a sealed-aware game bridge (a server-run member, like webhooks) so a conversation shown in a game shows words again. Not checked: whether the transfer carries the new `ChatSealedReaction` rows and the sweep's `reaction`/`vote` rollback copies (the transfer names no chat table, so they should travel like `ChatPollBallot`; no round trip has been run). | Partly (export/import must round-trip) | ~55% |
+| 9 | **Server features that read chat text**: built (2026-11-25): moderation reports of a sealed message with its files, and the sealed lines of a whole-conversation or person report, see "Sealed reports". Built 2026-11-26 (round 30): moving a whole Polaris (Settings transfer) now re-seals the bare envelopes it used to miss - the MLS store of server-run members (Polar, webhooks), the OPAQUE server setup, automation secrets - and carries each OPAQUE record's password tag as the hash it fingerprints, keyed again on arrival (before, the setup failed to open on the new instance, every OPAQUE record was deleted, and accounts whose password was set over OPAQUE could not sign in nor open their account key or sealed history). Sealed rows, `ChatHistoryKey` and account-key envelopes travel as they are, so a sealed conversation opens after the move. Not carried by the transfer at all (every file, sealed or not): attachment and Drive bytes on disk or a storage connection; a Polar change waiting for Approve is answered as gone; a Polaris database backup is not restorable from the screen and only opens on the instance with the same master key. Confirmed 2026-11-26 (round 31), see "Other places a message is shown": retention (`lib/retention-service.ts`: activity, audit log, notices) and the compliance evidence export (`lib/compliance/*`: accounts, domains, certificates, backups, bans) read no chat table at all; disappearing messages go by `expiresAt` alone, so they expire and are kept the same sealed or not; automations get "New chat message" for a sealed message with an empty body (they are told it was sent, by whom and where, not what), and post into a sealed conversation through a webhook's own MLS device; game chat shows a sealed message as "Sent a message". Left: a sealed-aware game bridge (a server-run member, like webhooks) so a conversation shown in a game shows words again. Checked 2026-11-26 (round 34): the transfer carries every model it does not leave behind, so `ChatSealedReaction`, `ChatPollBallot`, the sweep's `ChatHistoryKey` envelopes and the `reaction`/`vote` rollback copies travel as they are (round trip in `test/instance-transfer/round-trip.test.ts`). | Partly (export/import must round-trip) | ~55% |
 | 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. Designed 2026-11-26 (round 31), see "Shared search segments": one segment per history-key epoch, keyed from that epoch's history key, built once under a lease, corrected by small generations, every hit still opened before it is shown. Left: phase-0 measurement, the table, the route ops and the Worker. | No (documented limit) | ~45% |
 | 11 | **Web code trust** (proposal 4.7): published hash of the crypto bundle, extension and desktop checking it, strict CSP and Trusted Types on message rendering. | No for default-on; yes for intelligence deployments | ~10% |
 | 12 | **Large channels**: built (2026-11-25): `reconcile` adds at most 100 newcomers per send (`ADD_BATCH`, one `claim-key-packages` call's worth); the roster's pages together could name more, which the claim refused, so every add in a channel past 1,000 leaves failed and was retried forever. The rest are added by later sends or join by their own external commit on open (decision 9). Removals go at most 100 per commit (`REMOVE_BATCH`), as many commits as it takes, all before anything is sealed: every removed leaf blanks its path and the committer then encrypts to each node left under a blank, so one commit taking out thousands could pass the 1 MiB commit limit and never land (tested: five leaving with a batch of two take three commits, and none of them opens what is sealed after). Left: steady-state commit size with a filled tree is unmeasured (phase 0). A harness is written (`apps/web/test/chat/e2ee/mls-commit-size.test.ts`, skipped unless `POLARIS_MLS_MEASURE` names group sizes, e.g. `100,500,1000`) and has not been run. Designed, not built: a Welcome without the `ratchet_tree` extension (RFC 9420, 12.4.3.3), the joiner taking the tree from the `GroupInfo` the server already stores, so a Welcome into a large group stays small. | For big spaces | ~38% |
@@ -1052,15 +1052,22 @@ the emoji reaches the server - with the server keeping one sealed set per
 person and message so a page of history loads its reactions in one read
 instead of replaying a log.
 
-- A set is all of one person's emoji on one message (at most 20, each 1-100
-  bytes), padded to a fixed 2,048-byte plaintext (`encodeReactions`), so every
-  sealed set is the same size whatever it holds. It is sealed under the
+- A set is all of one person's emoji on one message, each once (a version
+  byte, a four-byte count, then each emoji as a length byte and its 1-255
+  UTF-8 bytes), padded to a 2,048-byte plaintext (`encodeReactions`), so a set
+  is the same size whatever it holds. The clear path never capped a person's
+  emoji on a message, so a set never refuses what fits a larger size: past
+  2,048 bytes (some 400 ordinary emoji, 27 of a space's own) it doubles until
+  they fit, up to 1 MiB (`reactionsFit`, `isSealedReactionsSize`). Its length
+  then says which size it took, never which emoji. A browser sends sets up to
+  64 KiB (a few thousand emoji); only the sweep seals larger ones, from rows
+  the server already holds. It is sealed under the
   conversation's `HK(c, e)` for the current epoch (`sealReactions`,
   `packages/chat-crypto/src/message-content.ts`), key and nonce derived from
   `canonical(LABEL, "reactions", conversation, epoch, message, setId,
   reactor)`: moved to another message, person, epoch or conversation it does
   not open, and it never opens as a message or a ballot.
-- `ChatSealedReaction` (migration `20281211000000_chat_sealed_reactions`,
+- `ChatSealedReaction` (migration `20281213000000_chat_sealed_reactions`,
   additive) holds one row per message and person; a new set replaces it, an
   empty one deletes it (`putReactions`, `lib/chat/sealed-reactions.ts`). The
   usual checks hold: the room allows reacting, the message is readable and not
@@ -1080,24 +1087,47 @@ instead of replaying a log.
   each migration pass under the same backup rule): a one-time key at a fresh
   sweep epoch (`SWEEP_EPOCH_TOP` down, one per run, just below
   `LEGACY_EPOCH`) sealed to every member first; each person's clear rows on a
-  message become one set, and each clear vote one ballot (voter named only on a
-  public poll); each is opened again and compared before anything is cut; the
+  message become one set, however many they are (nothing of a person is left
+  in the clear beside a set, nor sealed in part), and each clear vote one
+  ballot (voter named only on a public poll); each is opened again and
+  compared before anything is cut; the
   clear rows move to `ChatMigrationRollback` (kinds `reaction` and `vote`) in
   the transaction that deletes them, and are purged after 30 days with the
   rest. Rerunnable: each person is swept whole or not at all. Rolling a
   migrated conversation back puts them back where the set or ballot is still
   the sweep's (`annotation-rollback.ts`); one the person changed since stays.
+- The sweep's key and epoch are made the first time something is sealed under
+  them, so a run with nothing to seal spends no sweep epoch. The only rows it
+  leaves in the clear are ones no set can hold - an empty emoji or one past
+  255 bytes, which the clear path never stores (`react` keeps at most 8 code
+  points, a space's emoji token at most 73 bytes): that person stays clear on
+  that message, untouched and drawn as before, the rest of the conversation is
+  sealed, and the conversation is answered `kept` (more than 100 such people
+  in one run, `failed`).
+- Members whose account key came after a sweep get its key the way late
+  members get the legacy one: `legacy-key-gaps` covers every server-sealed
+  epoch (`LEGACY_EPOCH` and each sweep epoch), newest first, eight epochs a
+  page with an `upTo` cursor, all sharing the one budget of people a call
+  names; the browser seals each key it holds to them (`sealKeyGaps`,
+  `put-history-keys`, first write wins), up to four pages a pass.
+- Moving a whole Polaris (Settings transfer) carries `ChatSealedReaction`,
+  `ChatPollBallot`, the sweep's `ChatHistoryKey` envelopes and its
+  `reaction`/`vote` rollback copies as they are (tested in
+  `test/instance-transfer/round-trip.test.ts`).
 
 What the server still knows: who reacted to which message and when, as a
 reaction sent as a message tells Signal's and WhatsApp's servers. Limits: a
 set is not signed by a device, so the server could withhold one or hand back
-an older one of the same person; the sweep's key is passed on to members
-whose account key came later by nobody yet (the migration's `legacy-key-gaps`
-covers `LEGACY_EPOCH` only), so they do not count swept reactions until it
-is; a person's clear reactions beyond 20 on one message, or an emoji over 100
-bytes, are kept only in the rollback copy. A conversation with its own group
-but never cut by the migration has no rollback screen, so its swept copies
-only wait out the 30 days.
+an older one of the same person; a late member counts swept reactions only
+once a member holding the sweep's key has sent since. A conversation with its
+own group but never cut by the migration (no `ChatMigration` row) has no
+rollback: `rollBackConversation` answers `notCut`, so its sweep's copies only
+wait out the 30 days. Decided acceptable (round 34): a copy is never the only
+place an emoji or vote lives - every set and ballot is verified before the
+cut, a person is never sealed in part, and a superseded row was already
+replaced by the person's own set - and putting them back would be leaking
+them again. If wanted later: the admin card lists conversations swept but
+never migrated, with an action calling `restoreAnnotations`.
 
 Verified: nothing run yet (code only, round 33). Tests written:
 `apps/web/test/chat/e2ee/sealed-reactions.test.ts` (sets, server rules, the
@@ -1177,7 +1207,8 @@ timer, a large instance (throughput unmeasured).
   and stores them with `put-history-keys` (first write wins). The audience is
   the one the migration sealed to, so this gives the history to nobody the
   plain history was not shown to. Same trust in server-given account keys as
-  every epoch's envelope (row 7).
+  every epoch's envelope (row 7). It covers the sweep's epochs too (see
+  "Sealed reactions"): each epoch the server sealed, with its own people.
 
 Verified: `test/chat/e2ee/legacy-rollback.test.ts` (restore, kept rows,
 envelopes kept while needed, refused when not cut or expired, repeatable,
