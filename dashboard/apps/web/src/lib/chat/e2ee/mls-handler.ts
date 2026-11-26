@@ -26,6 +26,7 @@ import * as delivery from "./mls-delivery";
 import * as sealed from "./sealed-messages";
 import { conversationSealed } from "./sealed-conversation";
 import { backgroundUser } from "@/lib/session";
+import { sealedAppOutdated } from "./client-version";
 import { mlsBody, type MlsBody } from "./schemas";
 import { LEGACY_EPOCH } from "./mls-history-keys";
 import { channelAccess, conversationAudience, type ChatAccessError } from "@/lib/chat/access";
@@ -79,6 +80,10 @@ export async function handleMls(request: Request): Promise<Response> {
     const user = await backgroundUser();
     // i18n-ignore: a status body no screen shows
     if (!user) return json({ error: "Unauthorized" }, 401);
+    // A Polaris app too old for sealed chat gets no device here, and its page says
+    // to update instead (owner decision 5: no plaintext copy for old clients).
+    const outdated = sealedAppOutdated(request.headers.get("user-agent"));
+    if (outdated) return json({ error: "updateApp", app: outdated.app, minimum: outdated.minimum }, 426);
     const parsed = mlsBody.safeParse(await readBody(request));
     if (!parsed.success) return json({ error: "invalid" }, 400);
     const limit = await rateLimit(`e2ee-mls:${user.id}`, PER_ACCOUNT, WINDOW_MS);
