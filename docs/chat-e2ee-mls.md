@@ -1514,7 +1514,7 @@ splits nothing and asks again in a minute.
 `recovery-own`, `recovery-open` (rate limited), `recovery-inbox`,
 `recovery-approve`, `recovery-decline`, `recovery-complete`,
 `recovery-key-state`, `put-recovery-key`. **Tables** (migration
-`20281220000000_chat_recovery_quorum`, additive): `ChatRecoveryShare`,
+`20281231000000_chat_recovery_quorum`, additive): `ChatRecoveryShare`,
 `ChatRecoveryRequest`, `ChatRecoveryApproval`, and `ChatRecoveryKey` /
 `ChatRecoveryKeyShare` for the `ORK` below.
 
