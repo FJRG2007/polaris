@@ -105,6 +105,7 @@ export const keysBody = z.discriminatedUnion("op", [
     z.object({ op: z.literal("recovery-open"), requesterKey: z.string().length(1622).regex(BASE64URL) }),
     z.object({ op: z.literal("recovery-inbox") }),
     z.object({ op: z.literal("recovery-approve"), requestId: z.string().uuid(), envelope: recoveryEnvelope }),
+    z.object({ op: z.literal("recovery-decline"), requestId: z.string().uuid() }),
     z.object({ op: z.literal("recovery-complete"), requestId: z.string().uuid() })
 ]);
 export type KeysBody = z.infer<typeof keysBody>;

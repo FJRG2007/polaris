@@ -655,6 +655,9 @@
         "cancel": "Cancelar",
         "confirm": "Coinciden, aprobar",
         "approved": "Aprobado. La cuenta recupera sus chats cuando aprueben suficientes administradores.",
-        "approveFailed": "No se pudo aprobar. Abre antes tus chats cifrados en este dispositivo y vuelve a intentarlo."
+        "approveFailed": "No se pudo aprobar. Abre antes tus chats cifrados en este dispositivo y vuelve a intentarlo.",
+        "decline": "Rechazar",
+        "declined": "Rechazado. Tu parte no se ha entregado.",
+        "declineFailed": "No se pudo rechazar. Recarga la página y vuelve a intentarlo."
     }
 }

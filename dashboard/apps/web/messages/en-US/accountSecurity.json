@@ -655,6 +655,9 @@
         "cancel": "Cancel",
         "confirm": "Codes match, approve",
         "approved": "Approved. The account gets its chats back once enough administrators approve.",
-        "approveFailed": "Could not approve. Open your encrypted chats on this device first, then try again."
+        "approveFailed": "Could not approve. Open your encrypted chats on this device first, then try again.",
+        "decline": "Decline",
+        "declined": "Declined. Your share was not released.",
+        "declineFailed": "Could not decline. Reload the page and try again."
     }
 }

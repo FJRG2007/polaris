@@ -332,7 +332,7 @@ export async function approveRequest(
     } catch (caught) {
         if (!(caught instanceof Prisma.PrismaClientKnownRequestError && caught.code === "P2002")) throw caught;
     }
-    const approvals = await prisma.chatRecoveryApproval.count({ where: { requestId } });
+    const approvals = await prisma.chatRecoveryApproval.count({ where: { requestId, envelope: { not: null } } });
     const released =
         approvals >= request.threshold &&
         (await prisma.chatRecoveryRequest.updateMany({ where: { id: requestId, status: "pending" }, data: { status: "released" } }))
@@ -346,6 +346,48 @@ export async function approveRequest(
     });
     await tell(request.userId, "chat_recovery_approved", "chat_recovery_approved_body");
     return { released };
+}
+
+/**
+ * A custodian refuses to release their share - they could not confirm it was
+ * the person, or the code did not match. Once so many have declined that the
+ * rest cannot reach the threshold, the request is closed as `declined` and the
+ * account is told; a new request needs a new administrator approval window.
+ */
+export async function declineRequest(custodianId: string, requestId: string, now = new Date()): Promise<{ declined: boolean }> {
+    const request = await prisma.chatRecoveryRequest.findFirst({
+        where: { id: requestId, status: "pending", expiresAt: { gt: now } },
+        select: { userId: true, splitId: true, threshold: true }
+    });
+    if (!request) throw new RecoveryRefusal("notFound");
+    const share = await prisma.chatRecoveryShare.findUnique({
+        where: { ownerId_custodianId: { ownerId: request.userId, custodianId } },
+        select: { splitId: true }
+    });
+    if (!share || share.splitId !== request.splitId) throw new RecoveryRefusal("notFound");
+    try {
+        await prisma.chatRecoveryApproval.create({ data: { requestId, custodianId, envelope: null } });
+    } catch (caught) {
+        // Already answered, either way: an approval is never turned into a decline.
+        if (!(caught instanceof Prisma.PrismaClientKnownRequestError && caught.code === "P2002")) throw caught;
+    }
+    const [holders, declines] = await Promise.all([
+        prisma.chatRecoveryShare.count({ where: { ownerId: request.userId, splitId: request.splitId } }),
+        prisma.chatRecoveryApproval.count({ where: { requestId, envelope: null } })
+    ]);
+    const declined =
+        holders - declines < request.threshold &&
+        (await prisma.chatRecoveryRequest.updateMany({ where: { id: requestId, status: "pending" }, data: { status: "declined" } }))
+            .count === 1;
+    await recordAudit({
+        actorId: custodianId,
+        action: "chat.recovery.declined",
+        targetType: "user",
+        targetId: request.userId,
+        metadata: { requestId, declines, holders, threshold: request.threshold, closed: declined }
+    });
+    if (declined) await tell(request.userId, "chat_recovery_declined", "chat_recovery_declined_body");
+    return { declined };
 }
 
 /** The requester's browser holds its key again: close the request, drop the released shares. */

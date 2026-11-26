@@ -19620,7 +19620,7 @@ model ChatRecoveryShare {
 // recovery (AccountRecovery) was used recently can raise one. `requesterKey` is
 // the one-off X-Wing public key of the requester's browser; approvals are the
 // custodians' shares sealed to it. status: pending | released | completed |
-// expired | cancelled.
+// expired | cancelled | declined (too many custodians declined for the quorum).
 model ChatRecoveryRequest {
     id                String    @id @default(uuid(7)) @db.Uuid
     userId            String    @db.Uuid
@@ -19642,11 +19642,12 @@ model ChatRecoveryRequest {
 }
 
 // One custodian's share, opened in their browser and sealed again to the
-// request's key. Deleted with the request once it completes.
+// request's key, or null when the custodian declined. Deleted with the request
+// once it completes.
 model ChatRecoveryApproval {
     requestId   String   @db.Uuid
     custodianId String   @db.Uuid
-    envelope    Bytes
+    envelope    Bytes?
     createdAt   DateTime @default(now())
 
     request ChatRecoveryRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)

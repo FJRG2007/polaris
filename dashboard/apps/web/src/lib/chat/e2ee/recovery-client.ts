@@ -163,6 +163,11 @@ export async function approve(
     }
 }
 
+/** Decline as a custodian: the share is never opened. */
+export async function decline(item: InboxItem): Promise<boolean> {
+    return (await post({ op: "recovery-decline", requestId: item.id })) !== null;
+}
+
 function openDb(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
         const open = indexedDB.open(DB, 1);

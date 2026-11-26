@@ -92,7 +92,9 @@
         "chat_recovery_approved": "An administrator approved recovering your encrypted chats",
         "chat_recovery_approved_body": "If you did not ask for this, tell your administrators now.",
         "chat_recovery_completed": "Your encrypted chats were recovered on a new device",
-        "chat_recovery_completed_body": "Your administrators approved it. If it was not you, end every session on the sessions page."
+        "chat_recovery_completed_body": "Your administrators approved it. If it was not you, end every session on the sessions page.",
+        "chat_recovery_declined": "Your encrypted chat recovery was declined",
+        "chat_recovery_declined_body": "Too few administrators approved it. Ask them to confirm it is you, then request again."
     },
     "friends": {
         "somebody": "Somebody",

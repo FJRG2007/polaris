@@ -92,7 +92,9 @@
         "chat_recovery_approved": "Un administrador ha aprobado recuperar tus chats cifrados",
         "chat_recovery_approved_body": "Si no lo has pedido tú, avisa ahora a tus administradores.",
         "chat_recovery_completed": "Tus chats cifrados se han recuperado en un dispositivo nuevo",
-        "chat_recovery_completed_body": "Lo aprobaron tus administradores. Si no has sido tú, cierra todas las sesiones en la página de sesiones."
+        "chat_recovery_completed_body": "Lo aprobaron tus administradores. Si no has sido tú, cierra todas las sesiones en la página de sesiones.",
+        "chat_recovery_declined": "Se ha rechazado la recuperación de tus chats cifrados",
+        "chat_recovery_declined_body": "No la aprobaron suficientes administradores. Pídeles que confirmen que eres tú y vuelve a solicitarla."
     },
     "friends": {
         "somebody": "Alguien",

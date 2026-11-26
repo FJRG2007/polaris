@@ -40,7 +40,8 @@ CREATE INDEX IF NOT EXISTS "ChatRecoveryRequest_status_expiresAt_idx" ON "ChatRe
 CREATE TABLE IF NOT EXISTS "ChatRecoveryApproval" (
     "requestId" UUID NOT NULL,
     "custodianId" UUID NOT NULL,
-    "envelope" BYTEA NOT NULL,
+    -- NULL: the custodian declined.
+    "envelope" BYTEA,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ChatRecoveryApproval_pkey" PRIMARY KEY ("requestId", "custodianId")

@@ -189,6 +189,7 @@ export async function handleSignIn(request: Request): Promise<Response> {
             case "recovery-open":
             case "recovery-inbox":
             case "recovery-approve":
+            case "recovery-decline":
             case "recovery-complete":
                 return await recoveryOp(user.id, body);
         }
@@ -372,7 +373,7 @@ export async function handleKeys(request: Request): Promise<Response> {
 
 type RecoveryBody = Extract<
     KeysBody,
-    { op: "recovery-state" | "put-recovery-shares" | "recovery-own" | "recovery-open" | "recovery-inbox" | "recovery-approve" | "recovery-complete" }
+    { op: "recovery-state" | "put-recovery-shares" | "recovery-own" | "recovery-open" | "recovery-inbox" | "recovery-approve" | "recovery-decline" | "recovery-complete" }
 >;
 
 /** The quorum recovery ops, each scoped to the signed-in account. */
@@ -402,11 +403,12 @@ async function recoveryOp(userId: string, body: RecoveryBody): Promise<NextRespo
                     threshold: request.threshold,
                     requesterKey: text(request.requesterKey),
                     expiresAt: request.expiresAt.toISOString(),
-                    approvals: request.approvals.length,
+                    approvals: request.approvals.filter((a) => a.envelope).length,
+                    declines: request.approvals.filter((a) => !a.envelope).length,
                     // The shares only once the quorum is met; they open for this browser alone.
                     released:
                         request.status === "released"
-                            ? request.approvals.map((a) => ({ custodianId: a.custodianId, envelope: text(a.envelope) }))
+                            ? request.approvals.flatMap((a) => (a.envelope ? [{ custodianId: a.custodianId, envelope: text(a.envelope) }] : []))
                             : []
                 }
             });
@@ -437,6 +439,8 @@ async function recoveryOp(userId: string, body: RecoveryBody): Promise<NextRespo
         }
         case "recovery-approve":
             return json(await recovery.approveRequest(userId, body.requestId, bytes(body.envelope)));
+        case "recovery-decline":
+            return json(await recovery.declineRequest(userId, body.requestId));
         case "recovery-complete":
             await recovery.completeRequest(userId, body.requestId);
             return json({ completed: true });

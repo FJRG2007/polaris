@@ -84,6 +84,16 @@ export function ChatRecoveryCard() {
         await load();
     };
 
+    const declineApproval = async () => {
+        if (!approving) return;
+        setBusy(true);
+        const ok = await recovery.decline(approving.item).catch(() => false);
+        setBusy(false);
+        setApproving(null);
+        setMessage(ok ? { tone: "ok", text: t("chatRecovery.declined") } : { tone: "error", text: t("chatRecovery.declineFailed") });
+        await load();
+    };
+
     // Nothing while the keys route is off (sealed chat not served) or not read yet.
     if (!loaded) return null;
     const state = loaded?.state;
@@ -146,6 +156,9 @@ export function ChatRecoveryCard() {
                         <div className="flex justify-end gap-2">
                             <Button variant="outline" onClick={() => setApproving(null)}>
                                 {t("chatRecovery.cancel")}
+                            </Button>
+                            <Button variant="outline" disabled={busy} onClick={() => void declineApproval()}>
+                                {t("chatRecovery.decline")}
                             </Button>
                             <Button disabled={busy} onClick={() => void confirmApproval()}>
                                 {t("chatRecovery.confirm")}
