@@ -39,7 +39,8 @@ const BATCH = 100;
 const encoder = new TextEncoder();
 
 describe.skipIf(!nativeFile || sizes.length === 0)("MLS handshake size with a full tree", () => {
-    const { MlsMember } = createRequire(import.meta.url)(join(nativeDir, nativeFile!)) as { MlsMember: MlsMemberClass };
+    // The body runs at collection even when skipped, so the binary is loaded only when present.
+    const { MlsMember } = (nativeFile ? createRequire(import.meta.url)(join(nativeDir, nativeFile)) : {}) as { MlsMember: MlsMemberClass };
     let made = 0;
     const member = (): MlsMemberLike => {
         made += 1;
