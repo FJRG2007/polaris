@@ -127,26 +127,47 @@ afterEach(() => {
     delete (window as { polarisDesktop?: unknown }).polarisDesktop;
 });
 
+/** Pick an entry from a host row's three-dots menu. */
+async function fromMenu(user: ReturnType<typeof userEvent.setup>, host: string, item: string) {
+    await user.click(screen.getByRole("button", { name: `Actions for ${host}` }));
+    await user.click(await screen.findByRole("menuitem", { name: item }));
+}
+
+/** Open "Add host" from the header and return its dialog. */
+async function openAdd(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: "Add host" }));
+    return within(await screen.findByRole("dialog"));
+}
+
 describe("the hosts list", () => {
-    it("lists every host with how it answers and the one in use", async () => {
+    it("draws the hosts as a table with how each answers and the one in use", async () => {
         install(fakeHosts());
         await draw();
-        const home = screen.getByText("Home").closest("li") as HTMLElement;
-        expect(within(home).getByText("In use")).toBeTruthy();
-        expect(within(home).getByText("Answering")).toBeTruthy();
-        // A host with no name is shown by its address, and offers to switch to it.
-        const lab = screen.getByText("lab.example.test").closest("li") as HTMLElement;
-        expect(within(lab).getByText("Not answering")).toBeTruthy();
-        expect(within(lab).getByRole("button", { name: "Switch" })).toBeTruthy();
-        expect(within(home).queryByRole("button", { name: "Switch" })).toBeNull();
+        expect(screen.getByRole("table")).toBeTruthy();
+        const home = screen.getAllByText("Home")[0].closest("tr") as HTMLElement;
+        expect(within(home).getAllByText("In use").length).toBeGreaterThan(0);
+        expect(within(home).getAllByText("Answering").length).toBeGreaterThan(0);
+        // A host with no name is shown by its address.
+        const lab = screen.getAllByText("lab.example.test")[0].closest("tr") as HTMLElement;
+        expect(within(lab).getAllByText("Not answering").length).toBeGreaterThan(0);
+        expect(within(lab).getByRole("button", { name: "Actions for lab.example.test" })).toBeTruthy();
+    });
+
+    it("adds through one header button, never an inline form under the list", async () => {
+        install(fakeHosts());
+        await draw();
+        expect(screen.queryByLabelText("Address *")).toBeNull();
+        const add = screen.getByRole("button", { name: "Add host" });
+        expect(add.querySelector("svg")).toBeTruthy();
     });
 
     it("draws the list this device saw last before the app answers", async () => {
         window.localStorage.setItem("polaris.this-app.hosts", JSON.stringify(LIST));
         install(fakeHosts({ list: vi.fn(() => new Promise(() => undefined)), status: vi.fn(() => new Promise(() => undefined)) }));
         await draw();
-        expect(screen.getByText("Home")).toBeTruthy();
-        expect(screen.getAllByText("Checking").length).toBe(2);
+        expect(screen.getAllByText("Home").length).toBeGreaterThan(0);
+        // Each row draws its state twice - the phone line and the column - one of them hidden by width.
+        expect(screen.getAllByText("Checking").length).toBe(4);
         expect(document.querySelector("[aria-busy=true].h-9")).toBeNull();
     });
 
@@ -157,12 +178,16 @@ describe("the hosts list", () => {
         expect(screen.getByText("Reading the hosts this app keeps.")).toBeTruthy();
     });
 
-    it("switches to a host through the app", async () => {
+    it("switches to a host from its row menu, and offers no switch for the one in use", async () => {
         const hosts = fakeHosts();
         install(hosts);
         await draw();
-        const lab = screen.getByText("lab.example.test").closest("li") as HTMLElement;
-        await act(async () => within(lab).getByRole("button", { name: "Switch" }).click());
+        const user = userEvent.setup();
+        await user.click(screen.getByRole("button", { name: "Actions for Home" }));
+        await screen.findAllByRole("menuitem");
+        expect(screen.queryByRole("menuitem", { name: "Use this host" })).toBeNull();
+        await user.keyboard("{Escape}");
+        await fromMenu(user, "lab.example.test", "Use this host");
         expect(hosts.switchTo).toHaveBeenCalledWith(LAB.origin);
     });
 
@@ -171,51 +196,42 @@ describe("the hosts list", () => {
         const hosts = fakeHosts({ remove: vi.fn(() => new Promise((resolve) => (answer = resolve))) });
         install(hosts);
         await draw();
-        await act(async () => screen.getByRole("button", { name: "Remove lab.example.test" }).click());
+        const user = userEvent.setup();
+        await fromMenu(user, "lab.example.test", "Remove");
         expect(hosts.remove).not.toHaveBeenCalled();
         const dialog = await screen.findByRole("dialog");
         await act(async () => within(dialog).getByRole("button", { name: "Remove" }).click());
         expect(hosts.remove).toHaveBeenCalledWith(LAB.origin);
-        expect(screen.queryByText("lab.example.test")).toBeNull();
+        expect(screen.queryAllByText("lab.example.test")).toHaveLength(0);
         await act(async () => answer({ ok: false, error: "Refused." }));
-        expect(screen.getByText("lab.example.test")).toBeTruthy();
+        expect(screen.getAllByText("lab.example.test").length).toBeGreaterThan(0);
     });
 
     it("warns that removing the host in use closes its windows", async () => {
         install(fakeHosts());
         await draw();
-        await act(async () => screen.getByRole("button", { name: "Remove Home" }).click());
+        const user = userEvent.setup();
+        await fromMenu(user, "Home", "Remove");
         const dialog = await screen.findByRole("dialog");
         expect(within(dialog).getByText(/its windows close/)).toBeTruthy();
     });
 
-    it("draws a row's edit and remove as icons, named for the host they act on", async () => {
-        install(fakeHosts());
-        await draw();
-        for (const name of ["Edit Home", "Remove Home"]) {
-            const button = screen.getByRole("button", { name });
-            // A phone row has no room for two words beside the name: an icon, its words for a screen reader.
-            expect(button.querySelector("svg")).toBeTruthy();
-            expect(button.textContent?.trim()).toBe("");
-        }
-    });
-
-    it("edits a host's name and address together", async () => {
+    it("edits a host's name and address together, in a dialog", async () => {
         const hosts = fakeHosts();
         install(hosts);
         await draw();
         const user = userEvent.setup();
-        await user.click(screen.getByRole("button", { name: "Edit Home" }));
-        const save = screen.getByRole("button", { name: "Save" });
+        await fromMenu(user, "Home", "Edit");
+        const dialog = within(await screen.findByRole("dialog"));
+        const save = dialog.getByRole("button", { name: "Save" });
         // Nothing changed yet: nothing to save.
         expect(save.getAttribute("aria-disabled")).toBe("true");
-        const form = screen.getByRole("button", { name: "Save" }).closest("form") as HTMLElement;
-        const name = within(form).getByLabelText("Name");
+        const name = dialog.getByLabelText("Name");
         await user.clear(name);
         await user.type(name, "  Home   server ");
         // The address it already has needs no asking.
         expect(hosts.check).not.toHaveBeenCalled();
-        await user.click(screen.getByRole("button", { name: "Save" }));
+        await user.click(dialog.getByRole("button", { name: "Save" }));
         expect(hosts.edit).toHaveBeenCalledWith(HOME.origin, HOME.origin, "Home server");
     });
 });
@@ -226,21 +242,24 @@ describe("adding a host", () => {
         install(hosts);
         await draw();
         const user = userEvent.setup();
-        const add = screen.getByRole("button", { name: "Add" });
+        const dialog = await openAdd(user);
+        const add = dialog.getByRole("button", { name: "Add" });
         // Empty is incomplete, not wrong: no error, no asking, nothing added.
         expect(add.getAttribute("aria-disabled")).toBe("true");
-        expect(screen.queryByRole("alert")).toBeNull();
+        expect(dialog.queryByRole("alert")).toBeNull();
         await user.click(add);
         expect(hosts.add).not.toHaveBeenCalled();
 
-        await user.type(screen.getByLabelText("Address *"), "  new.example.test ");
+        await user.type(dialog.getByLabelText("Address *"), "  new.example.test ");
         await afterTyping();
         expect(hosts.check).toHaveBeenLastCalledWith("new.example.test");
-        expect(screen.getByText("A Polaris answers at this address.")).toBeTruthy();
-        await user.type(screen.getByLabelText("Name"), "New");
-        await user.click(screen.getByRole("button", { name: "Add" }));
+        expect(dialog.getByText("A Polaris answers at this address.")).toBeTruthy();
+        await user.type(dialog.getByLabelText("Name"), "New");
+        await user.click(dialog.getByRole("button", { name: "Add" }));
         expect(hosts.add).toHaveBeenCalledWith("new.example.test", "New");
         await waitFor(() => expect(hosts.list).toHaveBeenCalledTimes(2));
+        // Added: the dialog closes on its own.
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     });
 
     it("says what the app found wrong and does not add it", async () => {
@@ -248,10 +267,11 @@ describe("adding a host", () => {
         install(hosts);
         await draw();
         const user = userEvent.setup();
-        await user.type(screen.getByLabelText("Address *"), "example.test");
+        const dialog = await openAdd(user);
+        await user.type(dialog.getByLabelText("Address *"), "example.test");
         await afterTyping();
-        expect(screen.getByRole("alert").textContent).toBe("That is not a Polaris.");
-        await user.click(screen.getByRole("button", { name: "Add" }));
+        expect(dialog.getByRole("alert").textContent).toBe("That is not a Polaris.");
+        await user.click(dialog.getByRole("button", { name: "Add" }));
         expect(hosts.add).not.toHaveBeenCalled();
     });
 
@@ -259,11 +279,12 @@ describe("adding a host", () => {
         install(fakeHosts());
         await draw();
         const user = userEvent.setup();
-        await user.type(screen.getByLabelText("Address *"), "new.example.test");
+        const dialog = await openAdd(user);
+        await user.type(dialog.getByLabelText("Address *"), "new.example.test");
         await afterTyping();
-        await user.type(screen.getByLabelText("Name"), "x".repeat(41));
-        expect(screen.getByText("Use at most 40 characters.")).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Add" }).getAttribute("aria-disabled")).toBe("true");
+        await user.type(dialog.getByLabelText("Name"), "x".repeat(41));
+        expect(dialog.getByText("Use at most 40 characters.")).toBeTruthy();
+        expect(dialog.getByRole("button", { name: "Add" }).getAttribute("aria-disabled")).toBe("true");
         expect(normalizeHostName("  a   b ")).toBe("a b");
     });
 });

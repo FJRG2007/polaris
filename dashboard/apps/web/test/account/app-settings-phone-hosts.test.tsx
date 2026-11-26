@@ -12,7 +12,7 @@
 import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 
@@ -64,7 +64,8 @@ describe("hosts in the phone app", () => {
         await draw();
         expect(await screen.findByText("Home")).toBeTruthy();
         expect(screen.getByText("lab.example.test")).toBeTruthy();
-        expect(screen.getByText("In use")).toBeTruthy();
+        // Once in the phone line under the name, once in the state column; width hides one.
+        expect(screen.getAllByText("In use").length).toBeGreaterThan(0);
         await waitFor(() => expect(calls.filter((call) => call.op === "status")).toHaveLength(2));
         expect(calls.find((call) => call.op === "status")?.args).toEqual({ origin: HOME.origin });
     });
@@ -72,8 +73,9 @@ describe("hosts in the phone app", () => {
     it("switches to a listed host by its origin", async () => {
         const { calls } = phone();
         await draw();
-        const lab = (await screen.findByText("lab.example.test")).closest("li") ?? document.body;
-        await userEvent.click(within(lab as HTMLElement).getByRole("button", { name: "Switch" }));
+        await screen.findByText("lab.example.test");
+        await userEvent.click(screen.getByRole("button", { name: "Actions for lab.example.test" }));
+        await userEvent.click(await screen.findByRole("menuitem", { name: "Use this host" }));
         await waitFor(() => expect(calls.some((call) => call.op === "switch")).toBe(true));
         expect(calls.find((call) => call.op === "switch")?.args).toEqual({ origin: LAB.origin });
     });

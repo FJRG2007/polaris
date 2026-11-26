@@ -198,12 +198,7 @@ export function AccountView({
                 </form>
             </SectionCard>
 
-            <SectionCard
-                title={t("emails.title")}
-                description={t("emails.description")}
-            >
-                <EmailsView emails={emails} mailReady={mailReady} />
-            </SectionCard>
+            <EmailsView emails={emails} mailReady={mailReady} />
 
             <PhoneCard phones={phones} canSend={canSendWhatsApp} enforced={phoneRequired} />
         </div>

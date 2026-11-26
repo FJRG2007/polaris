@@ -381,10 +381,9 @@
         "noneHere": "None of these work on {host}. Add one to sign in here with your device.",
         "namePlaceholder": "Name this device",
         "nameLabel": "Passkey name",
-        "add": "Add a passkey",
-        "confirmTitle": "Confirm your password",
+        "add": "Add passkey",
+        "confirmTitle": "Add passkey",
         "confirmDescription": "Adding a passkey adds a way into your account, so it asks for your password first. Your device will prompt you next.",
-        "naming": "Naming it \"{name}\".",
         "originUnknown": "Not recorded yet",
         "firstSeen": "First seen on use",
         "firstSeenHint": "Nothing was recorded when this passkey was added. This is the browser, system and address of its first sign-in after that."

@@ -2,8 +2,9 @@
 
 /**
  * Settings > This app > Hosts, in a desktop app that manages its hosts from here
- * (`appSettings.hosts`): the list with how each host answers, switching, editing,
- * removing, adding, and sending the list to or taking one from another device.
+ * (`appSettings.hosts`): the hosts as a table with how each one answers, a row menu
+ * to switch to, edit, copy or remove one, "Add host" in the header opening a dialog,
+ * and sending the list to or taking one from another device.
  *
  * Every address is checked by the app itself, with the same schema and probe as
  * its own hosts window; the page only normalizes what is typed and reads every
@@ -15,11 +16,30 @@
  */
 
 import { QRCodeSVG } from "qrcode.react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Check, Copy, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { QrScanDialog } from "@/app/(app)/vault/qr-scan";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, Input, Textarea, useToast } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    Input,
+    Textarea,
+    useToast
+} from "@polaris/ui";
 import * as bridge from "@/lib/desktop-bridge";
 import { useKeptAnswer, type KeptAnswerStore } from "@/components/this-app/app-settings-values";
 
@@ -123,11 +143,12 @@ function AddressLine({ state }: { state: AddressState }) {
     );
 }
 
-export function HostsManager({ hosts }: { hosts: bridge.DesktopHosts }) {
+export function HostsManager({ hosts }: { hosts: bridge.DesktopHosts; }) {
     const t = useTranslations("appSettings");
     const toast = useToast();
     const [status, setStatus] = useState<ReadonlyMap<string, bridge.DesktopHostStatus>>(() => new Map(sessionStatus));
-    const [editing, setEditing] = useState<string | null>(null);
+    const [adding, setAdding] = useState(false);
+    const [editing, setEditing] = useState<bridge.DesktopHostRow | null>(null);
     const [removing, setRemoving] = useState<bridge.DesktopHostRow | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
 
@@ -179,12 +200,30 @@ export function HostsManager({ hosts }: { hosts: bridge.DesktopHosts }) {
         refused(outcome.error);
     };
 
+    const copyAddress = async (row: bridge.DesktopHostRow) => {
+        const ok = await navigator.clipboard?.writeText(row.origin).then(
+            () => true,
+            () => false
+        );
+        toast.show({ title: ok ? t("hosts.addressCopied") : t("hosts.failed") });
+    };
+
     const servers = snapshot?.servers ?? [];
 
     return (
         <div className="flex flex-col gap-4">
             <Card>
                 <CardBody className="flex flex-col gap-3">
+                    {/* The one way to add a host, where every list in Polaris keeps it: the header, opening a dialog. */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="min-w-0 text-xs text-muted-foreground">
+                            {snapshot && servers.length > 0 ? t("hosts.count", { count: servers.length }) : null}
+                        </p>
+                        <Button size="sm" onClick={() => setAdding(true)}>
+                            <Plus className="size-4" aria-hidden />
+                            {t("hosts.addHost")}
+                        </Button>
+                    </div>
                     {snapshot?.error && (
                         <p className="text-sm text-danger-ink" role="alert">
                             {snapshot.error}
@@ -200,37 +239,60 @@ export function HostsManager({ hosts }: { hosts: bridge.DesktopHosts }) {
                     ) : servers.length === 0 ? (
                         <p className="text-sm text-muted-foreground">{snapshot ? t("hosts.none") : t("hosts.reading")}</p>
                     ) : (
-                        <ul className="flex flex-col divide-y divide-border">
-                            {servers.map((row) =>
-                                editing === row.origin ? (
-                                    <li key={row.origin} className="py-3 first:pt-0 last:pb-0">
-                                        <HostEdit
-                                            hosts={hosts}
+                        // The table every list in Polaris is drawn as. On a phone the state folds under the name
+                        // instead of taking a column, so the row never scrolls sideways.
+                        <div className="overflow-x-auto rounded-lg border border-border">
+                            <table className="w-full text-sm">
+                                <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                                    <tr>
+                                        <th scope="col" className="w-full max-w-0 px-3 py-2 text-start font-medium">
+                                            {t("hosts.columns.host")}
+                                        </th>
+                                        <th scope="col" className="hidden px-3 py-2 text-start font-medium sm:table-cell">
+                                            {t("hosts.columns.state")}
+                                        </th>
+                                        <th scope="col" className="px-3 py-2">
+                                            <span className="sr-only">{t("hosts.columns.actions")}</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {servers.map((row) => (
+                                        <HostRow
+                                            key={row.origin}
                                             row={row}
-                                            onDone={(changed) => {
-                                                setEditing(null);
-                                                if (changed) void refresh();
-                                            }}
+                                            status={status.get(row.origin) ?? null}
+                                            busy={busy === row.origin}
+                                            onSwitch={() => void switchTo(row)}
+                                            onEdit={() => setEditing(row)}
+                                            onCopy={() => void copyAddress(row)}
+                                            onRemove={() => setRemoving(row)}
                                         />
-                                    </li>
-                                ) : (
-                                    <HostItem
-                                        key={row.origin}
-                                        row={row}
-                                        status={status.get(row.origin) ?? null}
-                                        busy={busy === row.origin}
-                                        onSwitch={() => void switchTo(row)}
-                                        onEdit={() => setEditing(row.origin)}
-                                        onRemove={() => setRemoving(row)}
-                                    />
-                                )
-                            )}
-                        </ul>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </CardBody>
             </Card>
-            <HostAdd hosts={hosts} onAdded={() => void refresh()} />
             <HostTransfer hosts={hosts} count={servers.length} onImported={() => void refresh()} />
+            <HostAddDialog
+                hosts={hosts}
+                open={adding}
+                onOpenChange={setAdding}
+                onAdded={() => {
+                    setAdding(false);
+                    void refresh();
+                }}
+            />
+            <HostEditDialog
+                hosts={hosts}
+                row={editing}
+                onDone={(changed) => {
+                    setEditing(null);
+                    if (changed) void refresh();
+                }}
+            />
             <ConfirmDeleteDialog
                 open={removing !== null}
                 onOpenChange={(open) => !open && setRemoving(null)}
@@ -254,12 +316,27 @@ const STATUS_DOT: Record<bridge.DesktopHostStatus | "checking", string> = {
     checking: "bg-muted-foreground/40"
 };
 
-function HostItem({
+function HostState({ status, active }: { status: bridge.DesktopHostStatus | null; active: boolean; }) {
+    const t = useTranslations("appSettings");
+    const shown = status ?? "checking";
+    return (
+        <span className="flex min-w-0 items-center gap-2">
+            <span className="flex min-w-0 items-center gap-1.5">
+                <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[shown]}`} aria-hidden />
+                <span className="truncate text-xs text-muted-foreground">{t(`hosts.status.${shown}`)}</span>
+            </span>
+            {active && <Badge variant="success">{t("hosts.current")}</Badge>}
+        </span>
+    );
+}
+
+function HostRow({
     row,
     status,
     busy,
     onSwitch,
     onEdit,
+    onCopy,
     onRemove
 }: {
     row: bridge.DesktopHostRow;
@@ -267,60 +344,70 @@ function HostItem({
     busy: boolean;
     onSwitch: () => void;
     onEdit: () => void;
+    onCopy: () => void;
     onRemove: () => void;
 }) {
     const t = useTranslations("appSettings");
-    const shown = status ?? "checking";
-    const label = t(`hosts.status.${shown}`);
+    const name = shownName(row);
     return (
-        // One line at any width: the name gives way and truncates, the actions are icons that never wrap under it.
-        <li className="flex min-w-0 items-center gap-3 py-3 first:pt-0 last:pb-0">
-            <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[shown]}`} title={label} aria-hidden />
-                <span className="sr-only">{label}</span>
-                <div className="flex min-w-0 flex-col">
-                    <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm" title={shownName(row)}>
-                            {shownName(row)}
-                        </span>
-                        {row.active && <Badge variant="success">{t("hosts.current")}</Badge>}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground" title={row.origin}>
-                        {row.origin}
-                    </span>
-                </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-                {!row.active && (
-                    <Button size="sm" variant="secondary" className="me-1" onClick={onSwitch} disabled={busy} aria-busy={busy}>
-                        {t("hosts.switch")}
-                    </Button>
-                )}
-                <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={onEdit}
-                    aria-label={t("hosts.editNamed", { name: shownName(row) })}
-                    title={t("hosts.edit")}
-                >
-                    <Pencil aria-hidden />
-                </Button>
-                <Button
-                    size="icon"
-                    variant="ghost"
-                    className="text-danger-ink hover:bg-danger-soft hover:text-danger-ink"
-                    onClick={onRemove}
-                    aria-label={t("hosts.removeNamed", { name: shownName(row) })}
-                    title={t("hosts.remove")}
-                >
-                    <Trash2 aria-hidden />
-                </Button>
-            </div>
-        </li>
+        <tr className="border-t border-border hover:bg-card-hover">
+            <td className="max-w-0 px-3 py-2 align-top">
+                <span className="block truncate font-medium" title={name}>
+                    {name}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground" title={row.origin}>
+                    {row.origin}
+                </span>
+                <span className="mt-1 flex sm:hidden">
+                    <HostState status={status} active={row.active} />
+                </span>
+            </td>
+            <td className="hidden whitespace-nowrap px-3 py-2 align-top sm:table-cell">
+                <HostState status={status} active={row.active} />
+            </td>
+            <td className="px-3 py-2 align-top">
+                <span className="flex justify-end">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label={t("hosts.menuFor", { name })}
+                                title={t("hosts.more")}
+                                aria-busy={busy || undefined}
+                            >
+                                <MoreHorizontal className="size-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            {row.active ? null : (
+                                <DropdownMenuItem disabled={busy} onSelect={onSwitch}>
+                                    <Check className="size-3.5" />
+                                    {t("hosts.useThis")}
+                                </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onSelect={onEdit}>
+                                <Pencil className="size-3.5" />
+                                {t("hosts.edit")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={onCopy}>
+                                <Copy className="size-3.5" />
+                                {t("hosts.copyAddress")}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem variant="danger" onSelect={onRemove}>
+                                <Trash2 className="size-3.5" />
+                                {t("hosts.remove")}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </span>
+            </td>
+        </tr>
     );
 }
 
-/** The address and name fields both forms share, with the name's own limit. */
+/** The address and name fields both dialogs share, with the name's own limit. */
 function HostFields({
     address,
     name,
@@ -339,7 +426,7 @@ function HostFields({
     const t = useTranslations("appSettings");
     const nameLong = normalizeHostName(name).length > HOST_NAME_MAX;
     return (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-3">
             <div className="flex min-w-0 flex-col gap-1">
                 <label htmlFor={`${idPrefix}-address`} className="text-xs text-muted-foreground">
                     {t("hosts.address")} *
@@ -380,7 +467,17 @@ function HostFields({
     );
 }
 
-function HostAdd({ hosts, onAdded }: { hosts: bridge.DesktopHosts; onAdded: () => void }) {
+function HostAddDialog({
+    hosts,
+    open,
+    onOpenChange,
+    onAdded
+}: {
+    hosts: bridge.DesktopHosts;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onAdded: () => void;
+}) {
     const t = useTranslations("appSettings");
     const [address, setAddress] = useState("");
     const [name, setName] = useState("");
@@ -405,10 +502,13 @@ function HostAdd({ hosts, onAdded }: { hosts: bridge.DesktopHosts; onAdded: () =
     };
 
     return (
-        <Card>
-            <CardBody>
+        <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t("hosts.addTitle")}</DialogTitle>
+                    <DialogDescription>{t("hosts.addDescription")}</DialogDescription>
+                </DialogHeader>
                 <form className="flex flex-col gap-3" onSubmit={(event) => void add(event)}>
-                    <h3 className="text-sm font-medium">{t("hosts.addTitle")}</h3>
                     <HostFields
                         address={address}
                         name={name}
@@ -425,18 +525,45 @@ function HostAdd({ hosts, onAdded }: { hosts: bridge.DesktopHosts; onAdded: () =
                             {error}
                         </p>
                     )}
-                    <div>
-                        <Button type="submit" size="sm" aria-disabled={!ready} disabled={pending} aria-busy={pending}>
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" disabled={pending} onClick={() => onOpenChange(false)}>
+                            {t("hosts.cancel")}
+                        </Button>
+                        <Button type="submit" aria-disabled={!ready} disabled={pending} aria-busy={pending}>
                             {t("hosts.add")}
                         </Button>
                     </div>
                 </form>
-            </CardBody>
-        </Card>
+            </DialogContent>
+        </Dialog>
     );
 }
 
-function HostEdit({ hosts, row, onDone }: { hosts: bridge.DesktopHosts; row: bridge.DesktopHostRow; onDone: (changed: boolean) => void }) {
+function HostEditDialog({
+    hosts,
+    row,
+    onDone
+}: {
+    hosts: bridge.DesktopHosts;
+    row: bridge.DesktopHostRow | null;
+    onDone: (changed: boolean) => void;
+}) {
+    const t = useTranslations("appSettings");
+    return (
+        <Dialog open={row !== null} onOpenChange={(open) => !open && onDone(false)}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t("hosts.editTitle")}</DialogTitle>
+                    <DialogDescription>{row ? shownName(row) : ""}</DialogDescription>
+                </DialogHeader>
+                {/* Keyed by the row so a second host opens on its own values. */}
+                {row ? <HostEdit key={row.origin} hosts={hosts} row={row} onDone={onDone} /> : null}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function HostEdit({ hosts, row, onDone }: { hosts: bridge.DesktopHosts; row: bridge.DesktopHostRow; onDone: (changed: boolean) => void; }) {
     const t = useTranslations("appSettings");
     const [address, setAddress] = useState(row.origin);
     const [name, setName] = useState(row.name ?? "");
@@ -461,11 +588,7 @@ function HostEdit({ hosts, row, onDone }: { hosts: bridge.DesktopHosts; row: bri
     };
 
     return (
-        <form
-            className="flex flex-col gap-3"
-            onSubmit={(event) => void save(event)}
-            onKeyDown={(event) => event.key === "Escape" && onDone(false)}
-        >
+        <form className="flex flex-col gap-3" onSubmit={(event) => void save(event)}>
             <HostFields
                 address={address}
                 name={name}
@@ -482,18 +605,17 @@ function HostEdit({ hosts, row, onDone }: { hosts: bridge.DesktopHosts; row: bri
                     {error}
                 </p>
             )}
-            <div className="flex flex-wrap gap-2">
-                <Button type="submit" size="sm" aria-disabled={!ready} disabled={pending} aria-busy={pending}>
-                    {t("hosts.save")}
-                </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => onDone(false)}>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="ghost" disabled={pending} onClick={() => onDone(false)}>
                     {t("hosts.cancel")}
+                </Button>
+                <Button type="submit" aria-disabled={!ready} disabled={pending} aria-busy={pending}>
+                    {t("hosts.save")}
                 </Button>
             </div>
         </form>
     );
 }
-
 function HostTransfer({ hosts, count, onImported }: { hosts: bridge.DesktopHosts; count: number; onImported: () => void }) {
     const t = useTranslations("appSettings");
     const toast = useToast();

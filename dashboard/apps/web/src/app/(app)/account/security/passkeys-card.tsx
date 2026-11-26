@@ -32,7 +32,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import type { PasskeyView } from "@/lib/passkey-directory";
 import { Feedback, type SettingLock } from "./setting-card";
-import { KeyRound, Trash2, ShieldCheck } from "lucide-react";
+import { KeyRound, Plus, Trash2 } from "lucide-react";
 import { BrowserMark, SystemMark } from "@/components/client-marks";
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { PASSKEY_NAME_MAX, passkeyNameKey, passkeyRelyingPartyId } from "@polaris/core";
@@ -126,6 +126,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
 
     async function confirmPassword(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (!canAdd) return;
         const form = new FormData(event.currentTarget);
         setBusy(true);
         setProtecting(false);
@@ -161,9 +162,25 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <div>
-                    <h2 className="text-sm font-medium">{t("passkeys.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("passkeys.description")}</p>
+                {/* Adding sits in the header and opens a dialog, as on every list in Polaris. */}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1 basis-64">
+                        <h2 className="text-sm font-medium">{t("passkeys.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("passkeys.description")}</p>
+                    </div>
+                    <Button
+                        size="sm"
+                        disabled={!supported || Boolean(lock)}
+                        title={lock?.reason}
+                        onClick={() => {
+                            setName("");
+                            setError(null);
+                            setAsking(true);
+                        }}
+                    >
+                        <Plus className="size-4" />
+                        {t("passkeys.add")}
+                    </Button>
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-border">
@@ -262,25 +279,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                     <p className="text-xs text-muted-foreground">{t("passkeys.noneHere", { host: here?.host ?? "" })}</p>
                 )}
 
-                <div className="flex items-start gap-2">
-                    {/* A name field is a few words wide whatever the page is; letting it
-                        run the full width of a wide table only makes it harder to read. */}
-                    <div className="flex-1 sm:max-w-sm">
-                        <Input
-                            value={name}
-                            maxLength={PASSKEY_NAME_MAX}
-                            placeholder={t("passkeys.namePlaceholder")}
-                            aria-label={t("passkeys.nameLabel")}
-                            aria-invalid={problem ? true : undefined}
-                            onChange={(event) => setName(event.target.value)}
-                        />
-                        {problem ? <p className="mt-1 text-xs text-danger">{problem}</p> : null}
-                    </div>
-                    <Button onClick={() => setAsking(true)} disabled={!canAdd}>
-                        {t("passkeys.add")}
-                    </Button>
-                </div>
-                <Feedback error={lock?.reason ?? error} />
+                <Feedback error={lock?.reason ?? (asking ? null : error)} />
                 {confirmElement}
             </CardBody>
 
@@ -298,14 +297,25 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                         <DialogDescription>{t("passkeys.confirmDescription")}</DialogDescription>
                     </DialogHeader>
                     <form onSubmit={confirmPassword} className="flex flex-col gap-3">
+                        {/* The name is checked as it is typed against the passkeys on screen, so the
+                            problem is named before the device raises a prompt that would only fail. */}
+                        <label className="flex flex-col gap-1 text-sm">
+                            {t("passkeys.nameLabel")} *
+                            <Input
+                                value={name}
+                                maxLength={PASSKEY_NAME_MAX}
+                                placeholder={t("passkeys.namePlaceholder")}
+                                aria-invalid={problem ? true : undefined}
+                                autoFocus
+                                autoComplete="off"
+                                onChange={(event) => setName(event.target.value)}
+                            />
+                            {problem ? <span className="text-xs text-danger">{problem}</span> : null}
+                        </label>
                         <label className="flex flex-col gap-1 text-sm">
                             {t("dialog.currentPassword")}
                             <Input name="password" type="password" required autoComplete="current-password" />
                         </label>
-                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <ShieldCheck className="size-3.5 shrink-0" />
-                            {t("passkeys.naming", { name: name.trim() })}
-                        </p>
                         <Feedback error={error} />
                         <div className="flex justify-end gap-2">
                             <Button
@@ -316,7 +326,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                             >
                                 {tc("actions.cancel")}
                             </Button>
-                            <Button type="submit" disabled={busy}>
+                            <Button type="submit" disabled={busy} aria-disabled={!canAdd || undefined}>
                                 {busy ? (
                                     <SlowSubmitLabel busyLabel={t("dialog.waiting")} protecting={protecting} />
                                 ) : (

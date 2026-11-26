@@ -16,18 +16,24 @@ import { Card, CardBody } from "@polaris/ui";
 export function SectionCard({
     title,
     description,
+    action,
     children
 }: {
     title: string;
     description: string;
+    /** The block's own header button - "Add ..." on a list - at the end of the title row. */
+    action?: ReactNode;
     children: ReactNode;
 }) {
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <div>
-                    <h2 className="text-sm font-medium">{title}</h2>
-                    <p className="text-xs text-muted-foreground">{description}</p>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1 basis-64">
+                        <h2 className="text-sm font-medium">{title}</h2>
+                        <p className="text-xs text-muted-foreground">{description}</p>
+                    </div>
+                    {action}
                 </div>
                 {children}
             </CardBody>

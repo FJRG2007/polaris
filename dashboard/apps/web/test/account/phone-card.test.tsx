@@ -2,8 +2,8 @@
 
 /**
  * The phone numbers on the account, listed the way the email addresses are:
- * each with its Primary and Confirmed marks, an Add field with its country
- * picker that asks the password once pressed, and a code box that only opens
+ * each with its Primary and Confirmed marks, an "Add phone number" header button
+ * opening a dialog with the country picker that asks the password next, and a code box that only opens
  * under the number the code went to, labelled with that number.
  */
 
@@ -45,8 +45,9 @@ function renderCard(phones: (typeof PRIMARY)[], enforced = false) {
     );
 }
 
-const addField = () => screen.getByLabelText("Add a phone number") as HTMLInputElement;
-const addButton = () => screen.getByRole("button", { name: "Add" }) as HTMLButtonElement;
+const openAdd = () => fireEvent.click(screen.getByRole("button", { name: "Add phone number" }));
+const addField = () => screen.getByLabelText(/^Phone number/) as HTMLInputElement;
+const addButton = () => screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement;
 
 describe("PhoneCard", () => {
     it("lists every number with its marks, and no code box until a code is sent", () => {
@@ -58,18 +59,33 @@ describe("PhoneCard", () => {
         expect(screen.queryByLabelText(/^Code sent to/)).toBeNull();
     });
 
-    it("keeps Add off for a number already on the account, even regrouped", () => {
+    it("adds through one header button and a dialog, never an inline field", async () => {
         renderCard([PRIMARY]);
-        expect(addButton().disabled).toBe(true);
+        expect(screen.queryByLabelText(/^Phone number/)).toBeNull();
+        openAdd();
+        expect(await screen.findByRole("dialog")).toBeTruthy();
+        expect(addField()).toBeTruthy();
+    });
+
+    it("keeps Continue off for a number already on the account, even regrouped", () => {
+        renderCard([PRIMARY]);
+        openAdd();
+        expect(addButton().getAttribute("aria-disabled")).toBe("true");
         fireEvent.change(addField(), { target: { value: "+34 600 111 222" } });
-        expect(addButton().disabled).toBe(true);
+        expect(addButton().getAttribute("aria-disabled")).toBe("true");
         expect(screen.getByText("That number is already on your account.")).toBeTruthy();
         fireEvent.change(addField(), { target: { value: "+34 600 111 444" } });
-        expect(addButton().disabled).toBe(false);
+        expect(addButton().getAttribute("aria-disabled")).toBeNull();
+    });
+
+    it("keeps the header button off once the account holds the most numbers", () => {
+        renderCard([1, 2, 3, 4, 5].map((n) => ({ ...SECOND, id: `p${n}`, phone: `+3460011100${n}` })));
+        expect((screen.getByRole("button", { name: "Add phone number" }) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it("asks the password after Add, then sends a code and labels the box with the number", async () => {
         renderCard([PRIMARY]);
+        openAdd();
         fireEvent.change(addField(), { target: { value: "+34 600 111 444" } });
         fireEvent.click(addButton());
         const password = await screen.findByLabelText("Current password");

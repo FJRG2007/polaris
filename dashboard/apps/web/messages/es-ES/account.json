@@ -1342,20 +1342,27 @@
         "unverified": "Sin verificar",
         "noChannel": "No hay ningún canal de correo configurado, así que Polaris no puede enviar el enlace.",
         "verify": "Verificar",
-        "stopRecovery": "Dejar de usar {email} para recuperación",
-        "useRecovery": "Usar {email} para recuperación",
         "notForRecovery": "No para recuperar",
         "forRecovery": "Para recuperar",
-        "makePrimaryNamed": "Hacer principal {email}",
         "makePrimary": "Hacer principal",
-        "removeNamed": "Quitar {email}",
         "add": "Añadir",
         "duplicate": "Esa dirección ya está en tu cuenta.",
         "recoveryHint": "Una dirección de recuperación es donde un operador puede contactarte si pierdes el acceso.",
         "promoteTitle": "¿Hacer esta tu dirección principal?",
         "promoteDescription": "Iniciarás sesión con {email}. La actual sigue en tu cuenta.",
         "currentPassword": "Contraseña actual",
-        "working": "Procesando..."
+        "working": "Procesando...",
+        "addEmail": "Añadir email",
+        "addTitle": "Añadir un email",
+        "invalid": "Escribe una dirección completa, como nombre@ejemplo.com.",
+        "addFailed": "No se pudo añadir la dirección. Inténtalo de nuevo.",
+        "columns": {
+            "address": "Dirección",
+            "state": "Estado",
+            "actions": "Acciones"
+        },
+        "menuFor": "Acciones de {email}",
+        "more": "Más"
     },
     "phone": {
         "title": "Teléfonos",
@@ -1378,7 +1385,6 @@
         "removeTitle": "Quitar este número",
         "removeDescription": "Confirma tu contraseña para quitar {phone}.",
         "lastRequired": "Tu administrador exige un número confirmado. Añade otro antes.",
-        "addLabel": "Añadir un teléfono",
         "add": "Añadir",
         "adding": "Añadiendo...",
         "addTitle": "Añadir un teléfono",
@@ -1386,7 +1392,10 @@
         "duplicate": "Ese número ya está en tu cuenta.",
         "limitReached": "Ya tienes el máximo de números. Quita uno para añadir otro.",
         "empty": "Aún no hay teléfonos.",
-        "requiredByAdmin": "Lo exige tu administrador."
+        "requiredByAdmin": "Lo exige tu administrador.",
+        "addPhone": "Añadir teléfono",
+        "number": "Teléfono",
+        "continue": "Continuar"
     },
     "aiKeys": {
         "page": {

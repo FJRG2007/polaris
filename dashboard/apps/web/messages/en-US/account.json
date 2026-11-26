@@ -1342,20 +1342,27 @@
         "unverified": "Unverified",
         "noChannel": "No email channel is set up, so Polaris cannot send the link.",
         "verify": "Verify",
-        "stopRecovery": "Stop using {email} for recovery",
-        "useRecovery": "Use {email} for recovery",
         "notForRecovery": "Not for recovery",
         "forRecovery": "Use for recovery",
-        "makePrimaryNamed": "Make {email} primary",
         "makePrimary": "Make primary",
-        "removeNamed": "Remove {email}",
         "add": "Add",
         "duplicate": "That address is already on your account.",
         "recoveryHint": "A recovery address is where an operator can reach you if you lose access.",
         "promoteTitle": "Make this your primary address?",
         "promoteDescription": "You will sign in with {email}. The current one stays on your account.",
         "currentPassword": "Current password",
-        "working": "Working..."
+        "working": "Working...",
+        "addEmail": "Add email",
+        "addTitle": "Add an email address",
+        "invalid": "Enter a whole address, like name@example.com.",
+        "addFailed": "The address could not be added. Try again.",
+        "columns": {
+            "address": "Address",
+            "state": "State",
+            "actions": "Actions"
+        },
+        "menuFor": "Actions for {email}",
+        "more": "More"
     },
     "phone": {
         "title": "Phone numbers",
@@ -1378,7 +1385,6 @@
         "removeTitle": "Remove this number",
         "removeDescription": "Confirm your password to remove {phone}.",
         "lastRequired": "Your administrator requires a confirmed number. Add another first.",
-        "addLabel": "Add a phone number",
         "add": "Add",
         "adding": "Adding...",
         "addTitle": "Add a phone number",
@@ -1386,7 +1392,10 @@
         "duplicate": "That number is already on your account.",
         "limitReached": "You hold the most numbers an account can. Remove one to add another.",
         "empty": "No phone numbers yet.",
-        "requiredByAdmin": "Required by your administrator."
+        "requiredByAdmin": "Required by your administrator.",
+        "addPhone": "Add phone number",
+        "number": "Phone number",
+        "continue": "Continue"
     },
     "aiKeys": {
         "page": {

@@ -117,6 +117,7 @@ export function PhoneCard({
     const router = useRouter();
     const t = useTranslations("account");
     const ts = useTranslations("accountSecurity");
+    const tc = useTranslations("common");
     const addId = useId();
     // The number just added, listed while the save is on its way and dropped
     // again if it fails.
@@ -124,7 +125,8 @@ export function PhoneCard({
     const shown = pending ? [...phones, pending] : phones;
     const [draft, setDraft] = useState("");
     const [touched, setTouched] = useState(false);
-    const [asking, setAsking] = useState(false);
+    // The add dialog: the number first, then the password it re-asks for.
+    const [adding, setAdding] = useState<"number" | "password" | null>(null);
     const [passwordError, setPasswordError] = useState<string | null>(null);
     const [removing, setRemoving] = useState<UserPhoneView | null>(null);
     // The number a code was sent to, whose confirmation box is open.
@@ -171,14 +173,14 @@ export function PhoneCard({
         setTouched(true);
         if (!toAdd || full) return;
         setPasswordError(null);
-        setAsking(true);
+        setAdding("password");
     }
 
     /** Adding a number is a way into the account, so it re-asks for the password. */
     async function confirmAdd(password: string) {
         const next = phoneToAdd(draft, held);
         if (!next) return;
-        setAsking(false);
+        setAdding(null);
         setPending({ id: "pending", phone: next, verified: false, primary: phones.length === 0 });
         setBusy("add");
         setError(null);
@@ -191,7 +193,7 @@ export function PhoneCard({
             // the field, and the password is asked again with the reason.
             setPending(null);
             setPasswordError(result.error ?? ts("errors.checkForm"));
-            setAsking(true);
+            setAdding("password");
             return;
         }
         setDraft("");
@@ -205,12 +207,27 @@ export function PhoneCard({
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <div className="min-w-0">
-                    <h2 className="text-sm font-medium">{t("phone.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("phone.description")}</p>
-                    {enforced ? (
-                        <p className="mt-1 text-xs text-muted-foreground">{t("phone.requiredByAdmin")}</p>
-                    ) : null}
+                {/* Adding sits in the header and opens a dialog, as on every list in Polaris. */}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1 basis-64">
+                        <h2 className="text-sm font-medium">{t("phone.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("phone.description")}</p>
+                        {enforced ? (
+                            <p className="mt-1 text-xs text-muted-foreground">{t("phone.requiredByAdmin")}</p>
+                        ) : null}
+                    </div>
+                    <Button
+                        size="sm"
+                        disabled={full || busy === "add"}
+                        title={full ? t("phone.limitReached") : undefined}
+                        onClick={() => {
+                            setTouched(false);
+                            setAdding("number");
+                        }}
+                    >
+                        <Plus className="size-4" />
+                        {busy === "add" ? t("phone.adding") : t("phone.addPhone")}
+                    </Button>
                 </div>
 
                 {shown.length > 0 ? (
@@ -239,39 +256,48 @@ export function PhoneCard({
                     <p className="text-sm text-muted-foreground">{t("phone.empty")}</p>
                 )}
 
-                <form onSubmit={askToAdd} noValidate className="flex min-w-0 flex-col gap-1">
-                    <label htmlFor={addId} className="text-xs font-medium">
-                        {t("phone.addLabel")}
-                    </label>
-                    <div className="flex min-w-0 flex-wrap items-start gap-2">
-                        <PhoneInput
-                            id={addId}
-                            value={draft}
-                            onChange={setDraft}
-                            showError={touched}
-                            onBlur={() => draft && setTouched(true)}
-                            disabled={full}
-                            className="min-w-0 flex-1 basis-56"
-                        />
-                        <Button type="submit" disabled={!toAdd || full || busy === "add"}>
-                            <Plus className="size-4" />
-                            {busy === "add" ? t("phone.adding") : t("phone.add")}
-                        </Button>
-                    </div>
-                    {full ? (
-                        <p className="text-xs text-muted-foreground">{t("phone.limitReached")}</p>
-                    ) : duplicate ? (
-                        <p className="text-xs text-danger">{t("phone.duplicate")}</p>
-                    ) : null}
-                </form>
+                {full ? <p className="text-xs text-muted-foreground">{t("phone.limitReached")}</p> : null}
 
                 <Feedback error={error} />
             </CardBody>
 
+            <Dialog open={adding === "number"} onOpenChange={(open) => !open && setAdding(null)}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>{t("phone.addTitle")}</DialogTitle>
+                        <DialogDescription>{t("phone.setDescription")}</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={askToAdd} noValidate className="flex min-w-0 flex-col gap-3">
+                        <div className="flex min-w-0 flex-col gap-1">
+                            <label htmlFor={addId} className="text-sm">
+                                {t("phone.number")} *
+                            </label>
+                            <PhoneInput
+                                id={addId}
+                                value={draft}
+                                onChange={setDraft}
+                                showError={touched}
+                                onBlur={() => draft && setTouched(true)}
+                                disabled={full}
+                                className="min-w-0"
+                            />
+                            {duplicate ? <p className="text-xs text-danger">{t("phone.duplicate")}</p> : null}
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" onClick={() => setAdding(null)}>
+                                {tc("actions.cancel")}
+                            </Button>
+                            <Button type="submit" aria-disabled={!toAdd || full || undefined}>
+                                {t("phone.continue")}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
             <PasswordDialog
-                open={asking}
+                open={adding === "password"}
                 error={passwordError}
-                onOpenChange={(open) => !open && setAsking(false)}
+                onOpenChange={(open) => !open && setAdding(null)}
                 onConfirm={(password) => void confirmAdd(password)}
             />
             <RemovePhoneDialog
