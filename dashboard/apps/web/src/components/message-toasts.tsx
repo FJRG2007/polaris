@@ -112,11 +112,17 @@ const sealedChannels = new Set<string>();
 /**
  * Sealed messages' words, opened on this device - the server never had them
  * (docs/chat-e2ee-mls.md). One behind the reader's chat lock stays as the
- * server redacted it, and one that does not open keeps the general line.
+ * server redacted it, and one that does not open reads `unopened` (the
+ * reader's "New message", as Signal's "Name only" notices do) when given, else
+ * the server's general line.
  *
  * Exported for its test (test/chat/e2ee/sealed-toasts.test.ts).
  */
-export async function withOpenedWords(viewerId: string, toasts: readonly MessageToast[]): Promise<readonly MessageToast[]> {
+export async function withOpenedWords(
+    viewerId: string,
+    toasts: readonly MessageToast[],
+    unopened?: string
+): Promise<readonly MessageToast[]> {
     if (!viewerId || !toasts.some((one) => one.sealed)) return toasts;
     // Only a sealed row says sealed chat is on, so this is where the shell turns it on for the account.
     sealedChat.configureSealedChat(viewerId);
@@ -127,7 +133,8 @@ export async function withOpenedWords(viewerId: string, toasts: readonly Message
             if (one.locked) return one;
             const opened = await sealedChat.openSealed(one.channelId, [one.messageId]).catch(() => null);
             const words = plainExcerpt(opened?.get(one.messageId)?.body ?? "", EXCERPT);
-            return words ? { ...one, excerpt: words } : one;
+            if (words) return { ...one, excerpt: words };
+            return unopened ? { ...one, excerpt: unopened } : one;
         })
     );
 }
@@ -296,7 +303,7 @@ export function MessageToasts() {
         // Which client chimes, as the server sees it now: the window in front of
         // the person may have changed since the stream last said.
         noteSounderKind(sounder);
-        const toasts = await withOpenedWords(device.current, arrived);
+        const toasts = await withOpenedWords(device.current, arrived, words.current("messageToasts.sealedBody"));
         let sounded = false;
         for (const message of toasts) {
             const inThatChat = showsConversation(here.current, message.channelId);

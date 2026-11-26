@@ -41,6 +41,8 @@ export interface MobileNotice {
     readonly body: string;
     /** Where opening it lands, on this instance. */
     readonly path: string;
+    /** A sealed message: `body` is the general "New message", never its words. */
+    readonly sealed?: boolean;
     /** A sign-in asking this phone: the request to answer, and when it stops counting (epoch ms). */
     readonly approvalId?: string;
     readonly expiresAt?: number;
@@ -123,8 +125,13 @@ export async function GET(request: Request): Promise<Response> {
                         channelId: toast.channelId,
                         tag: `chat:${toast.channelId}`,
                         title,
-                        body: toast.locked ? "" : toast.excerpt,
-                        path: `/chat/c/${toast.channelId}`
+                        // A sealed message's words exist only on the reader's devices, and
+                        // this service has none of them: who sent it and "New message", as
+                        // Signal's "Name only" notices, in the reader's language - never
+                        // the server's English general line.
+                        body: toast.locked ? "" : toast.sealed ? t("messageToasts.sealedBody") : toast.excerpt,
+                        path: `/chat/c/${toast.channelId}`,
+                        ...(toast.sealed ? { sealed: true } : {})
                     });
                 }
             }

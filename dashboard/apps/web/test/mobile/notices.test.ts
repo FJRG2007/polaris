@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 type Change = Record<string, unknown>;
 let listener: ((change: Change) => void) | null = null;
 const toastCalls: string[][] = [];
+/** Fields laid over the one toast the read answers, per test. */
+let toastExtra: Record<string, unknown> = {};
 
 vi.mock("@/lib/session", () => ({
     backgroundUser: async () => ({ id: "me", isAdmin: false }),
@@ -50,7 +52,8 @@ vi.mock("@/lib/chat/toasts", () => ({
                 authorName: "Ana",
                 excerpt: "Lunch?",
                 media: null,
-                at: new Date().toISOString()
+                at: new Date().toISOString(),
+                ...toastExtra
             }
         ];
     }
@@ -89,6 +92,7 @@ async function open() {
 
 beforeEach(() => {
     toastCalls.length = 0;
+    toastExtra = {};
 });
 afterEach(() => {
     listener = null;
@@ -112,6 +116,20 @@ describe("the phone's notices", () => {
                 path: "/chat/c/c1"
             }
         ]);
+        await stream.close();
+    });
+
+    it("says who sent a sealed message and 'New message', in the reader's words, never the server's line", async () => {
+        toastExtra = { sealed: true, excerpt: "Sent a message" };
+        const stream = await open();
+        listener!({ channelId: "c1", kind: "posted", actorId: "u2" });
+        const [frame] = await stream.frames();
+        expect(frame).toMatchObject({
+            kind: "message",
+            title: "components.messageToasts.inChannel(Ana,general)",
+            body: "components.messageToasts.sealedBody",
+            sealed: true
+        });
         await stream.close();
     });
 

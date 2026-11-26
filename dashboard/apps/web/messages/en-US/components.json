@@ -90,6 +90,7 @@
     "messageToasts": {
         "markRead": "Mark as read",
         "notSent": "That could not be sent",
+        "sealedBody": "New message",
         "replyNotSent": "Your reply was not sent",
         "inChannel": "{author} in {channel}",
         "messageChannel": "Message #{channel}",

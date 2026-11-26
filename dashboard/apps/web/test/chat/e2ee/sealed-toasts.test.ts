@@ -56,6 +56,14 @@ describe("withOpenedWords", () => {
         expect(failed?.excerpt).toBe("New message");
     });
 
+    it("reads the reader's own 'New message' when it does not open and one is given", async () => {
+        const [closed] = await withOpenedWords("v1", [toast("m1", { sealed: true, excerpt: "Sent a message" } as Partial<MessageToast>)], "Mensaje nuevo");
+        expect(closed?.excerpt).toBe("Mensaje nuevo");
+        state.opened.set("m2", "hola");
+        const [opened] = await withOpenedWords("v1", [toast("m2", { sealed: true } as Partial<MessageToast>)], "Mensaje nuevo");
+        expect(opened?.excerpt).toBe("hola");
+    });
+
     it("does not open one behind the reader's chat lock", async () => {
         state.opened.set("m1", "secret");
         const [locked] = await withOpenedWords("v1", [toast("m1", { sealed: true, locked: true } as Partial<MessageToast>)]);

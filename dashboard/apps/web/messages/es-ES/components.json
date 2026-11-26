@@ -90,6 +90,7 @@
     "messageToasts": {
         "markRead": "Marcar leído",
         "notSent": "No se ha podido enviar",
+        "sealedBody": "Mensaje nuevo",
         "replyNotSent": "Tu respuesta no se ha enviado",
         "inChannel": "{author} en {channel}",
         "messageChannel": "Mensaje en #{channel}",
