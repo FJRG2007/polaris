@@ -10,6 +10,7 @@ import { IndexedDbMlsStore } from "@polaris/core-rs/mls-store";
 import { fetchTransport, MlsDevice, type MlsDeviceOptions, type MlsMemberClass } from "./mls-client";
 import { IndexedDbHistoryKeyStore } from "./mls-history-keys";
 import { deviceAcrossTabs } from "./device-across-tabs";
+import * as peerKeys from "./peer-keys";
 import * as keyLog from "./key-log-client";
 import { SealedSearchIndex } from "./sealed-search-index";
 
@@ -72,7 +73,7 @@ export async function openBrowserDevice(userId: string, account?: MlsDeviceOptio
     return deviceAcrossTabs(
         device,
         store,
-        (tracked) => MlsDevice.open({ userId, device, MlsMember, store: tracked, historyKeys, ...(account ? { account } : {}), vouch: (channelId, served) => keyLog.vouchedAccounts(userId, channelId, served), notes: localStorage, transport: fetchTransport() }),
+        (tracked) => MlsDevice.open({ userId, device, MlsMember, store: tracked, historyKeys, ...(account ? { account } : {}), vouch: (channelId, served) => keyLog.vouchedAccounts(userId, channelId, served, peerKeys.refetchServed(channelId)), notes: localStorage, transport: fetchTransport() }),
         { locks: typeof navigator !== "undefined" ? (navigator.locks ?? null) : null, notes: localStorage },
         (opened) => opened.register()
     );

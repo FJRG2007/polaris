@@ -163,6 +163,16 @@ export async function fetchPeersKeys(channelId: string, peerIds: ReadonlyArray<s
     }
 }
 
+/** `vouchedAccounts`' second ask after a mismatch: the keys of `userIds` in `channelId` served afresh. */
+export function refetchServed(channelId: string): (userIds: string[]) => Promise<keyLog.ServedKey[] | null> {
+    return async (userIds) => {
+        const keys = await fetchPeersKeys(channelId, userIds);
+        return keys
+            ? [...keys].map(([userId, pair]) => ({ userId, signPublicKey: fromText(pair.signPublicKey), hpkePublicKey: fromText(pair.hpkePublicKey) }))
+            : null;
+    };
+}
+
 /** The peer's published keys in `channelId`; "none" when they have none, null when unreachable. */
 export async function fetchPeerKeys(channelId: string, peerId: string): Promise<PublishedPair | "none" | null> {
     const found = await fetchPeersKeys(channelId, [peerId]);
@@ -186,7 +196,7 @@ export async function checkPeers(ownId: string, channelId: string, peerIds: Read
         signPublicKey: fromText(pair.signPublicKey),
         hpkePublicKey: fromText(pair.hpkePublicKey)
     }));
-    const vouched = await keyLog.vouchedAccounts(ownId, channelId, served);
+    const vouched = await keyLog.vouchedAccounts(ownId, channelId, served, refetchServed(channelId));
     const known = vouched ? null : readBook(ownId);
     const now = Date.now();
     for (const [userId, pair] of keys) {

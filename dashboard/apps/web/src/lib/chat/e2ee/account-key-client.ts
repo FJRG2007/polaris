@@ -160,24 +160,37 @@ export async function pairSafetyNumber(channelId: string, peerId: string): Promi
     const mine = state ? publishedOf(state) : null;
     if (!state || !mine) return { kind: "unavailable" };
     try {
-        const theirs = await peerKeys.fetchPeerKeys(channelId, peerId);
-        if (!theirs) return { kind: "unavailable" };
-        if (theirs === "none") return { kind: "no-key" };
-        const peerKeysBytes = { signPublicKey: fromText(theirs.signPublicKey), hpkePublicKey: fromText(theirs.hpkePublicKey) };
-        const logged = await keyLog.askLog(state.userId, { op: "proofs", channelId, userIds: [peerId] });
-        if (logged.kind === "unavailable") return { kind: "unavailable" };
-        if (logged.kind === "failed" || !keyLog.entryMatches(logged.entries.find((e) => e.userId === peerId), null, peerKeysBytes))
-            return { kind: "unlogged" };
-        const digits = await safety.safetyNumber(
-            { userId: state.userId, keys: mine },
-            { userId: peerId, keys: peerKeysBytes }
-        );
-        const peerFingerprint = await peerKeys.keyFingerprint(theirs.signPublicKey, theirs.hpkePublicKey);
-        peerKeys.updateBook(state.userId, (book) => peerKeys.observePeer(book, peerId, peerFingerprint, Date.now()));
-        return { kind: "ready", digits, ownId: state.userId, peerFingerprint };
+        // Twice at most: a key the peer rotated between the two asks differs from the log's latest once, not again.
+        for (let attempt = 0; ; attempt++) {
+            const theirs = await peerKeys.fetchPeerKeys(channelId, peerId);
+            if (!theirs) return { kind: "unavailable" };
+            if (theirs === "none") return { kind: "no-key" };
+            const peerKeysBytes = { signPublicKey: fromText(theirs.signPublicKey), hpkePublicKey: fromText(theirs.hpkePublicKey) };
+            const logged = await keyLog.askLog(state.userId, { op: "proofs", channelId, userIds: [peerId] });
+            if (logged.kind === "unavailable") return { kind: "unavailable" };
+            if (logged.kind === "failed") return { kind: "unlogged" };
+            if (!keyLog.entryMatches(logged.entries.find((e) => e.userId === peerId), null, peerKeysBytes)) {
+                if (attempt === 0) continue;
+                return { kind: "unlogged" };
+            }
+            return await readyPair(state.userId, mine, peerId, theirs, peerKeysBytes);
+        }
     } catch {
         return { kind: "unavailable" };
     }
+}
+
+async function readyPair(
+    ownId: string,
+    mine: { signPublicKey: Uint8Array; hpkePublicKey: Uint8Array },
+    peerId: string,
+    theirs: { signPublicKey: string; hpkePublicKey: string },
+    peerKeysBytes: { signPublicKey: Uint8Array; hpkePublicKey: Uint8Array }
+): Promise<PairSafety> {
+    const digits = await safety.safetyNumber({ userId: ownId, keys: mine }, { userId: peerId, keys: peerKeysBytes });
+    const peerFingerprint = await peerKeys.keyFingerprint(theirs.signPublicKey, theirs.hpkePublicKey);
+    peerKeys.updateBook(ownId, (book) => peerKeys.observePeer(book, peerId, peerFingerprint, Date.now()));
+    return { kind: "ready", digits, ownId, peerFingerprint };
 }
 
 /**
