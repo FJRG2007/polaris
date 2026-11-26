@@ -441,6 +441,9 @@ model User {
     mobileVoipTokens    MobileVoipToken[]
     chatAccountKey      ChatAccountKey?
     chatAccountKeyLocks ChatAccountKeyLock[]
+    chatRecoverySharesOwned ChatRecoveryShare[] @relation("RecoveryShareOwner")
+    chatRecoverySharesHeld  ChatRecoveryShare[] @relation("RecoveryShareCustodian")
+    chatRecoveryRequests    ChatRecoveryRequest[]
     opaqueRecord        OpaqueRecord?
     signInApprovals     SignInApproval[]
     chatAttachmentOpens ChatAttachmentOpen[]
@@ -19586,6 +19589,102 @@ model ChatMigrationRollback {
     @@index([createdAt])
 }
 
+// Quorum recovery of an account key (docs/chat-e2ee-mls.md, "Recovery"): the
+// account's own browser splits its key M of N with Shamir and seals one share
+// to each custodian's account key. The server cannot open any of them. All
+// shares of an account come from one split (`splitId`) and are replaced
+// together whenever the custodians, the threshold or a key version changes.
+model ChatRecoveryShare {
+    ownerId            String   @db.Uuid
+    custodianId        String   @db.Uuid
+    // The owner's account key version the split is of.
+    akVersion          Int
+    splitId            String
+    threshold          Int
+    // The custodian's account key version the share is sealed to.
+    custodianAkVersion Int
+    // "org:<id>" or "instance": whose administrators the custodians are.
+    scope              String
+    envelope           Bytes
+    createdAt          DateTime @default(now())
+
+    owner     User @relation("RecoveryShareOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+    custodian User @relation("RecoveryShareCustodian", fields: [custodianId], references: [id], onDelete: Cascade)
+
+    @@id([ownerId, custodianId])
+    @@index([custodianId])
+}
+
+// A request to rebuild an account key from its shares, open for 7 days
+// (default, owner may change). Only an account whose administrator-approved
+// recovery (AccountRecovery) was used recently can raise one. `requesterKey` is
+// the one-off X-Wing public key of the requester's browser; approvals are the
+// custodians' shares sealed to it. status: pending | released | completed |
+// expired | cancelled.
+model ChatRecoveryRequest {
+    id                String    @id @default(uuid(7)) @db.Uuid
+    userId            String    @db.Uuid
+    accountRecoveryId String?   @db.Uuid
+    status            String    @default("pending")
+    akVersion         Int
+    splitId           String
+    threshold         Int
+    requesterKey      Bytes
+    expiresAt         DateTime
+    completedAt       DateTime?
+    createdAt         DateTime  @default(now())
+
+    user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    approvals ChatRecoveryApproval[]
+
+    @@index([userId, status])
+    @@index([status, expiresAt])
+}
+
+// One custodian's share, opened in their browser and sealed again to the
+// request's key. Deleted with the request once it completes.
+model ChatRecoveryApproval {
+    requestId   String   @db.Uuid
+    custodianId String   @db.Uuid
+    envelope    Bytes
+    createdAt   DateTime @default(now())
+
+    request ChatRecoveryRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+    @@id([requestId, custodianId])
+    @@index([custodianId])
+}
+
+// The organisation recovery key (ORK): only what history is sealed to for
+// members with no account key yet (the legacy migration, proposal 8.4). Its
+// private seed is split to the custodians in ChatRecoveryKeyShare; the server
+// holds the public half. One live key per scope ("org:<id>" | "instance").
+model ChatRecoveryKey {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    scope         String
+    hpkePublicKey Bytes
+    threshold     Int
+    createdById   String    @db.Uuid
+    retiredAt     DateTime?
+    createdAt     DateTime  @default(now())
+
+    shares ChatRecoveryKeyShare[]
+
+    @@index([scope, retiredAt])
+}
+
+model ChatRecoveryKeyShare {
+    keyId              String   @db.Uuid
+    custodianId        String   @db.Uuid
+    custodianAkVersion Int
+    envelope           Bytes
+    createdAt          DateTime @default(now())
+
+    key ChatRecoveryKey @relation(fields: [keyId], references: [id], onDelete: Cascade)
+
+    @@id([keyId, custodianId])
+    @@index([custodianId])
+}
 // The conversation's history key for one epoch, sealed to one account's key
 // (or "org" for the organisation recovery key): what lets that account's next
 // device read the past (proposal 4.2 item 4). Opaque to the server.
