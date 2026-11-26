@@ -163,11 +163,12 @@ function StateMark({ state }: { state: steps.CodeStepState }) {
 }
 
 /** The command a step ran, whole: painted as shell, wrapped rather than cut,
- *  and copyable. */
+ *  and copyable. The copy button is a column of its own, so a long command's
+ *  scrollbar and the button never sit on top of each other. */
 function CommandBlock({ command }: { command: string }) {
     const t = useTranslations("polar");
     return (
-        <div className="group relative flex min-w-0 items-start gap-2 rounded bg-muted/50 py-1.5 pe-8 ps-2 text-[11px] leading-relaxed">
+        <div className="group flex min-w-0 items-start gap-2 rounded bg-muted/50 py-1.5 pe-1 ps-2 text-[11px] leading-relaxed">
             <span className="shrink-0 select-none font-mono text-foreground-subtle" aria-hidden>
                 $
             </span>
@@ -177,7 +178,7 @@ function CommandBlock({ command }: { command: string }) {
             <CopyButton
                 value={command}
                 label={t("code.step.command")}
-                className="absolute end-1 top-1 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                className="-my-0.5 shrink-0 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
             />
         </div>
     );
