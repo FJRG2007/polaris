@@ -702,22 +702,22 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         await alice.addAccounts(CHANNEL, [BOB, CAROL, DAVE]);
         const commitsBy = (address: string) => state.tables.mlsGroupEvent!.filter((e) => e.kind === "commit" && e.sender === address).length;
 
-        // Leaves 0-3: Bob shares every ancestor with Alice, whose add commit
-        // carried her path; Carol's parent with Dave is blank.
-        await bob.sync(CHANNEL);
-        expect(commitsBy(bob.address)).toBe(0);
-        await carol.sync(CHANNEL);
-        expect(commitsBy(carol.address)).toBe(1);
-        // Filled: her next sync commits nothing, and Dave, under the node she filled, has nothing left blank.
-        await carol.sync(CHANNEL);
-        await dave.sync(CHANNEL);
-        expect(commitsBy(carol.address)).toBe(1);
-        expect(commitsBy(dave.address)).toBe(0);
+        // Leaves 0-3: the joiner beside Alice shares every ancestor with her,
+        // whose add commit carried her path; the parent of leaves 2 and 3 is
+        // blank, and the first of those two to sync fills it for both.
+        const joiners = [bob, carol, dave];
+        const fills = () => joiners.reduce((sum, device) => sum + commitsBy(device.address), 0);
+        for (const device of joiners) await device.sync(CHANNEL);
+        expect(fills()).toBe(1);
+        // Filled: nobody commits for it again.
+        for (const device of joiners) await device.sync(CHANNEL);
+        expect(fills()).toBe(1);
+        const filler = joiners.find((device) => commitsBy(device.address) === 1)!;
 
-        for (const device of [alice, bob]) await device.sync(CHANNEL);
-        await say(carol, "after filling");
-        expect(await heard(alice)).toEqual(["carol-desk-1: after filling"]);
-        expect(await heard(dave)).toEqual(["carol-desk-1: after filling"]);
+        await alice.sync(CHANNEL);
+        await say(filler, "after filling");
+        for (const device of [alice, ...joiners.filter((d) => d !== filler)])
+            expect(await heard(device)).toEqual([`${filler.address.split("/")[1]}: after filling`]);
     });
 
     it("splits a removal the route would refuse, and holds the send for later when one leaf is still too large", async () => {
