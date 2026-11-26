@@ -642,7 +642,7 @@
         "nobody": "Nadie puede recuperar tu cuenta todavía: ningún administrador tiene el chat cifrado configurado.",
         "on": "Activada",
         "start": "Recuperar chats cifrados",
-        "refused": "No se pudo iniciar la recuperación. Necesita una recuperación de cuenta aprobada por un administrador en los últimos 7 días.",
+        "refused": "No se pudo iniciar la recuperación. Restablece aquí tu contraseña o pide a un administrador que apruebe la recuperación; vale 7 días.",
         "waiting": "Código {code}. Díselo a tus administradores cuando te lo pidan. Aprobaciones: {approvals} de {threshold}.",
         "recovered": "Tus chats cifrados vuelven a estar en este dispositivo.",
         "failed": "La clave recuperada no coincide con tu cuenta. Pide a tus administradores una solicitud nueva.",

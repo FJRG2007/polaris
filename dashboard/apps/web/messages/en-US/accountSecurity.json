@@ -642,7 +642,7 @@
         "nobody": "Nobody can recover your account yet: no administrator has encrypted chat set up.",
         "on": "On",
         "start": "Recover encrypted chats",
-        "refused": "Recovery could not start. It needs an account recovery approved by an administrator in the last 7 days.",
+        "refused": "Recovery could not start. First reset your password here or have an administrator approve an account recovery; either counts for 7 days.",
         "waiting": "Code {code}. Read it to your administrators when they ask. {approvals} of {threshold} approvals so far.",
         "recovered": "Your encrypted chats are back on this device.",
         "failed": "The recovered key did not match your account. Ask your administrators for a new request.",

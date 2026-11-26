@@ -24,6 +24,7 @@ import { requireUser } from "@/lib/session";
 import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { PASSWORD_RECOVERED } from "@/lib/chat/e2ee/recovery-policy";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { opaqueFinish, passwordOrProof } from "@/lib/chat/e2ee/schemas";
 import { provesPassword, setPasswordOverOpaque, withPasswordOrProof } from "@/lib/chat/e2ee/opaque-password";
@@ -309,7 +310,9 @@ export async function recoverPasswordAction(input: unknown): Promise<ActionResul
     const result = await resetUserPassword(auth, user.id, parsed.data.newPassword);
     if (!result.error) {
         await revokeOtherSessions(user.id, user.sessionId);
-        await recordAudit({ actorId: user.id, action: "account.password.recovered" });
+        // This row is also what lets the account ask its custodians for its
+        // encrypted chats back (recovery-service.ts, `eligibleRecovery`).
+        await recordAudit({ actorId: user.id, action: PASSWORD_RECOVERED });
     }
     return localized(result);
 }

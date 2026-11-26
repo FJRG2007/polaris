@@ -7,10 +7,13 @@
  *   account joined first, or the instance's administrators (`users.manage`) for
  *   an account in no organisation; only accounts with a key; see
  *   `recovery-policy.ts` for how many.
- * - A request can only be raised by an account whose administrator-approved
- *   account recovery (`account-recovery-service.ts`) was used in the last 7
- *   days: the quorum is for "forgot the password and lost every device", and an
- *   administrator has already judged that this is the person.
+ * - A request can only be raised by an account that recovered its password in
+ *   the last 7 days: an administrator-approved account recovery
+ *   (`account-recovery-service.ts`) that was used, or the Security page's
+ *   forgotten-password reset (`recoverPasswordAction`: an authenticator code, or
+ *   the recovery questions with a code sent to the email or phone). The quorum
+ *   is for "forgot the password and lost every device", and the person has
+ *   already proven who they are once.
  * - Every request, approval and completion is in the audit log and told to the
  *   account; custodians are told a request waits for them.
  */
@@ -183,18 +186,29 @@ export async function putShares(
     ]);
 }
 
-/** The administrator-approved recovery that lets this account ask, if any. */
-async function eligibleRecovery(userId: string, now: Date): Promise<string | null> {
-    const row = await prisma.accountRecovery.findFirst({
-        where: {
-            userId,
-            status: "used",
-            decidedAt: { gte: new Date(now.getTime() - policy.RECOVERY_WINDOW_MS) }
-        },
-        orderBy: { decidedAt: "desc" },
-        select: { id: true }
-    });
-    return row?.id ?? null;
+/**
+ * What lets this account ask, if anything, within the window: an
+ * administrator-approved recovery that was used (its id), or a forgotten
+ * password reset from the Security page with an authenticator code or the
+ * recovery questions plus a code sent to the account's email or phone
+ * (`self`). Either way the custodians still compare the code with the person.
+ */
+async function eligibleRecovery(userId: string, now: Date): Promise<{ accountRecoveryId: string | null; via: "admin" | "self" } | null> {
+    const since = new Date(now.getTime() - policy.RECOVERY_WINDOW_MS);
+    const [approved, reset] = await Promise.all([
+        prisma.accountRecovery.findFirst({
+            where: { userId, status: "used", decidedAt: { gte: since } },
+            orderBy: { decidedAt: "desc" },
+            select: { id: true }
+        }),
+        prisma.auditLog.findFirst({
+            where: { actorId: userId, action: policy.PASSWORD_RECOVERED, at: { gte: since } },
+            orderBy: { at: "desc" },
+            select: { id: true }
+        })
+    ]);
+    if (approved) return { accountRecoveryId: approved.id, via: "admin" };
+    return reset ? { accountRecoveryId: null, via: "self" } : null;
 }
 
 async function tell(userId: string, title: string, body: string): Promise<void> {
@@ -231,8 +245,8 @@ export async function ownRequest(userId: string, now = new Date()) {
 
 /** Raise a request with the requester browser's one-off public key. Replaces a pending one. */
 export async function openRequest(userId: string, requesterKey: Uint8Array, now = new Date()): Promise<string> {
-    const recoveryId = await eligibleRecovery(userId, now);
-    if (!recoveryId) throw new RecoveryRefusal("notEligible");
+    const eligible = await eligibleRecovery(userId, now);
+    if (!eligible) throw new RecoveryRefusal("notEligible");
     const key = await prisma.chatAccountKey.findUnique({ where: { userId }, select: { akVersion: true } });
     if (!key) throw new RecoveryRefusal("noKey");
     const shares = await prisma.chatRecoveryShare.findMany({
@@ -253,7 +267,7 @@ export async function openRequest(userId: string, requesterKey: Uint8Array, now 
         return tx.chatRecoveryRequest.create({
             data: {
                 userId,
-                accountRecoveryId: recoveryId,
+                accountRecoveryId: eligible.accountRecoveryId,
                 akVersion: key.akVersion,
                 splitId,
                 threshold,
@@ -268,7 +282,7 @@ export async function openRequest(userId: string, requesterKey: Uint8Array, now 
         action: "chat.recovery.requested",
         targetType: "user",
         targetId: userId,
-        metadata: { requestId: created.id, threshold, custodians: shares.length }
+        metadata: { requestId: created.id, threshold, custodians: shares.length, via: eligible.via }
     });
     await Promise.all([
         tell(userId, "chat_recovery_requested", "chat_recovery_requested_body"),

@@ -240,6 +240,22 @@ describe("raising a request", () => {
         expect((await service.ownRequest("ana", NOW)).eligible).toBe(false);
     });
 
+    it("opens after the Security page's forgotten-password reset, with no administrator approval", async () => {
+        acme();
+        await anaShares();
+        db.audits.push({ id: "old", actorId: "ana", action: "account.password.recovered", at: new Date(NOW.getTime() - 8 * DAY) });
+        await expect(service.openRequest("ana", bytes(32), NOW)).rejects.toMatchObject({ code: "notEligible" });
+        // Someone else's reset, or another action, does not count.
+        db.audits.push({ id: "other", actorId: "a1", action: "account.password.recovered", at: NOW });
+        db.audits.push({ id: "failed", actorId: "ana", action: "account.password.recovery-failed", at: NOW });
+        expect((await service.ownRequest("ana", NOW)).eligible).toBe(false);
+        db.audits.push({ id: "new", actorId: "ana", action: "account.password.recovered", at: new Date(NOW.getTime() - DAY) });
+        expect((await service.ownRequest("ana", NOW)).eligible).toBe(true);
+        const id = await service.openRequest("ana", bytes(32), NOW);
+        expect(db.requests.find((r) => r.id === id)).toMatchObject({ status: "pending", accountRecoveryId: null });
+        expect(db.recorded.find((r) => r.action === "chat.recovery.requested")?.metadata).toMatchObject({ via: "self" });
+    });
+
     it("is refused with no shares to recover from", async () => {
         acme();
         adminApproved();

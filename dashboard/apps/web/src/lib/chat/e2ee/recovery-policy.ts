@@ -15,6 +15,8 @@ export const REQUEST_DAYS = 7;
 export const REQUEST_MS = REQUEST_DAYS * 24 * 60 * 60 * 1000;
 /** How recently an administrator-approved account recovery must have been used. */
 export const RECOVERY_WINDOW_MS = REQUEST_MS;
+/** The audit action the Security page's forgotten-password reset records; it also opens the window. */
+export const PASSWORD_RECOVERED = "account.password.recovered";
 
 /** "org:<id>" for an organisation's administrators, "instance" for the instance's. */
 export type RecoveryScope = `org:${string}` | "instance";
