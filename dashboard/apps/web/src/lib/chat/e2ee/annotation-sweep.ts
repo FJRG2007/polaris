@@ -45,7 +45,7 @@ import { REACTION_COPY, VOTE_COPY, sweptEpochs, type AnnotationCopy } from "./an
 export type SweepOutcome = "sealed" | "kept" | "none" | "pending" | "failed" | "off";
 
 const BATCH = 200;
-/** People one run leaves in the clear before it calls the conversation failed: a bound on the query that skips them. */
+/** People with a row no set holds one run leaves in the clear before it calls the conversation failed: a bound on the query that skips them. */
 const KEPT_MAX = 100;
 /** Passes over a conversation before what keeps moving is left for the next run. */
 const ROUNDS = 5;
@@ -74,9 +74,10 @@ export async function nextSweepEpoch(channelId: string): Promise<bigint | null> 
 
 /**
  * What one person's clear emoji on a message seal to: each once, in the order
- * they were put on, all of them - or null when they do not fit one set
- * (`content.reactionsFit`). Never part of them: a set holding some would make
- * the rest disappear once the rollback copy expires.
+ * they were put on, all of them, in a set as large as they need - or null for
+ * a row no set holds (an empty emoji or one past 255 bytes, which the clear
+ * path never stores; `content.reactionsFit`). Never part of them: a set
+ * holding some would make the rest disappear once the rollback copy expires.
  */
 export function sealableEmoji(emoji: readonly string[]): string[] | null {
     const out = [...new Set(emoji)];
@@ -104,8 +105,9 @@ const owned = (value: Uint8Array): Uint8Array<ArrayBuffer> => new Uint8Array(val
 
 /**
  * Sweep one person's clear reactions on one message: true when swept, false
- * when a set did not verify, "kept" when they do not fit one set - left in the
- * clear, untouched and drawn as before, rather than sealed in part.
+ * when a set did not verify, "kept" when one of them is a row no set holds
+ * (see `sealableEmoji`) - left in the clear, untouched and drawn as before,
+ * rather than sealed in part.
  */
 async function sweepReactions(channelId: string, messageId: string, userId: string, key: SweepKey): Promise<boolean | "kept"> {
     const rows = await prisma.chatReaction.findMany({
@@ -229,8 +231,7 @@ async function hasClear(channelId: string, kept: readonly Pair[] = []): Promise<
 
 /**
  * Sweep one conversation (see the header). Answers `sealed`, `kept` (sealed
- * but for people whose emoji on a message do not fit one set, left in the
- * clear), `none` (not sealed, rolled back, or nothing clear left), `pending`
+ * but for people with a row no set holds, left in the clear), `none` (not sealed, rolled back, or nothing clear left), `pending`
  * (nobody to seal to yet, or rows that kept moving), `failed` (one did not
  * verify), or `off`.
  */

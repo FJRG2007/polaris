@@ -119,11 +119,17 @@ describe("the sealed reaction set", () => {
         expect(await openRow({ messageId: MESSAGE, userId: ALICE, ...one })).toEqual(["👍"]);
     });
 
-    it("holds what fits its fixed size, refuses more, and does not open moved to another message or person", async () => {
+    it("doubles in size for emoji past its first size, refuses none it can hold, and does not open moved to another message or person", async () => {
         const wide = Array.from({ length: 30 }, (_, at) => String(at).padEnd(80, "x"));
-        expect(content.reactionsFit(wide.slice(0, 25))).toBe(true);
-        expect(content.decodeReactions(content.encodeReactions(wide.slice(0, 25)))).toEqual(wide.slice(0, 25));
-        expect(() => content.encodeReactions(wide)).toThrow(RangeError);
+        expect(content.encodeReactions(wide.slice(0, 25)).length).toBe(2048);
+        expect(content.encodeReactions(wide).length).toBe(4096);
+        expect(content.decodeReactions(content.encodeReactions(wide))).toEqual(wide);
+        const sealedWide = await sealedSet(ALICE, wide);
+        expect(content.isSealedReactionsSize(fromText(sealedWide.sealed).length)).toBe(true);
+        expect(await openRow({ messageId: MESSAGE, userId: ALICE, ...sealedWide })).toEqual(wide);
+        // Not a size a set comes in.
+        expect(content.decodeReactions(new Uint8Array(3000))).toBeNull();
+        expect(content.isSealedReactionsSize(content.SEALED_REACTIONS_BYTES + 1)).toBe(false);
         expect(() => content.encodeReactions(["x".repeat(256)])).toThrow(RangeError);
         const set = await sealedSet(ALICE, ["🎉"]);
         expect(await openRow({ messageId: OTHER, userId: ALICE, ...set })).toBeNull();
@@ -150,10 +156,19 @@ describe("sealed reactions on the server", () => {
         expect(plain).toEqual([{ messageId: MESSAGE, userId: BOB, emoji: "👍" }]);
     });
 
+    it("takes a set past the first size, a person with many emoji on one message", async () => {
+        const wide = Array.from({ length: 30 }, (_, at) => String(at).padEnd(80, "x"));
+        await service.putReactions({ id: ALICE }, { messageId: MESSAGE, set: await sealedSet(ALICE, wide) });
+        expect(rows).toHaveLength(1);
+    });
+
     it("refuses a set in a plain conversation, of the wrong size, or at an epoch the group has not reached", async () => {
         const good = await sealedSet(ALICE, ["👍"]);
         await expect(service.putReactions({ id: ALICE }, { messageId: MESSAGE, set: { ...good, sealed: toText(new Uint8Array(40)) } })).rejects.toThrow("errors.sealedOnlyReload");
         await expect(service.putReactions({ id: ALICE }, { messageId: MESSAGE, set: { ...good, epoch: "6" } })).rejects.toThrow("errors.sealedOnlyReload");
+        // Larger than a browser sends (the sweep alone seals those, from rows the server holds).
+        const huge = Array.from({ length: 900 }, (_, at) => String(at).padEnd(80, "x"));
+        await expect(service.putReactions({ id: ALICE }, { messageId: MESSAGE, set: await sealedSet(ALICE, huge) })).rejects.toThrow("errors.sealedOnlyReload");
         sealedConversation = false;
         await expect(service.putReactions({ id: ALICE }, { messageId: MESSAGE, set: good })).rejects.toThrow("errors.sealedOnlyReload");
         expect(rows).toHaveLength(0);

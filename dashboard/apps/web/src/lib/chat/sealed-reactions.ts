@@ -26,13 +26,19 @@ import { publishChatChange } from "./live";
 import * as history from "./history-visibility";
 import { fromText, toText } from "./e2ee/base64url";
 import { conversationSealed } from "./e2ee/sealed-conversation";
-import { SEALED_REACTIONS_BYTES } from "@polaris/chat-crypto/message-content";
+import { isSealedReactionsSize } from "@polaris/chat-crypto/message-content";
 import { ChatAccessError, ChatRuleError, requireChannel, requirePostable } from "./access";
 
 /** Rows handed out per read; a browser reads on until `next` is null. */
 export const REACTION_PAGE = 1_000;
 /** Messages asked about in one read: a page of a conversation. */
 export const REACTION_MESSAGES = 100;
+/**
+ * The largest set a browser sends, in plaintext bytes: a few thousand emoji
+ * from one person on one message. Only the sweep, from rows the server already
+ * holds, seals larger ones.
+ */
+const PUT_PLAINTEXT_MAX = 64 * 1024;
 
 export const putReactionsSchema = z.object({
     messageId: z.string().uuid(),
@@ -41,7 +47,8 @@ export const putReactionsSchema = z.object({
         .object({
             setId: z.string().uuid(),
             epoch: z.string().regex(/^\d{1,19}$/),
-            sealed: z.string().regex(/^[A-Za-z0-9_-]+$/).max(4_096)
+            // base64url of the largest set taken (`PUT_PLAINTEXT_MAX` and its 17 bytes of version and tag).
+            sealed: z.string().regex(/^[A-Za-z0-9_-]+$/).max(Math.ceil(((PUT_PLAINTEXT_MAX + 17) * 4) / 3))
         })
         .nullable()
 });
@@ -87,7 +94,7 @@ export async function putReactions(actor: { id: string }, input: PutReactionsInp
     if (set) {
         sealed = new Uint8Array(fromText(set.sealed));
         epoch = BigInt(set.epoch);
-        if (sealed.length !== SEALED_REACTIONS_BYTES) throw new ChatRuleError(NOT_TAKEN);
+        if (!isSealedReactionsSize(sealed.length, PUT_PLAINTEXT_MAX)) throw new ChatRuleError(NOT_TAKEN);
         // An epoch the group has not reached opens for nobody.
         const group = await prisma.mlsGroup.findUnique({ where: { channelId: message.channelId }, select: { epoch: true } });
         if (!group || epoch > group.epoch) throw new ChatRuleError(NOT_TAKEN);

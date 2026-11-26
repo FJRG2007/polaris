@@ -315,7 +315,9 @@ export async function sealBallot(historyKey: Uint8Array, binding: BallotBinding,
  * `set` is a fresh random id every time the set is sealed, and `reactor` the
  * account the row is for, so a set moved to another message or person does not
  * open. The plaintext is padded to a fixed size (`encodeReactions`), so a row's
- * length says nothing about how many emoji it holds.
+ * length says nothing about how many emoji it holds - but for a person whose
+ * emoji outgrow the first size: their set doubles until it fits, so its length
+ * says which size it took, never which emoji.
  */
 export interface ReactionsBinding {
     readonly conversationId: string;
@@ -330,33 +332,53 @@ export interface ReactionsBinding {
 
 const REACTIONS_VERSION = 1;
 /**
- * Emoji one person may have on one message: as many as fit the fixed-size
- * plaintext (`reactionsFit`), and never more than its count byte holds. The
- * clear path never capped a person's emoji on a message, so a set holds what
- * fits rather than a round number: every person's clear reactions the sweep
- * (`annotation-sweep.ts`) finds carry over whole unless they come to more than
- * `REACTIONS_PLAINTEXT_BYTES`, some 400 ordinary emoji or 27 of a space's own.
+ * The plaintext sizes a set comes in: the first, then each double of it up to
+ * the last. The clear path never capped a person's emoji on a message, so a set
+ * takes the smallest size its emoji fit rather than refusing more: nearly every
+ * set is the first size (some 400 ordinary emoji, 27 of a space's own), and the
+ * sweep (`annotation-sweep.ts`) carries a person's clear reactions over whole
+ * however many they put on.
  */
-export const REACTIONS_MAX = 255;
+const REACTIONS_PLAINTEXT_BYTES = 2048;
+const REACTIONS_SIZE_STEPS = 9;
+const REACTIONS_PLAINTEXT_MAX = REACTIONS_PLAINTEXT_BYTES << REACTIONS_SIZE_STEPS;
+/** Version byte and a four-byte count. */
+const REACTIONS_HEADER_BYTES = 5;
 /** The longest emoji (or custom emoji token) a set holds, in UTF-8 bytes: what its length byte holds. */
 export const REACTION_MAX_BYTES = 255;
-const REACTIONS_PLAINTEXT_BYTES = 2048;
-const REACTIONS_HEADER_BYTES = 2;
 
-/** Whether one person's emoji (each once) seal as one set: none empty or too long, and all of them within the plaintext. */
-export function reactionsFit(emoji: readonly string[]): boolean {
-    const unique = [...new Set(emoji)];
-    if (unique.length > REACTIONS_MAX) return false;
+/** The plaintext size one person's emoji (each once) seal to, or null when one is empty or too long or they outgrow the largest. */
+function reactionsPlaintextBytes(unique: readonly string[]): number | null {
     let size = REACTIONS_HEADER_BYTES;
+    const encoder = new TextEncoder();
     for (const one of unique) {
-        const bytes = new TextEncoder().encode(one).length;
-        if (bytes === 0 || bytes > REACTION_MAX_BYTES) return false;
+        const bytes = encoder.encode(one).length;
+        if (bytes === 0 || bytes > REACTION_MAX_BYTES) return null;
         size += 1 + bytes;
     }
-    return size <= REACTIONS_PLAINTEXT_BYTES;
+    for (let bucket = REACTIONS_PLAINTEXT_BYTES; bucket <= REACTIONS_PLAINTEXT_MAX; bucket *= 2) if (size <= bucket) return bucket;
+    return null;
 }
-/** The size of every sealed reaction set. */
+
+/** Whether one person's emoji (each once) seal as one set: none empty or too long, and all of them within the largest size. */
+export function reactionsFit(emoji: readonly string[]): boolean {
+    return reactionsPlaintextBytes([...new Set(emoji)]) !== null;
+}
+
+/** Whether a plaintext length is one of the sizes a set comes in. */
+function isReactionsPlaintextSize(length: number): boolean {
+    for (let bucket = REACTIONS_PLAINTEXT_BYTES; bucket <= REACTIONS_PLAINTEXT_MAX; bucket *= 2) if (length === bucket) return true;
+    return false;
+}
+
+/** The size of a sealed reaction set at the first size: what nearly every one is. */
 export const SEALED_REACTIONS_BYTES = 1 + REACTIONS_PLAINTEXT_BYTES + TAG_BYTES;
+
+/** Whether a sealed set's length is one a set comes in, no larger than `maxPlaintext` (the largest size by default). */
+export function isSealedReactionsSize(length: number, maxPlaintext: number = REACTIONS_PLAINTEXT_MAX): boolean {
+    const plaintext = length - 1 - TAG_BYTES;
+    return plaintext <= maxPlaintext && isReactionsPlaintextSize(plaintext);
+}
 
 function reactionsInfo(binding: ReactionsBinding): Uint8Array<ArrayBuffer> {
     const { conversationId, epoch, messageId, setId, reactor } = binding;
@@ -365,16 +387,18 @@ function reactionsInfo(binding: ReactionsBinding): Uint8Array<ArrayBuffer> {
     return owned(canonical(LABEL, "reactions", conversationId, BigInt(epoch).toString(), messageId, setId, reactor));
 }
 
-/** A set of emoji as the fixed-size plaintext of a sealed reaction set; duplicates are kept once. */
+/** A set of emoji as the padded plaintext of a sealed reaction set (the smallest size they fit); duplicates are kept once. */
 export function encodeReactions(emoji: readonly string[]): Uint8Array {
     const unique = [...new Set(emoji)];
-    if (!reactionsFit(unique)) throw new RangeError("Those reactions do not fit one sealed set");
-    const out = new Uint8Array(REACTIONS_PLAINTEXT_BYTES);
+    const size = reactionsPlaintextBytes(unique);
+    if (size === null) throw new RangeError("Those reactions do not fit one sealed set");
+    const out = new Uint8Array(size);
     out[0] = REACTIONS_VERSION;
-    out[1] = unique.length;
+    new DataView(out.buffer).setUint32(1, unique.length);
     let at = REACTIONS_HEADER_BYTES;
+    const encoder = new TextEncoder();
     for (const one of unique) {
-        const bytes = new TextEncoder().encode(one);
+        const bytes = encoder.encode(one);
         out[at] = bytes.length;
         out.set(bytes, at + 1);
         at += 1 + bytes.length;
@@ -384,8 +408,8 @@ export function encodeReactions(emoji: readonly string[]): Uint8Array {
 
 /** The emoji of a reaction set's plaintext, in the order sealed; null for one that is not a set. */
 export function decodeReactions(bytes: Uint8Array): string[] | null {
-    if (bytes.length !== REACTIONS_PLAINTEXT_BYTES || bytes[0] !== REACTIONS_VERSION) return null;
-    const count = bytes[1]!;
+    if (!isReactionsPlaintextSize(bytes.length) || bytes[0] !== REACTIONS_VERSION) return null;
+    const count = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(1);
     const out: string[] = [];
     let at = REACTIONS_HEADER_BYTES;
     const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -416,7 +440,7 @@ export async function sealReactions(historyKey: Uint8Array, binding: ReactionsBi
 
 /** Open a reaction set sealed by `sealReactions`; one coarse error for every failure. */
 export async function openReactions(historyKey: Uint8Array, binding: ReactionsBinding, sealed: Uint8Array): Promise<Uint8Array> {
-    if (sealed.length !== SEALED_REACTIONS_BYTES || sealed[0] !== MESSAGE_CONTENT_VERSION) throw new MessageOpenError();
+    if (!isSealedReactionsSize(sealed.length) || sealed[0] !== MESSAGE_CONTENT_VERSION) throw new MessageOpenError();
     try {
         const info = reactionsInfo(binding);
         const [key, iv] = await keyAndNonce(historyKey, info);
