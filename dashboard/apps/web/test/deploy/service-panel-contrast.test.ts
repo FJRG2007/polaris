@@ -18,6 +18,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { SIDE_PANEL } from "../../src/app/(app)/apps/deploy/side-panel";
 
 const TOKENS = readFileSync(
     new URL("../../../../packages/ui/src/styles/tokens.css", import.meta.url),
@@ -128,8 +129,12 @@ describe("service panel", () => {
             const panel = source.slice(source.indexOf("<DialogContent"));
             const tag = panel.slice(0, panel.indexOf(">\n"));
             expect(tag).toContain('data-service-panel=""');
-            expect(tag).toMatch(/"[^"]*\bbg-background\b[^"]*"/);
+            // The ground comes from the one string the three panels share - see
+            // `side-panel.ts` - or is written on the tag itself.
+            if (tag.includes("SIDE_PANEL")) expect(SIDE_PANEL).toMatch(/\bbg-background\b/);
+            else expect(tag).toMatch(/"[^"]*\bbg-background\b[^"]*"/);
             expect(tag).not.toMatch(/\bbg-(elevated|surface)\b/);
+            expect(SIDE_PANEL).not.toMatch(/\bbg-(elevated|surface)\b/);
         });
     }
 
