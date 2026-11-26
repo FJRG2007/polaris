@@ -25,6 +25,7 @@ import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
 import * as history from "./history-visibility";
 import { fromText, toText } from "./e2ee/base64url";
+import { conversationSealed } from "./e2ee/sealed-conversation";
 import { SEALED_BALLOT_BYTES } from "@polaris/chat-crypto/message-content";
 import { ChatAccessError, ChatRuleError, requireChannel, requirePostable } from "./access";
 
@@ -87,7 +88,10 @@ async function sealedPoll(messageId: string) {
     });
     if (!message?.poll) throw new ChatAccessError({ key: "errors.pollGone" });
     if (message.deletedAt) throw new ChatRuleError({ key: "errors.pollDeleted" });
-    return { ...message, poll: message.poll, sealed: message.e2eeEpoch != null };
+    // A plain poll sent before its conversation was sealed is voted on sealed from then on:
+    // a vote in the clear there would tell the server what every sealed message keeps from it.
+    const sealed = message.e2eeEpoch != null || (await conversationSealed(message.channelId));
+    return { ...message, poll: message.poll, sealed };
 }
 
 /** Cast, replace or take back this person's ballot on a sealed poll. */

@@ -39,6 +39,8 @@ let ballots: Ballot[] = [];
 let plainVotes: { optionId: string; userId: string }[] = [];
 let poll = { multiple: false, hideResults: false, anonymous: true, closesAt: null as Date | null, closedAt: null as Date | null };
 let sealedMessage = true;
+/** Whether the conversation itself is sealed (its MLS group exists or the migration cut it). */
+let sealedConversation = true;
 let published = 0;
 
 vi.mock("@/lib/chat/access", () => ({
@@ -50,6 +52,7 @@ vi.mock("@/lib/chat/access", () => ({
 vi.mock("@/lib/chat/history-visibility", () => ({ requireReadable: async () => undefined }));
 vi.mock("@/app/(app)/chat/actions", () => ({}));
 vi.mock("@/lib/chat/e2ee/sealed-chat", () => ({}));
+vi.mock("@/lib/chat/e2ee/sealed-conversation", () => ({ conversationSealed: async () => sealedConversation }));
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => void (published += 1) }));
 
 vi.mock("@polaris/db", () => {
@@ -138,6 +141,7 @@ beforeEach(() => {
     plainVotes = [];
     poll = { multiple: false, hideResults: false, anonymous: true, closesAt: null, closedAt: null };
     sealedMessage = true;
+    sealedConversation = true;
     published = 0;
 });
 
@@ -168,8 +172,19 @@ describe("sealed ballots on the server", () => {
         await expect(service.castBallot({ id: ALICE }, { messageId: POLL, ballot: good })).rejects.toThrow("errors.pollClosed");
         poll.closedAt = null;
         sealedMessage = false;
+        sealedConversation = false;
         await expect(service.castBallot({ id: ALICE }, { messageId: POLL, ballot: good })).rejects.toThrow("errors.voteNotCounted");
         expect(ballots).toHaveLength(0);
+    });
+
+    it("takes sealed ballots on a plain poll sent before the conversation was sealed, and drops its clear vote", async () => {
+        sealedMessage = false;
+        plainVotes = [{ optionId: OPTIONS[0]!, userId: ALICE }];
+        await service.castBallot({ id: ALICE }, { messageId: POLL, ballot: await sealedBallot(null, [1]) });
+        expect(ballots).toHaveLength(1);
+        expect(plainVotes).toEqual([]);
+        const page = await service.readBallots({ id: ALICE }, { messageId: POLL, after: null });
+        expect((await opened(page, ALICE)).map((row) => row.picks)).toEqual([[1]]);
     });
 
     it("validates what it is sent", () => {

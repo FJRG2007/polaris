@@ -24,6 +24,7 @@ import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
 import { ChatAccessError, ChatRuleError, requireChannel, requirePostable } from "./access";
 import * as history from "./history-visibility";
+import { conversationSealed, sealedConversations } from "./e2ee/sealed-conversation";
 
 /** One answer, already counted for the reader looking at it. */
 export interface ChatPollOptionView {
@@ -117,7 +118,7 @@ export async function pollsFor(
             anonymous: true,
             closesAt: true,
             closedAt: true,
-            message: { select: { e2eeEpoch: true } },
+            message: { select: { e2eeEpoch: true, channelId: true } },
             options: {
                 orderBy: { position: "asc" },
                 select: { id: true, text: true }
@@ -126,8 +127,13 @@ export async function pollsFor(
     });
     if (polls.length === 0) return found;
 
+    // A poll takes sealed ballots when it was sent sealed or its conversation
+    // has been sealed since (`poll-ballots.ts`).
+    const sealedChannels = await sealedConversations(polls.flatMap((poll) => (poll.message ? [poll.message.channelId] : [])));
+    const takesBallots = (poll: (typeof polls)[number]) =>
+        poll.message?.e2eeEpoch != null || (poll.message != null && sealedChannels.has(poll.message.channelId));
     // Who cast a sealed ballot, never what it picks: the server cannot read that.
-    const sealedIds = polls.filter((poll) => poll.message?.e2eeEpoch != null).map((poll) => poll.messageId);
+    const sealedIds = polls.filter(takesBallots).map((poll) => poll.messageId);
     const ballots = sealedIds.length
         ? await prisma.chatPollBallot.findMany({
               where: { pollId: { in: sealedIds } },
@@ -161,7 +167,7 @@ export async function pollsFor(
         const people = new Set(
             votes.filter((cast) => ids.has(cast.optionId)).map((cast) => cast.userId)
         );
-        const sealedVotes = poll.message?.e2eeEpoch != null;
+        const sealedVotes = takesBallots(poll);
         for (const ballot of ballots) if (ballot.pollId === poll.messageId) people.add(ballot.userId);
         found.set(poll.messageId, {
             multiple: poll.multiple,
@@ -325,8 +331,10 @@ export async function vote(
     if (message.deletedAt) throw new ChatRuleError({ key: "errors.pollDeleted" });
     // A sealed poll takes sealed ballots only (`poll-ballots.ts`): a vote in the
     // clear would tell the server the very thing the ballot keeps from it. Only
-    // a page from before sealed votes sends one.
-    if (message.e2eeEpoch != null) throw new ChatRuleError({ key: "errors.sealedOnlyReload" });
+    // a page from before sealed votes sends one. A plain poll sent before its
+    // conversation was sealed takes sealed ballots from then on too.
+    if (message.e2eeEpoch != null || (await conversationSealed(message.channelId)))
+        throw new ChatRuleError({ key: "errors.sealedOnlyReload" });
     await requirePostable(actor, message.channelId, { reacting: true });
     await history.requireReadable(actor, message.channelId, input.messageId);
 

@@ -25,3 +25,14 @@ export async function conversationSealed(channelId: string): Promise<boolean> {
     ]);
     return group + cut > 0;
 }
+
+/** Which of these conversations are sealed (`conversationSealed`), in two queries for the lot. */
+export async function sealedConversations(channelIds: readonly string[]): Promise<Set<string>> {
+    const ids = [...new Set(channelIds)];
+    if (!ids.length || !chatE2eeEnabled()) return new Set();
+    const [groups, cuts] = await Promise.all([
+        prisma.mlsGroup.findMany({ where: { channelId: { in: ids } }, select: { channelId: true } }),
+        prisma.chatMigration.findMany({ where: { channelId: { in: ids }, state: "cut" }, select: { channelId: true } })
+    ]);
+    return new Set([...groups, ...cuts].map((row) => row.channelId));
+}
