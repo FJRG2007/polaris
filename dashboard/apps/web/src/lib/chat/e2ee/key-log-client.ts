@@ -134,14 +134,19 @@ export function subscribeLog(listener: () => void): () => void {
 const resetKeys = new Map<string, string>();
 const trustedResets = new Map<string, string>();
 
+/** The log key the last `log-reset` for this account pointed at, or null. */
+export function pendingReset(ownId: string): string | null {
+    return resetKeys.get(ownId) ?? null;
+}
+
 /**
- * The user's answer to `log-reset`: trust the key the log was reset to, which
- * the next ask pins - still only if the log under it extends the head this
- * browser saw. Only that exact key: a later, different reset asks again.
+ * The user's answer to `log-reset`: trust `key`, the one the log was reset to
+ * and the user was shown, which the next ask pins - still only if the log
+ * under it extends the head this browser saw. Only that exact key: when the
+ * log has since been reset to another, nothing is trusted and that one asks.
  */
-export function trustLogReset(ownId: string): void {
-    const key = resetKeys.get(ownId);
-    if (!key) return;
+export function trustLogReset(ownId: string, key: string): void {
+    if (resetKeys.get(ownId) !== key) return;
     trustedResets.set(ownId, key);
     resetKeys.delete(ownId);
     dismissLogProblem(ownId);
@@ -257,6 +262,7 @@ async function askOnce(ownId: string, body: { op: "proofs"; userIds: string[]; c
     const checked = await checkAnswer(answer, seen, trustedResets.get(ownId) ?? null);
     if (checked.kind === "failed") {
         if (checked.problem === "log-reset") resetKeys.set(ownId, answer.logKey);
+        else resetKeys.delete(ownId);
         return report(ownId, checked.problem);
     }
     if (checked.kind === "verified" && checked.seen) {

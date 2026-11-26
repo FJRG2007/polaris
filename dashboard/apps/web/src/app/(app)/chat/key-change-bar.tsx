@@ -16,7 +16,7 @@ import * as peerKeys from "@/lib/chat/e2ee/peer-keys";
 import * as keyLog from "@/lib/chat/e2ee/key-log-client";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Dialog, DialogContent, DialogTitle } from "@polaris/ui";
+import { Button, Dialog, DialogFooter, DialogHeader, DialogTitle, DialogContent, DialogDescription } from "@polaris/ui";
 
 export function KeyChangeBar({
     channelId,
@@ -121,20 +121,30 @@ export function GroupKeyChangeBar({
 /** One own-entry check per page and account: the log is asked once, not per conversation. */
 const alarms = new Map<string, Promise<number>>();
 
+/** The notices each account put away in this page, by what they said: a different one shows again. */
+const dismissedNotices = new Map<string, ReadonlySet<string>>();
+
 /**
  * The account's own alarm (design 4.6): the key log holds a key for this
  * account that this browser's copy did not make - which is what anybody else
  * would be handed if the server substituted it - or the log contradicted
- * itself. Shown above the box of every sealed conversation until dismissed;
- * checked once per page.
+ * itself, or was reset to a key the old one never handed over to. Shown above
+ * the box of every sealed conversation until dismissed; a dismissed notice
+ * stays away for the page, but a different problem (another kind, another
+ * count of foreign keys, another reset key) is shown again. A reset offers to
+ * trust exactly the key it was reset to, after a confirmation.
  */
 export function KeyLogNotice({ viewerId }: { viewerId: string }) {
     const t = useTranslations("chat");
     const [foreign, setForeign] = useState(0);
-    const [dismissed, setDismissed] = useState(false);
+    const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => dismissedNotices.get(viewerId) ?? new Set());
+    const [trusting, setTrusting] = useState<string | null>(null);
     const problem = useSyncExternalStore(
         keyLog.subscribeLog,
-        () => keyLog.logProblem(viewerId),
+        () => {
+            const kind = keyLog.logProblem(viewerId);
+            return kind === "log-reset" ? `log-reset:${keyLog.pendingReset(viewerId) ?? ""}` : kind ? `problem:${kind}` : null;
+        },
         () => null
     );
 
@@ -154,22 +164,55 @@ export function KeyLogNotice({ viewerId }: { viewerId: string }) {
         };
     }, [viewerId]);
 
-    if (dismissed || (!foreign && !problem)) return null;
+    const notice = [foreign ? `foreign:${foreign}` : null, problem].find((n): n is string => !!n && !dismissed.has(n));
+    if (!notice) return null;
+    const resetKey = notice.startsWith("log-reset:") ? notice.slice("log-reset:".length) : "";
+    const dismiss = () => {
+        const next = new Set(dismissed).add(notice);
+        dismissedNotices.set(viewerId, next);
+        setDismissed(next);
+    };
     return (
         <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border px-4 py-2">
             <ShieldAlert className="size-4 shrink-0 text-danger" aria-hidden />
-            <p className="min-w-0 flex-1 break-words text-xs">{t(foreign ? "info.keyLogForeign" : "info.keyLogFailed")}</p>
-            <Button
-                size="sm"
-                variant="outline"
-                className="shrink-0"
-                onClick={() => {
-                    keyLog.dismissLogProblem(viewerId);
-                    setDismissed(true);
-                }}
-            >
-                {t("info.safetyDismiss")}
-            </Button>
+            <p className="min-w-0 flex-1 break-words text-xs">
+                {t(notice.startsWith("foreign:") ? "info.keyLogForeign" : resetKey ? "info.keyLogReset" : "info.keyLogFailed")}
+            </p>
+            <div className="flex shrink-0 gap-2">
+                <Button size="sm" variant="outline" onClick={dismiss}>
+                    {t("info.safetyDismiss")}
+                </Button>
+                {resetKey && (
+                    <Button size="sm" onClick={() => setTrusting(resetKey)}>
+                        {t("info.keyLogTrust")}
+                    </Button>
+                )}
+            </div>
+            <Dialog open={trusting !== null} onOpenChange={(open) => !open && setTrusting(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t("info.keyLogTrustTitle")}</DialogTitle>
+                        <DialogDescription>{t("info.keyLogTrustBody")}</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="ghost" size="sm" onClick={() => setTrusting(null)}>
+                            {t("info.keyLogTrustCancel")}
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={() => {
+                                // The key this dialog was opened for, never whatever the log points at by now.
+                                if (trusting) keyLog.trustLogReset(viewerId, trusting);
+                                setTrusting(null);
+                                // Pinned on this ask, not the next conversation's: a log that does not extend the old head fails here.
+                                void keyLog.askLog(viewerId, { op: "own" });
+                            }}
+                        >
+                            {t("info.keyLogTrust")}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
