@@ -28,6 +28,7 @@ import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import * as polls from "@/lib/chat/polls";
 import * as pollBallots from "@/lib/chat/poll-ballots";
+import * as sealedReactions from "@/lib/chat/sealed-reactions";
 import * as locations from "@/lib/chat/locations";
 import * as pins from "@/lib/chat/pins";
 import * as reminders from "@/lib/chat/reminders";
@@ -783,6 +784,28 @@ export async function pollBallotsAction(
     const parsed = pollBallots.readBallotsSchema.safeParse(input);
     if (!parsed.success) return { error: (await getTranslations("chat"))("errors.pollGone") };
     const result = await guard(() => pollBallots.readBallots(me, parsed.data));
+    return result.error ? { error: result.error } : { page: result.value };
+}
+
+/**
+ * Replace, or take back, this person's sealed set of reactions on a message
+ * of a sealed conversation; the server stores it without being able to read it.
+ */
+export async function putSealedReactionsAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = sealedReactions.putReactionsSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.sealedOnlyReload") };
+    return guard(() => sealedReactions.putReactions(me, parsed.data));
+}
+
+/** One page of the sealed reaction sets on a page of messages, which this browser opens and counts. */
+export async function sealedReactionsAction(
+    input: unknown
+): Promise<{ page?: sealedReactions.SealedReactionsPage; error?: string }> {
+    const me = await actor();
+    const parsed = sealedReactions.readReactionsSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.messageGone") };
+    const result = await guard(() => sealedReactions.readReactions(me, parsed.data));
     return result.error ? { error: result.error } : { page: result.value };
 }
 

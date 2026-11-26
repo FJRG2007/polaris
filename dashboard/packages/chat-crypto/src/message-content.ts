@@ -300,6 +300,117 @@ export async function sealBallot(historyKey: Uint8Array, binding: BallotBinding,
     return concat(version, new Uint8Array(sealed));
 }
 
+/**
+ * Sealed reactions (docs/chat-e2ee-mls.md, "Sealed reactions"): the emoji one
+ * person has on one message, sealed under the conversation's `HK(c, e)` so the
+ * server keeps one opaque row per person and message and never learns which
+ * emoji. Like a Signal or WhatsApp reaction, it is an encrypted message that
+ * names its target; unlike theirs it is a set, because a Polaris message takes
+ * several emoji from one person.
+ *
+ *     K, nonce = HKDF-SHA256(HK, salt = empty,
+ *                            info = canonical(LABEL, "reactions", conversation, epoch, message, set, reactor))
+ *     sealed   = version(1) || AES-256-GCM(K, nonce, emoji set, aad = version || info)
+ *
+ * `set` is a fresh random id every time the set is sealed, and `reactor` the
+ * account the row is for, so a set moved to another message or person does not
+ * open. The plaintext is padded to a fixed size (`encodeReactions`), so a row's
+ * length says nothing about how many emoji it holds.
+ */
+export interface ReactionsBinding {
+    readonly conversationId: string;
+    readonly epoch: bigint | number;
+    /** The message reacted to. */
+    readonly messageId: string;
+    /** This sealing's own random id. */
+    readonly setId: string;
+    /** The account whose reactions these are. */
+    readonly reactor: string;
+}
+
+const REACTIONS_VERSION = 1;
+/** Emoji one person may have on one message. */
+export const REACTIONS_MAX = 20;
+/** The longest emoji (or custom emoji token) a set holds, in UTF-8 bytes. */
+export const REACTION_MAX_BYTES = 100;
+const REACTIONS_PLAINTEXT_BYTES = 2048;
+/** The size of every sealed reaction set. */
+export const SEALED_REACTIONS_BYTES = 1 + REACTIONS_PLAINTEXT_BYTES + TAG_BYTES;
+
+function reactionsInfo(binding: ReactionsBinding): Uint8Array<ArrayBuffer> {
+    const { conversationId, epoch, messageId, setId, reactor } = binding;
+    if (!conversationId || !messageId || !setId || !reactor) throw new RangeError("A reaction set names its conversation, message, id and person");
+    if (BigInt(epoch) < 0n) throw new RangeError("The epoch is not negative");
+    return owned(canonical(LABEL, "reactions", conversationId, BigInt(epoch).toString(), messageId, setId, reactor));
+}
+
+/** A set of emoji as the fixed-size plaintext of a sealed reaction set; duplicates are kept once. */
+export function encodeReactions(emoji: readonly string[]): Uint8Array {
+    const unique = [...new Set(emoji)];
+    if (unique.length > REACTIONS_MAX) throw new RangeError(`A person has at most ${REACTIONS_MAX} reactions on a message`);
+    const out = new Uint8Array(REACTIONS_PLAINTEXT_BYTES);
+    out[0] = REACTIONS_VERSION;
+    out[1] = unique.length;
+    let at = 2;
+    for (const one of unique) {
+        const bytes = new TextEncoder().encode(one);
+        if (bytes.length === 0 || bytes.length > REACTION_MAX_BYTES) throw new RangeError("A reaction is 1-100 bytes");
+        out[at] = bytes.length;
+        out.set(bytes, at + 1);
+        at += 1 + bytes.length;
+    }
+    return out;
+}
+
+/** The emoji of a reaction set's plaintext, in the order sealed; null for one that is not a set. */
+export function decodeReactions(bytes: Uint8Array): string[] | null {
+    if (bytes.length !== REACTIONS_PLAINTEXT_BYTES || bytes[0] !== REACTIONS_VERSION) return null;
+    const count = bytes[1]!;
+    if (count > REACTIONS_MAX) return null;
+    const out: string[] = [];
+    let at = 2;
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    try {
+        for (let n = 0; n < count; n += 1) {
+            const length = bytes[at]!;
+            if (length === 0 || length > REACTION_MAX_BYTES || at + 1 + length > bytes.length) return null;
+            out.push(decoder.decode(bytes.subarray(at + 1, at + 1 + length)));
+            at += 1 + length;
+        }
+    } catch {
+        return null;
+    }
+    // The padding is zeros: anything else is not a set this code sealed.
+    for (; at < bytes.length; at += 1) if (bytes[at] !== 0) return null;
+    return new Set(out).size === out.length ? out : null;
+}
+
+/** Seal a reaction set's plaintext (`encodeReactions`) under `HK`. */
+export async function sealReactions(historyKey: Uint8Array, binding: ReactionsBinding, plaintext: Uint8Array): Promise<Uint8Array> {
+    const info = reactionsInfo(binding);
+    const [key, iv] = await keyAndNonce(historyKey, info);
+    const version = Uint8Array.of(MESSAGE_CONTENT_VERSION);
+    const sealed = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: owned(concat(version, info)) }, key, owned(plaintext));
+    return concat(version, new Uint8Array(sealed));
+}
+
+/** Open a reaction set sealed by `sealReactions`; one coarse error for every failure. */
+export async function openReactions(historyKey: Uint8Array, binding: ReactionsBinding, sealed: Uint8Array): Promise<Uint8Array> {
+    if (sealed.length !== SEALED_REACTIONS_BYTES || sealed[0] !== MESSAGE_CONTENT_VERSION) throw new MessageOpenError();
+    try {
+        const info = reactionsInfo(binding);
+        const [key, iv] = await keyAndNonce(historyKey, info);
+        const opened = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv, additionalData: owned(concat(sealed.subarray(0, 1), info)) },
+            key,
+            owned(sealed.subarray(1))
+        );
+        return new Uint8Array(opened);
+    } catch {
+        throw new MessageOpenError();
+    }
+}
+
 /** Open a ballot sealed by `sealBallot`; one coarse error for every failure. */
 export async function openBallot(historyKey: Uint8Array, binding: BallotBinding, sealed: Uint8Array): Promise<Uint8Array> {
     if (sealed.length < 1 + TAG_BYTES || sealed[0] !== MESSAGE_CONTENT_VERSION) throw new MessageOpenError();

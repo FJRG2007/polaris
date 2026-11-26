@@ -651,6 +651,35 @@ export class MlsDevice {
         return { ballotId, epoch: epoch.toString(), sealed: toText(sealed) };
     }
 
+    /**
+     * Seal this account's whole set of reactions on a message under the
+     * group's current history key, the group brought up to date first as for
+     * a send. Answers what the server stores.
+     */
+    async sealReactions(channelId: string, messageId: string, reactor: string, emoji: readonly string[]): Promise<{ setId: string; epoch: string; sealed: string }> {
+        this.requireGroup(channelId);
+        await this.pull(channelId);
+        await this.reconcile(channelId);
+        const epoch = this.member.epoch(this.requireGroup(channelId));
+        const key = await this.historyKey(channelId, epoch);
+        // Never reacted in the clear instead: the caller shows the reaction as not taken.
+        if (!key) throw new Error("this device holds no history key for the conversation's current epoch");
+        const setId = crypto.randomUUID();
+        const binding = { conversationId: channelId, epoch, messageId, setId, reactor };
+        const sealed = await content.sealReactions(key, binding, content.encodeReactions(emoji));
+        return { setId, epoch: epoch.toString(), sealed: toText(sealed) };
+    }
+
+    /** The emoji of a stored set, or null for one that does not open here (bound to its row's person and message). */
+    async openReactions(channelId: string, row: { messageId: string; userId: string; setId: string; epoch: string; sealed: string }): Promise<string[] | null> {
+        const epoch = BigInt(row.epoch);
+        const key = await this.historyKey(channelId, epoch).catch(() => null);
+        if (!key) return null;
+        const binding = { conversationId: channelId, epoch, messageId: row.messageId, setId: row.setId, reactor: row.userId };
+        const opened = await content.openReactions(key, binding, fromText(row.sealed)).catch(() => null);
+        return opened ? content.decodeReactions(opened) : null;
+    }
+
     /** The picks of a stored ballot, or null for one that does not open here. */
     async openBallot(channelId: string, pollId: string, voter: string | null, row: { ballotId: string; epoch: string; sealed: string }): Promise<number[] | null> {
         const epoch = BigInt(row.epoch);

@@ -21,7 +21,7 @@ import {
     type ChatGroupInviteCard
 } from "./invite-cards";
 import { prisma, Prisma } from "@polaris/db";
-import { conversationSealed } from "@/lib/chat/e2ee/sealed-conversation";
+import { conversationSealed, sealedConversations } from "@/lib/chat/e2ee/sealed-conversation";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
 import { rulesForChannel } from "./rules";
@@ -161,6 +161,12 @@ export interface ChatMessageView {
     /** Whether its author lets it be kept. Absent means yes. */
     readonly keepable?: boolean;
     readonly reactions: readonly ChatReactionView[];
+    /**
+     * Reacted to with sealed sets (a sealed conversation): `reactions` counts
+     * only what was put on in the clear before, and the browser adds the sets
+     * it opens (`sealed-reactions.ts`).
+     */
+    readonly sealedReactions?: boolean;
     readonly attachments: readonly ChatAttachmentView[];
     /**
      * The question under this message, when it is a poll.
@@ -1660,6 +1666,9 @@ export async function react(actor: ChatActor, input: core.ChatReactInput): Promi
         select: { channelId: true, audience: true }
     });
     if (!message || isEphemeral(message.audience)) throw new ChatAccessError({ key: "errors.messageGone" });
+    // A sealed conversation takes sealed reaction sets only (`sealed-reactions.ts`):
+    // an emoji in the clear would tell the server what the set keeps from it.
+    if (await conversationSealed(message.channelId)) throw new ChatRuleError({ key: "errors.sealedOnlyReload" });
     const access = await requirePostable(actor, message.channelId, { reacting: true });
     await history.requireReadable(actor, message.channelId, input.messageId);
 
@@ -2607,6 +2616,9 @@ export async function decorateMessages(
         .filter((row) => row.deletedAt === null && row.body.includes("://"))
         .map((row) => row.id);
 
+    // In a sealed conversation the reactions are sealed sets the reader's browser opens and adds in.
+    const sealedChannels = await sealedConversations(rows.map((row) => row.channelId));
+
     const [authors, reactions, files, stars, quoted, previews, polls, flags, places] = await Promise.all([
         authorIds.length || noticeIds.length
             ? prisma.user.findMany({
@@ -2903,6 +2915,7 @@ export async function decorateMessages(
                     (left, right) =>
                         right.count - left.count || left.emoji.localeCompare(right.emoji)
                 ),
+            ...(sealedChannels.has(row.channelId) ? { sealedReactions: true } : {}),
             attachments: onMessageFiles.get(row.id) ?? [],
             poll: polls.get(row.id) ?? null,
             location: places.get(row.id) ?? null,

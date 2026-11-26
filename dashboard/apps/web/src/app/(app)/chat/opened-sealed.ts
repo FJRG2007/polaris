@@ -16,6 +16,7 @@ import * as sealedFiles from "@/lib/chat/e2ee/sealed-files";
 import { isInlineImage } from "@/lib/mime";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { sealedStill, stillTried, takeSealedStill, wantsStill } from "./sealed-stills";
+import * as sealedReactions from "./sealed-reactions";
 
 /** As much of an opened body as a list row shows (as `last-messages.ts` cuts a plain one). */
 const PREVIEW_CHARS = 160;
@@ -181,8 +182,35 @@ export function useOpenedSealed(
             live = false;
         };
     }, [messages, version]);
+    // The sealed reaction sets on these messages, read and opened again whenever the rows change
+    // (a reaction anywhere publishes a change that brings new rows), at most a page of messages per read.
+    useEffect(() => {
+        if (!sealedChat.sealedChatActive()) return;
+        sealedReactions.noteSealedReactions(messages);
+        const wanted = new Map<string, string[]>();
+        for (const message of messages)
+            if (message.sealedReactions) wanted.set(message.channelId, [...(wanted.get(message.channelId) ?? []), message.id]);
+        if (!wanted.size) return;
+        let live = true;
+        for (const [channelId, ids] of wanted)
+            for (let at = 0; at < ids.length; at += 100)
+                sealedReactions
+                    .loadSealedReactions(channelId, ids.slice(at, at + 100))
+                    .then(() => {
+                        if (live) setVersion((current) => current + 1);
+                    })
+                    .catch((caught: unknown) => console.warn("polaris: sealed reactions could not be opened here:", caught));
+        return () => {
+            live = false;
+        };
+    }, [messages]);
     // `version` is what says the cache moved.
-    return useMemo(() => withOpened(messages, sealedChat.openedContent), [messages, version]);
+    return useMemo(() => {
+        const shown = withOpened(messages, sealedChat.openedContent);
+        const counted = shown.map(sealedReactions.withOpenedReactions);
+        // The same list back when no row took sealed reactions, as `withOpened` does.
+        return counted.every((message, at) => message === shown[at]) ? shown : counted;
+    }, [messages, version]);
 }
 
 /** The same for a list whose entries each hold one message (pins, search hits). */

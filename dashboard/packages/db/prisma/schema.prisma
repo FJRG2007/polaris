@@ -401,6 +401,7 @@ model User {
     chatLock               ChatLock?
     chatPollVotes        ChatPollVote[]
     chatPollBallots      ChatPollBallot[]
+    chatSealedReactions  ChatSealedReaction[]
     contactNamesGiven    ContactName[]       @relation("ContactNamesGiven")
     contactNamesReceived ContactName[]       @relation("ContactNamesReceived")
     chatReportsMade     ChatReport[]         @relation("ChatReportsMade")
@@ -11271,6 +11272,7 @@ model ChatMessage {
     replyTo     ChatMessage?     @relation("ChatQuote", fields: [replyToId], references: [id], onDelete: SetNull)
     quotedBy    ChatMessage[]    @relation("ChatQuote")
     reactions   ChatReaction[]
+    sealedReactions ChatSealedReaction[]
     attachments ChatAttachment[]
     poll        ChatPoll?
     location    ChatLocation?
@@ -11626,6 +11628,27 @@ model ChatReaction {
 
     @@unique([messageId, userId, emoji])
     @@index([messageId])
+}
+
+// The reactions one person has on one message of a sealed conversation
+// (docs/chat-e2ee-mls.md, "Sealed reactions"): the set of emoji is sealed in
+// their browser under the conversation's history key, so the server keeps one
+// opaque row per person and message and never which emoji; each member's
+// browser opens the rows and counts them. Sealed again whole on every change.
+model ChatSealedReaction {
+    messageId String   @db.Uuid
+    userId    String   @db.Uuid
+    setId     String   @db.Uuid
+    // The MLS epoch whose history key sealed it.
+    epoch     BigInt
+    sealed    Bytes
+    updatedAt DateTime @default(now()) @updatedAt
+
+    message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+    user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([messageId, userId])
+    @@index([userId])
 }
 
 // A question asked in a conversation, and the answers under it.

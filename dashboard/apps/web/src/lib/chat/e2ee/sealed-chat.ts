@@ -386,6 +386,31 @@ export async function removeSealedAccounts(channelId: string, userIds: readonly 
     await mls.removeAccounts(channelId, [...userIds]);
 }
 
+/** A stored sealed reaction set as the server hands it out (`sealed-reactions.ts`). */
+export interface StoredReactions {
+    readonly messageId: string;
+    readonly userId: string;
+    readonly setId: string;
+    readonly epoch: string;
+    readonly sealed: string;
+}
+
+/** Seal this account's whole set of reactions on a message of a sealed conversation. */
+export async function sealReactions(channelId: string, messageId: string, emoji: readonly string[]): Promise<{ setId: string; epoch: string; sealed: string }> {
+    const mls = await device();
+    await mls.ensureGroup(channelId);
+    // Bound to the account it is for; a page that does not know who it is reacts nowhere.
+    if (!viewer) throw new Error("sealed chat has not been started for an account");
+    return mls.sealReactions(channelId, messageId, viewer, emoji);
+}
+
+/** The emoji of each of these sets, in order; null for one that does not open here. */
+export async function openReactions(channelId: string, rows: readonly StoredReactions[]): Promise<(string[] | null)[]> {
+    if (!rows.length) return [];
+    const mls = await device();
+    return Promise.all(rows.map((row) => mls.openReactions(channelId, row)));
+}
+
 /** A stored sealed ballot as the server hands it out (`poll-ballots.ts`). */
 export interface StoredBallot {
     readonly ballotId: string;

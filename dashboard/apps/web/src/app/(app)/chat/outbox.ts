@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { sendAction } from "@/lib/poll-fetch";
 import { actionFailureText, runAction } from "@/lib/run-action";
 import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
+import * as sealedReactions from "./sealed-reactions";
 import { chatStore } from "@/lib/chat/offline/chat-cache";
 import { isNetworkFailure, noteRequestFailure } from "@/lib/reachability";
 import { newClientKey, type QueueSendResult } from "@/lib/offline/outbox";
@@ -260,6 +261,11 @@ async function sendChange(change: ChangeRequest): Promise<ChangeAnswer | { refus
         return result.error ? { refused: result.error } : {};
     }
     if (change.op === "react") {
+        // A sealed conversation's reactions go as this person's sealed set, never in the clear.
+        if (sealedReactions.takesSealed(change.messageId)) {
+            const sealed = await sealedReactions.sendSealedReaction(change.channelId, change.messageId, change.emoji, change.on);
+            return sealed.error ? { refused: sealed.error } : { on: sealed.on ?? change.on };
+        }
         const result = await actions.reactAction({ messageId: change.messageId, emoji: change.emoji, on: change.on });
         return result.error ? { refused: result.error } : { on: result.on ?? change.on };
     }
