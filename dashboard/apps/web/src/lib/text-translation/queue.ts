@@ -18,7 +18,21 @@ import { planBatches, sameLanguage, TranslationCache, unchanged } from "./logic"
 export type TranslationOutcome =
     | { readonly kind: "translated"; readonly text: string; readonly detected: string | null }
     | { readonly kind: "same" }
-    | { readonly kind: "failed"; readonly message: string | null };
+    | {
+          readonly kind: "failed";
+          readonly message: string | null;
+          /** Asked to stay on this device (an end-to-end encrypted message) and no engine here could translate it. */
+          readonly onDevice?: true;
+      };
+
+/** How one text may be translated. */
+export interface TranslateOptions {
+    /**
+     * Only by an engine on this device: the words of an end-to-end encrypted
+     * message never go to the server to be translated.
+     */
+    readonly deviceOnly?: boolean;
+}
 
 /** How long a request waits for others to leave with it. */
 export const GATHER_MS = 150;
@@ -29,6 +43,7 @@ const DETECT_MIN = 24;
 interface Waiting {
     readonly text: string;
     readonly to: string;
+    readonly deviceOnly: boolean;
     readonly settle: Array<(outcome: TranslationOutcome) => void>;
 }
 
@@ -139,19 +154,20 @@ export class TranslationQueue {
     ) {}
 
     /** One text into `to`, answered from the cache or with the next batch. */
-    translate(text: string, to: string): Promise<TranslationOutcome> {
+    translate(text: string, to: string, options: TranslateOptions = {}): Promise<TranslationOutcome> {
+        const deviceOnly = options.deviceOnly === true;
         const words = text.trim();
         if (!words) return Promise.resolve({ kind: "same" });
         const kept = this.cache.get(to, words);
         if (kept) return Promise.resolve(kept);
         return new Promise((settle) => {
-            const key = `${to}\u0000${words}`;
+            const key = `${deviceOnly ? "device" : "any"}\u0000${to}\u0000${words}`;
             const already = this.waiting.get(key);
             if (already) {
                 already.settle.push(settle);
                 return;
             }
-            this.waiting.set(key, { text: words, to, settle: [settle] });
+            this.waiting.set(key, { text: words, to, deviceOnly, settle: [settle] });
             this.timer ??= setTimeout(() => void this.flush(), this.gatherMs);
         });
     }
@@ -203,9 +219,11 @@ export class TranslationQueue {
                 this.finish(item, { kind: "same" });
                 continue;
             }
-            byTarget.set(item.to, [...(byTarget.get(item.to) ?? []), item]);
+            const target = `${item.deviceOnly ? "device" : "any"}\u0000${item.to}`;
+            byTarget.set(target, [...(byTarget.get(target) ?? []), item]);
         }
-        for (const [to, group] of byTarget) {
+        for (const group of byTarget.values()) {
+            const { to, deviceOnly } = group[0]!;
             const { batches, tooLong } = planBatches(
                 group.map((item) => item.text),
                 status.charLimit
@@ -215,7 +233,8 @@ export class TranslationQueue {
                 await this.send(
                     status,
                     to,
-                    batch.map((at) => group[at]!)
+                    batch.map((at) => group[at]!),
+                    deviceOnly
                 );
         }
     }
@@ -227,8 +246,18 @@ export class TranslationQueue {
      * engine switched off or without a key does not count; last when the order
      * names none), and its failure is the one shown when nothing after it answers.
      */
-    private async send(status: Status, to: string, batch: readonly Waiting[]): Promise<void> {
+    private async send(status: Status, to: string, batch: readonly Waiting[], deviceOnly = false): Promise<void> {
         const texts = batch.map((item) => item.text);
+        if (deviceOnly) {
+            // The administrator's order first, then any device engine it does not name; never the server.
+            const devices = [...status.order.filter(isDevice), ...DEVICE_IDS.filter((id) => !status.order.includes(id))];
+            for (const id of devices) {
+                const answer = status[id] ? await this.askDevice(id, texts, to) : null;
+                if (answer?.ok) return this.settle(batch, to, answer.texts, answer.detected);
+            }
+            for (const item of batch) this.finish(item, { kind: "failed", message: null, onDevice: true });
+            return;
+        }
         const usable = status.engines;
         const serverAt = status.order.findIndex((id) =>
             usable === null ? !isDevice(id) : usable.includes(id)

@@ -1085,7 +1085,7 @@ const Message = memo(function Message({
     );
     const bodyText = (
         <div className={cn("text-sm", captionBelow && "mt-1")}>
-            <TranslatableText id={message.id} body={message.body} live={live}>
+            <TranslatableText id={message.id} body={message.body} live={live} sealed={message.sealed === true}>
                 <RichText
                     value={message.body}
                     origin={baseUrl}

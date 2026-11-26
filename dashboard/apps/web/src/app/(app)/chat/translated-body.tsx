@@ -35,11 +35,14 @@ export function TranslatableText({
     id,
     body,
     live,
+    sealed = false,
     children
 }: {
     id: string;
     body: string;
     live: boolean;
+    /** End-to-end encrypted: translated on this device only, never by the server. */
+    sealed?: boolean;
     children: ReactNode;
 }) {
     const translator = useTextTranslator();
@@ -58,13 +61,13 @@ export function TranslatableText({
                 body,
                 plainText(body),
                 translator.target,
-                translator.translate,
+                (text, to) => translator.translate(text, to, { deviceOnly: sealed }),
                 "live"
             );
         });
         watcher.observe(node);
         return () => watcher.disconnect();
-    }, [live, translator, id, body]);
+    }, [live, translator, id, body, sealed]);
 
     const outcome = entry?.state.phase === "done" ? entry.state.outcome : null;
     return (
@@ -107,7 +110,11 @@ export function TranslationNote({
     if (entry?.state.phase === "working") {
         line = <span className="animate-pulse">{t("translation.working")}</span>;
     } else if (outcome?.kind === "failed") {
-        line = <span title={outcome.message ?? undefined}>{t("translation.failed")}</span>;
+        line = outcome.onDevice ? (
+            <span>{t("translation.sealedOnDevice")}</span>
+        ) : (
+            <span title={outcome.message ?? undefined}>{t("translation.failed")}</span>
+        );
     } else if (outcome?.kind === "same" && entry?.asked) {
         line = <span>{t("translation.alreadyIn")}</span>;
     } else if (outcome?.kind === "translated") {
@@ -172,7 +179,7 @@ export function TranslationNote({
  * "Show original".
  */
 export function useTranslateToggle(
-    message: Pick<ChatMessageView, "id" | "body" | "kind" | "deleted">
+    message: Pick<ChatMessageView, "id" | "body" | "kind" | "deleted"> & { readonly sealed?: boolean }
 ): { readonly showing: boolean; readonly run: () => void } | null {
     const translator = useTextTranslator();
     const entry = useMessageTranslation(message.id, message.body);
@@ -189,7 +196,8 @@ export function useTranslateToggle(
                       message.body,
                       plainText(message.body),
                       translator.preferred,
-                      translator.translate,
+                      // An end-to-end encrypted message is translated here or not at all.
+                      (text, to) => translator.translate(text, to, { deviceOnly: message.sealed === true }),
                       "menu"
                   )
     };
@@ -199,7 +207,7 @@ export function useTranslateToggle(
 export function TranslateButton({
     message
 }: {
-    message: Pick<ChatMessageView, "id" | "body" | "kind" | "deleted">;
+    message: Pick<ChatMessageView, "id" | "body" | "kind" | "deleted"> & { readonly sealed?: boolean };
 }) {
     const t = useTranslations("chat");
     const toggle = useTranslateToggle(message);

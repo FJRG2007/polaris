@@ -24,6 +24,7 @@ import {
     TranslationQueue,
     type DeviceEngines,
     type LoadDevices,
+    type TranslateOptions,
     type TranslationOutcome
 } from "@/lib/text-translation/queue";
 
@@ -51,7 +52,8 @@ export interface TextTranslator {
     readonly preferred: string;
     /** Remembers a language the reader picked, so the next translation starts in it. */
     readonly choose: (to: string) => void;
-    readonly translate: (text: string, to: string) => Promise<TranslationOutcome>;
+    /** `deviceOnly` for the words of an end-to-end encrypted message: never sent to the server. */
+    readonly translate: (text: string, to: string, options?: TranslateOptions) => Promise<TranslationOutcome>;
     /** The app's own screen, with this text and target carried along. */
     readonly openHref: (text: string, to: string) => string;
 }
@@ -118,7 +120,7 @@ export function TextTranslationProvider({
             target: localeLanguage(locale),
             preferred: last ?? localeLanguage(locale),
             choose,
-            translate: (text, to) => queue.translate(text, to),
+            translate: (text, to, options) => queue.translate(text, to, options),
             openHref: (text, to) => {
                 const query = new URLSearchParams({ text: text.slice(0, OPEN_TEXT_MAX), to });
                 return `${offer.page}?${query.toString()}`;
