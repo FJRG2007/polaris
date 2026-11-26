@@ -6,14 +6,14 @@
  * system is a stand-in; nothing real is read or started.
  */
 
-import { win32 } from "node:path";
+import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { topMatches } from "@/shared/launcher";
 import * as programs from "../../src/main/launcher-programs";
 import { parseRegQuery } from "../../src/main/launcher-stores";
 
-const fixture = (name: string) => parseRegQuery(readFileSync(win32.join(__dirname, "..", "fixtures", "launcher", name), "utf8"));
+const fixture = (name: string) => parseRegQuery(readFileSync(join(__dirname, "..", "fixtures", "launcher", name), "utf8"));
 const present = new Set([
     "D:\\Fixture Games\\Rockstar Games\\Grand Theft Auto V\\PlayGTAV.exe",
     "D:\\Fixture Games\\Rockstar Games\\Launcher\\Launcher.exe",
