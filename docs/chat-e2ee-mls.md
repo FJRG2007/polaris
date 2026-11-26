@@ -670,7 +670,7 @@ every consistency pair) and the RFC test vectors.
   server keeps only the leaves and the hashes of complete subtrees, which never
   change once written, so a root or proof is one indexed read.
 - **The server** (`lib/chat/e2ee/key-log.ts`, migration
-  `20281209000000_chat_key_log`, additive): `ChatKeyLogEntry` and
+  `20281212000000_chat_key_log`, additive): `ChatKeyLogEntry` and
   `ChatKeyLogNode`. An append takes `pg_try_advisory_xact_lock` in its
   transaction, so two appends never take one index; a busy lock ends the
   transaction at once and is retried with a jittered backoff (6 tries, about
