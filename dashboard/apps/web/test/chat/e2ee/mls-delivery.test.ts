@@ -680,6 +680,110 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         }
     });
 
+    it("fills a joiner's blank path with one commit of its own, once, and the group reads on", async () => {
+        const filling = (userId: string, device: string) => {
+            const notes = new Map<string, string>();
+            return MlsDevice.open({
+                userId,
+                device,
+                MlsMember,
+                store: new MemoryStore(),
+                transport: through(userId),
+                fill: { minMembers: 2, spreadMs: 0 },
+                notes: { getItem: (k) => notes.get(k) ?? null, setItem: (k, v) => void notes.set(k, v) }
+            });
+        };
+        const alice = await filling(ALICE, "alice-laptop");
+        const bob = await filling(BOB, "bob-phone-1");
+        const carol = await filling(CAROL, "carol-desk-1");
+        const dave = await filling(DAVE, "dave-desk-1");
+        for (const device of [alice, bob, carol, dave]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB, CAROL, DAVE]);
+        const commitsBy = (address: string) => state.tables.mlsGroupEvent!.filter((e) => e.kind === "commit" && e.sender === address).length;
+
+        // Leaves 0-3: Bob shares every ancestor with Alice, whose add commit
+        // carried her path; Carol's parent with Dave is blank.
+        await bob.sync(CHANNEL);
+        expect(commitsBy(bob.address)).toBe(0);
+        await carol.sync(CHANNEL);
+        expect(commitsBy(carol.address)).toBe(1);
+        // Filled: her next sync commits nothing, and Dave, under the node she filled, has nothing left blank.
+        await carol.sync(CHANNEL);
+        await dave.sync(CHANNEL);
+        expect(commitsBy(carol.address)).toBe(1);
+        expect(commitsBy(dave.address)).toBe(0);
+
+        for (const device of [alice, bob]) await device.sync(CHANNEL);
+        await say(carol, "after filling");
+        expect(await heard(alice)).toEqual(["carol-desk-1: after filling"]);
+        expect(await heard(dave)).toEqual(["carol-desk-1: after filling"]);
+    });
+
+    it("splits a removal the route would refuse, and holds the send for later when one leaf is still too large", async () => {
+        const crowd = Array.from({ length: 3 }, (_, i) => `88888888-8888-4888-8888-${String(i).padStart(12, "0")}`);
+        // The Node member, refusing removals of more than `most` leaves as the Rust one does past 1 MiB.
+        const limit = { most: 1 };
+        const tooLarge = () => Object.assign(new Error("MlsCommitTooLarge: past the limit"), { code: "MlsCommitTooLarge" });
+        const wrap = (member: ReturnType<MlsMemberClass["restore"]>) =>
+            new Proxy(member, {
+                get(target, key) {
+                    if (key === "removeMembers")
+                        return (groupId: Uint8Array, leaves: number[]) => {
+                            if (leaves.length > limit.most) throw tooLarge();
+                            return target.removeMembers(groupId, leaves);
+                        };
+                    const value = Reflect.get(target, key, target) as unknown;
+                    return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+                }
+            });
+        const Limited = Object.assign(
+            function (identity: Uint8Array, suite: number, seed: Uint8Array) {
+                return wrap(new MlsMember(identity, suite, seed));
+            },
+            { restore: (...args: Parameters<MlsMemberClass["restore"]>) => wrap(MlsMember.restore(...args)) }
+        ) as unknown as MlsMemberClass;
+        const commits: number[] = [];
+        const counted: MlsTransport = async (body) => {
+            if (body.op === "commit") commits.push(1);
+            return through(ALICE)(body);
+        };
+        const notes = new Map<string, string>();
+        const alice = await MlsDevice.open({
+            userId: ALICE,
+            device: "alice-laptop",
+            MlsMember: Limited,
+            store: new MemoryStore(),
+            transport: counted,
+            notes: { getItem: (k) => notes.get(k) ?? null, setItem: (k, v) => void notes.set(k, v) }
+        });
+        const others = await Promise.all(crowd.map((id, i) => open(id, `split-device-${i}`)));
+        for (const device of [alice, ...others]) await device.register();
+        for (const id of crowd) state.members.add(`${id}:${CHANNEL}`);
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, crowd);
+
+        // Two leave: the batch of two is refused and goes as two commits of one.
+        for (const id of crowd.slice(0, 2)) state.members.delete(`${id}:${CHANNEL}`);
+        commits.length = 0;
+        await alice.sendSealed(CHANNEL, new TextEncoder().encode("after two left"));
+        expect(commits).toHaveLength(2);
+
+        // The last one cannot go even alone: the send fails as not delivered yet, never sealed past the removal.
+        limit.most = 0;
+        state.members.delete(`${crowd[2]}:${CHANNEL}`);
+        commits.length = 0;
+        const failed = await alice.sendSealed(CHANNEL, new TextEncoder().encode("still there")).catch((caught: unknown) => caught);
+        expect(failed).toBeInstanceOf(MlsRequestError);
+        expect(failed).toMatchObject({ status: 503, reason: "commitTooLarge" });
+        expect(commits).toHaveLength(0);
+
+        // Once it fits (the tree filled), the same send goes.
+        limit.most = 1;
+        await alice.sendSealed(CHANNEL, new TextEncoder().encode("now it goes"));
+        expect(commits).toHaveLength(1);
+    });
+
     it("before sealing, takes out the devices of who left and adds the people who joined", async () => {
         const alice = await open(ALICE, "alice-laptop");
         const bob = await open(BOB, "bob-phone-1");

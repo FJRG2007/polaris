@@ -82,6 +82,25 @@ const ADD_BATCH = 100;
  * them before anything is sealed.
  */
 const REMOVE_BATCH = 100;
+/**
+ * Members from which a device fills its own path. A group built by one
+ * device's adds has every parent node blank but that device's path, and a
+ * blank node is encrypted to through every leaf under it (RFC 9420, 4.2), so
+ * each commit grows by one HPKE ciphertext (~1.2 KB with the hybrid suite)
+ * per member and passes the route's 1 MiB at some 880 members. One commit of
+ * a joiner's own path fills its ancestors (RFC 9750, 5.1: update leaf keys as
+ * early as possible). Below this the blanks cost a few KB and nobody commits
+ * for them.
+ */
+const FILL_MIN_MEMBERS = 32;
+/**
+ * Longest a device waits before that commit, spread at random (at most 100 ms
+ * per member) so the hundred joiners of one add batch do not all race for
+ * the same epoch.
+ */
+const FILL_SPREAD_MS = 2 * 60 * 1000;
+/** Least time between two tries of one conversation's fill: a lost race or a commit still too large. */
+const FILL_RETRY_MS = 60 * 1000;
 const ACCOUNT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** `${userId}/${device}`, as the delivery service addresses a device. */
 const DEVICE_ADDRESS = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[A-Za-z0-9_-]{8,64}$/;
@@ -114,7 +133,11 @@ export interface MlsMemberLike {
     keyPackage(): Uint8Array;
     createGroup(groupId: Uint8Array): void;
     addMembers(groupId: Uint8Array, keyPackages: Uint8Array[]): MlsCommitOut;
+    /** Past the route's 1 MiB a removal throws `MlsCommitTooLarge` (nothing staged); an add drops its optional path first. */
     removeMembers(groupId: Uint8Array, leaves: number[]): MlsCommitOut;
+    selfUpdate(groupId: Uint8Array): MlsCommitOut;
+    /** Blank nodes on this member's path; above zero, its `selfUpdate` fills them. */
+    blankPath(groupId: Uint8Array): number;
     forgetGroup(groupId: Uint8Array): void;
     members(groupId: Uint8Array): { leaf: number; identity: Uint8Array }[];
     ownLeaf(groupId: Uint8Array): number;
@@ -287,6 +310,8 @@ export interface MlsDeviceOptions {
     historyKeys?: MlsHistoryKeyStore;
     /** Changes per commit (`ADD_BATCH`, `REMOVE_BATCH` unless given): tests use small ones. */
     batch?: { add?: number; remove?: number };
+    /** When a device fills its path (`FILL_MIN_MEMBERS`, `FILL_SPREAD_MS` unless given): tests use small groups and no wait. */
+    fill?: { minMembers?: number; spreadMs?: number };
     /**
      * The key log's word on account keys the server handed out (design 4.6,
      * `vouchedAccounts` in `key-log-client.ts`): which of them it vouches for,
@@ -309,6 +334,8 @@ export class MlsDevice {
     private readonly historyKeys = new Map<string, Uint8Array>();
     /** When this run last passed each conversation's migrated history on, by channel. */
     private readonly legacyShared = new Map<string, number>();
+    /** When this run next tries to fill its path in each conversation, by channel. */
+    private readonly fillDue = new Map<string, number>();
 
     private constructor(
         private readonly options: MlsDeviceOptions,
@@ -534,12 +561,14 @@ export class MlsDevice {
      * `REMOVE_BATCH` per commit, until none is left. Returns them all.
      * Leaves that keep coming back (rejoining as fast as they go) fail the
      * caller once the commits it should have taken are spent, rather than
-     * stopping with one of them still in the group.
+     * stopping with one of them still in the group. A batch too large for the
+     * route is split (`removeBatch`), so the budget is one commit per leaf at
+     * worst: every commit takes at least one out.
      */
     private async removeLeaves(channelId: string, pick: (identity: string) => boolean): Promise<string[]> {
         const own = this.member.ownLeaf(this.requireGroup(channelId));
         const picked = this.member.members(this.requireGroup(channelId)).filter((m) => m.leaf !== own && pick(decoder.decode(m.identity))).length;
-        const commits = Math.ceil(picked / (this.options.batch?.remove ?? REMOVE_BATCH)) + COMMIT_ATTEMPTS;
+        const commits = picked + COMMIT_ATTEMPTS;
         const removed = new Set<string>();
         for (let round = 0; round < commits; round++) {
             const batch = await this.removeBatch(channelId, pick);
@@ -551,19 +580,33 @@ export class MlsDevice {
 
     /**
      * Commit the removal of up to one batch of the leaves `pick` selects,
-     * catching up and choosing again when another commit wins the epoch.
+     * catching up and choosing again when another commit wins the epoch. A
+     * commit past the route's limit (`MlsCommitTooLarge`, a sparse tree) is
+     * built again with half the leaves; one leaf still too large fails the
+     * send as not delivered yet (`commitTooLarge`, 503: the outbox tries it
+     * again), since the members filling their paths (`fillPath`) shrink it.
      */
     private async removeBatch(channelId: string, pick: (identity: string) => boolean): Promise<string[]> {
         for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt++) {
             const groupId = this.requireGroup(channelId);
             const own = this.member.ownLeaf(groupId);
-            const leaves = this.member.members(groupId).flatMap((m) => {
+            let leaves = this.member.members(groupId).flatMap((m) => {
                 const identity = decoder.decode(m.identity);
                 return m.leaf !== own && pick(identity) ? [{ leaf: m.leaf, identity }] : [];
             }).slice(0, this.options.batch?.remove ?? REMOVE_BATCH);
             if (!leaves.length) return [];
             const epoch = this.member.epoch(groupId);
-            const out = this.member.removeMembers(groupId, leaves.map((l) => l.leaf));
+            let out: MlsCommitOut;
+            for (;;) {
+                try {
+                    out = this.member.removeMembers(groupId, leaves.map((l) => l.leaf));
+                    break;
+                } catch (caught) {
+                    if ((caught as { code?: unknown } | null)?.code !== "MlsCommitTooLarge") throw caught;
+                    if (leaves.length === 1) throw new MlsRequestError(503, "commitTooLarge");
+                    leaves = leaves.slice(0, Math.ceil(leaves.length / 2));
+                }
+            }
             if (!out.groupInfo) throw new Error("an MLS remove commit came back without its GroupInfo");
             const body: CommitBody = {
                 op: "commit",
@@ -915,9 +958,67 @@ export class MlsDevice {
     /** Read the group's log from where this device left off; returns the application messages, in order. */
     async sync(channelId: string): Promise<MlsApplication[]> {
         await this.pull(channelId);
+        await this.fillPath(channelId).catch((caught: unknown) => {
+            console.warn("polaris: this device could not fill its path in a large sealed conversation:", caught);
+        });
         const mine = this.inbox.filter((m) => m.channelId === channelId);
         this.inbox.splice(0, this.inbox.length, ...this.inbox.filter((m) => m.channelId !== channelId));
         return mine;
+    }
+
+    /**
+     * Commit this device's own path once its ancestors in a large group are
+     * blank (`blankPath`): a joiner by Welcome, or any member of a group built
+     * before this existed, so every later commit encrypts to a few nodes
+     * instead of to every leaf under a blank (see `FILL_MIN_MEMBERS`). The
+     * first look schedules it a random while ahead (`FILL_SPREAD_MS`); a sync
+     * after that commits, at most once per `FILL_RETRY_MS`. A lost epoch race
+     * drops the commit; one past the route's limit (`MlsCommitTooLarge`: the
+     * tree is still sparse around it) waits for others' fills to shrink it.
+     * Returns whether it committed. Only a device that is open fills: an
+     * offline member costs a commit one ciphertext per blank it leaves, which
+     * the members around it filling theirs keep to its own subtree.
+     */
+    async fillPath(channelId: string, now = Date.now()): Promise<boolean> {
+        const groupId = this.groupOf(channelId);
+        if (!groupId) return false;
+        const members = this.member.members(groupId).length;
+        if (members < (this.options.fill?.minMembers ?? FILL_MIN_MEMBERS) || this.member.blankPath(groupId) === 0) {
+            this.fillDue.delete(channelId);
+            return false;
+        }
+        let due = this.fillDue.get(channelId);
+        if (due === undefined) {
+            const spread = Math.min(this.options.fill?.spreadMs ?? FILL_SPREAD_MS, members * 100);
+            const [a = 0, b = 0, c = 0, d = 0] = (this.options.random ?? ((n) => crypto.getRandomValues(new Uint8Array(n))))(4);
+            due = now + Math.floor((((a << 24) | (b << 16) | (c << 8) | d) >>> 0) / 2 ** 32 * spread);
+            this.fillDue.set(channelId, due);
+        }
+        if (now < due) return false;
+        this.fillDue.set(channelId, now + FILL_RETRY_MS);
+        const epoch = this.member.epoch(groupId);
+        let out: MlsCommitOut;
+        try {
+            out = this.member.selfUpdate(groupId);
+        } catch (caught) {
+            if ((caught as { code?: unknown } | null)?.code === "MlsCommitTooLarge") return false;
+            throw caught;
+        }
+        if (!out.groupInfo) throw new Error("an MLS update commit came back without its GroupInfo");
+        const body: CommitBody = {
+            op: "commit",
+            channelId,
+            device: this.options.device,
+            epoch: epoch.toString(),
+            commit: toText(out.commit),
+            groupInfo: toText(out.groupInfo),
+            welcomes: [],
+            ...(out.ratchetTree ? { ratchetTree: toText(out.ratchetTree) } : {})
+        };
+        if (!(await this.settleCommit(body, groupId))) return false;
+        this.fillDue.delete(channelId);
+        await this.distributeHistoryKey(channelId, []);
+        return true;
     }
 
     private async pull(channelId: string): Promise<void> {

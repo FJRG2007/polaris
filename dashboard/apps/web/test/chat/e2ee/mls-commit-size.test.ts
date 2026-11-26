@@ -11,6 +11,8 @@
  * takes (`mlsBytes` in `lib/chat/e2ee/schemas.ts`), or when a Welcome or GroupInfo
  * is: past `INLINE_TREE_BYTES` both leave the ratchet tree out, and the tree
  * (reported as `tree`) goes up on its own in `TREE_PART_BYTES` parts.
+ * Every joiner fills its blank path as the device does (`fillPath`), and the
+ * run also fails when a fill, an add batch or a batch of removals is past it.
  */
 
 import { fileURLToPath } from "node:url";
@@ -36,6 +38,10 @@ const sizes = (process.env.POLARIS_MLS_MEASURE ?? "")
 const WIRE_LIMIT = 1024 * 1024;
 /** `ADD_BATCH` / `REMOVE_BATCH` in `mls-client.ts`. */
 const BATCH = 100;
+/** `FILL_MIN_MEMBERS` in `mls-client.ts`. */
+const FILL_MIN_MEMBERS = 32;
+/** `POLARIS_MLS_SPARSE=1` measures the group as it was before joiners filled their paths (fails past ~880 members). */
+const fillPaths = process.env.POLARIS_MLS_SPARSE !== "1";
 const encoder = new TextEncoder();
 
 describe.skipIf(!nativeFile || sizes.length === 0)("MLS handshake size with a full tree", () => {
@@ -54,13 +60,31 @@ describe.skipIf(!nativeFile || sizes.length === 0)("MLS handshake size with a fu
             const committer = member();
             committer.createGroup(groupId);
 
-            const others = Array.from({ length: size - 1 }, () => member().keyPackage());
-            const keyPackage = others[0]!.length;
+            let keyPackage = 0;
             let lastAdd = { commit: 0, welcome: 0, groupInfo: 0, tree: 0 };
-            for (let i = 0; i < others.length; i += BATCH) {
-                const out = committer.addMembers(groupId, others.slice(i, i + BATCH));
+            // What `fillPath` in mls-client.ts does on each joiner: one commit of its own path once
+            // its ancestors are blank. Each batch's joiners fill in turn before the next batch; the
+            // committer and the batchmates still waiting apply each fill, and a joiner that filled is
+            // dropped (nothing after it needs it), which keeps the run to one batch of trees in memory.
+            const fills: number[] = [];
+            for (let added = 1; added < size; added += BATCH) {
+                const joiners = Array.from({ length: Math.min(BATCH, size - added) }, () => member());
+                const packages = joiners.map((m) => m.keyPackage());
+                keyPackage = packages[0]!.length;
+                const out = committer.addMembers(groupId, packages);
                 committer.mergePendingCommit(groupId);
                 lastAdd = { commit: out.commit.length, welcome: out.welcome?.length ?? 0, groupInfo: out.groupInfo?.length ?? 0, tree: out.ratchetTree?.length ?? 0 };
+                if (fillPaths && committer.members(groupId).length >= FILL_MIN_MEMBERS) {
+                    for (const joiner of joiners) joiner.joinByWelcome(out.welcome!, out.ratchetTree ?? null);
+                    for (const [turn, joiner] of joiners.entries()) {
+                        if (joiner.blankPath(groupId) === 0) continue;
+                        const fill = joiner.selfUpdate(groupId);
+                        joiner.mergePendingCommit(groupId);
+                        fills.push(fill.commit.length);
+                        committer.process(groupId, fill.commit);
+                        for (const waiting of joiners.slice(turn + 1)) waiting.process(groupId, fill.commit);
+                    }
+                }
             }
             expect(committer.members(groupId)).toHaveLength(size);
             const groupInfo = committer.groupInfo(groupId).length;
@@ -98,15 +122,22 @@ describe.skipIf(!nativeFile || sizes.length === 0)("MLS handshake size with a fu
                 addOneCommit: addOne.commit.length,
                 addOneWelcome: addOne.welcome?.length ?? 0,
                 removeBatchCommit: removeBatch,
+                fillPaths,
+                fills: fills.length,
+                fillCommitMax: fills.length ? Math.max(...fills) : 0,
+                fillCommitLast: fills.at(-1) ?? 0,
                 wireLimit: WIRE_LIMIT
             };
             console.log(`mls-size ${JSON.stringify(line)}`);
+            for (const fill of fills) expect(fill).toBeLessThan(WIRE_LIMIT);
+            expect(line.removeBatchCommit).toBeLessThan(WIRE_LIMIT);
+            expect(line.addBatchCommit).toBeLessThan(WIRE_LIMIT);
             expect(line.removeOneCommit).toBeLessThan(WIRE_LIMIT);
             expect(line.addOneCommit).toBeLessThan(WIRE_LIMIT);
             expect(line.addOneWelcome).toBeLessThan(WIRE_LIMIT);
             expect(line.addBatchWelcome).toBeLessThan(WIRE_LIMIT);
             expect(line.groupInfoBare).toBeLessThan(WIRE_LIMIT);
             expect(line.treeParts).toBeLessThanOrEqual(MAX_TREE_PARTS);
-        }, 600_000);
+        }, Math.max(600_000, size * 1_200));
     }
 });
