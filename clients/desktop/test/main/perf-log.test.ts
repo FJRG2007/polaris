@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
-import { activeSummary, checkLoop, perfLine, PerfLog, perfValue, writePageReport, type DelayHistogram } from "@/main/perf-log";
+import { activeSummary, checkLoop, errorWords, perfLine, PerfLog, perfValue, scriptName, writePageReport, writeRendererError, type DelayHistogram } from "@/main/perf-log";
 
 let folder: string;
 beforeEach(() => void (folder = mkdtempSync(join(tmpdir(), "perf-log-"))));
@@ -139,5 +139,44 @@ describe("the page's report", () => {
         const log = recorder();
         expect(writePageReport(log, raw)).toBe(false);
         expect(log.lines).toHaveLength(0);
+    });
+});
+
+describe("a page's error", () => {
+    const at = (message: string, level = "error") => ({ level, message, lineNumber: 2, sourceId: "https://polaris.example.test/_next/static/chunks/app/layout-1a2b.js?v=3" });
+
+    it("keeps the error's kind, words, script and line", () => {
+        const log = recorder();
+        expect(writeRendererError(log, at("Uncaught TypeError: Cannot read properties of undefined (reading 'tab')"), "window")).toBe(true);
+        expect(log.lines).toEqual([
+            ["page-error", { type: "window", msg: "Cannot read properties of undefined (reading 'tab')", name: "TypeError", src: "layout-1a2b.js", line: 2 }]
+        ]);
+    });
+
+    it("writes nothing for the rest of the console", () => {
+        const log = recorder();
+        expect(writeRendererError(log, at("hello", "warning"), "window")).toBe(false);
+        expect(writeRendererError(log, at("hello", "info"), "window")).toBe(false);
+        expect(log.lines).toHaveLength(0);
+    });
+
+    it("takes out addresses, mail, quoted text and ids", () => {
+        const words = errorWords("Failed https://polaris.example.test/game-servers/abc for user@example.test 'a long quoted sentence' 1234567\nat stack");
+        expect(words).toBe("Failed <url> for <mail> <text> <n>");
+    });
+
+    it("names a script by its file alone", () => {
+        expect(scriptName("https://polaris.example.test/_next/static/chunks/main.js?x=1#y")).toBe("main.js");
+        expect(scriptName("")).toBe("");
+    });
+
+    it("stays a line of short tokens when written", async () => {
+        const file = join(folder, "perf.log");
+        const log = new PerfLog(file, { now: () => AT });
+        writeRendererError(log, at("Uncaught Error: Minified React error #130; visit https://react.dev/errors/130"), "window");
+        await log.write("end");
+        const line = readFileSync(file, "utf8").split("\n")[0];
+        expect(line).not.toContain("react.dev");
+        expect(line).toMatch(/^\S+ page-error type=window msg=\S+ name=Error src=layout-1a2b.js line=2$/);
     });
 });

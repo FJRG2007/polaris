@@ -188,3 +188,51 @@ export function writePageReport(log: Pick<PerfLog, "write">, raw: unknown): bool
     void log.write("page", fields);
     return true;
 }
+
+/** What a page's console message carries that a line may keep (Electron's `console-message`). */
+export interface ConsoleDetails {
+    readonly level: string;
+    readonly message: string;
+    readonly lineNumber: number;
+    readonly sourceId: string;
+}
+
+/**
+ * The words of an error with what could name somebody taken out first:
+ * addresses, mail addresses, quoted text and long numbers (ids). What stays is
+ * the framework's or the browser's own sentence, which is what names the bug.
+ */
+export function errorWords(message: string): string {
+    return message
+        .split("\n")[0]
+        .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, "<url>")
+        .replace(/\S+@\S+/g, "<mail>")
+        .replace(/(["'`])(?:(?!\1).){13,}\1/g, "<text>")
+        .replace(/\d{5,}/g, "<n>")
+        .trim();
+}
+
+/** A script's file name, without the address, folders or query around it. */
+export function scriptName(sourceId: string): string {
+    const path = sourceId.split(/[?#]/)[0];
+    return path.slice(path.lastIndexOf("/") + 1);
+}
+
+/**
+ * A page's error as a line: what the page said when it could not be drawn -
+ * Next's "Application error" screen says nothing on its own, the console says
+ * why. Only errors are written; the rest of a page's console is its own.
+ */
+export function writeRendererError(log: Pick<PerfLog, "write">, details: ConsoleDetails, type: string): boolean {
+    if (details.level !== "error") return false;
+    const words = errorWords(details.message);
+    const kind = /^(?:Uncaught\s+)?((?:[A-Z][A-Za-z]*)?Error)\b:?\s*/.exec(words);
+    const name = kind?.[1] ?? "";
+    const fields: Record<string, PerfValue> = { type, msg: kind ? words.slice(kind[0].length) : words };
+    if (name) fields.name = name;
+    const script = scriptName(details.sourceId);
+    if (script) fields.src = script;
+    if (details.lineNumber > 0) fields.line = details.lineNumber;
+    void log.write("page-error", fields);
+    return true;
+}

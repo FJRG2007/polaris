@@ -1,14 +1,15 @@
 /**
  * What fills `perf.log` (`perf-log.ts`): the main process's own delay, the
- * processes Chromium runs going away or hanging, the page's slow inputs, and
- * whether a game was in front, so a slow click can be read against all four.
+ * processes Chromium runs going away or hanging, the page's slow inputs, the
+ * errors a page logs and a preload that failed, and whether a game was in
+ * front, so a slow click or a page that went blank can be read against them.
  * Started once the app is ready.
  */
 
 import { app } from "electron";
 import { join } from "node:path";
 import { monitorEventLoopDelay } from "node:perf_hooks";
-import { checkLoop, LOOP_CHECK_MS, PerfLog, writePageReport, type PerfValue } from "./perf-log";
+import { checkLoop, LOOP_CHECK_MS, PerfLog, writePageReport, writeRendererError, type PerfValue } from "./perf-log";
 
 let log: PerfLog | null = null;
 
@@ -54,6 +55,14 @@ export function startPerfWatch(accelerated: boolean): void {
         contents.on("unresponsive", () => {
             since = Date.now();
             void current.write("unresponsive", { type: contents.getType() });
+        });
+        // Windows only: the search, notices and Polaris pages. A page that
+        // breaks says why in its console, and nothing else keeps that.
+        if (contents.getType() === "window") {
+            contents.on("console-message", (details) => void writeRendererError(current, details, contents.getType()));
+        }
+        contents.on("preload-error", (_event, preloadPath, error) => {
+            void current.write("preload-error", { preload: preloadPath.slice(Math.max(preloadPath.lastIndexOf("/"), preloadPath.lastIndexOf("\\")) + 1), name: error?.name ?? "Error" });
         });
         contents.on("responsive", () => {
             if (!since) return;
