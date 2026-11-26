@@ -52,6 +52,13 @@ describe("openInPage", () => {
         expect(openInPage(on, "https://other.example.test/home", ORIGIN)).toBe("loaded");
     });
 
+    it("never hands a path to a page on the Polaris that is not one of its screens", () => {
+        const { made } = page(7, `${ORIGIN}/api/preview/session`);
+        setRouterListening(made, true);
+        expect(openInPage(made, `${ORIGIN}/home`, ORIGIN)).toBe("loaded");
+        expect(made.send).not.toHaveBeenCalled();
+    });
+
     it("stops routing once the page says it no longer listens", () => {
         const { made } = page(6);
         setRouterListening(made, true);

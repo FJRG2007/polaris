@@ -203,8 +203,7 @@ export interface ConsoleDetails {
  * the framework's or the browser's own sentence, which is what names the bug.
  */
 export function errorWords(message: string): string {
-    return message
-        .split("\n")[0]
+    return (message.split("\n")[0] ?? "")
         .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, "<url>")
         .replace(/\S+@\S+/g, "<mail>")
         .replace(/(["'`])(?:(?!\1).){13,}\1/g, "<text>")
@@ -214,7 +213,7 @@ export function errorWords(message: string): string {
 
 /** A script's file name, without the address, folders or query around it. */
 export function scriptName(sourceId: string): string {
-    const path = sourceId.split(/[?#]/)[0];
+    const path = sourceId.split(/[?#]/)[0] ?? "";
     return path.slice(path.lastIndexOf("/") + 1);
 }
 

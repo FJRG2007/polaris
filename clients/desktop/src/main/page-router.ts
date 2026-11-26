@@ -14,7 +14,7 @@
  */
 
 import { CHANNELS } from "@/shared/bridge";
-import { isServerUrl } from "./navigation";
+import { isDashboardPage } from "./navigation";
 
 /** The part of a window's contents this needs; `WebContents` in the app. */
 export interface RoutablePage {
@@ -52,7 +52,8 @@ export function setRouterListening(page: RoutablePage, on: boolean): void {
 
 /**
  * Open `url` (an address of the Polaris at `origin`) in `page`: through the
- * page's router when it listens and is on that Polaris, a full load otherwise.
+ * page's router when it listens and is a dashboard screen of that Polaris
+ * (`isDashboardPage`), a full load otherwise.
  * Answers which it was.
  */
 export function openInPage(page: RoutablePage, url: string, origin: string): "routed" | "loaded" {
@@ -62,7 +63,7 @@ export function openInPage(page: RoutablePage, url: string, origin: string): "ro
         target.origin === origin &&
         listening.has(page.id) &&
         !page.isDestroyed() &&
-        isServerUrl(page.getURL(), origin)
+        isDashboardPage(page.getURL(), origin)
     ) {
         page.send(CHANNELS.navigate, `${target.pathname}${target.search}${target.hash}`);
         return "routed";

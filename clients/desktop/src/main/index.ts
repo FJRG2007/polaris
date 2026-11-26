@@ -613,7 +613,8 @@ async function openSettings(place: SettingsPlace = "general"): Promise<void> {
     page.show();
     page.focus();
     if (route.kind === "page") page.webContents.send(CHANNELS.appSettingsOpen, place);
-    else openInPage(page.webContents, `${origin}${route.path}`, origin);
+    // `origin` is set here: without one the route is "local" and returned above.
+    else if (origin) openInPage(page.webContents, `${origin}${route.path}`, origin);
 }
 
 /** The hosts window, and why it opened in place of the host's screen: with the
