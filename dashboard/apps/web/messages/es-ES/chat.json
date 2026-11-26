@@ -1569,7 +1569,10 @@
         "failedMany": "{count} mensajes programados no se pudieron enviar",
         "scheduledFor": "Programado para el {date}",
         "scheduledMany": "{count} programados, el próximo el {date}",
-        "sends": "Se envía el {date}"
+        "sends": "Se envía el {date}",
+        "sealedElsewhere": "Cifrado en un dispositivo que no puede abrirlo aquí",
+        "sealedWaitsForDevice": "Las claves del chat cambiaron. Sale cuando abras este chat en el dispositivo donde lo escribiste.",
+        "sealedDeviceGone": "El dispositivo que lo cifró cerró sesión, así que no puede salir. Bórralo y escríbelo otra vez."
     },
     "messageInfo": {
         "messageInformation": "Información del mensaje",

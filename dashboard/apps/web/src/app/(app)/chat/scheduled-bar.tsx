@@ -30,8 +30,15 @@ import {
     DialogTitle
 } from "@polaris/ui";
 
+/**
+ * One waiting message as the list shows it: a sealed one with its words opened
+ * on this device, or `unopened` when it does not open here (`sealed-scheduled.ts`).
+ */
+export type ScheduledShown = ScheduledMessageView & { readonly unopened?: boolean };
+
 /** What a waiting message says it is, when it is only files. */
-function summarize(entry: ScheduledMessageView): string {
+function summarize(entry: ScheduledShown, sealedHere: string): string {
+    if (entry.unopened) return sealedHere;
     const text = plainExcerpt(entry.body, 160);
     if (text) return text;
     if (entry.files.length === 1) return entry.files[0]!.name;
@@ -43,7 +50,7 @@ export function ScheduledBar({
     onSendNow,
     onCancel
 }: {
-    scheduled: readonly ScheduledMessageView[];
+    scheduled: readonly ScheduledShown[];
     onSendNow: (id: string) => Promise<void>;
     onCancel: (id: string) => Promise<void>;
 }) {
@@ -57,7 +64,15 @@ export function ScheduledBar({
     const next = scheduled[0]!;
     /** Anything that could not be sent, which is what the line leads with when
      *  there is one: "waiting" and "never went" are not the same news. */
-    const failed = scheduled.filter((entry) => entry.failure !== null);
+    // A sealed one whose sealing device is gone never goes either.
+    const failed = scheduled.filter((entry) => entry.failure !== null || entry.sealed === null);
+    /** What the line under one says: why it did not go, that it waits for a
+     *  device of the writer's to seal it again, or when it goes. */
+    const status = (entry: ScheduledShown): string => {
+        if (entry.sealed === null) return t("scheduledBar.sealedDeviceGone");
+        if (entry.resealDue) return t("scheduledBar.sealedWaitsForDevice");
+        return entry.failure ?? t("scheduledBar.sends", { date: format.dateTime(entry.sendAt) });
+    };
 
     const run = async (id: string, work: () => Promise<void>) => {
         setBusy(id);
@@ -106,17 +121,17 @@ export function ScheduledBar({
                                 className="flex flex-col gap-2 rounded-md border border-border bg-muted/20 p-3"
                             >
                                 <p className="whitespace-pre-wrap break-words text-sm">
-                                    {summarize(entry)}
+                                    {summarize(entry, t("scheduledBar.sealedElsewhere"))}
                                 </p>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span
                                         className={
-                                            entry.failure
+                                            entry.failure || entry.resealDue || entry.sealed === null
                                                 ? "text-xs text-danger"
                                                 : "text-xs text-muted-foreground"
                                         }
                                     >
-                                        {entry.failure ?? t("scheduledBar.sends", { date: format.dateTime(entry.sendAt) })}
+                                        {status(entry)}
                                     </span>
                                     <span className="ms-auto flex items-center gap-1">
                                         <Button

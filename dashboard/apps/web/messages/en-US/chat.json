@@ -1569,7 +1569,10 @@
         "failedMany": "{count} scheduled messages could not be sent",
         "scheduledFor": "Scheduled for {date}",
         "scheduledMany": "{count} scheduled, next at {date}",
-        "sends": "Sends {date}"
+        "sends": "Sends {date}",
+        "sealedElsewhere": "Encrypted on a device that cannot open it here",
+        "sealedWaitsForDevice": "The chat's keys changed. It goes once you open this chat on the device you wrote it on.",
+        "sealedDeviceGone": "The device that encrypted it is signed out, so it cannot go. Delete it and write it again."
     },
     "messageInfo": {
         "messageInformation": "Message information",

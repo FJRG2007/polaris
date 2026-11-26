@@ -54,10 +54,11 @@ import { useCallHidden } from "./call-hidden";
 import { CallRosterList } from "./call-roster";
 import type { PollDraft } from "./poll-dialog";
 import { draftMessage, stillPending } from "./draft-message";
-import { ScheduledBar } from "./scheduled-bar";
+import { ScheduledBar, type ScheduledShown } from "./scheduled-bar";
 import { GroupKeyChangeBar, KeyChangeBar, KeyLogNotice } from "./key-change-bar";
 import { SealedNotice } from "./sealed-notice";
-import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
+import { sealedChatActive, sealsSendsIn } from "@/lib/chat/e2ee/sealed-chat";
+import { openedScheduled, resealDue } from "./sealed-scheduled";
 import { ChannelHeader, PanelSearch } from "./channel-header";
 import { useWideScreen } from "./use-wide-screen";
 import { DirectProfile } from "./direct-profile";
@@ -80,7 +81,7 @@ import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { sendFile, type Sent } from "@/components/transfers/move-file";
 import type { SendOutcome, SendProgress, SendTrack } from "./outgoing";
 import { measureMedia } from "./media-measure";
-import { discardUpload, notUploadedSaid, sendWithFiles } from "./send-with-files";
+import { discardUpload, notUploadedSaid, sendSealedWithFiles, sendWithFiles } from "./send-with-files";
 import { useOutgoing } from "./outgoing";
 import { outgoingMessage, unlandedOutgoing, withSending } from "./outgoing-message";
 import { writeMediaShape } from "@/lib/chat/media-shape";
@@ -1999,10 +2000,17 @@ export function ChannelView({
      * changed it, or because the hour came and the message became an ordinary
      * message, which arrives on the stream like any other.
      */
-    const [scheduled, setScheduled] = useState<readonly ScheduledMessageView[]>([]);
+    const [scheduled, setScheduled] = useState<readonly ScheduledShown[]>([]);
     const loadScheduled = useCallback(async () => {
         const result = await actions.listScheduledAction(channelId);
-        setScheduled(result.scheduled ?? []);
+        let rows: readonly ScheduledMessageView[] = result.scheduled ?? [];
+        // A sealed one whose conversation rekeyed waits for a device of its
+        // writer to seal it again: this one, now, when it can. Once per read,
+        // and the list read again only when something was actually sealed.
+        if (sealedChatActive() && (await resealDue(channelId, rows)) > 0) {
+            rows = (await actions.listScheduledAction(channelId)).scheduled ?? rows;
+        }
+        setScheduled(await openedScheduled(channelId, rows));
     }, [channelId]);
 
     useEffect(() => {
@@ -2023,7 +2031,27 @@ export function ChannelView({
         files: readonly File[]
     ): Promise<{ error?: string }> => {
         const answering = replyingTo?.id ?? null;
-        if (files.length > 0) {
+        let seals: boolean;
+        try {
+            seals = await sealsSendsIn(channelId);
+        } catch {
+            // Not knowing whether it seals is never a reason to write it in the clear.
+            return { error: t("errors.notSent") };
+        }
+        if (seals) {
+            // Sealed here, now, and only the seal waits on the server: the plain
+            // action and route are never the door for a conversation that seals.
+            const answered = await sendSealedWithFiles({
+                channelId,
+                body,
+                files,
+                sendAt,
+                fields: answering ? { replyToId: answering } : {},
+                notUploaded,
+                notSent: t("errors.notSent")
+            });
+            if (answered !== "sent") return { error: answered.error ?? t("errors.notSent") };
+        } else if (files.length > 0) {
             // Uploaded first, exactly as a message sent now is: the bytes have to be
             // on the storage before the hour comes, and streaming them is what lets
             // somebody schedule a recording rather than a screenshot.
@@ -2889,6 +2917,9 @@ export function ChannelView({
                     <ScheduledBar
                         scheduled={scheduled}
                         onSendNow={async (id) => {
+                            // Sealed again first when its keys moved on, or the server
+                            // would only set it aside again.
+                            if (sealedChatActive()) await resealDue(channelId, scheduled.filter((entry) => entry.id === id));
                             const result = await actions.sendScheduledNowAction(id);
                             if (result.error) setError(result.error);
                             await loadScheduled();
