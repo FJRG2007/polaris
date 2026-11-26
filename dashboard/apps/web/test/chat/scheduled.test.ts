@@ -32,6 +32,8 @@ interface Row {
     sendAt: Date;
     failure: string | null;
     failedAt: Date | null;
+    /** Null on a plain one, as the column reads for every row not sealed. */
+    e2eeCiphertext: Uint8Array | null;
     files: {
         name: string;
         size: bigint;
@@ -118,6 +120,7 @@ vi.mock("@polaris/db", () => ({
                     sendAt: data.sendAt as Date,
                     failure: null,
                     failedAt: null,
+                    e2eeCiphertext: (data.e2eeCiphertext as Uint8Array | undefined) ?? null,
                     files: ((data.files as { create: Row["files"] } | undefined)?.create ?? []).map(
                         (file) => ({ ...file })
                     )
