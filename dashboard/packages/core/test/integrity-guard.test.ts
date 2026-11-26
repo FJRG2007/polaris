@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { watchPageCode, type GuardReply } from "../src/integrity-guard";
 import type { PageVerdict } from "../src/integrity";
 
@@ -19,6 +19,8 @@ function page(build: string | null, ...chunks: string[]): void {
     }
 }
 
+// A check hashes what it fetched (WebCrypto, off the main thread) before it asks,
+// so a fixed number of ticks is not enough: each test waits for what it expects.
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function asker(verdict: (build: string | null) => PageVerdict) {
@@ -31,24 +33,23 @@ afterEach(() => {
 });
 
 describe("page code watcher", () => {
-    vi.stubGlobal("fetch", async () => new Response("code"));
+    // Every test, not only the first: `afterEach` takes the stubs away.
+    beforeEach(() => {
+        vi.stubGlobal("fetch", async () => new Response("code"));
+    });
 
     it("names the build the document says served it", async () => {
         page(OWN, "a.js");
         const ask = asker((build) => ({ kind: "verified", build: build ?? CURRENT, checked: 1 }));
         watchPageCode(ask);
-        await settle();
-        await settle();
-        expect(ask).toHaveBeenCalledWith([expect.objectContaining({ path: "/_next/static/chunks/a.js" })], OWN);
+        await vi.waitFor(() => expect(ask).toHaveBeenCalledWith([expect.objectContaining({ path: "/_next/static/chunks/a.js" })], OWN));
     });
 
     it("offers a reload for a page of an earlier build, with no warning and no locked fields", async () => {
         page(OWN, "b.js");
         document.body.innerHTML = '<input type="password">';
         watchPageCode(asker(() => ({ kind: "outdated", build: OWN, current: CURRENT, checked: 1 })));
-        await settle();
-        await settle();
-        expect(document.getElementById("polaris-integrity-outdated")).not.toBeNull();
+        await vi.waitFor(() => expect(document.getElementById("polaris-integrity-outdated")).not.toBeNull());
         expect(document.getElementById("polaris-integrity-warning")).toBeNull();
         expect(document.querySelector<HTMLInputElement>("input")?.readOnly).toBe(false);
     });
@@ -56,9 +57,7 @@ describe("page code watcher", () => {
     it("warns over a changed page", async () => {
         page(OWN, "c.js");
         watchPageCode(asker(() => ({ kind: "changed", build: OWN, paths: ["/_next/static/chunks/c.js"] })));
-        await settle();
-        await settle();
-        expect(document.getElementById("polaris-integrity-warning")).not.toBeNull();
+        await vi.waitFor(() => expect(document.getElementById("polaris-integrity-warning")).not.toBeNull());
         expect(document.getElementById("polaris-integrity-outdated")).toBeNull();
     });
 
@@ -76,16 +75,16 @@ describe("page code watcher", () => {
             }
         );
         watchPageCode(ask);
-        await settle();
-        await settle();
+        await vi.waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
         expect(ask.mock.calls[0]?.[1]).toBeNull();
+        // The first verdict lands after its ask resolves.
+        await settle();
         // A chunk loaded later is judged against that same build.
         const script = document.createElement("script");
         script.src = "/_next/static/chunks/e.js";
         document.head.append(script);
         observers[0]?.();
-        await new Promise((resolve) => setTimeout(resolve, 450));
-        await settle();
+        await vi.waitFor(() => expect(ask).toHaveBeenCalledTimes(2), { timeout: 2_000 });
         expect(ask.mock.calls[1]?.[1]).toBe(CURRENT);
     });
 });
