@@ -12,6 +12,13 @@
  * Then it opens over its own menu instead: a step in from the trigger's
  * leading edge and just under it, so the trigger stays readable and the
  * submenu reads as nested. Measured from the trigger when the submenu opens.
+ *
+ * Laid over its menu, a submenu covers the options below its trigger - on a
+ * phone, Notifications under an open Mute - and Radix gives a finger no way to
+ * put it away: a tap only ever opens a submenu, and a press outside one closes
+ * nothing. So while it overlaps, a press anywhere outside it, its own trigger
+ * included, closes the submenu and leaves its menu open (`useOverlapDismiss`).
+ * A second tap on Mute shuts Mute, and what it covered is reachable again.
  */
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
@@ -52,6 +59,8 @@ export function submenuFit(
 interface SubmenuFitState {
     readonly trigger: React.RefObject<HTMLElement | null>;
     readonly offsets: SubmenuOffsets | null;
+    /** Shuts this submenu, and only this one. */
+    readonly close: () => void;
 }
 
 const SubmenuFitContext = createContext<SubmenuFitState | null>(null);
@@ -61,7 +70,8 @@ export const SubmenuFitProvider = SubmenuFitContext.Provider;
 /** The trigger to measure and the offsets for the submenu, for one `Sub`. */
 export function useSubmenuFitRoot(
     gutter: number,
-    minRem: number = SUBMENU_MIN_REM
+    minRem: number = SUBMENU_MIN_REM,
+    close: () => void = () => {}
 ): {
     readonly state: SubmenuFitState;
     readonly measure: (open: boolean) => void;
@@ -81,7 +91,9 @@ export function useSubmenuFitRoot(
         },
         [gutter, minRem]
     );
-    const state = useMemo(() => ({ trigger, offsets }), [offsets]);
+    const shut = useRef(close);
+    shut.current = close;
+    const state = useMemo(() => ({ trigger, offsets, close: () => shut.current() }), [offsets]);
     return { state, measure };
 }
 
@@ -103,4 +115,34 @@ export function useSubmenuTriggerRef<T extends HTMLElement>(
 /** The offsets for this submenu's content; empty when it fits beside. */
 export function useSubmenuOffsets(): Partial<SubmenuOffsets> {
     return useContext(SubmenuFitContext)?.offsets ?? {};
+}
+
+/**
+ * The submenu content's `onPointerDownOutside`: while the submenu is laid over
+ * its menu, a press outside it shuts it - see the note at the top. Beside its
+ * menu it does nothing, and Radix's own hover and focus rules stand. A press on
+ * its own trigger is left to the trigger (`useOverlapToggle`): shut here, the
+ * tap's click would open it straight back.
+ */
+export function useOverlapDismiss(): (event: Event) => void {
+    const fit = useContext(SubmenuFitContext);
+    return (event) => {
+        if (!fit?.offsets) return;
+        const target = event.target;
+        if (target instanceof Node && fit.trigger.current?.contains(target)) return;
+        fit.close();
+    };
+}
+
+/**
+ * The trigger's `onClick`: a tap on an open, overlapping submenu's trigger shuts
+ * it, where Radix would only ever open it. Prevented, so Radix leaves it shut.
+ */
+export function useOverlapToggle(): (event: React.MouseEvent<HTMLElement>) => void {
+    const fit = useContext(SubmenuFitContext);
+    return (event) => {
+        if (!fit?.offsets || event.currentTarget.dataset.state !== "open") return;
+        event.preventDefault();
+        fit.close();
+    };
 }

@@ -10,7 +10,7 @@ import * as fit from "../lib/submenu-fit";
 import { ignoreOpeningPress } from "../lib/menu-press";
 import { keepSearchFocus, redirectMenuFocus, tabThroughMenu } from "../lib/menu-search-focus";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
+import { forwardRef, useState, type ComponentPropsWithoutRef, type ElementRef } from "react";
 import { clearOfWindowControls } from "../shell/window-controls";
 
 /** How far a menu keeps from the edge of the screen, in px - the page's own
@@ -110,19 +110,23 @@ DropdownMenuItem.displayName = "DropdownMenuItem";
  * either side - see `submenu-fit`.
  */
 export function DropdownMenuSub({
+    open: controlled,
+    defaultOpen = false,
     onOpenChange,
     ...props
 }: ComponentPropsWithoutRef<typeof RadixMenu.Sub>) {
-    const { state, measure } = fit.useSubmenuFitRoot(MENU_GUTTER);
+    // Held here rather than inside Radix, so a press outside an overlapping
+    // submenu can shut it - see `submenu-fit`.
+    const [own, setOwn] = useState(defaultOpen);
+    const change = (next: boolean) => {
+        measure(next);
+        setOwn(next);
+        onOpenChange?.(next);
+    };
+    const { state, measure } = fit.useSubmenuFitRoot(MENU_GUTTER, undefined, () => change(false));
     return (
         <fit.SubmenuFitProvider value={state}>
-            <RadixMenu.Sub
-                {...props}
-                onOpenChange={(next) => {
-                    measure(next);
-                    onOpenChange?.(next);
-                }}
-            />
+            <RadixMenu.Sub {...props} open={controlled ?? own} onOpenChange={change} />
         </fit.SubmenuFitProvider>
     );
 }
@@ -132,7 +136,8 @@ export function DropdownMenuSub({
 export const DropdownMenuSubTrigger = forwardRef<
     ElementRef<typeof RadixMenu.SubTrigger>,
     ComponentPropsWithoutRef<typeof RadixMenu.SubTrigger> & { variant?: "default" | "danger" }
->(({ className, children, variant = "default", onPointerMove, onPointerLeave, ...props }, ref) => {
+>(({ className, children, variant = "default", onClick, onPointerMove, onPointerLeave, ...props }, ref) => {
+    const toggle = fit.useOverlapToggle();
     const settled = useSettledHover();
     const measured = fit.useSubmenuTriggerRef(ref);
     return (
@@ -149,6 +154,10 @@ export const DropdownMenuSubTrigger = forwardRef<
             )}
             {...props}
             // After the spread, so nothing a caller passes loses the nudge.
+            onClick={(event) => {
+                onClick?.(event);
+                if (!event.defaultPrevented) toggle(event);
+            }}
             onPointerMove={(event) => {
                 onPointerMove?.(event);
                 settled.onPointerMove(event);
@@ -169,7 +178,20 @@ DropdownMenuSubTrigger.displayName = "DropdownMenuSubTrigger";
 const FittedSubContent = forwardRef<
     ElementRef<typeof RadixMenu.SubContent>,
     ComponentPropsWithoutRef<typeof RadixMenu.SubContent>
->((props, ref) => <RadixMenu.SubContent ref={ref} {...fit.useSubmenuOffsets()} {...props} />);
+>(({ onPointerDownOutside, ...props }, ref) => {
+    const dismiss = fit.useOverlapDismiss();
+    return (
+        <RadixMenu.SubContent
+            ref={ref}
+            {...fit.useSubmenuOffsets()}
+            {...props}
+            onPointerDownOutside={(event) => {
+                onPointerDownOutside?.(event);
+                dismiss(event);
+            }}
+        />
+    );
+});
 FittedSubContent.displayName = "FittedSubContent";
 
 export const DropdownMenuSubContent = forwardRef<

@@ -49,31 +49,34 @@ export const ContextMenuGroup = RadixMenu.Group;
  * the menu is open, which is the span somebody is moving between the options.
  */
 export function ContextMenuSub({
+    open: controlled,
+    defaultOpen = false,
     onOpenChange,
     ...props
 }: ComponentPropsWithoutRef<typeof RadixMenu.Sub>) {
-    const [open, setOpen] = useState(false);
-    const [kept, setKept] = useState(false);
+    // Held here rather than inside Radix, so a press outside an overlapping
+    // submenu can shut it - see `submenu-fit`.
+    const [own, setOwn] = useState(defaultOpen);
+    const open = controlled ?? own;
+    const [kept, setKept] = useState(defaultOpen);
     // Published rather than kept to this file: something drawn inside a submenu
     // that is hidden instead of unmounted has no other way of telling that it
     // is back on screen - see `menu-surface`.
     const surface = useMemo(() => ({ open, kept }), [open, kept]);
     // Over its menu in a window too narrow for either side - see `submenu-fit`.
-    const { state, measure } = fit.useSubmenuFitRoot(MENU_GUTTER, 11);
+    const change = (next: boolean) => {
+        measure(next);
+        setOwn(next);
+        // Kept only once it has actually been opened, so a menu nobody steps
+        // into still costs nothing to put on screen.
+        if (next) setKept(true);
+        onOpenChange?.(next);
+    };
+    const { state, measure } = fit.useSubmenuFitRoot(MENU_GUTTER, 11, () => change(false));
     return (
         <MenuSurfaceProvider value={surface}>
             <fit.SubmenuFitProvider value={state}>
-                <RadixMenu.Sub
-                    {...props}
-                    onOpenChange={(next) => {
-                        measure(next);
-                        setOpen(next);
-                        // Kept only once it has actually been opened, so a menu
-                        // nobody steps into still costs nothing to put on screen.
-                        if (next) setKept(true);
-                        onOpenChange?.(next);
-                    }}
-                />
+                <RadixMenu.Sub {...props} open={open} onOpenChange={change} />
             </fit.SubmenuFitProvider>
         </MenuSurfaceProvider>
     );
@@ -247,7 +250,8 @@ ContextMenuItem.displayName = "ContextMenuItem";
 export const ContextMenuSubTrigger = forwardRef<
     ElementRef<typeof RadixMenu.SubTrigger>,
     ComponentPropsWithoutRef<typeof RadixMenu.SubTrigger> & { variant?: "default" | "danger" }
->(({ className, children, variant = "default", onPointerMove, onPointerLeave, ...props }, ref) => {
+>(({ className, children, variant = "default", onClick, onPointerMove, onPointerLeave, ...props }, ref) => {
+    const toggle = fit.useOverlapToggle();
     const settled = useSettledHover();
     const measured = fit.useSubmenuTriggerRef(ref);
 
@@ -265,6 +269,10 @@ export const ContextMenuSubTrigger = forwardRef<
             )}
             {...props}
             // After the spread, so nothing a caller passes loses the nudge.
+            onClick={(event) => {
+                onClick?.(event);
+                if (!event.defaultPrevented) toggle(event);
+            }}
             onPointerMove={(event) => {
                 onPointerMove?.(event);
                 settled.onPointerMove(event);
@@ -326,12 +334,13 @@ function unmeasureKeptSubmenu(trigger: HTMLElement): void {
 export const ContextMenuSubContent = forwardRef<
     ElementRef<typeof RadixMenu.SubContent>,
     ComponentPropsWithoutRef<typeof RadixMenu.SubContent>
->(({ className, collisionPadding = MENU_GUTTER, ...props }, ref) => {
+>(({ className, collisionPadding = MENU_GUTTER, onPointerDownOutside, ...props }, ref) => {
     // Kept mounted once it has been opened - see ContextMenuSub. Hidden rather
     // than faded while closed, since there is nothing to animate out of a
     // submenu that is only being stepped past.
     const { kept } = useMenuSurface();
     const offsets = fit.useSubmenuOffsets();
+    const dismiss = fit.useOverlapDismiss();
     return (
         <RadixMenu.Portal forceMount={kept || undefined}>
             <RadixMenu.SubContent
@@ -346,6 +355,10 @@ export const ContextMenuSubContent = forwardRef<
                     kept && "data-[state=closed]:hidden"
                 )}
                 {...props}
+                onPointerDownOutside={(event) => {
+                    onPointerDownOutside?.(event);
+                    dismiss(event);
+                }}
                 // After the spread: the menu must never commit an option on the
                 // release of the press that opened it.
                 onPointerUpCapture={ignoreOpeningPress}
