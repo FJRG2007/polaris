@@ -3,7 +3,7 @@ import { posterFor } from "./video-poster";
 import { measureMedia } from "./media-measure";
 import type { RecordedSound } from "./voice-recorder";
 import { writeMediaShape } from "@/lib/chat/media-shape";
-import type { KeptPick } from "@/components/file-picker/as-files";
+import { keptAsFiles, type KeptPick } from "@/components/file-picker/as-files";
 import { sendFile, type Sent } from "@/components/transfers/move-file";
 import { viewOnceText, type ViewOnceChoice } from "@/lib/chat/view-once-choice";
 import { withoutFiles, type SendOutcome, type SendProgress, type SendTrack } from "./outgoing";
@@ -256,12 +256,19 @@ export async function sendWithFiles(message: FilesMessage): Promise<"sent" | Exc
  * Send a message with files in a conversation this page seals (proposal 10b):
  * each file is sealed here under its own key and uploaded as an opaque blob,
  * then the message is sealed with every file's key, digest, name, type, shape
- * and sound inside it. Files sent to be seen once and files left in a Drive
+ * and sound inside it. A file picked from a Drive is fetched into this
+ * browser and sealed like the rest: a sealed message cannot lend a reference
+ * the server reads, so it carries a sealed copy. Files sent to be seen once
  * are not sealed yet, so a message carrying them is not sent at all.
  */
 async function sendSealedWithFiles(message: FilesMessage): Promise<"sent" | Exclude<SendOutcome, void>> {
-    const { channelId, body, files, track, report, notUploaded } = message;
-    if ((message.viewOnce ?? []).length > 0 || (message.fromDrive ?? []).length > 0) return { error: message.notSent };
+    const { channelId, body, track, report, notUploaded } = message;
+    if ((message.viewOnce ?? []).length > 0) return { error: message.notSent };
+    const fromDrive = message.fromDrive ?? [];
+    const copied = fromDrive.length ? await keptAsFiles(fromDrive, message.notSent) : { files: [], failed: [] };
+    if (copied.failed.length) return { error: copied.failed[0]! };
+    // Drive copies after the picked files, so every index the tracker knows stays its own.
+    const files = [...message.files, ...copied.files];
     const spoilers = message.spoilers ?? [];
     const sounds = message.sounds ?? [];
     const sealedFiles = await import("@/lib/chat/e2ee/sealed-files");
@@ -279,25 +286,27 @@ async function sendSealedWithFiles(message: FilesMessage): Promise<"sent" | Excl
             waveform: sound?.waveform ?? null,
             spoiler: spoilers.includes(at)
         });
-        const signal = track?.signal(at);
-        track?.onFile(at, { phase: "sending", fraction: 0 });
+        // A Drive copy has no row in the box's tracker: only the files it was handed.
+        const own = at < message.files.length ? track : undefined;
+        const signal = own?.signal(at);
+        own?.onFile(at, { phase: "sending", fraction: 0 });
         const sent = await sendFile(`/api/chat/channels/${channelId}/uploads?name=file&sealed=1`, sealing.blob, {
-            listed: !track,
+            listed: !own,
             signal,
             onProgress: (moved, total) => {
                 report?.({ file: at, files: files.length, moved, total });
-                track?.onFile(at, { phase: total > 0 && moved >= total ? "processing" : "sending", fraction: total > 0 ? Math.min(1, moved / total) : 0 });
+                own?.onFile(at, { phase: total > 0 && moved >= total ? "processing" : "sending", fraction: total > 0 ? Math.min(1, moved / total) : 0 });
             }
         });
         if (!sent.ok) {
-            track?.onFile(at, { phase: signal?.aborted ? "cancelled" : "failed", fraction: 0 });
+            own?.onFile(at, { phase: signal?.aborted ? "cancelled" : "failed", fraction: 0 });
             await discardAll();
             return signal?.aborted ? { cancelled: true } : { error: notUploaded(sent, file.name) };
         }
         const answer: unknown = JSON.parse(sent.body || "{}");
         const id = String((answer as { id?: unknown }).id ?? "");
         staged.push(id);
-        track?.onFile(at, { phase: "sent", fraction: 1 });
+        own?.onFile(at, { phase: "sent", fraction: 1 });
         refs.push(sealing.ref(id));
         // The sender's own page draws it from the bytes it already has.
         sealedFiles.keepLocalFile(id, file);

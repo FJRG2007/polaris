@@ -53,21 +53,48 @@ export async function asFiles(
         const url =
             one.kind === "url"
                 ? `/api/attachments/fetch?url=${encodeURIComponent(one.url)}`
-                : `/api/attachments/fetch?c=${encodeURIComponent(one.connectionId)}&p=${encodeURIComponent(one.path)}`;
-        try {
-            const answer = await fetch(url);
-            if (!answer.ok) {
-                const body = (await answer.json().catch(() => null)) as { error?: string } | null;
-                failed.push(body?.error || unreachable);
-                continue;
-            }
-            const named = answer.headers.get("x-polaris-filename") ?? "";
-            const name = named ? decodeURIComponent(named) : "attachment";
-            const bytes = await answer.blob();
-            files.push(new File([bytes], name, { type: bytes.type || "application/octet-stream" }));
-        } catch {
-            failed.push(unreachable);
-        }
+                : storedUrl(one);
+        const got = await fetchAsFile(url, unreachable);
+        if (got instanceof File) files.push(got);
+        else failed.push(got.error);
     }
     return { files, kept, failed };
+}
+
+const storedUrl = (one: { readonly connectionId: string; readonly path: string }): string =>
+    `/api/attachments/fetch?c=${encodeURIComponent(one.connectionId)}&p=${encodeURIComponent(one.path)}`;
+
+async function fetchAsFile(url: string, unreachable: string): Promise<File | { error: string }> {
+    try {
+        const answer = await fetch(url);
+        if (!answer.ok) {
+            const body = (await answer.json().catch(() => null)) as { error?: string } | null;
+            return { error: body?.error || unreachable };
+        }
+        const named = answer.headers.get("x-polaris-filename") ?? "";
+        const name = named ? decodeURIComponent(named) : "attachment";
+        const bytes = await answer.blob();
+        return new File([bytes], name, { type: bytes.type || "application/octet-stream" });
+    } catch {
+        return { error: unreachable };
+    }
+}
+
+/**
+ * The bytes of picks kept on a storage, fetched into this browser. For a place
+ * that cannot send a reference - an end-to-end encrypted conversation seals the
+ * bytes here, so a Drive file is copied in rather than lent.
+ */
+export async function keptAsFiles(
+    kept: readonly KeptPick[],
+    unreachable: string
+): Promise<{ files: File[]; failed: string[] }> {
+    const files: File[] = [];
+    const failed: string[] = [];
+    for (const one of kept) {
+        const got = await fetchAsFile(storedUrl(one), unreachable);
+        if (got instanceof File) files.push(got);
+        else failed.push(got.error);
+    }
+    return { files, failed };
 }
