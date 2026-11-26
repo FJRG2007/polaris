@@ -478,8 +478,8 @@ share of the work, not of the code.
 | 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). A page loaded before sealed chat was on is told to reload instead (`errors.sealedOnlyReload`, see "Sealed only"). A conversation the migration cut is sealed only before any browser has made its group (`conversationSealed` reads `ChatMigration`). Left: a sealed form for editing an old plain message in a sealed conversation. | Yes | ~85% |
 | 3 | **Message kinds that are still plain.** Built (2026-11-25): attachments, see "Sealed files"; polls, see "Sealed polls" (question and answers sealed; votes sealed with the tally in each browser, see "Sealed votes"; public or anonymous chosen at creation, see "Public and anonymous votes"); forum post titles, see "Sealed forum posts"; reactions, and the clear reactions and votes left from before a conversation was sealed, written 2026-11-26 (rounds 32-33, see "Sealed reactions") but not yet built, tested or run. Written 2026-11-26 (track E, not yet run): translations of a sealed message stay on the device, see "Sealed translations"; a file picked from a Drive is copied into the browser and sealed, see "Sealed files". Voice notes ride the sealed-file path (length and waveform are inside the seal, from the recorder's `RecordedSound`), checked in the code but not in a browser. Left: scheduled messages, link cards and files sent to be seen once (refused in a sealed conversation, nothing sent in the clear; designs in the track E brief). Until each has its sealed form a sealed conversation cannot send it. | Yes | ~62% (text, edits, replies, threads, Polar, webhooks, files - with the gallery, forum list and video stills - poll questions, answers and votes, forum post titles are sealed) |
 | 4 | **Default-on switch.** Built (2026-11-25): `chatE2eeEnabled()` is `chatE2eeFrom(env, CHAT_E2EE_DEFAULT_ON)` in `flag.ts` - `1` on, `0` off, anything else the default - so turning it on is changing `CHAT_E2EE_DEFAULT_ON` to `true` in a release, on with nothing set and `0` kept as the kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md); tested in `test/chat/e2ee/flag.test.ts`. The kill switch never locks anybody out (built 2026-11-25, see "The kill switch"): `0` holds sealed chat - nothing new becomes sealed, every conversation already sealed keeps opening, sending sealed and refusing plain writes. Left: the flip itself (last); a held page in a browser. | Yes | ~70% |
-| 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback`), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Built 2026-11-25 (round 26, see "Rollback, purge and late members"): the admin line (Management > Security), the per-conversation rollback from `ChatMigrationRollback` and "Seal it again", the purge after 30 days (decision 4), and members whose account key came after the cut getting the legacy key from a member's browser (`legacy-key-gaps`). Left: attachments/polls/system rows (row 3), a "history before [date]" label, members nobody holding the key ever meets again (needs `ORK`, row 6). Not verified: the admin line and rollback in a browser and against a real PostgreSQL. | Yes (owner: every existing chat migrated) | ~65% |
-| 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
+| 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback`), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Built 2026-11-25 (round 26, see "Rollback, purge and late members"): the admin line (Management > Security), the per-conversation rollback from `ChatMigrationRollback` and "Seal it again", the purge after 30 days (decision 4), and members whose account key came after the cut getting the legacy key from a member's browser (`legacy-key-gaps`). Left: attachments/polls/system rows (row 3), a "history before [date]" label, members nobody holding the key ever meets again (needs `ORK`, row 6: its key pair and tables are written, the migrator does not seal to it yet). Not verified: the admin line and rollback in a browser and against a real PostgreSQL. | Yes (owner: every existing chat migrated) | ~65% |
+| 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Written 2026-11-26, not yet typechecked, tested, built or run (see "Recovery"): quorum recovery of the account key - each account's browser splits its own `AK` with Shamir (2 of 3 custodians by default, 1 of 1 with a warning for a single administrator, 2 of 2 for two) and seals each share to a custodian's account key with hybrid HPKE; re-split on any custodian change; a request (open 7 days) only after an administrator-approved account recovery was used, with a 12-digit code the custodians compare; at the quorum the account's new browser rebuilds its key, checks it against the key log and gets its history back; audit rows and notices on every step; the Security page line "Your organization can recover your account (N of M admins)". `ORK` reduced to sealing history for members with no account key: primitive and tables only. Left: custodian keys checked against the key log (blocker), the `ORK` ceremony and the migrator sealing to it, email password resets opening the quorum, the People screen naming the chat step, a browser run. | Yes, for "nobody loses history" | ~65% |
 | 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info; scanning the other person's QR in the app; the verified mark; the key-change line in the conversation (per browser, trust on first use). Built 2026-11-26, not yet run (see "Account key log"): the append-only key log (RFC 6962 tree, signed head), the browser checking the signature, consistency with the last head it saw and inclusion of every key before the QR hand-over, a safety number, a remembered peer key or a sealed history key trusts it; each account's browsers monitoring their own entries; the group form of the key-change line (first 100 members); the log's own key recorded with a signed hand-over or an unsigned reset, browsers following a signed chain and asking the user before trusting a reset key (exactly that key, still consistency-checked); a key that rotated between asks rechecked before it is reported; a dismissed notice coming back for a different problem; the append lock as a bounded try-lock. Left: no test (written, not run), typecheck or build has run on it, nor a real PostgreSQL or browser; nothing calls `rotateLogKey`, so a master key change, the only way the log key changes today, always shows the reset notice and rests on the user's judgement; no gossip between browsers and no third-party auditor, so a fork shown to one browser alone is caught only when its own later heads meet it; no non-membership proofs (own-entry monitoring trusts the server to list every entry); the pinned log key and the last head are per browser. | Yes, for "government-grade" | ~70% |
 | 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody; the instance limit on /admin/privacy ("Sealed chat devices", 7 to 90 days, shown while sealed chat is on, audited). Built 2026-11-26 (code and unit tests, not yet run in a browser or against a real Postgres): the organisation's own limit (only tighter, organisation settings, strictest of instance and every organisation applies per account), a "new device" security notice when an account with another device registers one, and a device list with remove on /account/sessions. Left: seeing the three screens rendered, the migration applied on a real database. | Yes, for post-compromise security | ~85% |
 | 9 | **Server features that read chat text**: built (2026-11-25): moderation reports of a sealed message with its files, and the sealed lines of a whole-conversation or person report, see "Sealed reports". Built 2026-11-26 (round 30): moving a whole Polaris (Settings transfer) now re-seals the bare envelopes it used to miss - the MLS store of server-run members (Polar, webhooks), the OPAQUE server setup, automation secrets - and carries each OPAQUE record's password tag as the hash it fingerprints, keyed again on arrival (before, the setup failed to open on the new instance, every OPAQUE record was deleted, and accounts whose password was set over OPAQUE could not sign in nor open their account key or sealed history). Sealed rows, `ChatHistoryKey` and account-key envelopes travel as they are, so a sealed conversation opens after the move. Not carried by the transfer at all (every file, sealed or not): attachment and Drive bytes on disk or a storage connection; a Polar change waiting for Approve is answered as gone; a Polaris database backup is not restorable from the screen and only opens on the instance with the same master key. Confirmed 2026-11-26 (round 31), see "Other places a message is shown": retention (`lib/retention-service.ts`: activity, audit log, notices) and the compliance evidence export (`lib/compliance/*`: accounts, domains, certificates, backups, bans) read no chat table at all; disappearing messages go by `expiresAt` alone, so they expire and are kept the same sealed or not; automations get "New chat message" for a sealed message with an empty body (they are told it was sent, by whom and where, not what), and post into a sealed conversation through a webhook's own MLS device; game chat shows a sealed message as "Sent a message". Left: a sealed-aware game bridge (a server-run member, like webhooks) so a conversation shown in a game shows words again. Checked 2026-11-26 (round 34): the transfer carries every model it does not leave behind, so `ChatSealedReaction`, `ChatPollBallot`, the sweep's `ChatHistoryKey` envelopes and the `reaction`/`vote` rollback copies travel as they are (round trip in `test/instance-transfer/round-trip.test.ts`). | Partly (export/import must round-trip) | ~55% |
@@ -1410,7 +1410,102 @@ Flip checklist:
    `SEALED_CHAT_MINIMUM`, and is released before the flip.
 6. Then `CHAT_E2EE_DEFAULT_ON = true` (`flag.ts:7`).
 
-## Proposal: the organisation recovery key (not built)
+## Recovery (written 2026-11-26, not yet run)
+
+The last way back to a history when the password is forgotten and every device
+is gone (owner decisions 1-2: quorum of organisation administrators, or of the
+instance's for an account in no organisation; every use logged and the account
+told; no opt-out). Nothing here needs a new `.env` key.
+
+**Defaults, owner may change** (`recovery-policy.ts`): up to 3 custodians and 2
+of them recover; an organisation with a single administrator recovers with 1 of
+1 and that administrator sees "You are the only administrator who can recover N
+accounts" on the Security page; 2 administrators make 2 of 2. A request stays
+open 7 days. Custodians are the administrators (owner first, then admins by
+seniority) of the organisation the account joined first; an account in no
+organisation uses the instance administrators (`users.manage`). Only accounts
+with an account key can be custodians.
+
+**Per-account shares, not one organisation key.** The proposal above sealed
+every `AK` to one `ORK` and rebuilt `ORK` in the recovering browser. That hands
+the recovering browser (or whichever browser combines) the key to every account
+in the organisation, so it is not what was built. Instead each account's own
+browser splits its own `AK` M of N with Shamir and seals one share to each
+custodian's account key (hybrid HPKE, X25519 + ML-KEM-768, `hybrid-envelope.ts`,
+bound to owner, key version, split id, custodian and custodian key version).
+Recovery rebuilds that one `AK` in that one account's new browser and nowhere
+else. Shares are sealed to custodians' **account keys**, not to their device
+keys: devices are retired after 30 days unseen (decision 7), which would
+silently destroy recovery, while a custodian's account key survives their own
+device changes. Custodian changes re-share without any quorum: the account's
+browser compares the stored shares with the policy (`needsSplit`) whenever it
+holds its key (sign-in, the MLS device asking for it, at most every 10 minutes
+per tab) and replaces every share with a fresh split.
+
+Prior art: Apple's recovery contact (a contact holds a piece of one account and
+reads a code to the person); 1Password recovery groups (an administrator's client
+re-encrypts to the person's new keys, the server cannot); Wire legal hold (visible, logged access in an organisation); Keybase's
+paper keys as the opposite end (no recovery without the person's own key);
+the share layout and GF(2^8) arithmetic of privy-io/shamir-secret-sharing and
+HashiCorp Vault's `shamir`. **Shamir implementation choice:** the repo's Rust core
+has no secret-sharing crate and this track could not add a dependency, so
+`chat-crypto/src/shamir.ts` is written here, branch-free and table-free
+(constant time), tested against FIPS 197 field vectors and every subset of
+splits. This departs from the rule above ("a vetted implementation in
+`core-rs`"); replacing it with `shamir-secret-sharing` (audited by Cure53 and
+Zellic) or a vetted Rust crate through the wasm build changes nothing stored.
+
+**The flow.**
+
+1. An administrator approves the account recovery (`account-recovery-service`,
+   unchanged); the person sets a new password with the ticket.
+2. On the Security page the "Encrypted chat recovery" card offers "Recover
+   encrypted chats" only while that approved recovery was used in the last 7
+   days (`eligibleRecovery`). The browser makes a one-off X-Wing pair (private
+   half non-extractable, kept in IndexedDB for the request's life), publishes
+   the public half on a `ChatRecoveryRequest`, and shows a 12-digit code made
+   from the request id and that key.
+3. Each custodian is notified; their Security page lists the request. Before
+   approving they compare the code with the person (phone or in person) - this
+   is what stops a server that swaps the requester's key. Their browser opens
+   their share with their account key and seals it to the request key.
+4. At M approvals the request is `released`; the requester's browser combines
+   `AK`, keeps it only if it is the published and logged key
+   (`publishedKeyVerifier`, the QR hand-over's check), stores a device lock,
+   closes the request (released shares deleted) and splits again. The next
+   password sign-in seals the password lock to the new password from that
+   device copy, as for any device.
+
+Every request, approval and completion is an audit row (`chat.recovery.*`) and
+a security notice to the account; custodians get a notice per request.
+
+**API** (`/api/e2ee/keys`, signed-in account only): `recovery-state`,
+`put-recovery-shares` (refused unless it matches the policy now),
+`recovery-own`, `recovery-open` (rate limited), `recovery-inbox`,
+`recovery-approve`, `recovery-complete`. **Tables** (migration
+`20281220000000_chat_recovery_quorum`, additive): `ChatRecoveryShare`,
+`ChatRecoveryRequest`, `ChatRecoveryApproval`, and `ChatRecoveryKey` /
+`ChatRecoveryKeyShare` for the `ORK` below.
+
+**`ORK` keeps one job: history for members with no account key.** The
+migration's legacy key for a member who has none, and a conversation where no
+member has one (proposal 8.4), still need a public key to seal to at migration
+time. `recoveryKeyPair(seed)` derives that X-Wing pair; its seed is split like
+an account key. Written: the primitive and the tables. Not written: the
+custodian ceremony that creates it, the migrator sealing to it, and opening it
+for a returning member.
+
+**Left / not verified.** Nothing above has been typechecked, tested, built, run
+against PostgreSQL or seen in a browser. Custodian public keys come from the
+server's `recovery-state` and are not yet checked against the key log (the log's
+`proofs` answers only the caller or conversation peers): a server that swaps M
+custodian keys gets the shares - a blocker for default-on, fixed by a
+`recovery` scope on `proofs`. Email password resets (not the administrator
+route) do not open the quorum yet. No "decline" for a custodian; a request
+simply expires. The admin People screen does not yet say that approving also
+starts the chat quorum.
+
+## Proposal: the organisation recovery key (superseded in part by "Recovery")
 
 Goal: an account that loses every factor of its own gets its account key and
 history back without the server ever being able to do it alone (proposal 3.4
