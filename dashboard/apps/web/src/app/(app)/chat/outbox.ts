@@ -20,6 +20,7 @@ import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import * as sealedReactions from "./sealed-reactions";
 import { chatStore } from "@/lib/chat/offline/chat-cache";
 import { isNetworkFailure, noteRequestFailure } from "@/lib/reachability";
+import { canKeepForLater, undelivered } from "@/lib/offline/try-now";
 import { newClientKey, type QueueSendResult } from "@/lib/offline/outbox";
 import { openAtRest, restKey, sealAtRest, type SealedAtRest } from "@/lib/offline/at-rest";
 import { createWriteQueue, useQueueFlusher } from "@/lib/offline/write-queue";
@@ -281,8 +282,7 @@ async function deliverChange(change: ChatChange): Promise<QueueSendResult> {
         const answer = await sendChange(change);
         return "refused" in answer ? { refused: answer.refused } : { sent: change.messageId };
     } catch (caught) {
-        noteRequestFailure(caught);
-        return "unreachable";
+        return undelivered(caught);
     }
 }
 
@@ -342,9 +342,10 @@ export async function changeMessage(
         const answer = await runAction(
             () =>
                 sendChange(change).catch((caught: unknown) => {
-                    // Not answered: kept below. Anything else fails as it always did.
-                    if (!isNetworkFailure(caught)) throw caught;
-                    noteRequestFailure(caught);
+                    // Not answered, or answered by a newer build: kept below. Anything
+                    // else fails as it always did.
+                    if (!canKeepForLater(caught)) throw caught;
+                    undelivered(caught);
                     unanswered = true;
                     return null;
                 }),

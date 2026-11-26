@@ -106,7 +106,7 @@ import {
     DateInput
 } from "@polaris/ui";
 import * as polls from "./drive-reads";
-import { isNetworkFailure } from "@/lib/reachability";
+import { canKeepForLater } from "@/lib/offline/try-now";
 import { KeptDriveChanges } from "./kept-changes";
 import { keepDriveChange, useDriveChanges, withDriveChanges, type DriveChange } from "./offline-changes";
 
@@ -281,7 +281,7 @@ export function DriveExplorer({
         try {
             return await ask();
         } catch (caught) {
-            if (isNetworkFailure(caught) && (await keepDriveChange(change))) return {};
+            if (canKeepForLater(caught) && (await keepDriveChange(change))) return {};
             throw caught;
         }
     }
@@ -908,7 +908,7 @@ export function DriveExplorer({
             // To the bin is kept for when Polaris answers; deleting for good is
             // not something to do later on its own, so it is put back and said.
             const kept =
-                kind === "trash" && isNetworkFailure(caught)
+                kind === "trash" && canKeepForLater(caught)
                     ? (
                           await Promise.all(
                               targets.map((entry) => keepDriveChange({ op: "trash", connectionId, path: entry.path }))

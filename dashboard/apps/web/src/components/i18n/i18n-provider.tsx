@@ -68,7 +68,11 @@ export function I18nProvider({
 function UiWords({ children }: { children: ReactNode }) {
     const t = useTranslations("components");
     const actionFailed = t("actions.requestFailed");
-    useEffect(() => setActionFailureText(actionFailed), [actionFailed]);
+    const actionFailedAfterUpdate = t("actions.requestFailedAfterUpdate");
+    useEffect(
+        () => setActionFailureText(actionFailed, actionFailedAfterUpdate),
+        [actionFailed, actionFailedAfterUpdate]
+    );
     const strings = useMemo<UiStrings>(() => {
         const parts = (said: (string | ReactNode)[]) =>
             said.map((part, index) => <Fragment key={index}>{part}</Fragment>);

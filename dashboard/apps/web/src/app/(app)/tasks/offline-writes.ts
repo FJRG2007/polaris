@@ -17,8 +17,7 @@
 import * as actions from "./actions";
 import { useEffect, useState } from "react";
 import { actionFailureText } from "@/lib/run-action";
-import { noteRequestFailure } from "@/lib/reachability";
-import { tryNow, UNANSWERED } from "@/lib/offline/try-now";
+import { tryNow, UNANSWERED, undelivered } from "@/lib/offline/try-now";
 import { newClientKey, type QueueSendResult } from "@/lib/offline/outbox";
 import { appWrites, offlineStore, registerWriteKind, type AppWrite } from "@/lib/offline/app-writes";
 
@@ -47,8 +46,7 @@ async function deliver(entry: Pick<AppWrite, "kind" | "target" | "payload">): Pr
         const result = await call[entry.kind as TaskWriteKind](entry.payload as Record<string, unknown>);
         return result.error ? { refused: result.error } : { sent: result.id ?? entry.target };
     } catch (caught) {
-        noteRequestFailure(caught);
-        return "unreachable";
+        return undelivered(caught);
     }
 }
 

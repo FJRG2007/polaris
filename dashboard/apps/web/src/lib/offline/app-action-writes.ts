@@ -21,7 +21,8 @@ import { useEffect, useState } from "react";
 import { fromWire, toWire } from "@/lib/app-bundles/wire";
 import { newClientKey, type QueueSendResult } from "./outbox";
 import { appWrites, offlineStore, registerWriteKind, type AppWrite } from "./app-writes";
-import { isNetworkFailure, noteRequestFailure, noteResponseStatus } from "@/lib/reachability";
+import { noteRequestFailure, noteResponseStatus } from "@/lib/reachability";
+import { canKeepForLater, undelivered } from "@/lib/offline/try-now";
 
 export const APP_ACTION = "app.action";
 
@@ -181,8 +182,10 @@ export async function attemptAppAction<T>(
     try {
         return { value: await (action as (...a: unknown[]) => Promise<T>)(...args) };
     } catch (caught) {
-        if (!ref || !isNetworkFailure(caught)) throw caught;
-        noteRequestFailure(caught);
+        // Not answered, or answered by a newer build that cannot run this
+        // tab's action: kept, and sent by the route, which any build serves.
+        if (!ref || !canKeepForLater(caught)) throw caught;
+        undelivered(caught);
         if (await keepAppAction(action, args, options)) return { kept: true };
         throw caught;
     }

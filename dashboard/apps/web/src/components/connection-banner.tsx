@@ -41,6 +41,7 @@ import {
     type LocalOffer
 } from "@/lib/local-address";
 import { updateInProgress } from "@/lib/update-in-progress";
+import { callsWaiting, subscribeCallsWaiting } from "@/lib/run-action";
 import { hostOffline, subscribeHostOffline } from "@/lib/host-internet";
 import {
     noteRequestFailure,
@@ -65,6 +66,8 @@ export function ConnectionBanner() {
     // The server's own line, said only when nothing more urgent is: Polaris
     // itself still answers, so this is a quiet note rather than an alarm.
     const noInternet = useSyncExternalStore(subscribeHostOffline, hostOffline, () => false);
+    // Saves made while Polaris is away, waiting to be sent again (`runAction`).
+    const saving = useSyncExternalStore(subscribeCallsWaiting, callsWaiting, () => 0) > 0;
     const [back, setBack] = useState<Back>("none");
     const [retrying, setRetrying] = useState(false);
     const [local, setLocal] = useState<LocalOffer | null>(null);
@@ -173,6 +176,9 @@ export function ConnectionBanner() {
                     <Icon className="size-4 shrink-0" aria-hidden />
                     <span className="min-w-0">{t(`network.${state}`)}</span>
                 </span>
+                {saving && (state === "unreachable" || state === "updating") ? (
+                    <span className="min-w-0">{t("network.savingWhenBack")}</span>
+                ) : null}
                 {state === "updating" ? <span className="update-line" aria-hidden /> : null}
                 {state === "unreachable" ? (
                     <span className="flex shrink-0 items-center gap-2">

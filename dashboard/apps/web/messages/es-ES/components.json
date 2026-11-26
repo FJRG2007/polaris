@@ -14,7 +14,8 @@
         "tryAgain": "Reintentar",
         "dismiss": "Descartar",
         "remove": "Quitar",
-        "requestFailed": "No se ha podido completar. Inténtalo de nuevo."
+        "requestFailed": "No se ha podido completar. Inténtalo de nuevo.",
+        "requestFailedAfterUpdate": "Polaris se acaba de actualizar. Recarga la página y vuelve a intentarlo."
     },
     "activity": {
         "heading": {
@@ -1933,7 +1934,8 @@
         "polarisBack": "Polaris ha vuelto",
         "retry": "Reintentar",
         "useLocal": "Abrir en tu red",
-        "useOther": "Abrir otra dirección"
+        "useOther": "Abrir otra dirección",
+        "savingWhenBack": "Tus cambios se guardan en cuanto vuelva."
     },
     "customEmoji": {
         "from": "De {space}"

@@ -16,9 +16,8 @@
 import * as actions from "./actions";
 import { useEffect, useState } from "react";
 import { actionFailureText } from "@/lib/run-action";
-import { noteRequestFailure } from "@/lib/reachability";
 import { keptTemplate } from "./offline-templates";
-import { tryNow, UNANSWERED } from "@/lib/offline/try-now";
+import { tryNow, UNANSWERED, undelivered } from "@/lib/offline/try-now";
 import { newClientKey, type QueueSendResult } from "@/lib/offline/outbox";
 import {
     appWrites,
@@ -87,8 +86,7 @@ async function deliverNoteText(entry: Pick<AppWrite, "key" | "payload">): Promis
         if (result.conflict) return { refused: NOTE_CONFLICT };
         return { refused: result.error ?? "" };
     } catch (caught) {
-        noteRequestFailure(caught);
-        return "unreachable";
+        return undelivered(caught);
     }
 }
 
@@ -148,8 +146,7 @@ async function deliverPlace(entry: Pick<AppWrite, "kind" | "target" | "payload">
         const result = await place[entry.kind as PlaceKind](entry.payload as Record<string, unknown>);
         return result.error ? { refused: result.error } : { sent: result.id ?? entry.target };
     } catch (caught) {
-        noteRequestFailure(caught);
-        return "unreachable";
+        return undelivered(caught);
     }
 }
 

@@ -16,7 +16,7 @@ import type { DriveEntry } from "./types";
 import type { DriveChange } from "./offline-actions";
 import { useEffect, useState } from "react";
 import { replayDriveChangeAction } from "./offline-actions";
-import { noteRequestFailure } from "@/lib/reachability";
+import { undelivered } from "@/lib/offline/try-now";
 import { newClientKey, type QueueSendResult } from "@/lib/offline/outbox";
 import { appWrites, registerWriteKind, type AppWrite } from "@/lib/offline/app-writes";
 
@@ -30,8 +30,7 @@ export async function deliverDriveChange(entry: Pick<AppWrite, "payload">): Prom
         const result = await replayDriveChangeAction(entry.payload);
         return result.error === undefined ? { sent: "" } : { refused: result.error };
     } catch (caught) {
-        noteRequestFailure(caught);
-        return "unreachable";
+        return undelivered(caught);
     }
 }
 
