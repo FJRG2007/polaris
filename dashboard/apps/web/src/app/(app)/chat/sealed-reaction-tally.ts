@@ -39,6 +39,23 @@ export function withSealedReactions(plain: readonly ChatReactionView[], sets: re
     return [...out.values()].filter((tally) => tally.count > 0);
 }
 
+/**
+ * The counts drawn for a sealed-reaction message: the reader's own reactions
+ * come from `own` alone (their sealed set, with whatever they still had in the
+ * clear folded in), so a row patched on screen or a clear row the server has
+ * since dropped is never counted next to the set that replaced it.
+ */
+export function countedFor(
+    plain: readonly ChatReactionView[],
+    sets: readonly OpenedReactions[],
+    own: readonly string[]
+): ChatReactionView[] {
+    const others = plain
+        .map((view) => (view.mine ? { ...view, count: view.count - 1, mine: false } : view))
+        .filter((view) => view.count > 0);
+    return withSealedReactions(others, [...sets.filter((set) => !set.mine), { emoji: own, mine: true }]);
+}
+
 /** This person's set with one emoji put on or taken off; a space emoji by its id. */
 export function toggled(set: readonly string[], emoji: string, on: boolean): string[] {
     const key = reactionKey(emoji);

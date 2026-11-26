@@ -42,6 +42,7 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MessagesSkeleton } from "./messages-skeleton";
 import { knownPeopleOf } from "./known-people";
+import { reactedByMe } from "./sealed-reactions";
 
 /**
  * What the thread may be narrowed and widened to.
@@ -253,8 +254,11 @@ export function ThreadPanel({
                                 await load();
                             }}
                             onReact={async (messageId, emoji) => {
-                                const mine =
-                                    shown?.find((entry) => entry.id === messageId)?.reactions.find((entry) => entry.emoji === emoji)?.mine ?? false;
+                                // Read as drawn, so an emoji in the reader's sealed set is taken back, not sent again.
+                                const mine = reactedByMe(
+                                    shown?.find((entry) => entry.id === messageId),
+                                    emoji
+                                );
                                 // Kept on this device when Polaris does not answer, drawn as pressed meanwhile.
                                 const result = await outbox.changeMessage(
                                     { op: "react", channelId: root.channelId, messageId, emoji, on: !mine },

@@ -11,7 +11,7 @@
 import * as actions from "./actions";
 import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import type { ChatMessageView } from "@/lib/chat/messages";
-import { toggled, withSealedReactions, type OpenedReactions } from "./sealed-reaction-tally";
+import { countedFor, reactionKey, toggled, type OpenedReactions } from "./sealed-reaction-tally";
 
 /** Pages of sets read at most for one batch of messages. */
 const MAX_PAGES = 50;
@@ -32,10 +32,30 @@ export function takesSealed(messageId: string): boolean {
     return takes.has(messageId);
 }
 
-/** Note the sealed-reaction messages of a page, with what the reader had on them in the clear. */
+/** Messages a set was sent for from this page: the server dropped the reader's clear rows on them. */
+const sent = new Set<string>();
+
+/**
+ * Note the sealed-reaction messages of a page, with what the reader had on
+ * them in the clear. Not again once a set went from here: a row patched on
+ * screen since would read as a clear reaction the server no longer has.
+ */
 export function noteSealedReactions(messages: readonly ChatMessageView[]): void {
     for (const message of messages)
-        if (message.sealedReactions) takes.set(message.id, message.reactions.filter((one) => one.mine).map((one) => one.emoji));
+        if (message.sealedReactions && !sent.has(message.id))
+            takes.set(message.id, message.reactions.filter((one) => one.mine).map((one) => one.emoji));
+}
+
+/** This reader's emoji on the message as the next set starts from: their set and what they had in the clear. */
+function ownOf(messageId: string): string[] {
+    return [...new Set([...(opened.get(messageId)?.own ?? []), ...(takes.get(messageId) ?? [])])];
+}
+
+/** Whether the reader has this emoji on the message as drawn (sealed or not); what a press takes back. */
+export function reactedByMe(message: ChatMessageView | undefined, emoji: string): boolean {
+    if (!message) return false;
+    const key = reactionKey(emoji);
+    return withOpenedReactions(message).reactions.some((one) => one.mine && reactionKey(one.emoji) === key);
 }
 
 /** Read and open every set on these messages of one conversation (at most 100). */
@@ -64,7 +84,7 @@ export async function loadSealedReactions(channelId: string, messageIds: readonl
 export function withOpenedReactions(message: ChatMessageView): ChatMessageView {
     const entry = message.sealedReactions ? opened.get(message.id) : undefined;
     if (!entry) return message;
-    const reactions = withSealedReactions(message.reactions, entry.sets).sort(
+    const reactions = countedFor(message.reactions, entry.sets, ownOf(message.id)).sort(
         (left, right) => right.count - left.count || left.emoji.localeCompare(right.emoji)
     );
     return { ...message, reactions };
@@ -76,8 +96,7 @@ export function withOpenedReactions(message: ChatMessageView): ChatMessageView {
  */
 export async function sendSealedReaction(channelId: string, messageId: string, emoji: string, on: boolean): Promise<{ on?: boolean; error?: string }> {
     // What they had in the clear before is sealed into the first set; the server drops those rows with it.
-    const before = [...new Set([...(opened.get(messageId)?.own ?? []), ...(takes.get(messageId) ?? [])])];
-    const after = toggled(before, emoji, on);
+    const after = toggled(ownOf(messageId), emoji, on);
     const set = after.length ? await sealedChat.sealReactions(channelId, messageId, after) : null;
     const result = await actions.putSealedReactionsAction({ messageId, set });
     if (result.error) return { error: result.error };
@@ -85,5 +104,6 @@ export async function sendSealedReaction(channelId: string, messageId: string, e
     const others = (entry?.sets ?? []).filter((one) => !one.mine);
     opened.set(messageId, { sets: after.length ? [...others, { emoji: after, mine: true }] : others, own: after });
     takes.set(messageId, []);
+    sent.add(messageId);
     return { on };
 }

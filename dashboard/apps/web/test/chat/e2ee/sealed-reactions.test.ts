@@ -188,4 +188,17 @@ describe("the counts in the browser", () => {
         expect(tally.toggled(["👍", "🎉"], "👍", false)).toEqual(["🎉"]);
         expect(tally.toggled(["👍"], "👍", true)).toEqual(["👍"]);
     });
+
+    it("counts the reader's own reactions from their set only, never a plain row patched on screen as well", () => {
+        // On screen: the reader's 👍 patched in as plain (count 2, mine) and their sealed set holding 👍.
+        const plainViews = [
+            { emoji: "👍", count: 2, mine: true },
+            { emoji: "🎉", count: 1, mine: true }
+        ];
+        const others = [{ emoji: ["👍"], mine: false }];
+        // One plain from somebody else, one sealed from somebody else, the reader's own: three.
+        expect(tally.countedFor(plainViews, others, ["👍"])).toEqual([{ emoji: "👍", count: 3, mine: true }]);
+        // Taken off: nothing of theirs is left, whatever the plain row still says.
+        expect(tally.countedFor(plainViews, others, [])).toEqual([{ emoji: "👍", count: 2, mine: false }]);
+    });
 });

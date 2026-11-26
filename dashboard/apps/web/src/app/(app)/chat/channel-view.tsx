@@ -134,6 +134,7 @@ import { usePolarContext } from "@/components/polar/polar-panel";
 import * as polls from "./chat-reads";
 import * as chatCache from "@/lib/chat/offline/chat-cache";
 import * as outbox from "./outbox";
+import { reactedByMe } from "./sealed-reactions";
 import * as readMarks from "@/lib/chat/read-marks";
 import { prefetchMedia } from "./media-download";
 import { OutdatedAppGate } from "./outdated-app-gate";
@@ -2289,11 +2290,12 @@ export function ChannelView({
     };
 
     const react = async (messageId: string, emoji: string) => {
-        // As drawn: a reaction still waiting on this device counts as pressed.
-        const before =
-            withChanges(held.current, changes)
-                .find((entry) => entry.id === messageId)
-                ?.reactions.find((entry) => entry.emoji === emoji)?.mine ?? false;
+        // As drawn: a reaction still waiting on this device counts as pressed, and
+        // one in the reader's sealed set (which the plain row does not carry) is theirs.
+        const before = reactedByMe(
+            withChanges(held.current, changes).find((entry) => entry.id === messageId),
+            emoji
+        );
         // Said deterministically rather than as a nudge up or down, so putting
         // it back is the same call with the other answer.
         patchReaction(messageId, emoji, !before);
