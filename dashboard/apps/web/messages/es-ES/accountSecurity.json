@@ -658,6 +658,19 @@
         "approveFailed": "No se pudo aprobar. Abre antes tus chats cifrados en este dispositivo y vuelve a intentarlo.",
         "decline": "Rechazar",
         "declined": "Rechazado. Tu parte no se ha entregado.",
-        "declineFailed": "No se pudo rechazar. Recarga la página y vuelve a intentarlo."
+        "declineFailed": "No se pudo rechazar. Recarga la página y vuelve a intentarlo.",
+        "declines": "Lo han rechazado {count, plural, one {# administrador} other {# administradores}}. Aún hacen falta {threshold} aprobaciones.",
+        "keyTitle": "Clave de recuperación de {org}",
+        "keyInstance": "esta instancia",
+        "keyWaiting": "{count, plural, one {# miembro ha vuelto y espera} other {# miembros han vuelto y esperan}} historial que solo guarda esta clave.",
+        "keyResplit": "Los administradores han cambiado. Abre la clave con los demás para repartirla entre los de hoy.",
+        "keyOpen": "Abrir con administradores",
+        "keyOpening": "Código {code}. Díselo a los demás administradores cuando lo pidan. {released} de {threshold} partes por ahora.",
+        "keyOpenFailed": "No se pudo abrir la clave. Abre primero tus chats cifrados en este dispositivo y vuelve a intentarlo.",
+        "keyFinished": "Clave abierta. {count, plural, =0 {No había nada pendiente} one {Se ha enviado # copia de historial} other {Se han enviado # copias de historial}}.",
+        "keyInboxTitle": "{name} pide abrir la clave de recuperación de {org}",
+        "keyInboxBody": "Permite a los miembros que vuelven leer sus chats anteriores. Deben aprobarlo {threshold} administradores.",
+        "keyConfirmTitle": "Aprobar abrir la clave",
+        "keyConfirmBody": "Pide a {name} el código de su pantalla, por teléfono o en persona. Aprueba solo si coincide con este."
     }
 }

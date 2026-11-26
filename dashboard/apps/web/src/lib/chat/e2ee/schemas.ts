@@ -120,7 +120,38 @@ export const keysBody = z.discriminatedUnion("op", [
             .array(z.object({ custodianId: z.string().uuid(), custodianAkVersion: akVersion, envelope: recoveryEnvelope }))
             .min(1)
             .max(3)
-    })
+    }),
+    // Opening a scope's recovery key with a quorum (recovery-opening.ts): raise
+    // one, release or decline a seed share, then the opener's browser reads the
+    // history sealed to it, seals it to the members missing it, splits the seed
+    // again when the custodians changed, and closes the opening.
+    z.object({ op: z.literal("recovery-key-open"), keyId: z.string().uuid(), requesterKey: z.string().length(1622).regex(BASE64URL) }),
+    z.object({ op: z.literal("recovery-key-release"), openingId: z.string().uuid(), envelope: recoveryEnvelope }),
+    z.object({ op: z.literal("recovery-key-decline"), openingId: z.string().uuid() }),
+    z.object({ op: z.literal("recovery-key-work"), openingId: z.string().uuid(), after: z.string().uuid().nullable() }),
+    z.object({
+        op: z.literal("recovery-key-seal"),
+        openingId: z.string().uuid(),
+        envelopes: z
+            .array(
+                z.object({
+                    channelId: z.string().uuid(),
+                    epoch: z.string().regex(/^[0-9]{1,20}$/),
+                    recipient: z.string().uuid(),
+                    envelope: base64Url(64, 4096)
+                })
+            )
+            .min(1)
+            .max(200)
+    }),
+    z.object({
+        op: z.literal("recovery-key-resplit"),
+        openingId: z.string().uuid(),
+        splitId: z.string().uuid(),
+        threshold: z.number().int().min(1).max(3),
+        shares: z.array(z.object({ custodianId: z.string().uuid(), custodianAkVersion: akVersion, envelope: recoveryEnvelope })).min(1).max(3)
+    }),
+    z.object({ op: z.literal("recovery-key-complete"), openingId: z.string().uuid() })
 ]);
 export type KeysBody = z.infer<typeof keysBody>;
 

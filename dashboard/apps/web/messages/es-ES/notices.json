@@ -94,7 +94,13 @@
         "chat_recovery_completed": "Tus chats cifrados se han recuperado en un dispositivo nuevo",
         "chat_recovery_completed_body": "Lo aprobaron tus administradores. Si no has sido tú, cierra todas las sesiones en la página de sesiones.",
         "chat_recovery_declined": "Se ha rechazado la recuperación de tus chats cifrados",
-        "chat_recovery_declined_body": "No la aprobaron suficientes administradores. Pídeles que confirmen que eres tú y vuelve a solicitarla."
+        "chat_recovery_declined_body": "No la aprobaron suficientes administradores. Pídeles que confirmen que eres tú y vuelve a solicitarla.",
+        "chat_recovery_key_waiting": "Un administrador pide abrir una clave de recuperación",
+        "chat_recovery_key_waiting_body": "Compara el código con esa persona antes de aprobarlo en la página de seguridad.",
+        "chat_recovery_key_released": "La clave de recuperación ya se abre",
+        "chat_recovery_key_released_body": "Han aprobado suficientes administradores. Abre la página de seguridad en el dispositivo desde el que lo pediste.",
+        "chat_recovery_key_declined": "Se ha rechazado abrir la clave de recuperación",
+        "chat_recovery_key_declined_body": "No lo aprobaron suficientes administradores. Habla con ellos y vuelve a pedirlo."
     },
     "friends": {
         "somebody": "Alguien",

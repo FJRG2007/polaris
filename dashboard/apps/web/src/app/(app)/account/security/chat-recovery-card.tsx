@@ -3,8 +3,11 @@
 /**
  * The Security page's line on quorum recovery of encrypted chats: who can
  * recover this account, the single administrator's warning, a request this
- * browser raised (its code and progress), and the requests waiting on this
- * account as a custodian. See lib/chat/e2ee/recovery-client.ts.
+ * browser raised (its code, approvals and declines), the requests waiting on
+ * this account as a custodian, and - for a custodian - each organisation
+ * recovery key: opening it with the other administrators when members came
+ * back for history only it holds or the administrators changed, and approving
+ * another administrator's opening. See lib/chat/e2ee/recovery-client.ts.
  */
 
 import { SettingCard, Feedback } from "./setting-card";
@@ -22,26 +25,43 @@ interface Loaded {
     own: recovery.OwnRequest | null;
     heldRequest: string | null;
     inbox: recovery.InboxItem[];
+    keys: recovery.RecoveryKeyScope[];
+    /** Openings of this account that this browser raised (and so shows the code of). */
+    heldOpenings: Record<string, string>;
 }
+
+type Approving =
+    | { kind: "account"; item: recovery.InboxItem; code: string }
+    | { kind: "key"; entry: recovery.RecoveryKeyScope; opening: recovery.KeyOpening; code: string };
 
 export function ChatRecoveryCard() {
     const t = useTranslations("accountSecurity");
     const [loaded, setLoaded] = useState<Loaded | null>(null);
     const [code, setCode] = useState<string | null>(null);
-    const [approving, setApproving] = useState<{ item: recovery.InboxItem; code: string } | null>(null);
+    const [approving, setApproving] = useState<Approving | null>(null);
     const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
     const [busy, setBusy] = useState(false);
 
     const load = useCallback(async () => {
-        const [keys, state, own, inbox] = await Promise.all([
+        const [keys, state, own, inbox, scopes] = await Promise.all([
             keyState(),
             recovery.recoveryState(),
             recovery.ownRequest(),
-            recovery.custodianInbox()
+            recovery.custodianInbox(),
+            recovery.recoveryKeyState()
         ]);
         if (!keys || !state) return;
         const heldRequest = await recovery.heldRequest(keys.userId);
-        setLoaded({ userId: keys.userId, state, own, heldRequest, inbox });
+        const heldOpenings: Record<string, string> = {};
+        for (const entry of scopes ?? [])
+            for (const opening of entry.openings) {
+                if (!opening.mine || !(await recovery.holdsOpening(opening.id))) continue;
+                if (opening.status === "released") {
+                    const sealed = await recovery.finishOpening(keys.userId, entry, opening).catch(() => null);
+                    if (sealed !== null) setMessage({ tone: "ok", text: t("chatRecovery.keyFinished", { count: sealed }) });
+                } else heldOpenings[opening.id] = await recovery.codeOf(opening.id, opening.requesterKey);
+            }
+        setLoaded({ userId: keys.userId, state, own, heldRequest, inbox, keys: scopes ?? [], heldOpenings });
         if (own?.request && heldRequest === own.request.id) {
             setCode(await recovery.codeOf(own.request.id, own.request.requesterKey));
             if (own.request.status === "released") {
@@ -72,12 +92,27 @@ export function ChatRecoveryCard() {
     };
 
     const openApproval = async (item: recovery.InboxItem) =>
-        setApproving({ item, code: await recovery.codeOf(item.id, item.requesterKey) });
+        setApproving({ kind: "account", item, code: await recovery.codeOf(item.id, item.requesterKey) });
+
+    const openKeyApproval = async (entry: recovery.RecoveryKeyScope, opening: recovery.KeyOpening) =>
+        setApproving({ kind: "key", entry, opening, code: await recovery.codeOf(opening.id, opening.requesterKey) });
+
+    const startOpening = async (entry: recovery.RecoveryKeyScope) => {
+        if (!loaded) return;
+        setBusy(true);
+        const started = await recovery.startOpening(loaded.userId, entry, deviceAccountHpke).catch(() => null);
+        setBusy(false);
+        if (!started) setMessage({ tone: "error", text: t("chatRecovery.keyOpenFailed") });
+        await load();
+    };
 
     const confirmApproval = async () => {
         if (!loaded || !approving) return;
         setBusy(true);
-        const ok = await recovery.approve(loaded.userId, approving.item, deviceAccountHpke).catch(() => false);
+        const ok = await (approving.kind === "account"
+            ? recovery.approve(loaded.userId, approving.item, deviceAccountHpke)
+            : recovery.approveOpening(loaded.userId, approving.entry, approving.opening, deviceAccountHpke)
+        ).catch(() => false);
         setBusy(false);
         setApproving(null);
         setMessage(ok ? { tone: "ok", text: t("chatRecovery.approved") } : { tone: "error", text: t("chatRecovery.approveFailed") });
@@ -87,7 +122,9 @@ export function ChatRecoveryCard() {
     const declineApproval = async () => {
         if (!approving) return;
         setBusy(true);
-        const ok = await recovery.decline(approving.item).catch(() => false);
+        const ok = await (approving.kind === "account" ? recovery.decline(approving.item) : recovery.declineOpening(approving.opening)).catch(
+            () => false
+        );
         setBusy(false);
         setApproving(null);
         setMessage(ok ? { tone: "ok", text: t("chatRecovery.declined") } : { tone: "error", text: t("chatRecovery.declineFailed") });
@@ -110,6 +147,11 @@ export function ChatRecoveryCard() {
             : t("chatRecovery.nobody");
     const request = loaded?.own?.request;
     const mine = request && loaded?.heldRequest === request.id;
+    const orgOf = (entry: recovery.RecoveryKeyScope) => entry.orgName ?? t("chatRecovery.keyInstance");
+    const approvingName =
+        approving?.kind === "account"
+            ? (approving.item.ownerName ?? approving.item.ownerEmail ?? "")
+            : (approving?.opening.openerName ?? approving?.opening.openerEmail ?? "");
 
     return (
         <>
@@ -131,6 +173,53 @@ export function ChatRecoveryCard() {
             {mine && code ? (
                 <Feedback ok={t("chatRecovery.waiting", { code, approvals: request.approvals, threshold: request.threshold })} />
             ) : null}
+            {mine && request.declines > 0 ? (
+                <Feedback error={t("chatRecovery.declines", { count: request.declines, threshold: request.threshold })} />
+            ) : null}
+            {loaded.keys.map((entry) => {
+                const key = entry.key;
+                if (!key?.share || !key.openable) return null;
+                const own = entry.openings.find((opening) => opening.mine && loaded.heldOpenings[opening.id]);
+                const others = entry.openings.filter((opening) => !opening.mine && opening.status === "pending" && !opening.ownReleased);
+                const needed = entry.waiting > 0 || !key.current;
+                return (
+                    <div key={entry.scope} className="flex flex-col gap-3">
+                        {needed && !own ? (
+                            <SettingCard
+                                title={t("chatRecovery.keyTitle", { org: orgOf(entry) })}
+                                description={entry.waiting > 0 ? t("chatRecovery.keyWaiting", { count: entry.waiting }) : t("chatRecovery.keyResplit")}
+                            >
+                                <Button size="sm" variant="outline" disabled={busy} onClick={() => void startOpening(entry)}>
+                                    {t("chatRecovery.keyOpen")}
+                                </Button>
+                            </SettingCard>
+                        ) : null}
+                        {own ? (
+                            <Feedback
+                                ok={t("chatRecovery.keyOpening", {
+                                    code: loaded.heldOpenings[own.id] ?? "",
+                                    released: own.released,
+                                    threshold: own.threshold
+                                })}
+                            />
+                        ) : null}
+                        {own && own.declined > 0 ? (
+                            <Feedback error={t("chatRecovery.declines", { count: own.declined, threshold: own.threshold })} />
+                        ) : null}
+                        {others.map((opening) => (
+                            <SettingCard
+                                key={opening.id}
+                                title={t("chatRecovery.keyInboxTitle", { name: opening.openerName ?? opening.openerEmail ?? "", org: orgOf(entry) })}
+                                description={t("chatRecovery.keyInboxBody", { threshold: opening.threshold })}
+                            >
+                                <Button size="sm" onClick={() => void openKeyApproval(entry, opening)}>
+                                    {t("chatRecovery.review")}
+                                </Button>
+                            </SettingCard>
+                        ))}
+                    </div>
+                );
+            })}
             {loaded?.inbox.map((item) => (
                 <SettingCard
                     key={item.id}
@@ -146,9 +235,9 @@ export function ChatRecoveryCard() {
             <Dialog open={approving !== null} onOpenChange={(open) => !open && setApproving(null)}>
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>{t("chatRecovery.confirmTitle")}</DialogTitle>
+                        <DialogTitle>{t(approving?.kind === "key" ? "chatRecovery.keyConfirmTitle" : "chatRecovery.confirmTitle")}</DialogTitle>
                         <DialogDescription>
-                            {t("chatRecovery.confirmBody", { name: approving?.item.ownerName ?? approving?.item.ownerEmail ?? "" })}
+                            {t(approving?.kind === "key" ? "chatRecovery.keyConfirmBody" : "chatRecovery.confirmBody", { name: approvingName })}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col gap-4">

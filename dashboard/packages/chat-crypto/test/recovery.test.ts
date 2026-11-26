@@ -143,4 +143,40 @@ describe("organisation recovery key", () => {
             recovery.openShare(holders[0]!.pair.privateKey, created.shares[0]!.envelope, recovery.recoveryKeyBinding("key-2"), "k1", 1)
         ).rejects.toThrow();
     });
+
+    it("opens an ORK for one custodian's opening, splits it again, and refuses a swapped key", async () => {
+        const holders = await Promise.all(["k1", "k2", "k3"].map(async (userId) => ({ userId, pair: await recovery.requesterKeyPair() })));
+        const custodians = holders.map((h) => ({ userId: h.userId, akVersion: 1, hpkePublicKey: h.pair.publicKey }));
+        const created = await recovery.createRecoveryKey("key-1", custodians, 2);
+        const opener = await recovery.requesterKeyPair();
+        const opening = recovery.openingBinding("opening-1", "key-1");
+        const releaseFrom = async (i: number, as = opening) => {
+            const share = await recovery.openShare(holders[i]!.pair.privateKey, created.shares[i]!.envelope, recovery.recoveryKeyBinding("key-1"), holders[i]!.userId, 1);
+            return { custodianId: holders[i]!.userId, envelope: await recovery.releaseShare(opener.publicKey, share, as, holders[i]!.userId) };
+        };
+        const released = [await releaseFrom(0), await releaseFrom(1)];
+        const opened = await recovery.openRecoveryKey(opener.privateKey, released, opening, created.publicKey);
+        expect((await recovery.recoveryKeyPair(opened.seed)).publicKey).toEqual(created.publicKey);
+
+        // A new split to changed custodians: same key, new shares that the new quorum rebuilds.
+        const newcomer = { userId: "k4", pair: await recovery.requesterKeyPair() };
+        const next = [holders[1]!, newcomer].map((h) => ({ userId: h.userId, akVersion: 1, hpkePublicKey: h.pair.publicKey }));
+        const split = recovery.recoveryKeyBinding("key-1", "split-2");
+        const resealed = await recovery.splitAccountKey(opened.seed, next, 2, split);
+        opened.seed.fill(0);
+        const shamir = await import("../src/shamir");
+        const parts = await Promise.all(
+            [holders[1]!, newcomer].map((h, i) => recovery.openShare(h.pair.privateKey, resealed[i]!.envelope, split, h.userId, 1))
+        );
+        expect((await recovery.recoveryKeyPair(await shamir.combine(parts))).publicKey).toEqual(created.publicKey);
+        // The old split's share does not open as the new one.
+        await expect(recovery.openShare(holders[1]!.pair.privateKey, created.shares[1]!.envelope, split, "k2", 1)).rejects.toThrow();
+
+        // Shares released to another opening, or checked against another key, are refused.
+        await expect(
+            recovery.openRecoveryKey(opener.privateKey, [await releaseFrom(0, recovery.openingBinding("opening-2", "key-1")), await releaseFrom(1)], opening, created.publicKey)
+        ).rejects.toThrow();
+        const other = await recovery.recoveryKeyPair(key(77));
+        await expect(recovery.openRecoveryKey(opener.privateKey, released, opening, other.publicKey)).rejects.toThrow(RangeError);
+    });
 });

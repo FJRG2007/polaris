@@ -658,6 +658,19 @@
         "approveFailed": "Could not approve. Open your encrypted chats on this device first, then try again.",
         "decline": "Decline",
         "declined": "Declined. Your share was not released.",
-        "declineFailed": "Could not decline. Reload the page and try again."
+        "declineFailed": "Could not decline. Reload the page and try again.",
+        "declines": "Declined by {count, plural, one {# administrator} other {# administrators}}. {threshold} approvals are still needed.",
+        "keyTitle": "Recovery key of {org}",
+        "keyInstance": "this instance",
+        "keyWaiting": "{count, plural, one {# member is} other {# members are}} back and waiting for chat history only this key holds.",
+        "keyResplit": "The administrators changed. Open the key with the others to share it among today's administrators.",
+        "keyOpen": "Open with administrators",
+        "keyOpening": "Code {code}. Read it to the other administrators when they ask. {released} of {threshold} shares so far.",
+        "keyOpenFailed": "The key could not be opened. Open your encrypted chats on this device first, then try again.",
+        "keyFinished": "Recovery key opened. {count, plural, =0 {Nothing was waiting} one {# chat history copy went out} other {# chat history copies went out}}.",
+        "keyInboxTitle": "{name} asks to open the recovery key of {org}",
+        "keyInboxBody": "It lets members who came back read their earlier chats. {threshold} administrators must approve.",
+        "keyConfirmTitle": "Approve opening the key",
+        "keyConfirmBody": "Ask {name} for the code on their screen, by phone or in person. Approve only if it matches this one."
     }
 }

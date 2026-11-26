@@ -189,9 +189,42 @@ export async function recoveryKeyPair(seed: Uint8Array): Promise<{ privateKey: C
     }
 }
 
-/** What an `ORK`'s seed shares are bound to: owner `ork:<id>`, version 1, the key id as the split. */
-export function recoveryKeyBinding(keyId: string): ShareBinding {
-    return { ownerId: `ork:${keyId}`, akVersion: 1, splitId: keyId };
+/**
+ * What an `ORK`'s seed shares are bound to: owner `ork:<id>`, version 1, and
+ * the split - the key id for the first one, a fresh id for every split after.
+ */
+export function recoveryKeyBinding(keyId: string, splitId: string = keyId): ShareBinding {
+    return { ownerId: `ork:${keyId}`, akVersion: 1, splitId };
+}
+
+/** What a seed share released to an opening is bound to: the opening and the key. */
+export function openingBinding(openingId: string, keyId: string): ReleaseBinding {
+    return { requestId: openingId, ownerId: `ork:${keyId}`, akVersion: 1 };
+}
+
+/**
+ * The opener's browser combines the released seed shares and checks the seed
+ * against the key's published public half, so shares of another split or a
+ * key the server swapped in are refused rather than used. Answers the private
+ * key and the seed, which the caller zeroes once it has split it again (or at
+ * once, when nothing needs splitting).
+ */
+export async function openRecoveryKey(
+    requesterPrivateKey: CryptoKey,
+    released: ReadonlyArray<{ custodianId: string; envelope: Uint8Array }>,
+    binding: ReleaseBinding,
+    publicKey: Uint8Array
+): Promise<{ privateKey: CryptoKey; seed: Uint8Array }> {
+    const seed = await recoverAccountKey(requesterPrivateKey, released, binding);
+    const pair = await recoveryKeyPair(seed).catch((caught: unknown) => {
+        seed.fill(0);
+        throw caught;
+    });
+    if (pair.publicKey.length !== publicKey.length || !pair.publicKey.every((byte, index) => byte === publicKey[index])) {
+        seed.fill(0);
+        throw new RangeError("The released shares do not rebuild this recovery key");
+    }
+    return { privateKey: pair.privateKey, seed };
 }
 
 /**

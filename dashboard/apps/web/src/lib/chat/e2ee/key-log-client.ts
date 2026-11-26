@@ -362,6 +362,32 @@ export async function vouchedCustodians(
     return vouched;
 }
 
+/**
+ * The accounts among `keys` whose key the log vouches for at exactly the
+ * version served, under the `recovery` scope: who an opened recovery key's
+ * history may be sealed to. Unlike `vouchedCustodians` one account the log
+ * does not hold leaves only that account out; a log that does not answer
+ * leaves everybody out.
+ */
+export async function vouchedRecoveryAccounts(
+    ownId: string,
+    keys: ReadonlyArray<{ userId: string; akVersion: number; hpkePublicKey: Uint8Array }>
+): Promise<Set<string>> {
+    const vouched = new Set<string>();
+    for (let at = 0; at < keys.length; at += 100) {
+        const page = keys.slice(at, at + 100);
+        const check = await askLog(ownId, { op: "proofs", recovery: true, userIds: page.map((k) => k.userId) });
+        if (check.kind !== "verified") continue;
+        const byUser = new Map(check.entries.map((e) => [e.userId, e]));
+        for (const key of page) {
+            const entry = byUser.get(key.userId);
+            if (entry && entry.akVersion === key.akVersion && equal(entry.hpkePublicKey, key.hpkePublicKey)) vouched.add(key.userId);
+            else if (entry && entry.akVersion === key.akVersion) report(ownId, "inclusion");
+        }
+    }
+    return vouched;
+}
+
 /** An account key as the server handed it out. */
 export interface ServedKey {
     readonly userId: string;

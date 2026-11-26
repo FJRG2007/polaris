@@ -460,7 +460,7 @@ const GAP_SCAN = 500;
  * are not listed - there is nothing to seal to yet.
  */
 export async function legacyKeyGaps(channelId: string, epoch: bigint, audience: readonly string[], limit = MAX_CLAIM_USERS) {
-    const found: { userId: string; hpkePublicKey: Uint8Array }[] = [];
+    const found: { userId: string; akVersion: number; hpkePublicKey: Uint8Array }[] = [];
     for (let at = 0; at < audience.length && found.length < limit; at += GAP_SCAN) {
         const slice = audience.slice(at, at + GAP_SCAN);
         const held = await prisma.chatHistoryKey.findMany({ where: { channelId, epoch, recipient: { in: slice } }, select: { recipient: true } });
@@ -469,9 +469,9 @@ export async function legacyKeyGaps(channelId: string, epoch: bigint, audience: 
         for (let from = 0; from < missing.length && found.length < limit; from += MAX_CLAIM_USERS) {
             const keys = await prisma.chatAccountKey.findMany({
                 where: { userId: { in: missing.slice(from, from + MAX_CLAIM_USERS) } },
-                select: { userId: true, hpkePublicKey: true }
+                select: { userId: true, akVersion: true, hpkePublicKey: true }
             });
-            for (const key of keys) if (found.length < limit) found.push({ userId: key.userId, hpkePublicKey: new Uint8Array(key.hpkePublicKey) });
+            for (const key of keys) if (found.length < limit) found.push({ userId: key.userId, akVersion: key.akVersion, hpkePublicKey: new Uint8Array(key.hpkePublicKey) });
         }
     }
     return found;

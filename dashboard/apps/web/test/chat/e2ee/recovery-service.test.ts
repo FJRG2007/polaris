@@ -21,6 +21,12 @@ const db = vi.hoisted(() => ({
     audits: [] as Row[],
     keys: [] as Row[],
     keyShares: [] as Row[],
+    openings: [] as Row[],
+    releases: [] as Row[],
+    historyKeys: [] as Row[],
+    users: [] as Row[],
+    audience: new Map<string, string[]>(),
+    waiting: 0,
     admins: [] as string[],
     told: [] as Array<{ userId: string; title: string }>,
     recorded: [] as Row[],
@@ -35,7 +41,7 @@ vi.mock("@polaris/db", () => {
     }
     const matches = (row: Row, w: Row = {}): boolean =>
         Object.entries(w).every(([key, want]) => {
-            if (key === "ownerId_custodianId") return matches(row, want as Row);
+            if (key === "ownerId_custodianId" || key === "channelId_epoch_recipient") return matches(row, want as Row);
             if (key === "approvals") {
                 const none = (want as { none: Row }).none;
                 return !db.approvals.some((a) => a.requestId === row.id && matches(a, none));
@@ -58,15 +64,24 @@ vi.mock("@polaris/db", () => {
         const orderBy = Array.isArray(order) ? order[0] : order;
         if (!orderBy) return rows;
         const [[field, dir]] = Object.entries(orderBy) as [[string, "asc" | "desc"]];
-        const n = (v: unknown) => (v instanceof Date ? v.getTime() : (v as number));
-        return [...rows].sort((a, b) => (n(a[field]) - n(b[field])) * (dir === "asc" ? 1 : -1));
+        const n = (v: unknown) => (v instanceof Date ? v.getTime() : (v as number | string | bigint));
+        return [...rows].sort((a, b) => (n(a[field]) < n(b[field]) ? -1 : n(a[field]) > n(b[field]) ? 1 : 0) * (dir === "asc" ? 1 : -1));
     };
     const table = (rows: () => Row[], unique?: (a: Row, b: Row) => boolean) => ({
         findFirst: async ({ where, orderBy }: { where?: Row; orderBy?: Record<string, "asc" | "desc"> }) =>
             sorted(rows().filter((r) => matches(r, where)), orderBy)[0] ?? null,
         findUnique: async ({ where }: { where: Row }) => rows().find((r) => matches(r, where)) ?? null,
-        findMany: async ({ where, orderBy, take }: { where?: Row; orderBy?: Order; take?: number }) =>
-            sorted(rows().filter((r) => matches(r, where)), orderBy).slice(0, take ?? Infinity),
+        findMany: async ({ where, orderBy, take, distinct }: { where?: Row; orderBy?: Order; take?: number; distinct?: string[] }) => {
+            const seen = new Set<unknown>();
+            const found = sorted(rows().filter((r) => matches(r, where)), orderBy).filter((r) => {
+                if (!distinct) return true;
+                const at = r[distinct[0]!];
+                if (seen.has(at)) return false;
+                seen.add(at);
+                return true;
+            });
+            return found.slice(0, take ?? Infinity);
+        },
         count: async ({ where }: { where?: Row }) => rows().filter((r) => matches(r, where)).length,
         create: async ({ data }: { data: Row }) => {
             if (unique && rows().some((r) => unique(r, data))) throw new PrismaClientKnownRequestError("P2002");
@@ -115,9 +130,34 @@ vi.mock("@polaris/db", () => {
                 (await table(() => db.keys).findMany(args)).map((key) => ({
                     ...key,
                     shares: db.keyShares.filter((share) => share.keyId === key.id)
-                }))
+                })),
+            findFirst: async (args: { where?: Row; orderBy?: Record<string, "asc" | "desc"> }) => {
+                const key = await table(() => db.keys).findFirst(args);
+                return key && { ...key, shares: db.keyShares.filter((share) => share.keyId === key.id) };
+            },
+            update: async ({ where, data }: { where: Row; data: Row }) => Object.assign(db.keys.find((k) => k.id === where.id)!, data)
         },
         chatRecoveryKeyShare: table(() => db.keyShares),
+        chatRecoveryKeyOpening: {
+            ...table(() => db.openings),
+            findMany: async (args: { where?: Row; orderBy?: Order; take?: number }) =>
+                (await table(() => db.openings).findMany(args)).map((opening) => ({
+                    ...opening,
+                    key: db.keys.find((k) => k.id === opening.keyId),
+                    releases: db.releases.filter((r) => r.openingId === opening.id)
+                })),
+            findFirst: async (args: { where?: Row; orderBy?: Record<string, "asc" | "desc"> }) => {
+                const opening = await table(() => db.openings).findFirst(args);
+                return opening && { ...opening, key: db.keys.find((k) => k.id === opening.keyId) };
+            }
+        },
+        chatRecoveryKeyRelease: table(
+            () => db.releases,
+            (a, b) => a.openingId === b.openingId && a.custodianId === b.custodianId
+        ),
+        chatHistoryKey: table(() => db.historyKeys),
+        user: table(() => db.users),
+        $queryRaw: async () => [{ waiting: BigInt(db.waiting) }],
         chatRecoveryApproval: table(
             () => db.approvals,
             (a, b) => a.requestId === b.requestId && a.custodianId === b.custodianId
@@ -125,8 +165,25 @@ vi.mock("@polaris/db", () => {
         $transaction: async (work: unknown) =>
             typeof work === "function" ? (work as (tx: unknown) => unknown)(client) : Promise.all(work as unknown[])
     };
-    return { prisma: client, Prisma: { PrismaClientKnownRequestError } };
+    return { prisma: client, Prisma: { PrismaClientKnownRequestError, sql: () => ({}) } };
 });
+
+vi.mock("@/lib/chat/e2ee/legacy-migration", () => ({ audienceOf: async (channelId: string) => db.audience.get(channelId) ?? null }));
+vi.mock("@/lib/chat/e2ee/mls-delivery", () => ({
+    legacyKeyGaps: async (channelId: string, epoch: bigint, audience: readonly string[], limit = 100) =>
+        audience
+            .filter((id) => !db.historyKeys.some((h) => h.channelId === channelId && h.epoch === epoch && h.recipient === id))
+            .flatMap((id) => {
+                const key = db.accountKeys.find((k) => k.userId === id);
+                return key ? [{ userId: id, akVersion: key.akVersion as number, hpkePublicKey: key.hpkePublicKey as Uint8Array }] : [];
+            })
+            .slice(0, limit),
+    putHistoryKeys: async (channelId: string, epoch: bigint, envelopes: Array<{ recipient: string; envelope: Uint8Array }>) => {
+        for (const { recipient, envelope } of envelopes)
+            if (!db.historyKeys.some((h) => h.channelId === channelId && h.epoch === epoch && h.recipient === recipient))
+                db.historyKeys.push({ channelId, epoch, recipient, envelope });
+    }
+}));
 
 vi.mock("@polaris/auth", () => ({ usersWithPermission: async () => db.admins }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async (entry: Row) => void db.recorded.push(entry) }));
@@ -172,7 +229,9 @@ function adminApproved(daysAgo = 1) {
 }
 
 beforeEach(() => {
-    for (const list of [db.members, db.orgs, db.accountKeys, db.shares, db.recoveries, db.requests, db.approvals, db.audits, db.keys, db.keyShares, db.admins, db.told, db.recorded])
+    db.audience.clear();
+    db.waiting = 0;
+    for (const list of [db.members, db.orgs, db.accountKeys, db.shares, db.recoveries, db.requests, db.approvals, db.audits, db.keys, db.keyShares, db.openings, db.releases, db.historyKeys, db.users, db.admins, db.told, db.recorded])
         list.length = 0;
     db.seq = 0;
 });
@@ -373,9 +432,9 @@ describe("the organisation recovery key", () => {
         acme();
         expect(await service.putRecoveryKey("a1", orkInput(), NOW)).toEqual({ kept: true });
         expect(db.keyShares).toHaveLength(3);
-        expect((await service.recoveryKeyState("own"))[0]!.key).toEqual({ id: KEY_ID, current: true });
+        expect((await service.recoveryKeyState("own"))[0]!.key).toMatchObject({ id: KEY_ID, current: true, holders: 3, openable: true, splitId: KEY_ID });
         db.accountKeys.find((k) => k.userId === "a2")!.akVersion = 2;
-        expect((await service.recoveryKeyState("own"))[0]!.key).toEqual({ id: KEY_ID, current: false });
+        expect((await service.recoveryKeyState("own"))[0]!.key).toMatchObject({ id: KEY_ID, current: false, holders: 2, openable: true });
         // A second key for the same scope is refused while one is live.
         await expect(service.putRecoveryKey("own", orkInput("0190a000-0000-7000-8000-000000000002", {
             shares: ["own", "a1", "a2"].map((custodianId) => ({ custodianId, custodianAkVersion: custodianId === "a2" ? 2 : 1, envelope: bytes(64) }))
@@ -415,5 +474,152 @@ describe("the organisation recovery key", () => {
         const { liveRecoveryKeysFor } = await import("@/lib/chat/e2ee/recovery-keys");
         expect((await liveRecoveryKeysFor(["ana", "stranger"])).map((k) => k.id)).toEqual([KEY_ID]);
         expect(await liveRecoveryKeysFor(["stranger"])).toEqual([]);
+    });
+});
+describe("opening the organisation recovery key", () => {
+    const KEY_ID = "0190a000-0000-7000-8000-000000000001";
+    const shares = (versions: Record<string, number> = {}) =>
+        ["own", "a1", "a2"].map((custodianId) => ({ custodianId, custodianAkVersion: versions[custodianId] ?? 1, envelope: bytes(64) }));
+    const ork = (id = KEY_ID, versions: Record<string, number> = {}) => ({
+        id,
+        scope: "org:acme",
+        hpkePublicKey: bytes(1216),
+        threshold: 2,
+        shares: shares(versions)
+    });
+    const loadOpening = () => import("@/lib/chat/e2ee/recovery-opening");
+
+    async function withKey() {
+        acme();
+        db.users.push({ id: "a1", name: "Alex", email: "alex@example.test" });
+        await service.putRecoveryKey("a1", ork(), NOW);
+    }
+
+    it("lets only a holder raise an opening, tells the other holders, and replaces the caller's pending one", async () => {
+        const opening = await loadOpening();
+        await withKey();
+        await expect(opening.startOpening("ana", KEY_ID, bytes(1216), NOW)).rejects.toMatchObject({ code: "notFound" });
+        const first = await opening.startOpening("a1", KEY_ID, bytes(1216), NOW);
+        expect(db.told.map((t) => t.userId).sort()).toEqual(["a2", "own"]);
+        expect(db.told.every((t) => t.title === "security.chat_recovery_key_waiting")).toBe(true);
+        const second = await opening.startOpening("a1", KEY_ID, bytes(1216), NOW);
+        expect(db.openings.find((o) => o.id === first)!.status).toBe("cancelled");
+        const [own] = await opening.keyState("own", NOW);
+        expect(own!.openings).toEqual([expect.objectContaining({ id: second, mine: false, openerName: "Alex", status: "pending", threshold: 2, shares: [] })]);
+        const [mine] = await opening.keyState("a1", NOW);
+        expect(mine!.openings[0]).toMatchObject({ id: second, mine: true });
+    });
+
+    it("releases at the key's threshold, counts a repeat once, and hands the shares to the opener alone", async () => {
+        const opening = await loadOpening();
+        await withKey();
+        const id = await opening.startOpening("a1", KEY_ID, bytes(1216), NOW);
+        expect(await opening.releaseOpening("a1", id, bytes(1600), NOW)).toEqual({ released: false });
+        expect(await opening.releaseOpening("a1", id, bytes(1600), NOW)).toEqual({ released: false });
+        expect(await opening.releaseOpening("a2", id, bytes(1600), NOW)).toEqual({ released: true });
+        expect(db.told.some((t) => t.userId === "a1" && t.title === "security.chat_recovery_key_released")).toBe(true);
+        // Released: no more answers, and only the opener sees the shares.
+        await expect(opening.releaseOpening("own", id, bytes(1600), NOW)).rejects.toMatchObject({ code: "notFound" });
+        expect((await opening.keyState("a1", NOW))[0]!.openings[0]).toMatchObject({ status: "released", released: 2 });
+        expect((await opening.keyState("a1", NOW))[0]!.openings[0]!.shares.map((s) => s.custodianId).sort()).toEqual(["a1", "a2"]);
+        await expect(opening.openingWork("a2", id, null, NOW)).rejects.toMatchObject({ code: "notFound" });
+        // A non-holder and an expired opening are refused.
+        const late = await opening.startOpening("own", KEY_ID, bytes(1216), NOW);
+        await expect(opening.releaseOpening("ana", late, bytes(1600), NOW)).rejects.toMatchObject({ code: "notFound" });
+        await expect(opening.releaseOpening("a2", late, bytes(1600), new Date(NOW.getTime() + 8 * DAY))).rejects.toMatchObject({ code: "notFound" });
+    });
+
+    it("closes as declined once the rest cannot reach the threshold", async () => {
+        const opening = await loadOpening();
+        await withKey();
+        const id = await opening.startOpening("a1", KEY_ID, bytes(1216), NOW);
+        expect(await opening.declineOpening("own", id, NOW)).toEqual({ declined: false });
+        expect(await opening.declineOpening("a2", id, NOW)).toEqual({ declined: true });
+        expect(db.openings.find((o) => o.id === id)!.status).toBe("declined");
+        expect(db.told.some((t) => t.userId === "a1" && t.title === "security.chat_recovery_key_declined")).toBe(true);
+    });
+
+    it("pages the history sealed to the key by whole conversations with the members missing it, and stores only real gaps", async () => {
+        const opening = await loadOpening();
+        await withKey();
+        const recipient = `ork:${KEY_ID}`;
+        db.historyKeys.push(
+            { channelId: "c1", epoch: 5n, recipient, envelope: bytes(80) },
+            { channelId: "c1", epoch: 6n, recipient, envelope: bytes(80) },
+            { channelId: "c2", epoch: 5n, recipient, envelope: bytes(80) },
+            { channelId: "c3", epoch: 5n, recipient: "someone", envelope: bytes(80) }
+        );
+        db.audience.set("c1", ["ana", "bob"]);
+        db.audience.set("c3", ["ana"]);
+        const id = await opening.startOpening("a1", KEY_ID, bytes(1216), NOW);
+        await opening.releaseOpening("a1", id, bytes(1600), NOW);
+        await opening.releaseOpening("own", id, bytes(1600), NOW);
+
+        const work = await opening.openingWork("a1", id, null, NOW);
+        expect(work.next).toBeNull();
+        expect(work.items.map((i) => `${i.channelId}:${i.epoch}`)).toEqual(["c1:5", "c1:6", "c2:5"]);
+        expect(work.items[0]!.gaps.map((g) => g.userId)).toEqual(["ana"]);
+        expect(work.items[2]!.gaps).toEqual([]);
+
+        const stored = await opening.putOpenedKeys(
+            "a1",
+            id,
+            [
+                { channelId: "c1", epoch: 5n, recipient: "ana", envelope: bytes(90) },
+                // No account key: nothing to seal to.
+                { channelId: "c1", epoch: 5n, recipient: "bob", envelope: bytes(90) },
+                // Not a conversation this key holds.
+                { channelId: "c3", epoch: 5n, recipient: "ana", envelope: bytes(90) },
+                // Not a member of the conversation.
+                { channelId: "c1", epoch: 6n, recipient: "own", envelope: bytes(90) }
+            ],
+            NOW
+        );
+        expect(stored).toBe(1);
+        expect(db.historyKeys.filter((h) => h.recipient === "ana").map((h) => `${h.channelId}:${h.epoch}`)).toEqual(["c1:5"]);
+        // Sealed already: a second copy is not a gap.
+        expect(await opening.putOpenedKeys("a1", id, [{ channelId: "c1", epoch: 5n, recipient: "ana", envelope: bytes(90) }], NOW)).toBe(0);
+    });
+
+    it("makes the scope's members key-log peers of the opener while the opening is released", async () => {
+        const opening = await loadOpening();
+        await withKey();
+        const id = await opening.startOpening("a1", KEY_ID, bytes(1216), NOW);
+        expect((await service.recoveryPeers("a1")).has("ana")).toBe(false);
+        await opening.releaseOpening("a1", id, bytes(1600), NOW);
+        await opening.releaseOpening("a2", id, bytes(1600), NOW);
+        expect((await service.recoveryPeers("a1")).has("ana")).toBe(true);
+        expect((await service.recoveryPeers("a2")).has("ana")).toBe(false);
+    });
+
+    it("splits the seed again to today's custodians, from the opener only, and then closes", async () => {
+        const opening = await loadOpening();
+        await withKey();
+        const id = await opening.startOpening("a1", KEY_ID, bytes(1216), NOW);
+        await opening.releaseOpening("a1", id, bytes(1600), NOW);
+        await opening.releaseOpening("own", id, bytes(1600), NOW);
+        db.accountKeys.find((k) => k.userId === "a2")!.akVersion = 2;
+        expect((await service.recoveryKeyState("a1"))[0]!.key).toMatchObject({ current: false, openable: true });
+        const split = { splitId: "0190a000-0000-7000-8000-0000000000aa", threshold: 2, shares: shares({ a2: 2 }) };
+        await expect(opening.resplitKey("a1", id, { ...split, shares: shares() }, NOW)).rejects.toMatchObject({ code: "stale" });
+        await expect(opening.resplitKey("own", id, split, NOW)).rejects.toMatchObject({ code: "notFound" });
+        await opening.resplitKey("a1", id, split, NOW);
+        expect(db.keyShares.filter((s) => s.keyId === KEY_ID).map((s) => `${s.custodianId}:${s.custodianAkVersion}`).sort()).toEqual(["a1:1", "a2:2", "own:1"]);
+        expect((await service.recoveryKeyState("a1"))[0]!.key).toMatchObject({ current: true, splitId: split.splitId });
+        await opening.completeOpening("a1", id);
+        expect(db.openings.find((o) => o.id === id)!.status).toBe("completed");
+        expect(db.releases.filter((r) => r.openingId === id)).toHaveLength(0);
+        await expect(opening.completeOpening("a1", id)).rejects.toMatchObject({ code: "notFound" });
+    });
+
+    it("lets a new key replace one no quorum of today's custodians can open", async () => {
+        await withKey();
+        db.accountKeys.find((k) => k.userId === "a1")!.akVersion = 2;
+        db.accountKeys.find((k) => k.userId === "a2")!.akVersion = 2;
+        expect((await service.recoveryKeyState("own"))[0]!.key).toMatchObject({ holders: 1, openable: false });
+        const next = "0190a000-0000-7000-8000-000000000002";
+        expect(await service.putRecoveryKey("own", ork(next, { a1: 2, a2: 2 }), NOW)).toEqual({ kept: true });
+        expect(db.keys.find((k) => k.id === KEY_ID)!.retiredAt).toEqual(NOW);
+        expect((await service.recoveryKeyState("own"))[0]!.key).toMatchObject({ id: next, openable: true });
     });
 });

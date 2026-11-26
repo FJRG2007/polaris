@@ -94,7 +94,13 @@
         "chat_recovery_completed": "Your encrypted chats were recovered on a new device",
         "chat_recovery_completed_body": "Your administrators approved it. If it was not you, end every session on the sessions page.",
         "chat_recovery_declined": "Your encrypted chat recovery was declined",
-        "chat_recovery_declined_body": "Too few administrators approved it. Ask them to confirm it is you, then request again."
+        "chat_recovery_declined_body": "Too few administrators approved it. Ask them to confirm it is you, then request again.",
+        "chat_recovery_key_waiting": "An administrator asks to open a recovery key",
+        "chat_recovery_key_waiting_body": "Compare the code with them before you approve it on the security page.",
+        "chat_recovery_key_released": "The recovery key can be opened",
+        "chat_recovery_key_released_body": "Enough administrators approved. Open the security page on the device you asked from.",
+        "chat_recovery_key_declined": "Opening the recovery key was declined",
+        "chat_recovery_key_declined_body": "Too few administrators approved it. Talk to them, then ask again."
     },
     "friends": {
         "somebody": "Somebody",

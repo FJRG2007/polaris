@@ -133,18 +133,54 @@ export async function custodianScopes(userId: string) {
  * already show it.
  */
 export async function recoveryPeers(userId: string): Promise<Set<string>> {
-    const [wanted, sealedTo, heldFor, scopes] = await Promise.all([
+    const [wanted, sealedTo, heldFor, scopes, opened] = await Promise.all([
         custodiansOf(userId),
         prisma.chatRecoveryShare.findMany({ where: { ownerId: userId }, select: { custodianId: true }, take: 16 }),
         prisma.chatRecoveryShare.findMany({ where: { custodianId: userId }, select: { ownerId: true }, take: 500 }),
-        custodianScopes(userId)
+        custodianScopes(userId),
+        openingPeers(userId)
     ]);
     return new Set([
         ...wanted.custodians.map((custodian) => custodian.userId),
         ...sealedTo.map((share) => share.custodianId),
         ...heldFor.map((share) => share.ownerId),
-        ...scopes.flatMap((scope) => scope.custodians.map((custodian) => custodian.userId))
+        ...scopes.flatMap((scope) => scope.custodians.map((custodian) => custodian.userId)),
+        ...opened
     ]);
+}
+
+/** Accounts of one scope an opened recovery key's history may be sealed to, and so vouched for. */
+const OPENING_PEERS = 5000;
+
+/**
+ * While this account holds an opened organisation recovery key (an opening it
+ * raised that was released and is not finished), the members of that key's
+ * scope: who its browser seals the key's history to, each checked against the
+ * key log first. The organisation's owner and members, or for the instance key
+ * the accounts that have a key - an instance administrator sees every account
+ * anyway. A guest of a conversation from outside the scope is not vouched for,
+ * so not sealed to; any member holding that history still passes it on.
+ */
+async function openingPeers(userId: string, now = new Date()): Promise<string[]> {
+    const openings = await prisma.chatRecoveryKeyOpening.findMany({
+        where: { openerId: userId, status: "released", expiresAt: { gt: now } },
+        select: { key: { select: { scope: true } } },
+        take: 5
+    });
+    const scopes = [...new Set(openings.map((opening) => opening.key.scope))];
+    const lists = await Promise.all(
+        scopes.map(async (scope) => {
+            if (scope === "instance")
+                return (await prisma.chatAccountKey.findMany({ select: { userId: true }, take: OPENING_PEERS })).map((row) => row.userId);
+            const orgId = scope.slice("org:".length);
+            const [org, members] = await Promise.all([
+                prisma.organization.findUnique({ where: { id: orgId }, select: { ownerId: true } }),
+                prisma.organizationMember.findMany({ where: { orgId }, select: { userId: true }, take: OPENING_PEERS })
+            ]);
+            return [...(org ? [org.ownerId] : []), ...members.map((member) => member.userId)];
+        })
+    );
+    return lists.flat();
 }
 
 const SHARE_SELECT = {
@@ -246,7 +282,7 @@ async function eligibleRecovery(userId: string, now: Date): Promise<{ accountRec
     return reset ? { accountRecoveryId: null, via: "self" } : null;
 }
 
-async function tell(userId: string, title: string, body: string): Promise<void> {
+export async function tell(userId: string, title: string, body: string): Promise<void> {
     const t = await wordsFor(userId, "notices");
     await notify({
         userId,
@@ -451,7 +487,14 @@ export async function recoveryKeyState(userId: string) {
     const keys = await prisma.chatRecoveryKey.findMany({
         where: { scope: { in: scopes.map((scope) => scope.scope) }, retiredAt: null },
         orderBy: { createdAt: "asc" },
-        select: { id: true, scope: true, threshold: true, shares: { select: { custodianId: true, custodianAkVersion: true }, take: 16 } },
+        select: {
+            id: true,
+            scope: true,
+            threshold: true,
+            splitId: true,
+            hpkePublicKey: true,
+            shares: { select: { custodianId: true, custodianAkVersion: true, envelope: true }, take: 16 }
+        },
         take: 100
     });
     return scopes.map((entry) => {
@@ -463,18 +506,47 @@ export async function recoveryKeyState(userId: string) {
             entry.custodians.every((custodian) =>
                 live.shares.some((share) => share.custodianId === custodian.userId && share.custodianAkVersion === custodian.akVersion)
             );
+        const holders = live ? keyHolders(live.shares, entry.custodians) : [];
+        const own = live && holders.includes(userId) ? (live.shares.find((share) => share.custodianId === userId) ?? null) : null;
         return {
             scope: entry.scope,
             orgName: entry.orgName,
             threshold: entry.threshold,
             custodians: entry.custodians,
-            key: live ? { id: live.id, current } : null
+            key: live
+                ? {
+                      id: live.id,
+                      current,
+                      splitId: live.splitId ?? live.id,
+                      keyThreshold: live.threshold,
+                      hpkePublicKey: new Uint8Array(live.hpkePublicKey),
+                      holders: holders.length,
+                      // A quorum of today's custodians still holds the seed: it can be opened and split again.
+                      openable: holders.length >= live.threshold,
+                      share: own ? { custodianAkVersion: own.custodianAkVersion, envelope: new Uint8Array(own.envelope) } : null
+                  }
+                : null
         };
     });
 }
 
 /**
- * Store a scope's first `ORK`: its public key and its seed's shares, one per
+ * Today's custodians who hold a share of a key's current split that their
+ * account key still opens (sealed to the version they have now). Only they can
+ * open it; a custodian who left, or rotated their key since, cannot.
+ */
+export function keyHolders(
+    shares: ReadonlyArray<{ custodianId: string; custodianAkVersion: number }>,
+    custodians: ReadonlyArray<{ userId: string; akVersion: number }>
+): string[] {
+    return custodians
+        .filter((custodian) => shares.some((share) => share.custodianId === custodian.userId && share.custodianAkVersion === custodian.akVersion))
+        .map((custodian) => custodian.userId);
+}
+
+/**
+ * Store a scope's first `ORK` (or the one replacing a key no quorum of today's
+ * custodians can open): its public key and its seed's shares, one per
  * custodian, only from one of those custodians and only if the split matches
  * the policy now. Two custodians creating at once both succeed here; the older
  * key stays live and the newer is retired at once, so a scope has one.
@@ -504,9 +576,17 @@ export async function putRecoveryKey(
             )
         );
     if (!matches) throw new RecoveryRefusal("stale");
-    const existing = await prisma.chatRecoveryKey.findFirst({ where: { scope: input.scope, retiredAt: null }, select: { id: true } });
-    if (existing) throw new RecoveryRefusal("stale");
+    const existing = await prisma.chatRecoveryKey.findFirst({
+        where: { scope: input.scope, retiredAt: null },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { id: true, threshold: true, shares: { select: { custodianId: true, custodianAkVersion: true }, take: 16 } }
+    });
+    // A live key is replaced only once no quorum of today's custodians can open it any more:
+    // the history already sealed to it stays with it, new history goes to the new one.
+    const replaced = existing && keyHolders(existing.shares, wanted.custodians).length < existing.threshold ? existing.id : null;
+    if (existing && !replaced) throw new RecoveryRefusal("stale");
     await prisma.$transaction([
+        ...(replaced ? [prisma.chatRecoveryKey.updateMany({ where: { id: replaced, retiredAt: null }, data: { retiredAt: now } })] : []),
         prisma.chatRecoveryKey.create({
             data: {
                 id: input.id,
@@ -536,7 +616,7 @@ export async function putRecoveryKey(
     await recordAudit({
         actorId: userId,
         action: "chat.recovery.key-created",
-        metadata: { keyId: input.id, scope: input.scope, threshold: input.threshold, custodians: input.shares.length, kept }
+        metadata: { keyId: input.id, scope: input.scope, threshold: input.threshold, custodians: input.shares.length, kept, replaced }
     });
     return { kept };
 }

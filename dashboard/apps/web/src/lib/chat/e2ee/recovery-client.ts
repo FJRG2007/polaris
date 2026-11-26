@@ -12,6 +12,7 @@ import type { KeysBody } from "./schemas";
 import * as policy from "./recovery-policy";
 import * as keyLog from "./key-log-client";
 import * as recovery from "@polaris/chat-crypto/recovery";
+import * as content from "@polaris/chat-crypto/message-content";
 import { fromText, toText } from "./base64url";
 
 const ROUTE = "/api/e2ee/keys";
@@ -41,6 +42,7 @@ export interface OwnRequest {
         readonly requesterKey: string;
         readonly expiresAt: string;
         readonly approvals: number;
+        readonly declines: number;
         readonly released: ReadonlyArray<{ custodianId: string; envelope: string }>;
     } | null;
 }
@@ -123,26 +125,64 @@ export async function refreshShares(ownerId: string, accountKey: Uint8Array, akV
     }
 }
 
+export interface KeyOpening {
+    readonly id: string;
+    readonly keyId: string;
+    /** Raised by this account (only its browser that raised it can finish it). */
+    readonly mine: boolean;
+    readonly openerName: string | null;
+    readonly openerEmail: string | null;
+    readonly status: "pending" | "released";
+    readonly splitId: string;
+    readonly threshold: number;
+    readonly requesterKey: string;
+    readonly expiresAt: string;
+    readonly released: number;
+    readonly declined: number;
+    readonly ownReleased: boolean;
+    readonly shares: ReadonlyArray<{ custodianId: string; envelope: string }>;
+}
+
 export interface RecoveryKeyScope {
     readonly scope: string;
     readonly orgName: string | null;
     readonly threshold: number;
     readonly custodians: ReadonlyArray<{ userId: string; akVersion: number; hpkePublicKey: string }>;
-    readonly key: { id: string; current: boolean } | null;
+    readonly key: {
+        readonly id: string;
+        /** Its shares match today's custodians and threshold. */
+        readonly current: boolean;
+        readonly splitId: string;
+        readonly keyThreshold: number;
+        readonly hpkePublicKey: string;
+        readonly holders: number;
+        /** A quorum of today's custodians can still open it. */
+        readonly openable: boolean;
+        /** This account's share, when it is one of the holders. */
+        readonly share: { custodianAkVersion: number; envelope: string } | null;
+    } | null;
+    /** Members who came back with a key and wait for history only this key holds. */
+    readonly waiting: number;
+    readonly openings: ReadonlyArray<KeyOpening>;
+}
+
+export async function recoveryKeyState(): Promise<RecoveryKeyScope[] | null> {
+    return (await post<{ scopes: RecoveryKeyScope[] }>({ op: "recovery-key-state" }))?.scopes ?? null;
 }
 
 /**
  * As a custodian, create the organisation recovery key of every scope that has
- * none: a fresh seed split to the scope's custodians, each checked against the
- * key log first, exactly as an account's own shares are. A scope whose key no
- * longer matches its custodians is left alone: splitting that seed again needs
- * a quorum to rebuild it, which is not built. Never throws.
+ * none, or whose key no quorum of today's custodians can open any more: a
+ * fresh seed split to the scope's custodians, each checked against the key log
+ * first, exactly as an account's own shares are. Then finish any opening this
+ * browser raised that the quorum released (`finishOpening`). Never throws.
  */
 export async function ensureRecoveryKeys(userId: string): Promise<void> {
     try {
-        const scopes = (await post<{ scopes: RecoveryKeyScope[] }>({ op: "recovery-key-state" }))?.scopes ?? [];
+        const scopes = (await recoveryKeyState()) ?? [];
         for (const entry of scopes) {
-            if (entry.key || entry.custodians.length === 0) continue;
+            for (const opening of entry.openings) if (opening.mine && opening.status === "released") await finishOpening(userId, entry, opening);
+            if ((entry.key && entry.key.openable) || entry.custodians.length === 0) continue;
             const custodians = entry.custodians.map((c) => ({ userId: c.userId, akVersion: c.akVersion, hpkePublicKey: fromText(c.hpkePublicKey) }));
             // Fail closed, as for an account's shares: a key the log does not hold could be the server's own.
             if (!(await keyLog.vouchedCustodians(userId, custodians))) continue;
@@ -160,6 +200,161 @@ export async function ensureRecoveryKeys(userId: string): Promise<void> {
     } catch (caught) {
         console.error("polaris: an organisation recovery key could not be created:", caught);
     }
+}
+
+const openingSlot = (openingId: string) => `ork-opening:${openingId}`;
+/** Work pages one finish reads at most (ten conversations each); the next refresh carries on. */
+const MAX_WORK_PAGES = 100;
+
+/** Open this account's seed share of `key` and seal it to an opening's key. */
+async function releaseOwnShare(
+    custodianId: string,
+    key: NonNullable<RecoveryKeyScope["key"]>,
+    openingId: string,
+    requesterKey: Uint8Array,
+    accountHpke: () => Promise<{ hpkePrivateKey: CryptoKey } | null>
+): Promise<boolean> {
+    if (!key.share) return false;
+    const own = await accountHpke();
+    if (!own) return false;
+    const share = await recovery.openShare(
+        own.hpkePrivateKey,
+        fromText(key.share.envelope),
+        recovery.recoveryKeyBinding(key.id, key.splitId),
+        custodianId,
+        key.share.custodianAkVersion
+    );
+    try {
+        const envelope = await recovery.releaseShare(requesterKey, share, recovery.openingBinding(openingId, key.id), custodianId);
+        return (await post({ op: "recovery-key-release", openingId, envelope: toText(envelope) })) !== null;
+    } finally {
+        share.fill(0);
+    }
+}
+
+/**
+ * Raise an opening of a scope's recovery key from this browser and release
+ * this account's own share to it. Answers the code the other custodians
+ * compare, or null when refused.
+ */
+export async function startOpening(
+    userId: string,
+    entry: RecoveryKeyScope,
+    accountHpke: () => Promise<{ hpkePrivateKey: CryptoKey } | null>
+): Promise<{ openingId: string; code: string } | null> {
+    if (!entry.key?.share) return null;
+    const pair = await recovery.requesterKeyPair();
+    const answer = await post<{ openingId: string }>({ op: "recovery-key-open", keyId: entry.key.id, requesterKey: toText(pair.publicKey) });
+    if (!answer) return null;
+    await stored("put", openingSlot(answer.openingId), { privateKey: pair.privateKey });
+    if (!(await releaseOwnShare(userId, entry.key, answer.openingId, pair.publicKey, accountHpke))) return null;
+    return { openingId: answer.openingId, code: await recovery.requestCode(answer.openingId, pair.publicKey) };
+}
+
+/** Whether this browser raised the opening (and so can finish it). */
+export async function holdsOpening(openingId: string): Promise<boolean> {
+    return Boolean(await stored("get", openingSlot(openingId)).catch(() => null));
+}
+
+/** Release this account's seed share to another custodian's opening, after comparing its code. */
+export function approveOpening(
+    userId: string,
+    entry: RecoveryKeyScope,
+    opening: KeyOpening,
+    accountHpke: () => Promise<{ hpkePrivateKey: CryptoKey } | null>
+): Promise<boolean> {
+    if (!entry.key) return Promise.resolve(false);
+    return releaseOwnShare(userId, entry.key, opening.id, fromText(opening.requesterKey), accountHpke);
+}
+
+/** Refuse another custodian's opening: the share is never opened. */
+export async function declineOpening(opening: KeyOpening): Promise<boolean> {
+    return (await post({ op: "recovery-key-decline", openingId: opening.id })) !== null;
+}
+
+/**
+ * Once the quorum released its shares: rebuild the key's seed in this
+ * browser, checked against the key's public half; split it again to today's
+ * custodians if they changed (each checked against the key log); then seal
+ * every history key sealed to it to the members missing it whose key the log
+ * vouches for, and close the opening. The seed is zeroed as soon as it is
+ * split; the private key lives only for this call. Answers how many history
+ * copies were stored, or null when this browser cannot finish it.
+ */
+export async function finishOpening(userId: string, entry: RecoveryKeyScope, opening: KeyOpening): Promise<number | null> {
+    if (!opening.mine || opening.status !== "released" || !entry.key || entry.key.id !== opening.keyId) return null;
+    const held = (await stored("get", openingSlot(opening.id)).catch(() => null)) as { privateKey: CryptoKey } | null;
+    if (!held) return null;
+    const key = entry.key;
+    const opened = await recovery.openRecoveryKey(
+        held.privateKey,
+        opening.shares.map((share) => ({ custodianId: share.custodianId, envelope: fromText(share.envelope) })),
+        recovery.openingBinding(opening.id, key.id),
+        fromText(key.hpkePublicKey)
+    );
+    try {
+        if (!key.current && entry.custodians.length > 0) {
+            const custodians = entry.custodians.map((c) => ({ userId: c.userId, akVersion: c.akVersion, hpkePublicKey: fromText(c.hpkePublicKey) }));
+            // Fail closed: a share is never sealed to a key the log does not hold.
+            if (await keyLog.vouchedCustodians(userId, custodians)) {
+                const splitId = crypto.randomUUID();
+                const shares = await recovery.splitAccountKey(opened.seed, custodians, entry.threshold, recovery.recoveryKeyBinding(key.id, splitId));
+                await post({
+                    op: "recovery-key-resplit",
+                    openingId: opening.id,
+                    splitId,
+                    threshold: entry.threshold,
+                    shares: shares.map((share) => ({ ...share, envelope: toText(share.envelope) }))
+                });
+            }
+        }
+    } finally {
+        opened.seed.fill(0);
+    }
+    const recipient = `ork:${key.id}`;
+    let sealed = 0;
+    let after: string | null = null;
+    for (let page = 0; page < MAX_WORK_PAGES; page++) {
+        type Work = { items: Array<{ channelId: string; epoch: string; envelope: string; gaps: Array<{ userId: string; akVersion: number; hpkePublicKey: string }> }>; next: string | null };
+        const work: Work | null = await post<Work>({ op: "recovery-key-work", openingId: opening.id, after });
+        if (!work) return null;
+        const served = new Map(work.items.flatMap((item) => item.gaps.map((g) => [g.userId, { userId: g.userId, akVersion: g.akVersion, hpkePublicKey: fromText(g.hpkePublicKey) }] as const)));
+        const vouched = await keyLog.vouchedRecoveryAccounts(userId, [...served.values()]);
+        const envelopes: Array<{ channelId: string; epoch: string; recipient: string; envelope: string }> = [];
+        for (const item of work.items) {
+            const gaps = item.gaps.filter((g) => vouched.has(g.userId));
+            if (!gaps.length) continue;
+            const epoch = BigInt(item.epoch);
+            let historyKey: Uint8Array;
+            try {
+                historyKey = await content.openHistoryKey(opened.privateKey, fromText(item.envelope), { recipient, conversationId: item.channelId, epoch });
+            } catch (caught) {
+                console.error("polaris: a history key sealed to the recovery key did not open:", caught);
+                continue;
+            }
+            try {
+                for (const gap of gaps) {
+                    const copy = await content.sealHistoryKey(served.get(gap.userId)!.hpkePublicKey, historyKey, { recipient: gap.userId, conversationId: item.channelId, epoch });
+                    envelopes.push({ channelId: item.channelId, epoch: item.epoch, recipient: gap.userId, envelope: toText(copy) });
+                }
+            } finally {
+                historyKey.fill(0);
+            }
+        }
+        for (let at = 0; at < envelopes.length; at += 200) {
+            const answer = await post<{ stored: number }>({ op: "recovery-key-seal", openingId: opening.id, envelopes: envelopes.slice(at, at + 200) });
+            if (!answer) return null;
+            sealed += answer.stored;
+        }
+        if (!work.next) {
+            await post({ op: "recovery-key-complete", openingId: opening.id });
+            await stored("delete", openingSlot(opening.id)).catch(() => undefined);
+            return sealed;
+        }
+        after = work.next;
+    }
+    // Left open: the next refresh carries on from the start, skipping what is already sealed.
+    return sealed;
 }
 
 export function ownRequest(): Promise<OwnRequest | null> {

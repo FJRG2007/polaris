@@ -19679,12 +19679,55 @@ model ChatRecoveryKey {
     hpkePublicKey Bytes
     threshold     Int
     createdById   String    @db.Uuid
+    // The split the shares are of; null for the first one, named by the key's
+    // id. A new split (custodians changed) gets a fresh id.
+    splitId       String?
     retiredAt     DateTime?
     createdAt     DateTime  @default(now())
 
-    shares ChatRecoveryKeyShare[]
+    shares   ChatRecoveryKeyShare[]
+    openings ChatRecoveryKeyOpening[]
 
     @@index([scope, retiredAt])
+}
+
+// A custodian's request to rebuild an ORK's seed in their own browser, to seal
+// the history it holds to members who now have an account key, and to split
+// the seed again when the custodians changed. The other custodians release
+// their seed shares to the one-off `requesterKey` after comparing its code,
+// exactly as for an account. status: pending | released | completed |
+// cancelled | declined; open 7 days.
+model ChatRecoveryKeyOpening {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    keyId        String    @db.Uuid
+    openerId     String    @db.Uuid
+    status       String    @default("pending")
+    splitId      String
+    threshold    Int
+    requesterKey Bytes
+    expiresAt    DateTime
+    completedAt  DateTime?
+    createdAt    DateTime  @default(now())
+
+    key      ChatRecoveryKey          @relation(fields: [keyId], references: [id], onDelete: Cascade)
+    releases ChatRecoveryKeyRelease[]
+
+    @@index([keyId, status])
+    @@index([openerId, status])
+    @@index([status, expiresAt])
+}
+
+// One custodian's seed share sealed to an opening's key, or null when declined.
+model ChatRecoveryKeyRelease {
+    openingId   String   @db.Uuid
+    custodianId String   @db.Uuid
+    envelope    Bytes?
+    createdAt   DateTime @default(now())
+
+    opening ChatRecoveryKeyOpening @relation(fields: [openingId], references: [id], onDelete: Cascade)
+
+    @@id([openingId, custodianId])
+    @@index([custodianId])
 }
 
 model ChatRecoveryKeyShare {

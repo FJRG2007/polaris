@@ -21,6 +21,7 @@
 import { auth } from "@/lib/auth";
 import * as keys from "./account-keys";
 import * as recovery from "./recovery-service";
+import * as opening from "./recovery-opening";
 import { passwordLockEnabled, sealedChatServed } from "./flag";
 import { NextResponse } from "next/server";
 import * as opaque from "./opaque-service";
@@ -363,6 +364,13 @@ export async function handleKeys(request: Request): Promise<Response> {
             case "recovery-complete":
             case "recovery-key-state":
             case "put-recovery-key":
+            case "recovery-key-open":
+            case "recovery-key-release":
+            case "recovery-key-decline":
+            case "recovery-key-work":
+            case "recovery-key-seal":
+            case "recovery-key-resplit":
+            case "recovery-key-complete":
                 return await recoveryOp(user.id, body);
         }
     } catch (caught) {
@@ -375,7 +383,7 @@ export async function handleKeys(request: Request): Promise<Response> {
 
 type RecoveryBody = Extract<
     KeysBody,
-    { op: "recovery-state" | "put-recovery-shares" | "recovery-own" | "recovery-open" | "recovery-inbox" | "recovery-approve" | "recovery-decline" | "recovery-complete" | "recovery-key-state" | "put-recovery-key" }
+    { op: "recovery-state" | "put-recovery-shares" | "recovery-own" | "recovery-open" | "recovery-inbox" | "recovery-approve" | "recovery-decline" | "recovery-complete" | "recovery-key-state" | "put-recovery-key" | "recovery-key-open" | "recovery-key-release" | "recovery-key-decline" | "recovery-key-work" | "recovery-key-seal" | "recovery-key-resplit" | "recovery-key-complete" }
 >;
 
 /** The quorum recovery ops, each scoped to the signed-in account. */
@@ -447,14 +455,64 @@ async function recoveryOp(userId: string, body: RecoveryBody): Promise<NextRespo
             await recovery.completeRequest(userId, body.requestId);
             return json({ completed: true });
         case "recovery-key-state": {
-            const scopes = await recovery.recoveryKeyState(userId);
+            const scopes = await opening.keyState(userId);
             return json({
                 scopes: scopes.map((entry) => ({
                     ...entry,
-                    custodians: entry.custodians.map((c) => ({ userId: c.userId, akVersion: c.akVersion, hpkePublicKey: text(c.hpkePublicKey) }))
+                    custodians: entry.custodians.map((c) => ({ userId: c.userId, akVersion: c.akVersion, hpkePublicKey: text(c.hpkePublicKey) })),
+                    key: entry.key && {
+                        ...entry.key,
+                        hpkePublicKey: text(entry.key.hpkePublicKey),
+                        share: entry.key.share && { custodianAkVersion: entry.key.share.custodianAkVersion, envelope: text(entry.key.share.envelope) }
+                    },
+                    openings: entry.openings.map((o) => ({
+                        ...o,
+                        requesterKey: text(o.requesterKey),
+                        expiresAt: o.expiresAt.toISOString(),
+                        shares: o.shares.map((s) => ({ custodianId: s.custodianId, envelope: text(s.envelope) }))
+                    }))
                 }))
             });
         }
+        case "recovery-key-open": {
+            const refusal = await limited([[`e2ee-recovery:${userId}`, PER_ACCOUNT]]);
+            if (refusal) return refusal;
+            return json({ openingId: await opening.startOpening(userId, body.keyId, bytes(body.requesterKey)) });
+        }
+        case "recovery-key-release":
+            return json(await opening.releaseOpening(userId, body.openingId, bytes(body.envelope)));
+        case "recovery-key-decline":
+            return json(await opening.declineOpening(userId, body.openingId));
+        case "recovery-key-work": {
+            const work = await opening.openingWork(userId, body.openingId, body.after);
+            return json({
+                next: work.next,
+                items: work.items.map((item) => ({
+                    channelId: item.channelId,
+                    epoch: item.epoch.toString(),
+                    envelope: text(item.envelope),
+                    gaps: item.gaps.map((g) => ({ userId: g.userId, akVersion: g.akVersion, hpkePublicKey: text(g.hpkePublicKey) }))
+                }))
+            });
+        }
+        case "recovery-key-seal":
+            return json({
+                stored: await opening.putOpenedKeys(
+                    userId,
+                    body.openingId,
+                    body.envelopes.map((e) => ({ channelId: e.channelId, epoch: BigInt(e.epoch), recipient: e.recipient, envelope: bytes(e.envelope) }))
+                )
+            });
+        case "recovery-key-resplit":
+            await opening.resplitKey(userId, body.openingId, {
+                splitId: body.splitId,
+                threshold: body.threshold,
+                shares: body.shares.map((share) => ({ ...share, envelope: bytes(share.envelope) }))
+            });
+            return json({ stored: true });
+        case "recovery-key-complete":
+            await opening.completeOpening(userId, body.openingId);
+            return json({ completed: true });
         case "put-recovery-key":
             return json(
                 await recovery.putRecoveryKey(userId, {
