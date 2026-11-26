@@ -42,6 +42,8 @@ the account to reach it, and so does every account the op names.
 | `events` | the log after a sequence number: group-wide rows and this device's own Welcomes |
 | `put-history-keys` / `history-keys` | store envelopes (first write wins); read the ones sealed to the caller |
 | `edit-sealed` | a new version of one of the caller's own sealed messages: every plain-edit check, then the device, epoch and signature checks of a send, and exactly the next revision; answers the edit time |
+| `schedule-sealed` | write one of the caller's messages down for later, sealed by the device at the group's current epoch (any other epoch gets `olderEpoch`), with its sealed uploads claimed at once; a repeat with the same `clientKey` answers the row already written. See "Sealed scheduled messages" |
+| `reseal-scheduled` | a new seal for one of the caller's sealed scheduled messages at the group's current epoch, bound to the same message id, written only over the seal it was read at; clears a failure the rekey caused |
 | `account-keys` | the public account keys (signing, HPKE) of up to 100 named accounts that reach the conversation; an account outside it is left out exactly like one with no key, never refused, so the answer says nothing about accounts the caller shares no conversation with |
 
 Retention: the log keeps the last 256 epochs, pruned every 32 inside the commit
@@ -931,6 +933,61 @@ A device-only request is never batched with a plain one for the same words.
 What the sender's own live translation puts inside the seal (`translation`)
 is unchanged. Verified by `test/text-translation/device-only.test.ts` once run.
 
+## Sealed scheduled messages (written 2026-11-26, not yet run)
+
+A scheduled message is sealed in the writer's browser when it is scheduled and
+the server keeps the seal, never the words. The box's schedule action
+(`channel-view.tsx`, `scheduleMessage`) asks `sealsSendsIn` first and, when the
+conversation seals, sends through `sendSealedWithFiles({ sendAt })`
+(`send-with-files.ts`): each file sealed and uploaded as for a send now, then
+`scheduleSealedMessage` (`sealed-chat.ts`) -> `mls.scheduleSealed` -> op
+`schedule-sealed` -> `scheduleSealed` (`lib/chat/scheduled.ts`). The plain
+action and route are never used there, and the plain `scheduleMessage` still
+refuses a sealed conversation (`errors.sealedOnly`). Not knowing whether the
+conversation seals fails the schedule; it never falls back to the clear.
+
+Tables (migration `20281214000000_chat_sealed_scheduled`, additive):
+`ChatScheduledMessage` gains `clientKey` and the `e2ee*` columns `send-sealed`
+takes (ciphertext, epoch, sender leaf, device, signature), with `body` empty;
+`ChatScheduledFile.sealed` marks a sealed upload, kept under the upload's own id
+because the seal names it.
+
+The epoch rule: it goes only while the conversation is at the epoch it was
+sealed in (`deliverSealed`). A later epoch means the keys changed, usually
+because somebody left or was removed, and a key they still hold must not seal a
+message that appears after they are gone - the same rule `edit-sealed` applies
+(`olderEpoch`). Such a row is marked failed with
+`errors.schedule.sealedKeysChanged` and kept, files and all. `listScheduled`
+hands each sealed row back with its seal and the sealing device's signature key
+(`sealed`) and `resealDue` when the group has moved on. Whenever the writer
+opens the conversation, the scheduled list (`sealed-scheduled.ts`) seals every
+`resealDue` row again on this device (op `reseal-scheduled`, `resealScheduled`:
+current epoch only, compare-and-set on the epoch it read, failure cleared) and
+opens each sealed row to show its words and file names. "Send now" seals again
+first. A row that fails at its hour and is sealed again goes at the next pass.
+
+What the writer sees (`scheduled-bar.tsx`): a sealed row's own words; "The
+chat's keys changed. It goes once you open this chat on the device you wrote it
+on." while one waits for a device that can seal it again; "The device that
+encrypted it is signed out..." when the sealing device's key is gone (counted
+with the failed ones); and "Encrypted on a device that cannot open it here" in
+place of the words on a device that never held its key.
+
+Limits:
+
+- A row sealed by a device that was retired or rekeyed its signature key no
+  longer verifies (`sealed: null`): it cannot be opened or sealed again and
+  stays failed until the writer deletes it.
+- Only a device holding the history key of the epoch it was sealed in can open
+  and seal it again; a device added later cannot.
+- After a rekey it is late until the writer opens the conversation on such a
+  device; nothing seals it in the background, since the server holds no key.
+- Polls and forum posts are not schedulable, sealed or not (the composer offers
+  scheduling for text and files only). A message with a file sent to be seen
+  once is never schedulable (`viewOnce.notScheduled`, `composer.tsx`).
+- Verified by `test/chat/e2ee/sealed-scheduled.test.ts` once run; not exercised
+  against PostgreSQL or in a browser.
+
 ## Sealed polls (built 2026-11-25)
 
 With sealed chat on, the poll dialog (`send-poll.ts`) seals the question as the
@@ -1340,8 +1397,9 @@ that sentence, since a page that seals never sends text through them.
 `sealedChatActive()`; a build from before that sends nothing and is told to
 reload): a page that seals still edits a plain message from before the group in
 the clear, which reloading would not fix, so it keeps `errors.sealedOnly`
-until that edit has a sealed form (row 5). Scheduling keeps `errors.sealedOnly`
-everywhere: no page can schedule sealed yet.
+until that edit has a sealed form (row 5). A plain schedule keeps
+`errors.sealedOnly` everywhere; a page that seals schedules sealed instead
+(see "Sealed scheduled messages").
 
 Not refused, on purpose: what the server writes itself - Polar's and Tasks'
 answers (`agent-message.ts`; Polar's go sealed through `polar-member.ts` when
