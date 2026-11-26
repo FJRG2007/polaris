@@ -9,7 +9,9 @@
  * ever kept or spread under another lock. `/api/e2ee/key-log` is a real tree
  * (`support/fake-key-log.ts`): a QR hand-over the log contradicts is refused,
  * a key logged for this account that it never made raises the own-key alarm,
- * and a forked, rewound or re-keyed log is refused.
+ * and a forked, rewound or re-keyed log is refused - a new log key is
+ * followed only through hand-overs the old one signed, or, after a reset,
+ * once the user trusted exactly that key and the log still extends the head.
  */
 
 import "fake-indexeddb/auto";
@@ -431,6 +433,84 @@ describe("the key log", () => {
             await replaced.append(keyLogFake.entries[0]!);
             expect(await keyLogClient.checkAnswer(await ask(replaced, seen.treeSize), seen)).toEqual({ kind: "failed", problem: "log-key" });
         });
+
+        it("follows a log key the pinned one signed over, and pins the new key", async () => {
+            await logForged(1);
+            const seen = await seenOf(keyLogFake);
+            await keyLogFake.rotate();
+            await keyLogFake.rotate();
+            await logForged(2);
+            const answer = await ask(keyLogFake, seen.treeSize);
+            const checked = await keyLogClient.checkAnswer(answer, seen);
+            expect(checked.kind).toBe("verified");
+            expect(checked.seen?.logKey).toBe(answer.logKey);
+            expect(answer.logKey).not.toBe(seen.logKey);
+        });
+
+        it("refuses a hand-over whose signature does not hold", async () => {
+            await logForged(1);
+            const seen = await seenOf(keyLogFake);
+            await keyLogFake.rotate();
+            const answer = await ask(keyLogFake, seen.treeSize);
+            const forged = { ...answer, handovers: answer.handovers!.map((h) => ({ ...h, signature: text(new Uint8Array(64).fill(7)) })) };
+            expect(await keyLogClient.checkAnswer(forged, seen)).toEqual({ kind: "failed", problem: "log-key" });
+        });
+
+        it("refuses a signed hand-over over a head the log does not extend", async () => {
+            await logForged(1);
+            const seen = await seenOf(keyLogFake);
+            const other = await keyLogFake.fork();
+            await other.append({ userId: server.userId, akVersion: 2, ...(await account.accountPublicKeys(account.generateAccountKey())) });
+            await keyLogFake.rotate(true, await other.head());
+            await logForged(2);
+            expect(await keyLogClient.checkAnswer(await ask(keyLogFake, seen.treeSize), seen)).toEqual({ kind: "failed", problem: "consistency" });
+        });
+
+        it("asks before following a reset, and then follows exactly the key trusted", async () => {
+            await logForged(1);
+            const seen = await seenOf(keyLogFake);
+            await keyLogFake.rotate(false);
+            const answer = await ask(keyLogFake, seen.treeSize);
+            expect(await keyLogClient.checkAnswer(answer, seen)).toEqual({ kind: "failed", problem: "log-reset" });
+            expect(await keyLogClient.checkAnswer(answer, seen, seen.logKey)).toEqual({ kind: "failed", problem: "log-reset" });
+            expect((await keyLogClient.checkAnswer(answer, seen, answer.logKey)).kind).toBe("verified");
+        });
+
+        it("still refuses a trusted reset to a log that does not extend the one seen", async () => {
+            await logForged(1);
+            const other = await keyLogFake.fork();
+            await logForged(2);
+            const seen = await seenOf(keyLogFake);
+            await other.append({ userId: server.userId, akVersion: 2, ...(await account.accountPublicKeys(account.generateAccountKey())) });
+            await other.rotate(false);
+            const answer = await ask(other, seen.treeSize);
+            expect(await keyLogClient.checkAnswer(answer, seen, answer.logKey)).toEqual({ kind: "failed", problem: "consistency" });
+        });
+    });
+
+    it("shows a reset until the user trusts that key, then pins it on the next ask", async () => {
+        const store = new Map<string, string>();
+        vi.stubGlobal("window", { localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) } });
+        await logForged(1);
+        const own = server.userId;
+        expect((await keyLogClient.askLog(own, { op: "own" })).kind).toBe("verified");
+        const pinned = keyLogClient.readSeen(own)!.logKey;
+        await keyLogFake.rotate(false);
+        expect(await keyLogClient.askLog(own, { op: "own" })).toEqual({ kind: "failed", problem: "log-reset" });
+        expect(keyLogClient.logProblem(own)).toBe("log-reset");
+        const shown = keyLogClient.pendingReset(own)!;
+        expect(shown).not.toBe(pinned);
+        // A key other than the one shown is never trusted.
+        keyLogClient.trustLogReset(own, pinned);
+        expect(keyLogClient.logProblem(own)).toBe("log-reset");
+        keyLogClient.trustLogReset(own, shown);
+        expect(keyLogClient.logProblem(own)).toBeNull();
+        expect((await keyLogClient.askLog(own, { op: "own" })).kind).toBe("verified");
+        expect(keyLogClient.readSeen(own)?.logKey).toBe(shown);
+        // The trust was spent on that key: a second reset asks again.
+        await keyLogFake.rotate(false);
+        expect(await keyLogClient.askLog(own, { op: "own" })).toEqual({ kind: "failed", problem: "log-reset" });
+        vi.unstubAllGlobals();
     });
 });
 

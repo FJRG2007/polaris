@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { FakeKeyLog } from "./support/fake-key-log";
 import * as peerKeys from "@/lib/chat/e2ee/peer-keys";
+import * as keyLog from "@/lib/chat/e2ee/key-log-client";
 
 const A = "a".repeat(64);
 const B = "b".repeat(64);
@@ -78,6 +80,52 @@ describe("peer key memory", () => {
             // The known peer's served key differs from the remembered one: the change still shows.
             expect(peerKeys.readBook("me")[KNOWN]?.changed).toBe(true);
             expect(peerKeys.readBook("me")[NEW]).toBeUndefined();
+        });
+
+        describe("a key that rotated between the two asks", () => {
+            const PEER = "0190a1b2-0000-7000-8000-0000000000a1";
+            const CHANNEL = "0190a1b2-0000-7000-8000-0000000000cc";
+            const bytes = (n: number) => new Uint8Array(32).fill(n);
+            let own = 0;
+
+            /** A log holding PEER at version 2, and the stale version 1 key the server handed out before it rotated. */
+            async function rotatedPeer() {
+                stubStorage();
+                const fake = await FakeKeyLog.create();
+                await fake.append({ userId: PEER, akVersion: 1, signPublicKey: bytes(1), hpkePublicKey: bytes(2) });
+                await fake.append({ userId: PEER, akVersion: 2, signPublicKey: bytes(3), hpkePublicKey: bytes(4) });
+                const ownId = `me-${++own}`;
+                vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => Response.json(await fake.answer(ownId, JSON.parse(init.body as string))));
+                return { ownId, stale: [{ userId: PEER, signPublicKey: bytes(1), hpkePublicKey: bytes(2) }] };
+            }
+
+            it("reports nothing when the key served afresh is the one the log holds, and vouches for neither", async () => {
+                const { ownId, stale } = await rotatedPeer();
+                const vouched = await keyLog.vouchedAccounts(ownId, CHANNEL, stale, async () => [{ userId: PEER, signPublicKey: bytes(3), hpkePublicKey: bytes(4) }]);
+                expect([...vouched!]).toEqual([]);
+                expect(keyLog.logProblem(ownId)).toBeNull();
+            });
+
+            it("reports a key served afresh that the log still contradicts", async () => {
+                const { ownId, stale } = await rotatedPeer();
+                await keyLog.vouchedAccounts(ownId, CHANNEL, stale, async () => [{ userId: PEER, signPublicKey: bytes(5), hpkePublicKey: bytes(6) }]);
+                expect(keyLog.logProblem(ownId)).toBe("inclusion");
+            });
+
+            it("reports nothing for a key no longer served, or a refetch that did not arrive", async () => {
+                const gone = await rotatedPeer();
+                await keyLog.vouchedAccounts(gone.ownId, CHANNEL, gone.stale, async () => []);
+                expect(keyLog.logProblem(gone.ownId)).toBeNull();
+                const lost = await rotatedPeer();
+                await keyLog.vouchedAccounts(lost.ownId, CHANNEL, lost.stale, async () => null);
+                expect(keyLog.logProblem(lost.ownId)).toBeNull();
+            });
+
+            it("reports the mismatch at once when there is no way to ask again", async () => {
+                const { ownId, stale } = await rotatedPeer();
+                await keyLog.vouchedAccounts(ownId, CHANNEL, stale);
+                expect(keyLog.logProblem(ownId)).toBe("inclusion");
+            });
         });
 
         it("stores per account and tells subscribers", () => {
