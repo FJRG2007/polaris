@@ -52,9 +52,11 @@ use windows::Win32::Security::WinTrust::{
 use windows::Win32::Storage::FileSystem::{
     CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, OPEN_EXISTING,
 };
+use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::System::LibraryLoader::{
     GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR, LOAD_LIBRARY_SEARCH_SYSTEM32,
 };
+use windows::Win32::UI::Shell::{FOLDERID_ProgramFiles, SHGetKnownFolderPath, KF_FLAG_DEFAULT};
 
 type NoArgs = unsafe extern "C" fn() -> i32;
 type OutU16 = unsafe extern "C" fn(*mut u16) -> i32;
@@ -113,12 +115,35 @@ fn wide(path: &Path) -> Vec<u16> {
 }
 
 /// The Hercules SDK folder, when Program Files is known and absolute.
+///
+/// Asked of the shell rather than read from `ProgramFiles`: the desktop app
+/// starts add-ons with a short list of environment variables that does not
+/// include it, so the variable is missing in exactly the process that needs it
+/// (BUG-0056), and a variable is whatever the parent set, where the known
+/// folder is what the system says.
 fn sdk_dir() -> Option<PathBuf> {
-    let base = PathBuf::from(std::env::var_os("ProgramFiles")?);
+    let base = program_files()?;
     if !base.is_absolute() {
         return None;
     }
     Some(SDK_DIR.iter().fold(base, |path, part| path.join(part)))
+}
+
+/// Program Files for this process's bitness (`FOLDERID_ProgramFiles`).
+fn program_files() -> Option<PathBuf> {
+    // SAFETY: the shell allocates the returned string; it is copied and then
+    // freed exactly once, on success and on failure alike.
+    unsafe {
+        let found = SHGetKnownFolderPath(&FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, None);
+        let raw = found.as_ref().ok().copied();
+        let path = raw
+            .and_then(|text| text.to_string().ok())
+            .map(PathBuf::from);
+        if let Some(text) = raw {
+            CoTaskMemFree(Some(text.0 as *const c_void));
+        }
+        path
+    }
 }
 
 /// Opens `path` for reading while refusing writers and deleters, so the file
@@ -440,5 +465,21 @@ impl Drop for SdkInput {
             (self.api.exit)();
         }
         ACTIVE.store(false, Ordering::Release);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The add-on process has no `ProgramFiles` variable (BUG-0056): the folder
+    // has to come from the shell, and be the real one.
+    #[test]
+    fn program_files_comes_from_the_shell() {
+        let path = program_files().expect("the shell names Program Files");
+        assert!(path.is_absolute());
+        assert!(path.is_dir());
+        let tail = Path::new("Hercules").join("HSM Series").join("sdk");
+        assert!(sdk_dir().is_some_and(|dir| dir.ends_with(&tail)));
     }
 }

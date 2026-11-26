@@ -60,3 +60,4 @@ Security findings are not kept here; they live in
 | BUG-0048 | Opening a page from the launcher shows "Application error" and drops the call on screen | Desktop | Fixed, watching | clients/desktop/src/main/page-router.ts | 2026-11-25 |
 | BUG-0049 | Polaris desktop does not show the Christmas icon of the winter season | Desktop | Fixed, watching | clients/desktop/src/main/shortcut-icon.ts | 2026-11-26 |
 | BUG-0050 | Launcher rows show a generic picture instead of the program's or game's icon | Desktop | Fixed, watching | clients/desktop/src/main/launcher-icons.ts | 2026-11-26 |
+| BUG-0056 | The Stream 100 add-on cannot read the controller through the Hercules software from the app | Device plugins | Fixed, watching | crates/polaris-stream100/src/native/sdk.rs | 2026-11-26 |
