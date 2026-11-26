@@ -183,20 +183,8 @@ export async function handleSignIn(request: Request): Promise<Response> {
                 // answered, and the password lock is sealed from the unlock.
                 return json({ verified });
             }
-            case "recovery-state":
-            case "put-recovery-shares":
-            case "recovery-own":
-            case "recovery-open":
-            case "recovery-inbox":
-            case "recovery-approve":
-            case "recovery-decline":
-            case "recovery-complete":
-            case "recovery-key-state":
-            case "put-recovery-key":
-                return await recoveryOp(user.id, body);
         }
     } catch (caught) {
-        if (caught instanceof recovery.RecoveryRefusal) return json({ error: caught.code }, 409);
         if (caught instanceof opaque.OpaqueRefusal) return json(REFUSED, 401);
         console.error("polaris: an end-to-end encryption sign-in step failed:", caught);
         return json(REFUSED, 401);
@@ -365,8 +353,20 @@ export async function handleKeys(request: Request): Promise<Response> {
                 await storePasswordLock(proved.userId, body.passwordLock);
                 return json({ passwordLock: await releasedEnvelope(proved.userId) });
             }
+            case "recovery-state":
+            case "put-recovery-shares":
+            case "recovery-own":
+            case "recovery-open":
+            case "recovery-inbox":
+            case "recovery-approve":
+            case "recovery-decline":
+            case "recovery-complete":
+            case "recovery-key-state":
+            case "put-recovery-key":
+                return await recoveryOp(user.id, body);
         }
     } catch (caught) {
+        if (caught instanceof recovery.RecoveryRefusal) return json({ error: caught.code }, 409);
         if (caught instanceof opaque.OpaqueRefusal) return json(REFUSED, 401);
         console.error("polaris: an end-to-end encryption key step failed:", caught);
         return json(REFUSED, 401);
