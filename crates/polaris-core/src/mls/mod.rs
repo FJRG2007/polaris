@@ -67,6 +67,7 @@ mod provider;
 pub use journal::{Journal, StoreChange};
 pub use member::{
     CommitOutput, GroupMember, Member, Processed, ProcessedKind, CONTENT_SIGNATURE_LABEL,
+    INLINE_TREE_BYTES,
 };
 pub use openmls_memory_storage::MemoryStorage;
 pub use provider::{Provider, SeededRand};
@@ -107,6 +108,10 @@ pub enum ErrorKind {
     Storage,
     /// OpenMLS reported an internal error.
     Internal,
+    /// A Welcome that left the ratchet tree out, joined without one: the
+    /// caller fetches that epoch's tree from the delivery service and joins
+    /// again with it.
+    MissingTree,
 }
 
 impl ErrorKind {
@@ -120,6 +125,7 @@ impl ErrorKind {
             ErrorKind::UnsupportedCiphersuite => "MlsUnsupportedCiphersuite",
             ErrorKind::Storage => "MlsStorage",
             ErrorKind::Internal => "MlsInternal",
+            ErrorKind::MissingTree => "MlsMissingTree",
         }
     }
 }

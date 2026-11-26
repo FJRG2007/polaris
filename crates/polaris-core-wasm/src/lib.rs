@@ -55,6 +55,19 @@ pub struct MlsCommit {
     pub welcome: Option<Vec<u8>>,
     #[wasm_bindgen(js_name = groupInfo)]
     pub group_info: Option<Vec<u8>>,
+    /// The new epoch's tree, when the Welcome and GroupInfo left it out.
+    #[wasm_bindgen(js_name = ratchetTree)]
+    pub ratchet_tree: Option<Vec<u8>>,
+}
+
+/// A GroupInfo and, for a large group, the tree it left out.
+#[cfg(feature = "mls")]
+#[wasm_bindgen(getter_with_clone)]
+pub struct MlsGroupInfoParts {
+    #[wasm_bindgen(js_name = groupInfo)]
+    pub group_info: Vec<u8>,
+    #[wasm_bindgen(js_name = ratchetTree)]
+    pub ratchet_tree: Option<Vec<u8>>,
 }
 
 #[cfg(feature = "mls")]
@@ -63,6 +76,7 @@ fn mls_commit(output: polaris_core::mls::CommitOutput) -> MlsCommit {
         commit: output.commit,
         welcome: output.welcome,
         group_info: output.group_info,
+        ratchet_tree: output.ratchet_tree,
     }
 }
 
@@ -229,8 +243,17 @@ impl MlsMember {
     }
 
     #[wasm_bindgen(js_name = joinByWelcome)]
-    pub fn join_by_welcome(&self, welcome: &[u8]) -> Result<Vec<u8>, JsValue> {
-        polaris_core::mls::Member::join_by_welcome(&self.inner, welcome).map_err(mls_error)
+    pub fn join_by_welcome(
+        &self,
+        welcome: &[u8],
+        ratchet_tree: Option<Vec<u8>>,
+    ) -> Result<Vec<u8>, JsValue> {
+        polaris_core::mls::Member::join_by_welcome_with_tree(
+            &self.inner,
+            welcome,
+            ratchet_tree.as_deref(),
+        )
+        .map_err(mls_error)
     }
 
     #[wasm_bindgen(js_name = groupInfo)]
@@ -238,9 +261,27 @@ impl MlsMember {
         polaris_core::mls::Member::group_info(&self.inner, group_id).map_err(mls_error)
     }
 
+    #[wasm_bindgen(js_name = groupInfoParts)]
+    pub fn group_info_parts(&self, group_id: &[u8]) -> Result<MlsGroupInfoParts, JsValue> {
+        polaris_core::mls::Member::group_info_parts(&self.inner, group_id)
+            .map(|(group_info, ratchet_tree)| MlsGroupInfoParts {
+                group_info,
+                ratchet_tree,
+            })
+            .map_err(mls_error)
+    }
+
     #[wasm_bindgen(js_name = joinByExternalCommit)]
-    pub fn join_by_external_commit(&self, group_info: &[u8]) -> Result<MlsExternalJoin, JsValue> {
-        polaris_core::mls::Member::join_by_external_commit(&self.inner, group_info)
+    pub fn join_by_external_commit(
+        &self,
+        group_info: &[u8],
+        ratchet_tree: Option<Vec<u8>>,
+    ) -> Result<MlsExternalJoin, JsValue> {
+        polaris_core::mls::Member::join_by_external_commit_with_tree(
+            &self.inner,
+            group_info,
+            ratchet_tree.as_deref(),
+        )
             .map(|(group_id, commit)| MlsExternalJoin { group_id, commit })
             .map_err(mls_error)
     }

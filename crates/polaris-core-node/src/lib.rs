@@ -264,6 +264,15 @@ pub struct MlsCommit {
     pub commit: Uint8Array,
     pub welcome: Option<Uint8Array>,
     pub group_info: Option<Uint8Array>,
+    /// The new epoch's tree, when the Welcome and GroupInfo left it out.
+    pub ratchet_tree: Option<Uint8Array>,
+}
+
+/// A GroupInfo and, for a large group, the tree it left out.
+#[napi(object)]
+pub struct MlsGroupInfoParts {
+    pub group_info: Uint8Array,
+    pub ratchet_tree: Option<Uint8Array>,
 }
 
 fn mls_commit(output: polaris_core::mls::CommitOutput) -> MlsCommit {
@@ -271,6 +280,7 @@ fn mls_commit(output: polaris_core::mls::CommitOutput) -> MlsCommit {
         commit: output.commit.into(),
         welcome: output.welcome.map(Uint8Array::from),
         group_info: output.group_info.map(Uint8Array::from),
+        ratchet_tree: output.ratchet_tree.map(Uint8Array::from),
     }
 }
 
@@ -441,8 +451,16 @@ impl MlsMember {
     }
 
     #[napi(catch_unwind)]
-    pub fn join_by_welcome(&self, welcome: Uint8Array) -> napi::Result<Uint8Array, ErrorClass> {
-        polaris_core::mls::Member::join_by_welcome(&self.inner, &welcome)
+    pub fn join_by_welcome(
+        &self,
+        welcome: Uint8Array,
+        ratchet_tree: Option<Uint8Array>,
+    ) -> napi::Result<Uint8Array, ErrorClass> {
+        polaris_core::mls::Member::join_by_welcome_with_tree(
+            &self.inner,
+            &welcome,
+            ratchet_tree.as_deref(),
+        )
             .map(Uint8Array::from)
             .map_err(mls_error)
     }
@@ -455,11 +473,26 @@ impl MlsMember {
     }
 
     #[napi(catch_unwind)]
+    pub fn group_info_parts(&self, group_id: Uint8Array) -> napi::Result<MlsGroupInfoParts, ErrorClass> {
+        polaris_core::mls::Member::group_info_parts(&self.inner, &group_id)
+            .map(|(group_info, ratchet_tree)| MlsGroupInfoParts {
+                group_info: group_info.into(),
+                ratchet_tree: ratchet_tree.map(Uint8Array::from),
+            })
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
     pub fn join_by_external_commit(
         &self,
         group_info: Uint8Array,
+        ratchet_tree: Option<Uint8Array>,
     ) -> napi::Result<MlsExternalJoin, ErrorClass> {
-        polaris_core::mls::Member::join_by_external_commit(&self.inner, &group_info)
+        polaris_core::mls::Member::join_by_external_commit_with_tree(
+            &self.inner,
+            &group_info,
+            ratchet_tree.as_deref(),
+        )
             .map(|(group_id, commit)| MlsExternalJoin {
                 group_id: group_id.into(),
                 commit: commit.into(),

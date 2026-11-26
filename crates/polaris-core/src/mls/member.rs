@@ -48,14 +48,34 @@ fn wrong_type(expected: &str) -> MlsError {
     )
 }
 
+/// The largest ratchet tree (TLS-encoded, before the commit) a Welcome and a
+/// GroupInfo still carry in their `ratchet_tree` extension. Past it both leave
+/// the tree out (RFC 9420, 12.4.3.3) and the commit hands it back on its own
+/// ([`CommitOutput::ratchet_tree`]) for the delivery service to keep, so a
+/// Welcome into a large group does not repeat the whole tree for every
+/// device it invites. Small groups keep the tree inline, which is what every
+/// device that predates this expects.
+pub const INLINE_TREE_BYTES: usize = 64 * 1024;
+
+fn parse_tree(bytes: &[u8]) -> Result<RatchetTreeIn> {
+    RatchetTreeIn::tls_deserialize_exact(bytes).map_err(malformed)
+}
+
 /// What a commit produced: the commit for the group, a Welcome for anyone it
-/// added, and the new epoch's GroupInfo (with the ratchet tree) for external
-/// joins. The commit is pending until [`Member::merge_pending_commit`].
+/// added, and the new epoch's GroupInfo for external joins. The commit is
+/// pending until [`Member::merge_pending_commit`].
+///
+/// While the tree is small the Welcome and GroupInfo carry it and
+/// `ratchet_tree` is `None`. Past [`INLINE_TREE_BYTES`] they leave it out and
+/// `ratchet_tree` is the new epoch's tree, which a joiner needs beside either
+/// of them; OpenMLS checks it against the tree hash the signed GroupInfo
+/// commits to, so whoever stores it cannot swap it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitOutput {
     pub commit: Vec<u8>,
     pub welcome: Option<Vec<u8>>,
     pub group_info: Option<Vec<u8>>,
+    pub ratchet_tree: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -365,52 +385,33 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
         Ok(key_package)
     }
 
-    /// Commit adding the members whose KeyPackages are given.
-    pub fn add_members(&self, group_id: &[u8], key_packages: &[Vec<u8>]) -> Result<CommitOutput> {
-        let parsed = key_packages
-            .iter()
-            .map(|bytes| self.parse_key_package(bytes))
-            .collect::<Result<Vec<_>>>()?;
-        let mut group = self.load(group_id)?;
-        let (commit, welcome, group_info) = group
-            .add_members(&self.provider, &self.signer, &parsed)
-            .map_err(rejected)?;
-        Ok(CommitOutput {
-            commit: encode(&commit)?,
-            welcome: Some(encode(&welcome)?),
-            group_info: group_info
-                .map(|info| encode(&MlsMessageOut::from(info)))
-                .transpose()?,
-        })
+    /// Whether this group's tree still travels inside Welcomes and GroupInfos.
+    fn tree_inline(group: &MlsGroup) -> bool {
+        use openmls::prelude::tls_codec::Size as _;
+        group.export_ratchet_tree().tls_serialized_len() <= INLINE_TREE_BYTES
     }
 
-    /// Commit removing the members at these leaves.
-    pub fn remove_members(&self, group_id: &[u8], leaves: &[u32]) -> Result<CommitOutput> {
-        let mut group = self.load(group_id)?;
-        let leaves: Vec<LeafNodeIndex> = leaves
-            .iter()
-            .map(|&leaf| LeafNodeIndex::new(leaf))
-            .collect();
-        let (commit, welcome, group_info) = group
-            .remove_members(&self.provider, &self.signer, &leaves)
-            .map_err(rejected)?;
-        Ok(CommitOutput {
-            commit: encode(&commit)?,
-            welcome: welcome.as_ref().map(encode).transpose()?,
-            group_info: group_info
-                .map(|info| encode(&MlsMessageOut::from(info)))
-                .transpose()?,
-        })
-    }
-
-    /// Commit a fresh leaf key and path: post-compromise security for this
-    /// member (RFC 9420, 16.6).
-    pub fn self_update(&self, group_id: &[u8]) -> Result<CommitOutput> {
-        let mut group = self.load(group_id)?;
-        let bundle = group
-            .self_update(&self.provider, &self.signer, LeafNodeParameters::default())
-            .map_err(rejected)?;
+    /// The wire form of a staged commit; with the new epoch's tree beside it
+    /// when the tree was left out of the Welcome and GroupInfo.
+    fn commit_output(
+        &self,
+        group: &MlsGroup,
+        bundle: openmls::group::CommitMessageBundle,
+        inline: bool,
+    ) -> Result<CommitOutput> {
         let (commit, welcome, group_info) = bundle.into_contents();
+        let ratchet_tree = if inline {
+            None
+        } else {
+            let staged = group
+                .pending_commit()
+                .ok_or_else(|| internal("the commit was not staged"))?;
+            let tree = staged
+                .export_ratchet_tree(self.provider.crypto(), group.export_ratchet_tree())
+                .map_err(internal)?
+                .ok_or_else(|| internal("the staged commit carries no tree"))?;
+            Some(tree.tls_serialize_detached().map_err(internal)?)
+        };
         Ok(CommitOutput {
             commit: encode(&commit)?,
             welcome: welcome
@@ -424,7 +425,99 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
             group_info: group_info
                 .map(|info| encode(&MlsMessageOut::from(info)))
                 .transpose()?,
+            ratchet_tree,
         })
+    }
+
+    /// Commit adding the members whose KeyPackages are given. As
+    /// `MlsGroup::add_members` does, the commit carries a path.
+    pub fn add_members(&self, group_id: &[u8], key_packages: &[Vec<u8>]) -> Result<CommitOutput> {
+        if key_packages.is_empty() {
+            return Err(rejected("no key packages to add"));
+        }
+        let parsed = key_packages
+            .iter()
+            .map(|bytes| self.parse_key_package(bytes))
+            .collect::<Result<Vec<_>>>()?;
+        let mut group = self.load(group_id)?;
+        let inline = Self::tree_inline(&group);
+        let bundle = group
+            .commit_builder()
+            .propose_adds(parsed)
+            .force_self_update(true)
+            .load_psks(self.provider.storage())
+            .map_err(rejected)?
+            .use_ratchet_tree_extension(inline)
+            .create_group_info(true)
+            .build(
+                self.provider.rand(),
+                self.provider.crypto(),
+                &self.signer,
+                |_| true,
+            )
+            .map_err(rejected)?
+            .stage_commit(&self.provider)
+            .map_err(rejected)?;
+        let out = self.commit_output(&group, bundle, inline)?;
+        if out.welcome.is_none() {
+            return Err(internal("an add commit came back without its Welcome"));
+        }
+        Ok(out)
+    }
+
+    /// Commit removing the members at these leaves.
+    pub fn remove_members(&self, group_id: &[u8], leaves: &[u32]) -> Result<CommitOutput> {
+        if leaves.is_empty() {
+            return Err(rejected("no members to remove"));
+        }
+        let mut group = self.load(group_id)?;
+        let leaves: Vec<LeafNodeIndex> = leaves
+            .iter()
+            .map(|&leaf| LeafNodeIndex::new(leaf))
+            .collect();
+        let inline = Self::tree_inline(&group);
+        let bundle = group
+            .commit_builder()
+            .propose_removals(leaves)
+            .load_psks(self.provider.storage())
+            .map_err(rejected)?
+            .use_ratchet_tree_extension(inline)
+            .create_group_info(true)
+            .build(
+                self.provider.rand(),
+                self.provider.crypto(),
+                &self.signer,
+                |_| true,
+            )
+            .map_err(rejected)?
+            .stage_commit(&self.provider)
+            .map_err(rejected)?;
+        self.commit_output(&group, bundle, inline)
+    }
+
+    /// Commit a fresh leaf key and path: post-compromise security for this
+    /// member (RFC 9420, 16.6).
+    pub fn self_update(&self, group_id: &[u8]) -> Result<CommitOutput> {
+        let mut group = self.load(group_id)?;
+        let inline = Self::tree_inline(&group);
+        let bundle = group
+            .commit_builder()
+            .leaf_node_parameters(LeafNodeParameters::default())
+            .consume_proposal_store(true)
+            .load_psks(self.provider.storage())
+            .map_err(rejected)?
+            .use_ratchet_tree_extension(inline)
+            .create_group_info(true)
+            .build(
+                self.provider.rand(),
+                self.provider.crypto(),
+                &self.signer,
+                |_| true,
+            )
+            .map_err(rejected)?
+            .stage_commit(&self.provider)
+            .map_err(rejected)?;
+        self.commit_output(&group, bundle, inline)
     }
 
     /// Apply this member's pending commit, once the delivery service accepted it.
@@ -464,14 +557,35 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
 
     /// Join the group a Welcome invites this member to; returns the group id.
     pub fn join_by_welcome(&self, welcome: &[u8]) -> Result<Vec<u8>> {
+        self.join_by_welcome_with_tree(welcome, None)
+    }
+
+    /// [`Member::join_by_welcome`] for a Welcome that may have left the
+    /// ratchet tree out: `ratchet_tree` is that epoch's tree as the delivery
+    /// service keeps it. OpenMLS builds the tree, checks its hash against the
+    /// GroupInfo the Welcome encrypts and refuses a mismatch, so a tree from
+    /// an untrusted store cannot put this member in a different group. A
+    /// Welcome without the tree, joined with none, is refused with
+    /// `MissingTree`: fetch the tree and call again.
+    pub fn join_by_welcome_with_tree(
+        &self,
+        welcome: &[u8],
+        ratchet_tree: Option<&[u8]>,
+    ) -> Result<Vec<u8>> {
         let MlsMessageBodyIn::Welcome(welcome) = decode(welcome)? else {
             return Err(wrong_type("Welcome"));
         };
-        let staged =
+        let tree = ratchet_tree.map(parse_tree).transpose()?;
+        let mut join =
             StagedWelcome::build_from_welcome(&self.provider, &Self::join_config(), welcome)
-                .map_err(rejected)?
-                .build()
                 .map_err(rejected)?;
+        if let Some(tree) = tree {
+            join = join.with_ratchet_tree(tree);
+        }
+        let staged = join.build().map_err(|error| match error {
+            WelcomeError::MissingRatchetTree => MlsError::new(ErrorKind::MissingTree, error),
+            error => rejected(error),
+        })?;
         let id = staged.group_context().group_id().clone();
         self.refuse_existing(&id)?;
         if staged.group_context().ciphersuite() != self.ciphersuite {
@@ -490,21 +604,61 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
         encode(&info)
     }
 
+    /// This epoch's signed GroupInfo without the ratchet tree, and the tree on
+    /// its own, for a group whose tree is past [`INLINE_TREE_BYTES`]: what an
+    /// external joiner then needs from the delivery service, in two pieces
+    /// the store can hold and serve apart. `None` for the tree while it is
+    /// small enough to ride inside the GroupInfo, as [`Member::group_info`].
+    pub fn group_info_parts(&self, group_id: &[u8]) -> Result<(Vec<u8>, Option<Vec<u8>>)> {
+        let group = self.load(group_id)?;
+        let inline = Self::tree_inline(&group);
+        let info = group
+            .export_group_info(self.provider.crypto(), &self.signer, inline)
+            .map_err(rejected)?;
+        let tree = if inline {
+            None
+        } else {
+            Some(
+                group
+                    .export_ratchet_tree()
+                    .tls_serialize_detached()
+                    .map_err(internal)?,
+            )
+        };
+        Ok((encode(&info)?, tree))
+    }
+
     /// Join through an external commit from a GroupInfo (RFC 9420, 12.4.3.2).
     /// Returns the group id and the commit. OpenMLS 0.9.2 applies an external
     /// commit as soon as it is built (`finalize`), so the joiner is in the new
     /// epoch at once; if the delivery service refuses the commit, the joiner
     /// discards the group and joins again from a fresh GroupInfo.
     pub fn join_by_external_commit(&self, group_info: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
+        self.join_by_external_commit_with_tree(group_info, None)
+    }
+
+    /// [`Member::join_by_external_commit`] from a GroupInfo that left the tree
+    /// out, with that epoch's tree beside it. OpenMLS verifies the GroupInfo's
+    /// signature against the signer's leaf in the tree and the tree against
+    /// the hash in the signed group context, and refuses either mismatch.
+    pub fn join_by_external_commit_with_tree(
+        &self,
+        group_info: &[u8],
+        ratchet_tree: Option<&[u8]>,
+    ) -> Result<(Vec<u8>, Vec<u8>)> {
         let MlsMessageBodyIn::GroupInfo(info) = decode(group_info)? else {
             return Err(wrong_type("GroupInfo"));
         };
         if info.ciphersuite() != self.ciphersuite {
             return Err(rejected("the group uses another cipher suite"));
         }
+        let tree = ratchet_tree.map(parse_tree).transpose()?;
         self.refuse_existing(&info.group_id().clone())?;
-        let (group, bundle) = MlsGroup::external_commit_builder()
-            .with_config(Self::join_config())
+        let mut builder = MlsGroup::external_commit_builder().with_config(Self::join_config());
+        if let Some(tree) = tree {
+            builder = builder.with_ratchet_tree(tree);
+        }
+        let (group, bundle) = builder
             .build_group(&self.provider, info, self.credential.clone())
             .map_err(rejected)?
             .leaf_node_parameters(
