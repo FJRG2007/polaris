@@ -80,9 +80,10 @@ const EVE = "33333333-3333-4333-8333-333333333333";
 const CHANNEL = "44444444-4444-4444-8444-444444444444";
 const blob = (fill: number, length = 40) => Buffer.alloc(length, fill).toString("base64url");
 
-async function call(body: unknown, as: string | null = ALICE) {
+async function call(body: unknown, as: string | null = ALICE, userAgent?: string) {
     state.user = as ? { id: as } : null;
-    const response = await handleMls(new Request("http://x/api/e2ee/mls", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
+    const headers: Record<string, string> = { "content-type": "application/json", ...(userAgent ? { "user-agent": userAgent } : {}) };
+    const response = await handleMls(new Request("http://x/api/e2ee/mls", { method: "POST", headers, body: JSON.stringify(body) }));
     return { status: response.status, body: (await response.json()) as Record<string, unknown> };
 }
 
@@ -132,6 +133,15 @@ describe("/api/e2ee/mls", () => {
         process.env.POLARIS_INTERNAL_CHAT_E2EE = "0";
         expect((await call({ op: "group", channelId: CHANNEL })).body).toEqual({ sealed: true, group: null });
         expect((await call({ op: "create-group", channelId: CHANNEL, groupId: blob(1, 16), ciphersuite: 0x004f, groupInfo: blob(2) })).status).toBe(200);
+    });
+
+    it("tells a Polaris app too old for sealed chat to update, and gives it no device", async () => {
+        const oldAndroid = "Mozilla/5.0 (Linux; Android 14; wv) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36 PolarisMobile/0.1.14 (Android)";
+        const refused = await call({ op: "register-device", device: "d-old", signatureKey: blob(7, 32), e2eeVersion: 1 }, ALICE, oldAndroid);
+        expect(refused).toEqual({ status: 426, body: { error: "updateApp", app: "android", minimum: "0.1.15" } });
+        expect(state.tables.mlsDevice ?? []).toHaveLength(0);
+        const current = oldAndroid.replace("0.1.14", "0.1.15");
+        expect((await call({ op: "register-device", device: "d-new", signatureKey: blob(7, 32), e2eeVersion: 1 }, ALICE, current)).status).toBe(200);
     });
 
     it("orders commits by epoch: the second commit for the same epoch is refused, not forked", async () => {
