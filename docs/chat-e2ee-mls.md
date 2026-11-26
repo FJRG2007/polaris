@@ -486,6 +486,7 @@ share of the work, not of the code.
 | 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. Designed 2026-11-26 (round 31), see "Shared search segments": one segment per history-key epoch, keyed from that epoch's history key, built once under a lease, corrected by small generations, every hit still opened before it is shown. Left: phase-0 measurement, the table, the route ops and the Worker. | No (documented limit) | ~45% |
 | 11 | **Web code trust** (proposal 4.7): published hash of the crypto bundle, extension and desktop checking it, strict CSP and Trusted Types on message rendering. | No for default-on; yes for intelligence deployments | ~10% |
 | 12 | **Large channels**: built (2026-11-25): `reconcile` adds at most 100 newcomers per send (`ADD_BATCH`, one `claim-key-packages` call's worth); the roster's pages together could name more, which the claim refused, so every add in a channel past 1,000 leaves failed and was retried forever. The rest are added by later sends or join by their own external commit on open (decision 9). Removals go at most 100 per commit (`REMOVE_BATCH`), as many commits as it takes, all before anything is sealed: every removed leaf blanks its path and the committer then encrypts to each node left under a blank, so one commit taking out thousands could pass the 1 MiB commit limit and never land (tested: five leaving with a batch of two take three commits, and none of them opens what is sealed after). Left: steady-state commit size with a filled tree is unmeasured (phase 0). | For big spaces | ~38% |
+| 13 | **Client readiness**: built (2026-11-26, see "Client readiness"): an app too old for sealed chat is refused a device and told to update; Android's sealed notices read "New message" in the reader's language; a live location ends once its conversation is sealed. Left: iOS 0.1.4 (the first with the native key store) released in the App Store. | Yes (iOS release) | ~85% |
 
 Rough overall to "on by default, every existing chat migrated, recoverable":
 about 44%. Text messaging between people on the web, with edits, Polar and
@@ -1216,6 +1217,64 @@ the clear tells it nothing it did not already hold; each still needs its sealed
 form for row 3, so a reader's screen shows one kind of row. While
 `POLARIS_INTERNAL_CHAT_E2EE` is off, `conversationSealed` answers false before
 touching the database and nothing is refused anywhere.
+
+A live location is the one person-authored write that keeps arriving after
+the message: the phone's `LiveLocationService` posts a new point to
+`/api/chat/location/live` every few seconds, and `moveLive`
+(`lib/chat/locations.ts:164`) writes it onto a message sent earlier. A share
+started before its conversation was sealed (the migration's cut, or a browser
+making the group) is ended there instead of moved (`locations.ts:199`), asked
+once per conversation per move, and the conversation is told so its card stops
+saying "live". Sweep of every other writer of message content
+(`grep -rnE "\.chat(Message|Location|Poll\w*|Attachment|Reaction|MessageEdit)\.(create|update|upsert|createMany|updateMany)"`,
+2026-11-26): person-authored text goes through `messages.send`/`edit`/
+`scheduleMessage` (refused above), forum posts through `forum.ts:173`, votes on
+a sealed poll are refused in the clear (`polls.ts:329`), webhooks seal
+(`webhooks.ts:272`); the rest are the server's own text (agent answers, notices,
+activity cards, followed copies), state on a message (pins, keeps, delivery,
+reads, vanish, view-once, expiry) or the migration itself. Still written in the
+clear in a sealed conversation, each waiting on its sealed form in row 3:
+reactions (`messages.ts:1700`) and votes on a plain poll sent before the seal
+(`polls.ts:352`).
+
+## Client readiness (2026-11-26)
+
+Every Polaris app draws chat from the instance's own page, so what an app can
+still get wrong is what it adds natively: the key store that locks the account
+key's device lock, notices built outside the page, and the live location.
+
+| Surface | How it reaches chat | Sealed state | Evidence |
+| --- | --- | --- | --- |
+| Desktop (Electron) | the dashboard page itself; OS notices raised by the page over IPC | ready: the page opens sealed rows; a toast opens a sealed notice on the device before it is shown | `apps/web/src/components/message-toasts.tsx:119-137`, `clients/desktop/src/main/ipc.ts:282-322`, `clients/desktop/src/main/notices.ts:59` |
+| Desktop native key store | `keyStore` bridge (safeStorage) | first in desktop-v0.1.56 (commit caa836866b) | `clients/desktop/src/main/key-wrap.ts`, `clients/desktop/src/shared/bridge.ts:338` |
+| Desktop User-Agent | Electron's default, never overridden (no `setUserAgent`/`userAgentFallback` in `clients/desktop/src`) | `... Polaris/<version> Chrome/<v> Electron/<v> ...`: Electron builds it from `app.name` (productName `Polaris`, `clients/desktop/package.json:3`) with spaces removed and `app.getVersion()` (`shell/common/application_info.cc`, `BuildApplicationUserAgent`). productName has been `Polaris` since the app was added (7e38cec31a), so every release sends it and no desktop change or version bump is needed | `apps/web/src/lib/chat/e2ee/client-version.ts:52`, `test/chat/e2ee/client-version.test.ts` |
+| Android app, foreground | WebView of the dashboard, agent `<WebView> PolarisMobile/<v> (Android)` since the first release | ready | `mobile/android/.../AppAgent.java:18`, `HomeActivity.java:187` |
+| Android background notices | native `NoticeService` reading `/api/mobile/notices` | ready: a sealed message reads the sender and "New message" in the reader's language, with `sealed: true` (Signal's "Name only" level; the service holds no MLS device, which lives in the WebView's IndexedDB) | `apps/web/src/app/api/mobile/notices/route.ts:132`, `NoticeService.java:216` |
+| Android native key store | `window.PolarisKeyStore` | first in android-v0.1.15 | `mobile/android/.../ChatKeyStore.java`, `apps/web/src/lib/chat/e2ee/platform-key-wrap.ts:7` |
+| Android live location | native `LiveLocationService` -> `moveLive` | ready: ended once the conversation is sealed (see "Sealed only") | `apps/web/src/lib/chat/locations.ts:199` |
+| Android view-once | native `ViewOnceActivity` | refused in sealed conversations (row 3) | `ViewOnceActivity.java:87` |
+| iOS app | WKWebView, `applicationNameForUserAgent = "PolarisMobile/<v> (iOS)"` since its first commit | page ready; no message notices at all (the notices stream rings calls only), not E2EE-specific | `mobile/ios/Polaris/WebViewController.swift:64`, `mobile/ios/Polaris/IncomingCalls.swift:17` |
+| iOS native key store | `webkit.messageHandlers.polarisKeyStore` | first in iOS 0.1.4; **no iOS build has been released** | `mobile/ios/Polaris/ChatKeyStore.swift`, `mobile/ios/project.yml:9` |
+| Browser extension | Polar side panel (`/polar/embed`), no chat, no account key | not applicable | `apps/extension/src/lib/polar-panel.ts:4-9` |
+| TV, launchers, Stream Deck | counts and labels only; the deck's `chat.send` is plain and refused in a sealed conversation | ready | `apps/web/src/app/api/tv/state/route.ts:61-79`, `apps/web/src/lib/deck/core-actions.ts:171-201` |
+
+An app older than its minimum is refused a device by the delivery route (426
+`updateApp`, `mls-handler.ts:84`), and its chat shows "Update" where the message
+box was, linking to the app's own update screen (`chat/outdated-app-gate.tsx`,
+wired at `channel-view.tsx:2870`). Only while sealed chat is on; a browser or an
+agent this cannot read is never held back. The minimums live in one place,
+`SEALED_CHAT_MINIMUM` (`client-version.ts:33`), sourced from
+`git tag --contains caa836866b`.
+
+Flip checklist:
+
+1. Desktop >= 0.1.56 published (tagged and released).
+2. Android >= 0.1.15 published (tagged and released).
+3. **iOS >= 0.1.4 approved in the App Store - not yet; blocks the flip.**
+4. Extension: nothing needed.
+5. A later client change sealed chat comes to depend on raises its row in
+   `SEALED_CHAT_MINIMUM`, and is released before the flip.
+6. Then `CHAT_E2EE_DEFAULT_ON = true` (`flag.ts:7`).
 
 ## Proposal: the organisation recovery key (not built)
 
