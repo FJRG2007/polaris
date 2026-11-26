@@ -481,7 +481,7 @@ share of the work, not of the code.
 | 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback`), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Built 2026-11-25 (round 26, see "Rollback, purge and late members"): the admin line (Management > Security), the per-conversation rollback from `ChatMigrationRollback` and "Seal it again", the purge after 30 days (decision 4), and members whose account key came after the cut getting the legacy key from a member's browser (`legacy-key-gaps`). Left: attachments/polls/system rows (row 3), a "history before [date]" label, members nobody holding the key ever meets again (needs `ORK`, row 6). Not verified: the admin line and rollback in a browser and against a real PostgreSQL. | Yes (owner: every existing chat migrated) | ~65% |
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
 | 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info; scanning the other person's QR in the app; the verified mark; the key-change line in the conversation (per browser, trust on first use). Left: `AccountKeyVerifier` still has no log behind it, so a server could hand out a substitute account key to somebody who never verifies - the append-only key log with a signed root and inclusion and consistency checks in the browser, and each account monitoring its own entries; key changes of group members (no number in a group). | Yes, for "government-grade" | ~30% |
-| 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody; the instance limit on /admin/privacy ("Sealed chat devices", 7 to 90 days, shown while sealed chat is on, audited). Left: the organisation's own limit (only tighter), the "new device added" notice on the account's other devices, a device list with revoke. | Yes, for post-compromise security | ~58% |
+| 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody; the instance limit on /admin/privacy ("Sealed chat devices", 7 to 90 days, shown while sealed chat is on, audited). Built 2026-11-26 (code and unit tests, not yet run in a browser or against a real Postgres): the organisation's own limit (only tighter, organisation settings, strictest of instance and every organisation applies per account), a "new device" security notice when an account with another device registers one, and a device list with remove on /account/sessions. Left: seeing the three screens rendered, the migration applied on a real database. | Yes, for post-compromise security | ~85% |
 | 9 | **Server features that read chat text**: built (2026-11-25): moderation reports of a sealed message with its files, and the sealed lines of a whole-conversation or person report, see "Sealed reports". Built 2026-11-26 (round 30): moving a whole Polaris (Settings transfer) now re-seals the bare envelopes it used to miss - the MLS store of server-run members (Polar, webhooks), the OPAQUE server setup, automation secrets - and carries each OPAQUE record's password tag as the hash it fingerprints, keyed again on arrival (before, the setup failed to open on the new instance, every OPAQUE record was deleted, and accounts whose password was set over OPAQUE could not sign in nor open their account key or sealed history). Sealed rows, `ChatHistoryKey` and account-key envelopes travel as they are, so a sealed conversation opens after the move. Not carried by the transfer at all (every file, sealed or not): attachment and Drive bytes on disk or a storage connection; a Polar change waiting for Approve is answered as gone; a Polaris database backup is not restorable from the screen and only opens on the instance with the same master key. Confirmed 2026-11-26 (round 31), see "Other places a message is shown": retention (`lib/retention-service.ts`: activity, audit log, notices) and the compliance evidence export (`lib/compliance/*`: accounts, domains, certificates, backups, bans) read no chat table at all; disappearing messages go by `expiresAt` alone, so they expire and are kept the same sealed or not; automations get "New chat message" for a sealed message with an empty body (they are told it was sent, by whom and where, not what), and post into a sealed conversation through a webhook's own MLS device; game chat shows a sealed message as "Sent a message". Left: a sealed-aware game bridge (a server-run member, like webhooks) so a conversation shown in a game shows words again. | Partly (export/import must round-trip) | ~55% |
 | 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. Designed 2026-11-26 (round 31), see "Shared search segments": one segment per history-key epoch, keyed from that epoch's history key, built once under a lease, corrected by small generations, every hit still opened before it is shown. Left: phase-0 measurement, the table, the route ops and the Worker. | No (documented limit) | ~45% |
 | 11 | **Web code trust** (proposal 4.7): published hash of the crypto bundle, extension and desktop checking it, strict CSP and Trusted Types on message rendering. | No for default-on; yes for intelligence deployments | ~10% |
@@ -668,7 +668,7 @@ proposal: 30 days by default, 7 to 90 adjustable.
 
 - **Retired devices.** A device is retired when its record is gone (signed out,
   or never known) or its `lastSeenAt` is older than the limit
-  (`retiredDevices`, `inactiveCutoff`, `mls-delivery.ts`). The limit is
+  (`retiredDevices`, `inactiveCutoffs`, `mls-delivery.ts`). The limit is
   `INACTIVE_DEVICE_DAYS` (30) unless the `Setting` key
   `chat.e2ee.inactiveDeviceDays` holds another, clamped to 7-90, so it works on
   every install with nothing set.
@@ -701,6 +701,29 @@ proposal: 30 days by default, 7 to 90 adjustable.
   while sealed chat is on; `setSealedDeviceDaysAction` takes a whole number
   in 7-90, stores it and writes `settings.chat-sealed-device-days` to the
   audit log. The next roster and claim read it.
+- **An organisation's own limit** (built 2026-11-26): `Organization.sealedDeviceDays`
+  (nullable, additive migration `20281210000000_org_sealed_device_days`; null is
+  the instance's limit, which every existing organisation keeps). Set from the
+  organisation's settings ("Encrypted chat devices") by someone with
+  `settings.manage`, only while sealed chat is served and only shorter than the
+  instance's (`setOrgSealedDeviceDaysAction`, audited as
+  `org.sealed-device-days`). Each account gets the strictest of the instance's
+  and every organisation it belongs to or owns (`strictestDays`,
+  `inactiveCutoffs`: two indexed reads for any number of accounts), and
+  `retiredDevices` and `claim-key-packages` use that per-account cutoff.
+- **A new device is announced** (built 2026-11-26): `registerDevice` sends the
+  account's security notice (`notifySealedDeviceAdded`, links to
+  /account/sessions) when a device it did not know registers while the account
+  already has another. Polar and webhooks are skipped; a failed notice is
+  logged and never fails the register. A browser signed out and back counts as
+  new, so it is announced again.
+- **The account's device list** (built 2026-11-26): /account/sessions lists the
+  account's sealed-chat devices (at most 100, with when each was added and last
+  used), marks "This browser" from the browser's own store without creating a
+  device, and removes any other one (`removeSealedDeviceAction`: retires it,
+  audited as `account.chat-device.removed`, which raises the security notice).
+  A removed device still signed in rejoins as a new device, so the copy says to
+  end its session too.
 - **What the server can do with it.** A server lying in `retired` can only
   make members remove a live device, which then rejoins by itself: a denial
   of service it could cause anyway by withholding messages. It cannot add a
