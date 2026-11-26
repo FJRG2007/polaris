@@ -84,12 +84,14 @@ import {
     powerMonitor,
     safeStorage,
     shell,
+    type IpcMainEvent,
     type IpcMainInvokeEvent,
     type NativeImage,
     type WebContents,
     webContents
 } from "electron";
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
+import { recordPageReport } from "./perf-watch";
 import { clearClipboardHistory, followClipboardKeep, launcherStatus, recordLauncherKey, setLauncherBinding } from "./launcher";
 import { APP_SETTING_FEATURES, appKeyPressSchema, appOverlayGameChangeSchema, readAppSettingChange, type AppSettingChange } from "@polaris/core/app-settings";
 import { bindingFromPress } from "@/shared/launcher-hotkey";
@@ -258,7 +260,7 @@ const opened = new Map<string, BrowserWindow>();
 
 export function registerIpc(host: IpcHost): void {
     /** The dashboard's channels: a Polaris window's main frame, on the Polaris. */
-    const fromPolaris = (event: IpcMainInvokeEvent): boolean => {
+    const fromPolaris = (event: IpcMainInvokeEvent | IpcMainEvent): boolean => {
         const origin = host.server();
         const frame = event.senderFrame;
         return Boolean(
@@ -382,6 +384,11 @@ export function registerIpc(host: IpcHost): void {
         return { ok: true };
     });
 
+    // A slow input or long task the Polaris window measured (`preload/perf-watch.ts`):
+    // sent, not asked, so the page never waits on it; checked again before it is written.
+    ipcMain.on(CHANNELS.perfReport, (event, raw: unknown) => {
+        if (fromPolaris(event)) recordPageReport(raw);
+    });
     // The account's text size, seen in the Polaris window and kept, so the app's
     // own windows read at it - including those opened signed out or offline.
     ipcMain.handle(CHANNELS.textSizeSeen, (event, raw: unknown): boolean => {

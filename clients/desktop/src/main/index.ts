@@ -68,6 +68,7 @@ import { addressWords, failoverFor, instanceRecordFor } from "./polaris-api";
 import { AUTHORITY_INVALID, USE_CHROMIUM, pinScope, verifyDecision } from "./local-ca-pin";
 import { activeOrigin, backStep, failedLoadStep, samePlaceOn, titleWith } from "./window-failover";
 import { openExternal } from "./open-external";
+import { perfEvent, startPerfWatch } from "./perf-watch";
 import { antivirusHelpUrl, antivirusNotice } from "./antivirus-help";
 import { installDeviceHeaders } from "./device-headers";
 import { startNativeHost } from "./native-host/service";
@@ -107,7 +108,10 @@ const games = new GameWatcher((game) => {
     if (main && !main.isDestroyed()) main.webContents.send(CHANNELS.gameActivity, game);
 }, undefined, () => installedGames());
 // Game mode: the launcher's key reaches the game while it is in front.
-games.onForeground((busy) => launcher.followGameForeground(busy));
+games.onForeground((busy) => {
+    launcher.followGameForeground(busy);
+    perfEvent("game-front", { busy });
+});
 
 /**
  * The same Polaris on a local address that proved it is this instance, while
@@ -983,6 +987,7 @@ function start(): void {
 
     app.whenReady().then(() => {
         markStartup("ready");
+        startPerfWatch(accelerated);
         // A start whose first window never draws still leaves its line.
         setTimeout(() => void writeStartupLog(startupLogPath(), app.getVersion(), startedByLogin), 120_000).unref();
         // The season's icon from the last launch, before any window or the tray is up.

@@ -861,6 +861,7 @@ export const CHANNELS = {
     appBadge: "desktop:app-badge",
     appIcon: "desktop:app-icon",
     textSizeSeen: "desktop:text-size-seen",
+    perfReport: "desktop:perf-report",
     textSize: "local:text-size",
     textSizeChanged: "local:text-size-changed",
     shareSources: "desktop:share-sources",

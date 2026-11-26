@@ -10,6 +10,7 @@
 import { contextBridge, ipcRenderer, webFrame } from "electron";
 import { followTitleBarColors } from "@/shared/title-bar";
 import { reportTextSize } from "./text-size";
+import { watchPagePerformance } from "./perf-watch";
 import { holdOutsideLinks } from "./outside-links";
 import { readLinkNotice, showLinkNotice } from "./link-notice";
 import { checkPageCode } from "./integrity";
@@ -265,6 +266,7 @@ contextBridge.exposeInMainWorld("polarisDesktop", bridge);
 
 followTitleBarColors((colors) => void ipcRenderer.invoke(CHANNELS.titleBarColors, colors));
 reportTextSize((raw) => void ipcRenderer.invoke(CHANNELS.textSizeSeen, raw));
+watchPagePerformance((report) => ipcRenderer.send(CHANNELS.perfReport, report));
 holdOutsideLinks((url) => ipcRenderer.invoke(CHANNELS.openOutside, url));
 ipcRenderer.on(CHANNELS.linkNotice, (_event, raw: unknown) => {
     const words = readLinkNotice(raw);
