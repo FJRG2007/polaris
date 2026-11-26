@@ -837,6 +837,24 @@ export async function linkPreviewAction(
 }
 
 /**
+ * The card for a link about to be sent sealed into a conversation; the page
+ * seals it inside the message (`messages.sealedLinkCard`). Null when there is
+ * none or none may be made.
+ */
+const sealedCardInput = z.object({ channelId: z.string().uuid(), url: z.string().trim().min(1).max(2048) });
+
+export async function sealedLinkCardAction(
+    channelId: string,
+    url: string
+): Promise<{ preview: LinkPreviewView | null }> {
+    const me = await actor();
+    const input = sealedCardInput.safeParse({ channelId, url });
+    if (!input.success) return { preview: null };
+    const result = await guard(() => messages.sealedLinkCard(me, input.data.channelId, input.data.url));
+    return { preview: result.value ?? null };
+}
+
+/**
  * What just arrived in these conversations, for the note that appears in the
  * corner.
  *

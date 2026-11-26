@@ -293,10 +293,9 @@ on the device, through `openSealed`, with the same page cache.
   the compliance evidence export (`lib/compliance/*`) lists accounts, domains,
   certificates, backups and bans. Disappearing messages and "Keep in chat"
   (`keep.ts`) go by `expiresAt` alone and work the same on a sealed message.
-- **Link cards.** Not made for a sealed message: the server makes a card by
-  fetching the link, which would tell it what was sent. The link is still a
-  link. A card the sender makes and seals beside the message is the way to
-  have one, and is not built.
+- **Link cards.** Written 2026-11-26, not yet run: the sender's page asks for
+  the card and seals it inside the message; see "Sealed link cards". The
+  server never attaches one to a sealed row (`linkPreviewFor`).
 - **Edits.** Sealed too (see "Editing" above), with the history kept sealed
   where the scope keeps one. A plain edit of a sealed message is still refused
   (`errors.sealedNotEditable`), since it would put the new words in the clear;
@@ -456,7 +455,6 @@ this is how it fits what is built. Decided here, nothing of it is code yet.
 
 ## Not built yet
 
-- Sealed link cards (see "Other places a message is shown").
 - The `org` history-key envelope. The organisation recovery key (proposal 3.5)
   has no public key stored anywhere yet - its custodian setup is not built - so
   nothing can serve it and no `org` envelope can be sealed until it is.
@@ -478,7 +476,7 @@ share of the work, not of the code.
 | --- | --- | --- | --- |
 | 1 | **Real-browser run of the sealed flows.** The text flows passed end to end against a production build on 2026-11-24 (see the note under this table). Also passed in a browser (2026-11-24, round 18): the launcher's Chat search finding a sealed message by its words on the sender's and the reader's browser; a webhook posting over HTTP into a sealed group (204, stored sealed under the given name, opened by both members, `?wait=true` answered); two tabs of one browser sending in turn and at once, every message opened by the other side - which showed the tabs fighting over the device, now fixed ("Every tab of a browser shares its device"; the fix itself is unit-tested and not yet re-run in a browser). Not yet: the chat panel's own search, the "Polar in this chat" switch (the driver did not reach it through the info panel), Polar's Approve and Cancel (needs a provider). | Yes | ~65% |
 | 2 | **Sealed only, enforced by the server.** Built: once a conversation has an `MlsGroup` (and sealed chat is on), every write in the clear from a person is refused with `errors.sealedOnly` - `messages.send` without sealed columns (so `sendAction`, replies from a notice, forwards, polls, attachments and saved media, locations, forum posts, the HTTP API, MCP tools, invite and game cards), a plain `edit`, and `scheduleMessage` at scheduling time (`refusePlainIfSealed`, `lib/chat/e2ee/sealed-conversation.ts`; see "Sealed only"). A page loaded before sealed chat was on is told to reload instead (`errors.sealedOnlyReload`, see "Sealed only"). A conversation the migration cut is sealed only before any browser has made its group (`conversationSealed` reads `ChatMigration`). Left: a sealed form for editing an old plain message in a sealed conversation. | Yes | ~85% |
-| 3 | **Message kinds that are still plain.** Built (2026-11-25): attachments, see "Sealed files"; polls, see "Sealed polls" (question and answers sealed; votes sealed with the tally in each browser, see "Sealed votes"; public or anonymous chosen at creation, see "Public and anonymous votes"); forum post titles, see "Sealed forum posts"; reactions, and the clear reactions and votes left from before a conversation was sealed, written 2026-11-26 (rounds 32-33, see "Sealed reactions") but not yet built, tested or run. Written 2026-11-26 (track E, not yet run): translations of a sealed message stay on the device, see "Sealed translations"; a file picked from a Drive is copied into the browser and sealed, see "Sealed files". Voice notes ride the sealed-file path (length and waveform are inside the seal, from the recorder's `RecordedSound`), checked in the code but not in a browser. Left: scheduled messages, link cards and files sent to be seen once (refused in a sealed conversation, nothing sent in the clear; designs in the track E brief). Until each has its sealed form a sealed conversation cannot send it. | Yes | ~62% (text, edits, replies, threads, Polar, webhooks, files - with the gallery, forum list and video stills - poll questions, answers and votes, forum post titles are sealed) |
+| 3 | **Message kinds that are still plain.** Built (2026-11-25): attachments, see "Sealed files"; polls, see "Sealed polls" (question and answers sealed; votes sealed with the tally in each browser, see "Sealed votes"; public or anonymous chosen at creation, see "Public and anonymous votes"); forum post titles, see "Sealed forum posts"; reactions, and the clear reactions and votes left from before a conversation was sealed, written 2026-11-26 (rounds 32-33, see "Sealed reactions") but not yet built, tested or run. Written 2026-11-26 (track E, not yet run): translations of a sealed message stay on the device, see "Sealed translations"; a file picked from a Drive is copied into the browser and sealed, see "Sealed files". Voice notes ride the sealed-file path (length and waveform are inside the seal, from the recorder's `RecordedSound`), checked in the code but not in a browser. Written 2026-11-26 (track E, not yet run): scheduled messages are sealed in the writer's browser and sent by the server only at the epoch they were sealed in, sealed again by the writer's device after a rekey, see "Sealed scheduled messages"; link cards are looked up for the sender and travel inside the seal, without a picture, see "Sealed link cards". Left: files sent to be seen once, blocked on the Android viewer, which cannot open a sealed file (see "Sealed view-once files: blocked"; refused in a sealed conversation, nothing sent in the clear); link card pictures. Until each has its sealed form a sealed conversation cannot send it. | Yes | ~66% (text, edits, replies, threads, Polar, webhooks, files - with the gallery, forum list and video stills - poll questions, answers and votes, forum post titles are sealed) |
 | 4 | **Default-on switch.** Built (2026-11-25): `chatE2eeEnabled()` is `chatE2eeFrom(env, CHAT_E2EE_DEFAULT_ON)` in `flag.ts` - `1` on, `0` off, anything else the default - so turning it on is changing `CHAT_E2EE_DEFAULT_ON` to `true` in a release, on with nothing set and `0` kept as the kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md); tested in `test/chat/e2ee/flag.test.ts`. The kill switch never locks anybody out (built 2026-11-25, see "The kill switch"): `0` holds sealed chat - nothing new becomes sealed, every conversation already sealed keeps opening, sending sealed and refusing plain writes. Left: the flip itself (last); a held page in a browser. | Yes | ~70% |
 | 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback`), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Built 2026-11-25 (round 26, see "Rollback, purge and late members"): the admin line (Management > Security), the per-conversation rollback from `ChatMigrationRollback` and "Seal it again", the purge after 30 days (decision 4), and members whose account key came after the cut getting the legacy key from a member's browser (`legacy-key-gaps`). Left: attachments/polls/system rows (row 3), a "history before [date]" label, members nobody holding the key ever meets again (written 2026-11-26, not yet run: the migrator also seals the legacy key to the `ORK` of each keyless member's scope, row 6; opening it for that member is not built). Not verified: the admin line and rollback in a browser and against a real PostgreSQL. | Yes (owner: every existing chat migrated) | ~65% |
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Written 2026-11-26, not yet typechecked, tested, built or run (see "Recovery"): quorum recovery of the account key - each account's browser splits its own `AK` with Shamir (2 of 3 custodians by default, 1 of 1 with a warning for a single administrator, 2 of 2 for two) and seals each share to a custodian's account key with hybrid HPKE; re-split on any custodian change; custodian keys checked against the key log before any split (fails closed); a request (open 7 days) only after an administrator-approved account recovery was used or the forgotten password was reset on the Security page, with a 12-digit code the custodians compare; custodians approve or decline; at the quorum the account's new browser rebuilds its key, checks it against the key log and gets its history back; audit rows and notices on every step; the Security page line "Your organization can recover your account (N of M admins)"; the People screen says approving also opens chat recovery. Shamir is the vendored, audited `shamir-secret-sharing` 0.0.4 (lookup tables, not constant time - accepted, see "Recovery"). `ORK` reduced to sealing history for members with no account key: a custodian's browser creates it and splits its seed under the same key-log check, and the migrator seals legacy history to it as an extra copy. Admin reset vs OPAQUE checked: sign-in keeps working. Left: opening the `ORK` for a returning member, re-splitting it when custodians change, showing declines on the card, and running all of it (typecheck, tests, PostgreSQL, a browser run with two custodians and one requester). | Yes, for "nobody loses history" | ~75% |
@@ -987,6 +985,55 @@ Limits:
   once is never schedulable (`viewOnce.notScheduled`, `composer.tsx`).
 - Verified by `test/chat/e2ee/sealed-scheduled.test.ts` once run; not exercised
   against PostgreSQL or in a browser.
+
+## Sealed link cards (written 2026-11-26, not yet run)
+
+Owner rule: the server fetches the page, as Discord does, and the card travels
+sealed. Before a sealed send, schedule or edit, `linkCardFor`
+(`sealed-chat.ts`) takes the body's first link (`core.firstLink`) and asks
+`sealedLinkCardAction` -> `messages.sealedLinkCard`, which looks it up with the
+same `unfurl` and `knownPreviews` every card uses and answers the card. The page
+puts it in the seal as `link` (`sealedLinkSchema`: url, target, title,
+description, author, site name, accent) and readers draw it from there
+(`openedCard`, `opened-sealed.ts`). `linkPreviewFor` answers null for any row
+with `e2eeEpoch`, so the server never ties a card to a sealed message, even if a
+stored body had a link in it.
+
+`sealedLinkCard` takes an address, which `linkPreviewFor` deliberately does not,
+so it is held to more: the caller may post in the conversation
+(`requirePostable`), the conversation really is sealed, previews are allowed
+there and for this author (`previewAllowed`), at most 20 a minute per person
+(`rateLimit`), fetched only through `safe-fetch`.
+
+Limits:
+
+- The server still learns that the sender asked for that address, and when;
+  it does not learn which message carries it or who reads it.
+- No picture: a reader fetching it from `/api/chat/links/<id>/image` would tell
+  the server which card each reader looked at. Sealing the picture as a file
+  of the message is the way to have one, and is not built.
+- A send waits at most 3 s for its card, then goes without one; it never fails
+  for want of a card. A poll's body is a question and gets none.
+- An edit keeps the card while the first link is unchanged and asks for a new
+  one when it changes.
+- Link safety flags (`flaggedLinks`) are computed by the server from the body,
+  so a sealed row has none and its card is never withheld for a flag.
+- Not run: no test yet (`openedCard`/`withOpened` and `sealedLinkCard` want
+  one each), not exercised in a browser.
+
+## Sealed view-once files: blocked (2026-11-26)
+
+Not built. The phone app cannot open a sealed view-once file: the Android
+viewer is a native activity (`ViewOnceActivity.java:86-97`) that downloads
+`/api/chat/attachments/<id>/once` and shows the bytes as they come. It holds no
+MLS device (that lives in the WebView's IndexedDB) and no file key, so a sealed
+blob would arrive as noise. Building it needs, together: the page passing the
+file's key from the opened seal to the activity over the bridge, AES-GCM
+decryption of the blob in the activity, the `viewOnce` field per upload on
+`send-sealed`, and an Android release before the flip (a row in
+`SEALED_CHAT_MINIMUM`). Until then a sealed conversation refuses a message with
+a file sent to be seen once (`sendSealedWithFiles`), and nothing goes in the
+clear.
 
 ## Sealed polls (built 2026-11-25)
 

@@ -8,6 +8,7 @@
  * version (`sealedEditedAt`), so one edited since it was opened is opened again.
  */
 
+import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import { useEffect, useMemo, useState } from "react";
 import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
@@ -51,12 +52,15 @@ export function withOpened(
         if (!content) return message;
         changed = true;
         const poll = message.poll && content.poll ? openedPoll(message.poll, content.poll) : message.poll;
-        if (!content.files || !message.attachments) return { ...message, body: content.body, poll };
+        // The card the sender sealed with it: the server attaches none to a sealed row.
+        const card = content.link ? { link: content.link.url, preview: openedCard(content.link), previewPending: false } : {};
+        if (!content.files || !message.attachments) return { ...message, body: content.body, poll, ...card };
         const refs = new Map(content.files.map((ref) => [ref.id, ref]));
         return {
             ...message,
             body: content.body,
             poll,
+            ...card,
             attachments: message.attachments.map((file) => {
                 const ref = file.sealed ? refs.get(file.id) : undefined;
                 return ref ? openedFile(file, ref, fileUrl(ref.id), stillUrl(ref.id)) : file;
@@ -64,6 +68,11 @@ export function withOpened(
         };
     });
     return changed ? out : messages;
+}
+
+/** A sealed link card as the card draws it: no stored id and no picture to ask for. */
+export function openedCard(link: sealedChat.SealedLink): LinkPreviewView {
+    return { id: "", url: link.url, target: link.target, title: link.title, description: link.description, author: link.author, siteName: link.siteName, accent: link.accent, hasImage: false, steam: null };
 }
 
 /** A sealed poll's answers named from its seal, by position (the server's answer rows hold no words). */

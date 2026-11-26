@@ -72,6 +72,26 @@ export const sealedPollSchema = z
 
 export type SealedPoll = z.infer<typeof sealedPollSchema>;
 
+/**
+ * A link's card, looked up for the sender before sealing and carried inside
+ * the seal (docs/chat-e2ee-mls.md, "Sealed link cards"), so readers draw it
+ * without asking the server about the message. No picture: fetching one would
+ * tell the server which card each reader looked at.
+ */
+export const sealedLinkSchema = z
+    .object({
+        url: z.string().url().max(2048),
+        target: z.string().url().max(2048).nullable(),
+        title: z.string().max(500),
+        description: z.string().max(2000),
+        author: z.string().max(300),
+        siteName: z.string().max(300),
+        accent: z.string().regex(/^#[0-9a-f]{6}$/i).nullable()
+    })
+    .strict();
+
+export type SealedLink = z.infer<typeof sealedLinkSchema>;
+
 const sealedContent = z.object({
     v: z.literal(SEALED_CONTENT_VERSION),
     body: core.chatSendSchema.shape.body,
@@ -79,7 +99,9 @@ const sealedContent = z.object({
     files: z.array(sealedFileSchema).min(1).max(core.CHAT_ATTACHMENT_COUNT_CEILING).optional(),
     poll: sealedPollSchema.optional(),
     /** A forum post's title, on the message that opens it. */
-    title: core.chatForumPostFieldsSchema.shape.title.optional()
+    title: core.chatForumPostFieldsSchema.shape.title.optional(),
+    /** The card of the body's first link, when one was made. */
+    link: sealedLinkSchema.optional()
 });
 
 /** What a sealed message carries inside its seal. */
@@ -235,8 +257,50 @@ function contentOf(input: SealedContent): SealedContent {
         ...(input.translation ? { translation: input.translation } : {}),
         ...(input.files?.length ? { files: input.files } : {}),
         ...(input.poll ? { poll: input.poll } : {}),
-        ...(input.title ? { title: input.title } : {})
+        ...(input.title ? { title: input.title } : {}),
+        ...(input.link ? { link: input.link } : {})
     };
+}
+
+/** How long a send waits for its link's card before going without one. */
+const CARD_WAIT_MS = 3_000;
+
+/**
+ * The card for the first link in `body`, for the seal: asked of the server
+ * (`sealedLinkCardAction`), which looks it up as it would for any message and
+ * keeps nothing tying it to this one. Null when there is no link, no card may
+ * be made here, or it takes longer than `CARD_WAIT_MS` - the message never
+ * waits longer than that, and never fails for want of a card.
+ */
+export async function linkCardFor(channelId: string, body: string): Promise<SealedLink | null> {
+    const link = core.firstLink(body);
+    if (!link) return null;
+    try {
+        const { sealedLinkCardAction } = await import("@/app/(app)/chat/actions");
+        const asked = sealedLinkCardAction(channelId, link).then((answer) => answer.preview);
+        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), CARD_WAIT_MS));
+        const view = await Promise.race([asked, timeout]);
+        if (!view) return null;
+        const card = sealedLinkSchema.safeParse({
+            url: view.url,
+            target: view.target,
+            title: view.title,
+            description: view.description,
+            author: view.author,
+            siteName: view.siteName,
+            accent: view.accent
+        });
+        return card.success ? card.data : null;
+    } catch {
+        return null;
+    }
+}
+
+/** `input` with its link's card added, unless it carries one or a poll (whose body is a question). */
+async function withCard<T extends SealedContent & { channelId: string }>(input: T): Promise<T> {
+    if (input.link || input.poll) return input;
+    const link = await linkCardFor(input.channelId, input.body);
+    return link ? { ...input, link } : input;
 }
 
 export interface SealedSendInput extends SealedContent {
@@ -252,7 +316,8 @@ export interface SealedSendInput extends SealedContent {
 }
 
 /** Seal and send one message; answers the stored message's id. */
-export async function sendSealedMessage(input: SealedSendInput): Promise<string> {
+export async function sendSealedMessage(sent: SealedSendInput): Promise<string> {
+    const input = await withCard(sent);
     const mls = await device();
     await mls.ensureGroup(input.channelId);
     const content = contentOf(input);
@@ -274,7 +339,8 @@ export async function sendSealedMessage(input: SealedSendInput): Promise<string>
  * (docs/chat-e2ee-mls.md, "Sealed scheduled messages"); answers the waiting
  * row's id. Text and files only, as a plain scheduled message.
  */
-export async function scheduleSealedMessage(input: Omit<SealedSendInput, "pollRules" | "forumTags" | "poll" | "title"> & { sendAt: string }): Promise<string> {
+export async function scheduleSealedMessage(scheduled: Omit<SealedSendInput, "pollRules" | "forumTags" | "poll" | "title"> & { sendAt: string }): Promise<string> {
+    const input = await withCard(scheduled);
     const mls = await device();
     await mls.ensureGroup(input.channelId);
     const content = contentOf(input);
@@ -396,9 +462,15 @@ export async function editSealedMessage(input: SealedEditInput): Promise<string>
     const shown = versionKey(input.messageId, input.editedAt);
     const before = opened.get(shown);
     // An edit rewrites the words; the files the message carries stay, with their keys, and a forum post keeps its title.
-    const content = contentOf({ ...input, files: input.files ?? before?.files, title: input.title ?? before?.title });
+    // Its card too while the first link is the same one; a new link gets a new card.
+    const kept = before?.link && core.firstLink(input.body) === before.link.url ? before.link : undefined;
+    let content = contentOf({ ...input, files: input.files ?? before?.files, title: input.title ?? before?.title, link: input.link ?? kept });
     keep(shown, content);
     try {
+        if (!content.link && !content.poll) {
+            const link = await linkCardFor(input.channelId, input.body);
+            if (link) content = { ...content, link };
+        }
         const mls = await device();
         await mls.ensureGroup(input.channelId);
         const editedAt = await mls.editSealed(input.channelId, input.messageId, encodeSealedContent(content));

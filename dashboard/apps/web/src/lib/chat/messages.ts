@@ -23,6 +23,7 @@ import {
 import { prisma, Prisma } from "@polaris/db";
 import { conversationSealed, sealedConversations } from "@/lib/chat/e2ee/sealed-conversation";
 import * as core from "@polaris/core";
+import { rateLimit } from "@/lib/rate-limit-service";
 import { blockedBy } from "@/lib/blocks";
 import { rulesForChannel } from "./rules";
 import { mayStartThread } from "./thread-rules";
@@ -1349,9 +1350,11 @@ export async function linkPreviewFor(
 ): Promise<LinkPreviewView | null> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },
-        select: { channelId: true, body: true, deletedAt: true, authorId: true }
+        select: { channelId: true, body: true, deletedAt: true, authorId: true, e2eeEpoch: true }
     });
-    if (!message || message.deletedAt) return null;
+    // A sealed message's card travels inside its seal (`sealedLinkCard`); the
+    // server never attaches one, even when the stored body has a link in it.
+    if (!message || message.deletedAt || message.e2eeEpoch !== null) return null;
     await requireChannel(actor, message.channelId);
     await history.requireReadable(actor, message.channelId, messageId);
     await requireAgeCleared(actor, message.channelId);
@@ -1368,6 +1371,32 @@ export async function linkPreviewFor(
     )
         return null;
 
+    await unfurl(link);
+    return (await knownPreviews([link])).get(link)?.view ?? null;
+}
+
+/** How many cards one person may ask for, a minute, for sealed messages they write. */
+const SEALED_CARDS_PER_MINUTE = 20;
+
+/**
+ * The card for a link somebody is about to send sealed into `channelId`
+ * (docs/chat-e2ee-mls.md, "Sealed link cards"): looked up by this server, as for
+ * any message, then sealed by the sender's page inside the message, so readers
+ * draw it from the seal and the server never ties it to the message.
+ *
+ * It takes an address, which `linkPreviewFor` deliberately does not, so it is
+ * held to more: only somebody who may post in a conversation that really is
+ * sealed, only where previews are allowed for that conversation and this
+ * author, at most `SEALED_CARDS_PER_MINUTE` a minute, and only through
+ * `safe-fetch` (public addresses, bounded reads). Null for anything else.
+ */
+export async function sealedLinkCard(actor: ChatActor, channelId: string, address: string): Promise<LinkPreviewView | null> {
+    await requirePostable(actor, channelId);
+    if (!(await conversationSealed(channelId))) return null;
+    const link = core.firstLink(address);
+    if (!link) return null;
+    if (!(await previewAllowed({ id: channelId, channelId, authorId: actor.id }))) return null;
+    if (!(await rateLimit(`chat-sealed-card:${actor.id}`, SEALED_CARDS_PER_MINUTE, 60_000)).ok) return null;
     await unfurl(link);
     return (await knownPreviews([link])).get(link)?.view ?? null;
 }
