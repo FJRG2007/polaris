@@ -70,7 +70,11 @@ fn grow(alice: &Member, tag: &str, fill: bool) -> Vec<Member> {
     last
 }
 
-fn assert_kind<T: std::fmt::Debug>(result: polaris_core::mls::Result<T>, kind: ErrorKind, what: &str) {
+fn assert_kind<T: std::fmt::Debug>(
+    result: polaris_core::mls::Result<T>,
+    kind: ErrorKind,
+    what: &str,
+) {
     match result {
         Err(error) => assert_eq!(error.kind, kind, "{what}: {error}"),
         Ok(value) => panic!("{what}: accepted, got {value:?}"),
@@ -90,12 +94,19 @@ fn a_joiner_has_blanks_on_its_path_until_it_commits_one() {
     // The adder's commits carry its path: nothing of its own is blank.
     assert_eq!(alice.blank_path(GROUP).unwrap(), 0);
     let joiner = &joiners[0];
-    assert!(joiner.blank_path(GROUP).unwrap() > 0, "a joiner's ancestors are blank");
+    assert!(
+        joiner.blank_path(GROUP).unwrap() > 0,
+        "a joiner's ancestors are blank"
+    );
 
     let update = joiner.self_update(GROUP).unwrap();
     joiner.merge_pending_commit(GROUP).unwrap();
     alice.process(GROUP, &update.commit).unwrap();
-    assert_eq!(joiner.blank_path(GROUP).unwrap(), 0, "its own commit filled them");
+    assert_eq!(
+        joiner.blank_path(GROUP).unwrap(),
+        0,
+        "its own commit filled them"
+    );
     // Nodes whose other side holds nobody are left out of a path (RFC 9420,
     // 4.1.2) and stay blank; they must not count, or a device would commit
     // again and again.
@@ -123,7 +134,10 @@ fn filled_paths_keep_commits_small() {
     };
     let sparse = removed(&blank);
     let dense = removed(&filled);
-    assert!(dense * 3 < sparse, "one leaving: {dense} bytes filled, {sparse} sparse");
+    assert!(
+        dense * 3 < sparse,
+        "one leaving: {dense} bytes filled, {sparse} sparse"
+    );
 
     let update = |alice: &Member| {
         let out = alice.self_update(GROUP).unwrap();
@@ -132,7 +146,10 @@ fn filled_paths_keep_commits_small() {
     };
     let sparse = update(&blank);
     let dense = update(&filled);
-    assert!(dense * 3 < sparse, "an update: {dense} bytes filled, {sparse} sparse");
+    assert!(
+        dense * 3 < sparse,
+        "an update: {dense} bytes filled, {sparse} sparse"
+    );
 }
 
 #[test]
@@ -149,8 +166,16 @@ fn a_commit_past_the_limit_is_refused_unstaged() {
         .leaf;
 
     alice.set_commit_limit(4 * 1024);
-    assert_kind(alice.remove_members(GROUP, &[leaf]), ErrorKind::CommitTooLarge, "a removal");
-    assert_kind(alice.self_update(GROUP), ErrorKind::CommitTooLarge, "an update");
+    assert_kind(
+        alice.remove_members(GROUP, &[leaf]),
+        ErrorKind::CommitTooLarge,
+        "a removal",
+    );
+    assert_kind(
+        alice.self_update(GROUP),
+        ErrorKind::CommitTooLarge,
+        "an update",
+    );
     assert_eq!(alice.epoch(GROUP).unwrap(), epoch);
 
     // Nothing was left staged: with the limit back the same removal goes.
@@ -166,7 +191,9 @@ fn an_add_drops_its_path_rather_than_pass_the_limit() {
     let alice = member("alice-add");
     let joiners = grow(&alice, "add", false);
     let with_path = {
-        let out = alice.add_members(GROUP, &[member("probe").key_package().unwrap()]).unwrap();
+        let out = alice
+            .add_members(GROUP, &[member("probe").key_package().unwrap()])
+            .unwrap();
         alice.clear_pending_commit(GROUP).unwrap();
         out.commit.len()
     };
@@ -174,8 +201,14 @@ fn an_add_drops_its_path_rather_than_pass_the_limit() {
     alice.set_commit_limit(limit);
 
     let late = member("late");
-    let out = alice.add_members(GROUP, &[late.key_package().unwrap()]).unwrap();
-    assert!(out.commit.len() <= limit, "{} bytes past {limit}", out.commit.len());
+    let out = alice
+        .add_members(GROUP, &[late.key_package().unwrap()])
+        .unwrap();
+    assert!(
+        out.commit.len() <= limit,
+        "{} bytes past {limit}",
+        out.commit.len()
+    );
     alice.merge_pending_commit(GROUP).unwrap();
 
     // The path-less commit is a valid commit: the newcomer joins and a member applies it.
@@ -183,9 +216,15 @@ fn an_add_drops_its_path_rather_than_pass_the_limit() {
         .unwrap();
     joiners[0].process(GROUP, &out.commit).unwrap();
     assert_eq!(late.epoch(GROUP).unwrap(), alice.epoch(GROUP).unwrap());
-    assert_eq!(joiners[0].epoch(GROUP).unwrap(), alice.epoch(GROUP).unwrap());
+    assert_eq!(
+        joiners[0].epoch(GROUP).unwrap(),
+        alice.epoch(GROUP).unwrap()
+    );
     let sealed = alice.encrypt(GROUP, b"after a path-less add").unwrap();
-    assert_eq!(late.process(GROUP, &sealed).unwrap().plaintext, b"after a path-less add");
+    assert_eq!(
+        late.process(GROUP, &sealed).unwrap().plaintext,
+        b"after a path-less add"
+    );
 
     // A key package alone past the limit is refused, not sent.
     alice.set_commit_limit(64);
