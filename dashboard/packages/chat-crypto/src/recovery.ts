@@ -69,7 +69,7 @@ export async function splitAccountKey(
         throw new RangeError("A custodian holds one share");
     if (custodians.some((custodian) => custodian.userId === binding.ownerId))
         throw new RangeError("An account is never its own custodian");
-    const shares = shamir.split(accountKey, custodians.length, threshold);
+    const shares = await shamir.split(accountKey, custodians.length, threshold);
     try {
         return await Promise.all(
             custodians.map(async (custodian, index) => ({
@@ -139,7 +139,7 @@ export async function recoverAccountKey(
         )
     );
     try {
-        const accountKey = shamir.combine(shares);
+        const accountKey = await shamir.combine(shares);
         if (accountKey.length !== ACCOUNT_KEY_BYTES) throw new RangeError("Not an account key");
         return accountKey;
     } finally {

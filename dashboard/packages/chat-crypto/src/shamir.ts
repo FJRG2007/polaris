@@ -1,77 +1,39 @@
 /**
- * Shamir secret sharing over GF(2^8), byte by byte (the construction of
- * privy-io/shamir-secret-sharing and HashiCorp Vault's `shamir` package: the
- * AES field, polynomial x^8 + x^4 + x^3 + x + 1, one random polynomial of degree
- * threshold - 1 per secret byte, a distinct random non-zero x per share).
+ * Shamir secret sharing over GF(2^8), byte by byte, from the audited
+ * `shamir-secret-sharing` package (privy-io; Cure53 and Zellic audits), vendored
+ * in `./vendor/shamir-secret-sharing` with its licence and a note of the exact
+ * version and tarball integrity. The AES field, x^8 + x^4 + x^3 + x + 1.
  *
- *     share = x(1) || y(secret.length)
+ *     share = y(secret.length) || x(1)
  *
- * Neither library is a dependency of this package and none is vendored: this
- * track could not add one (no install), and the repo's Rust core has no secret
- * sharing crate. So the arithmetic is written here, branch-free and without
- * lookup tables - multiplication is shift-and-add with masks and the inverse is
- * a^254 - so no timing or cache line depends on a secret byte, which the table
- * versions of both references do not promise. The tests check the field against
- * FIPS 197 and every subset of a split. Swapping in the audited package later
- * changes nothing stored: the share layout is the same.
+ * The package refuses a threshold or a share count below 2. Recovery needs
+ * 1 of 1 (an organisation with a single administrator), so a threshold of 1 is
+ * handled here as the degree-0 polynomial it is - every share is the secret
+ * behind its own x - and a single share is read the same way. Everything else
+ * goes to the package untouched.
  */
 
 import { randomBytes } from "./bytes";
-
-/** Multiply in GF(2^8) mod 0x11b, constant time. */
-export function gfMul(a: number, b: number): number {
-    let product = 0;
-    let x = a & 0xff;
-    let y = b & 0xff;
-    for (let bit = 0; bit < 8; bit++) {
-        product ^= x & -(y & 1);
-        const carry = -((x >> 7) & 1);
-        x = ((x << 1) ^ (0x1b & carry)) & 0xff;
-        y >>= 1;
-    }
-    return product & 0xff;
-}
-
-/** The multiplicative inverse, a^254 (0 maps to 0, never asked for here). */
-export function gfInv(a: number): number {
-    let result = 1;
-    let base = a & 0xff;
-    let exponent = 254;
-    for (let bit = 0; bit < 8; bit++) {
-        const factor = gfMul(result, base);
-        const mask = -(exponent & 1);
-        result = (factor & mask) | (result & ~mask);
-        base = gfMul(base, base);
-        exponent >>= 1;
-    }
-    return result & 0xff;
-}
+import * as audited from "./vendor/shamir-secret-sharing/index";
 
 /** `parts` shares, any `threshold` of which give `secret` back. */
-export function split(secret: Uint8Array, parts: number, threshold: number): Uint8Array[] {
+export async function split(secret: Uint8Array, parts: number, threshold: number): Promise<Uint8Array[]> {
     if (!Number.isInteger(parts) || !Number.isInteger(threshold)) throw new RangeError("Whole numbers only");
     if (threshold < 1 || parts < threshold || parts > 255) throw new RangeError("1 <= threshold <= parts <= 255");
     if (secret.length === 0) throw new RangeError("Nothing to split");
-
-    const xs = distinctXs(parts);
-    const shares = xs.map((x) => {
-        const share = new Uint8Array(1 + secret.length);
-        share[0] = x;
-        return share;
-    });
-    const coefficients = new Uint8Array(threshold);
-    for (let position = 0; position < secret.length; position++) {
-        coefficients[0] = secret[position]!;
-        coefficients.set(randomBytes(threshold - 1), 1);
-        shares.forEach((share, index) => {
-            // Horner's rule from the highest coefficient down.
-            let y = 0;
-            for (let degree = threshold - 1; degree >= 0; degree--) y = gfMul(y, xs[index]!) ^ coefficients[degree]!;
-            share[1 + position] = y;
+    // The package checks `constructor === Uint8Array`; a Buffer or a subclass is copied.
+    const plain = Uint8Array.from(secret);
+    try {
+        if (threshold >= 2) return await audited.split(plain, parts, threshold);
+        return distinctXs(parts).map((x) => {
+            const share = new Uint8Array(plain.length + 1);
+            share.set(plain);
+            share[plain.length] = x;
+            return share;
         });
+    } finally {
+        plain.fill(0);
     }
-    coefficients.fill(0);
-    return shares;
 }
 
 /**
@@ -79,37 +41,18 @@ export function split(secret: Uint8Array, parts: number, threshold: number): Uin
  * value unrelated to the secret, and nothing here can tell: whoever combines
  * checks the result (an account key against its published public keys).
  */
-export function combine(shares: ReadonlyArray<Uint8Array>): Uint8Array {
+export async function combine(shares: ReadonlyArray<Uint8Array>): Promise<Uint8Array> {
     if (shares.length === 0) throw new RangeError("No shares");
     const length = shares[0]!.length;
-    if (length < 2) throw new RangeError("A share holds an x and at least one byte");
+    if (length < 2) throw new RangeError("A share holds at least one byte and its x");
     const xs = shares.map((share) => {
         if (share.length !== length) throw new RangeError("Shares of one split are the same length");
-        if (share[0] === 0) throw new RangeError("x = 0 is the secret itself, never a share");
-        return share[0]!;
+        if (share[length - 1] === 0) throw new RangeError("x = 0 is the secret itself, never a share");
+        return share[length - 1]!;
     });
     if (new Set(xs).size !== xs.length) throw new RangeError("Two shares at the same x");
-
-    // Lagrange basis at 0: l_i = prod_{j != i} x_j / (x_j - x_i); minus is xor.
-    const basis = xs.map((xi, i) => {
-        let numerator = 1;
-        let denominator = 1;
-        xs.forEach((xj, j) => {
-            if (i === j) return;
-            numerator = gfMul(numerator, xj);
-            denominator = gfMul(denominator, xj ^ xi);
-        });
-        return gfMul(numerator, gfInv(denominator));
-    });
-    const secret = new Uint8Array(length - 1);
-    for (let position = 0; position < secret.length; position++) {
-        let value = 0;
-        shares.forEach((share, index) => {
-            value ^= gfMul(share[1 + position]!, basis[index]!);
-        });
-        secret[position] = value;
-    }
-    return secret;
+    if (shares.length === 1) return shares[0]!.slice(0, length - 1);
+    return audited.combine(shares.map((share) => Uint8Array.from(share)));
 }
 
 function distinctXs(count: number): number[] {
