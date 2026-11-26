@@ -22,7 +22,22 @@ import { useDisplayFormat } from "@/components/display-format";
 import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
 import type { OrgEmailInviteView, OrgInvitationView } from "@/lib/orgs/invitation-service";
 import { Copy, Mail, MailQuestion, RotateCw, Search, UserPlus, Users, X } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select, useToast } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    useToast
+} from "@polaris/ui";
 import {
     inviteOrgMemberAction,
     removeOrgMemberAction,
@@ -493,6 +508,7 @@ function InvitePerson({
     const t = useTranslations("accountOrgs");
     const router = useRouter();
     const toast = useToast();
+    const [inviting, setInviting] = useState(false);
     const [identifier, setIdentifier] = useState("");
     // The organization's own default, when it still has that role; the seeded
     // member otherwise, which every organization has.
@@ -506,76 +522,18 @@ function InvitePerson({
 
     return (
         <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
                 <CardTitle>{t("people.invite.title")}</CardTitle>
+                <Button
+                    size="sm"
+                    disabled={full}
+                    title={full ? t("people.invite.full", { limit: memberLimit }) : undefined}
+                    onClick={() => setInviting(true)}
+                >
+                    <UserPlus className="size-4 shrink-0" /> {t("people.invite.open")}
+                </Button>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <form
-                    className="flex flex-wrap items-end gap-2"
-                    onSubmit={async (event) => {
-                        event.preventDefault();
-                        const typed = identifier.trim();
-                        if (!typed) return;
-                        onLink(null);
-                        let emailed: { emailed?: boolean; url?: string; sendError?: string } = {};
-                        const done = await onRun(async () => {
-                            const result = await inviteOrgMemberAction(orgId, typed, role);
-                            emailed = result;
-                            return result;
-                        });
-                        if (!done) return;
-                        setIdentifier("");
-                        if (emailed.sendError) {
-                            onLink(emailed.url ?? null);
-                            toast.show({ title: t("people.invite.notEmailed") });
-                        } else if (emailed.emailed) {
-                            toast.show({ title: t("people.invite.emailed", { email: typed }) });
-                        } else {
-                            toast.show({ title: t("people.invite.sent") });
-                        }
-                    }}
-                >
-                    <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">
-                        {t("form.identifier")}
-                        <Input
-                            value={identifier}
-                            placeholder={t("form.identifierPlaceholder")}
-                            className="h-9"
-                            disabled={full}
-                            maxLength={254}
-                            onChange={(event) => setIdentifier(event.target.value)}
-                        />
-                    </label>
-                    <Select
-                        value={role}
-                        options={options}
-                        aria-label={t("form.role")}
-                        className="h-9 w-36"
-                        onValueChange={setRole}
-                    />
-                    <Button type="submit" size="sm" disabled={!identifier.trim() || full}>
-                        <UserPlus className="size-4 shrink-0" /> {t("people.invite.submit")}
-                    </Button>
-                    <p className="text-muted-foreground w-full text-xs">
-                        {full
-                            ? t("people.invite.full", { limit: memberLimit })
-                            : hint ||
-                              t.rich("people.invite.rolesHint", {
-                                  roles: (chunks) => (
-                                      <a
-                                          key="roles"
-                                          href={`/account/organizations/${orgSlug}/roles`}
-                                          className="hover:text-foreground underline"
-                                      >
-                                          {chunks}
-                                      </a>
-                                  )
-                              })}
-                    </p>
-                    <p className="text-muted-foreground w-full text-xs">
-                        {canInviteNewPeople ? t("people.invite.newPeople") : t("people.invite.existingOnly")}
-                    </p>
-                </form>
 
                 {lastLink ? (
                     <div className="border-border flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
@@ -625,6 +583,87 @@ function InvitePerson({
                     })}
                 </label>
             </CardBody>
+            <Dialog open={inviting} onOpenChange={setInviting}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t("people.invite.title")}</DialogTitle>
+                        <DialogDescription>{t("people.invite.dialogHint")}</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="flex flex-col gap-3"
+                        onSubmit={async (event) => {
+                            event.preventDefault();
+                            const typed = identifier.trim();
+                            if (!typed) return;
+                            onLink(null);
+                            let emailed: { emailed?: boolean; url?: string; sendError?: string } = {};
+                            const done = await onRun(async () => {
+                                const result = await inviteOrgMemberAction(orgId, typed, role);
+                                emailed = result;
+                                return result;
+                            });
+                            if (!done) return;
+                            setIdentifier("");
+                            setInviting(false);
+                            if (emailed.sendError) {
+                                onLink(emailed.url ?? null);
+                                toast.show({ title: t("people.invite.notEmailed") });
+                            } else if (emailed.emailed) {
+                                toast.show({ title: t("people.invite.emailed", { email: typed }) });
+                            } else {
+                                toast.show({ title: t("people.invite.sent") });
+                            }
+                        }}
+                    >
+                        <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                            {t("form.identifier")}
+                            <Input
+                                autoFocus
+                                value={identifier}
+                                placeholder={t("form.identifierPlaceholder")}
+                                className="h-9"
+                                disabled={full}
+                                maxLength={254}
+                                onChange={(event) => setIdentifier(event.target.value)}
+                            />
+                        </label>
+                        <Select
+                            value={role}
+                            options={options}
+                            aria-label={t("form.role")}
+                            className="h-9"
+                            onValueChange={setRole}
+                        />
+                        <p className="text-muted-foreground w-full text-xs">
+                            {full
+                                ? t("people.invite.full", { limit: memberLimit })
+                                : hint ||
+                                  t.rich("people.invite.rolesHint", {
+                                      roles: (chunks) => (
+                                          <a
+                                              key="roles"
+                                              href={`/account/organizations/${orgSlug}/roles`}
+                                              className="hover:text-foreground underline"
+                                          >
+                                              {chunks}
+                                          </a>
+                                      )
+                                  })}
+                        </p>
+                        <p className="text-muted-foreground w-full text-xs">
+                            {canInviteNewPeople ? t("people.invite.newPeople") : t("people.invite.existingOnly")}
+                        </p>
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" onClick={() => setInviting(false)}>
+                                {t("people.invite.cancel")}
+                            </Button>
+                            <Button type="submit" aria-disabled={!identifier.trim() || full}>
+                                <UserPlus className="size-4 shrink-0" /> {t("people.invite.submit")}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }

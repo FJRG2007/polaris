@@ -278,7 +278,10 @@
                 "owner": "Full",
                 "readwrite": "Read and write",
                 "readonly": "Read only"
-            }
+            },
+            "addUser": "New account",
+            "addTitle": "New account on this database",
+            "cancel": "Cancel"
         },
         "processes": {
             "title": "Open connections",

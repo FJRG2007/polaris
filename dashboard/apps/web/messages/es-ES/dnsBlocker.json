@@ -77,7 +77,8 @@
         "remove": "Quitar lista",
         "url": "Dirección",
         "category": "Categoría",
-        "add": "Añadir"
+        "add": "Añadir",
+        "addTitle": "Añadir una lista propia"
     },
     "categories": {
         "ads": "Anuncios",
@@ -172,7 +173,8 @@
         "remove": "Quitar nombre",
         "name": "Nombre",
         "address": "Dirección",
-        "add": "Añadir"
+        "add": "Añadir",
+        "addTitle": "Nuevo nombre local"
     },
     "settings": {
         "refresh": "Actualizar listas cada (horas)",
@@ -307,7 +309,8 @@
         "remove": "Quitar alias",
         "name": "Alias",
         "target": "Apunta a",
-        "add": "Añadir alias"
+        "add": "Añadir alias",
+        "addTitle": "Nuevo alias"
     },
     "groups": {
         "title": "Grupos de equipos",
@@ -320,7 +323,8 @@
         "clients": "Dispositivos: una dirección, un rango o un nombre, uno por línea",
         "add": "Añadir grupo",
         "addService": "Bloquear un servicio",
-        "removeService": "Dejar de bloquear {name}"
+        "removeService": "Dejar de bloquear {name}",
+        "addTitle": "Nuevo grupo"
     },
     "history": {
         "title": "Historial de un año",
@@ -377,7 +381,12 @@
         "namePlaceholder": "portatil-ana",
         "address": "Dirección",
         "add": "Nombrar",
-        "remove": "Quitar nombre"
+        "remove": "Quitar nombre",
+        "addDevice": "Nombrar equipo",
+        "addTitle": "Nombrar un equipo",
+        "cancel": "Cancelar",
+        "actions": "Acciones",
+        "full": "La lista está llena. Quita uno para añadir otro."
     },
     "forwards": {
         "title": "Dominios locales",
@@ -386,7 +395,8 @@
         "domain": "Dominio",
         "server": "Servidor",
         "add": "Reenviar",
-        "remove": "Dejar de reenviar"
+        "remove": "Dejar de reenviar",
+        "addTitle": "Usar otro servidor"
     },
     "safe": {
         "title": "Búsqueda segura",

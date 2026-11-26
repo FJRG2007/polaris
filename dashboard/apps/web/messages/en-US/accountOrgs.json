@@ -155,7 +155,10 @@
             "copyLink": "Copy the invitation link",
             "copied": "Link copied.",
             "defaultRole": "New invitations offer {picker} by default.",
-            "defaultRoleLabel": "The role new invitations offer by default"
+            "defaultRoleLabel": "The role new invitations offer by default",
+            "open": "Invite",
+            "cancel": "Cancel",
+            "dialogHint": "By email, username or name."
         }
     },
     "teams": {

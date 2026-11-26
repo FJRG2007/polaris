@@ -3094,7 +3094,10 @@
         "renameTag": "Rename {name}",
         "deleteTag": "Delete {name}",
         "newTag": "Add tag",
-        "addTag": "Add tag"
+        "addTag": "Add tag",
+        "addTagTitle": "New forum tag",
+        "addTagDescription": "Posts in this forum can carry it.",
+        "tagsFull": "This forum has as many tags as it can hold."
     },
     "follow": {
         "menu": "Follow",

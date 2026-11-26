@@ -90,6 +90,7 @@ describe("UsersSection", () => {
         expect(screen.queryByRole("button", { name: "Remove shop" })).toBeNull();
         expect(screen.getByRole("button", { name: "Remove reporting" })).toBeTruthy();
 
+        fireEvent.click(screen.getByRole("button", { name: "New account" }));
         fireEvent.change(screen.getByLabelText("Account name"), { target: { value: "Root" } });
         expect(screen.getByText("That name belongs to the engine. Pick another.")).toBeTruthy();
         fireEvent.change(screen.getByLabelText("Account name"), { target: { value: "reporting" } });

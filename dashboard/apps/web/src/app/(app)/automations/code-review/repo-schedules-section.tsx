@@ -5,8 +5,15 @@ import { runAction } from "@/lib/run-action";
 import { relativeTime } from "@/lib/relative-time";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Button, Select, Skeleton, Switch, Textarea } from "@polaris/ui";
+import {
+    Button,
+    Select,
+    Skeleton,
+    Switch,
+    Textarea
+} from "@polaris/ui";
 import { CronScheduleField, browserTimeZone } from "@/components/cron-schedule-field";
 import {
     SESSION_SCHEDULE_PROMPT_MAX,
@@ -123,11 +130,19 @@ export function RepoSchedulesSection({ repoId }: { repoId: string }) {
 
     return (
         <section className="flex min-w-0 flex-col gap-2 border-t border-border pt-4">
-            <div className="min-w-0">
-                <p className="text-sm font-medium">{t("repoSchedules.title")}</p>
-                <p className="text-xs text-muted-foreground">{t("repoSchedules.hint")}</p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-sm font-medium">{t("repoSchedules.title")}</p>
+                    <p className="text-xs text-muted-foreground">{t("repoSchedules.hint")}</p>
+                </div>
+                {rows !== undefined && !draft ? (
+                    <Button size="sm" onClick={startNew} disabled={agents.length === 0}>
+                        <Plus className="size-4" />
+                        {t("repoSchedules.new")}
+                    </Button>
+                ) : null}
             </div>
-            {rows === undefined ? (
+            {draft ? null : rows === undefined ? (
                 <Skeleton className="h-10 w-full" />
             ) : rows.length === 0 && !draft ? (
                 <p className="text-sm text-muted-foreground">{t("repoSchedules.empty")}</p>
@@ -211,7 +226,10 @@ export function RepoSchedulesSection({ repoId }: { repoId: string }) {
             )}
 
             {draft ? (
-                <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border p-3">
+                <div className="flex min-w-0 flex-col gap-3 rounded-md border border-border p-3">
+                    <p className="text-sm font-medium">
+                        {draft.id ? t("repoSchedules.editTitle") : t("repoSchedules.newTitle")}
+                    </p>
                     <label className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted-foreground">
                             {t("repoSchedules.agent")} <span aria-hidden>*</span>
@@ -254,15 +272,10 @@ export function RepoSchedulesSection({ repoId }: { repoId: string }) {
                             {draft.id ? t("repoSchedules.save") : t("repoSchedules.add")}
                         </Button>
                     </div>
-                </div>
-            ) : rows !== undefined ? (
-                <div>
-                    <Button size="sm" variant="outline" onClick={startNew} disabled={agents.length === 0}>
-                        {t("repoSchedules.new")}
-                    </Button>
+                    {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
                 </div>
             ) : null}
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {error && !draft ? <p className="text-sm text-danger">{error}</p> : null}
         </section>
     );
 }

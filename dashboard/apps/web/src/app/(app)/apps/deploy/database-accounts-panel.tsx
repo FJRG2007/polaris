@@ -17,7 +17,18 @@ import * as polls from "./deploy-polls";
 import { useUnmountSignal } from "@/lib/poll-fetch";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Loader2, Plus, RefreshCw, Trash2, X } from "lucide-react";
-import { Badge, Button, Input, Select, Skeleton } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 
 /** A pending confirmation, as the Manage panel's dialog takes it. */
@@ -78,6 +89,7 @@ export function UsersSection({
     const [error, setError] = useState<string | null>(null);
     const [name, setName] = useState("");
     const [createError, setCreateError] = useState<string | null>(null);
+    const [adding, setAdding] = useState(false);
     const [created, setCreated] = useState<{ username: string; password: string } | null>(null);
     const [granting, setGranting] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -117,6 +129,7 @@ export function UsersSection({
             }
             setCreated({ username: result.username, password: result.password });
             setName("");
+            setAdding(false);
             await load();
         });
     }
@@ -135,46 +148,62 @@ export function UsersSection({
 
     return (
         <section className="flex flex-col gap-3">
-            <div>
-                <h3 className="text-sm font-medium">{t("database.users.title")}</h3>
-                <p className="text-xs text-muted-foreground">{t("database.users.hint")}</p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h3 className="text-sm font-medium">{t("database.users.title")}</h3>
+                    <p className="text-xs text-muted-foreground">{t("database.users.hint")}</p>
+                </div>
+                {manage ? (
+                    <Button size="sm" onClick={() => setAdding(true)}>
+                        <Plus className="size-4" />
+                        {t("database.users.addUser")}
+                    </Button>
+                ) : null}
             </div>
 
-            {manage ? (
-                <form
-                    className="flex flex-wrap items-start gap-2"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        create();
-                    }}
-                >
-                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                        <Input
-                            aria-label={t("database.users.name")}
-                            placeholder={t("database.users.namePlaceholder")}
-                            value={name}
-                            maxLength={32}
-                            onChange={(event) => setName(event.target.value)}
-                            aria-invalid={nameIssue ? true : undefined}
-                        />
-                        {nameIssue ? <p className="text-xs text-danger">{nameIssue}</p> : null}
-                    </div>
-                    <Button
-                        type="submit"
-                        size="sm"
-                        disabled={pending || !parsed.success}
-                        aria-disabled={!parsed.success}
+            <Dialog open={adding} onOpenChange={(open) => !pending && setAdding(open)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t("database.users.addTitle")}</DialogTitle>
+                        <DialogDescription>{t("database.users.hint")}</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="flex flex-col gap-3"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            create();
+                        }}
                     >
-                        {pending ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <Plus className="size-4" />
-                        )}
-                        {t("database.users.add")}
-                    </Button>
-                </form>
-            ) : null}
-            {createError ? <p className="text-sm text-danger">{createError}</p> : null}
+                        <div className="flex min-w-0 flex-col gap-1">
+                            <Input
+                                autoFocus
+                                aria-label={t("database.users.name")}
+                                placeholder={t("database.users.namePlaceholder")}
+                                value={name}
+                                maxLength={32}
+                                onChange={(event) => setName(event.target.value)}
+                                aria-invalid={nameIssue ? true : undefined}
+                            />
+                            {nameIssue ? <p className="text-xs text-danger">{nameIssue}</p> : null}
+                        </div>
+                        {createError ? <p className="text-sm text-danger" role="alert">{createError}</p> : null}
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" disabled={pending} onClick={() => setAdding(false)}>
+                                {t("database.users.cancel")}
+                            </Button>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                disabled={pending}
+                                aria-disabled={!parsed.success}
+                            >
+                                {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+                                {t("database.users.add")}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             {created ? (
                 <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">

@@ -155,7 +155,10 @@
             "copyLink": "Copiar el enlace de invitación",
             "copied": "Enlace copiado.",
             "defaultRole": "Las invitaciones nuevas ofrecen {picker} por defecto.",
-            "defaultRoleLabel": "El rol que ofrecen por defecto las invitaciones nuevas"
+            "defaultRoleLabel": "El rol que ofrecen por defecto las invitaciones nuevas",
+            "open": "Invitar",
+            "cancel": "Cancelar",
+            "dialogHint": "Por correo, usuario o nombre."
         }
     },
     "teams": {

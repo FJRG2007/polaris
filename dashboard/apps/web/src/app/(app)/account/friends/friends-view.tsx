@@ -25,7 +25,18 @@ import { runAction } from "@/lib/run-action";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PersonName, PersonRow } from "@/components/person-name";
-import { Button, Card, CardBody, Input, Textarea } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Textarea
+} from "@polaris/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FRIEND_NOTE_MAX, normalizeFriendNote } from "@/lib/friend-note";
 import { Loader2, MessageSquarePlus, Search, UserMinus, UserPlus, X } from "lucide-react";
@@ -378,6 +389,7 @@ function AddFriend({
     onAsk: (run: () => Promise<{ error?: string }>) => Promise<boolean>;
 }) {
     const t = useTranslations("account");
+    const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     // The note goes with whichever request is sent next, and is cleared once it
     // has gone - the same words are rarely right for two people.
@@ -427,100 +439,116 @@ function AddFriend({
     };
 
     return (
-        <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-                <div className="relative min-w-0 flex-1">
-                    <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        value={query}
-                        onChange={(event) => {
-                            setQuery(event.target.value);
-                            setSaid("");
-                        }}
-                        onKeyDown={(event) => {
-                            if (event.key !== "Enter") return;
-                            event.preventDefault();
-                            void askByHandle();
-                        }}
-                        placeholder={t("friends.searchPlaceholder")}
-                        aria-label={t("friends.add")}
-                        className="ps-7"
-                    />
-                    {looking && (
-                        <Loader2 className="absolute end-2 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
-                    )}
-                </div>
-                <Button
-                    size="icon"
-                    variant={writing ? "secondary" : "ghost"}
-                    aria-label={t("friends.addNote")}
-                    title={t("friends.addNote")}
-                    aria-pressed={writing}
-                    onClick={() => setWriting((open) => !open)}
-                >
-                    <MessageSquarePlus className="size-4 shrink-0" />
-                </Button>
-                <Button
-                    variant="secondary"
-                    disabled={!query.trim() || noteTooLong}
-                    onClick={() => void askByHandle()}
-                    title={t("friends.askTitle")}
-                >
-                    {t("friends.ask")}
+        <>
+            <div className="flex justify-end">
+                <Button size="sm" onClick={() => setOpen(true)}>
+                    <UserPlus className="size-4 shrink-0" />
+                    {t("friends.addFriend")}
                 </Button>
             </div>
-
-            {writing && (
-                <div className="flex flex-col gap-1">
-                    <Textarea
-                        value={note}
-                        onChange={(event) => setNote(event.target.value)}
-                        rows={3}
-                        aria-label={t("friends.noteLabel")}
-                        aria-invalid={noteTooLong || undefined}
-                        placeholder={t("friends.notePlaceholder")}
-                    />
-                    <span
-                        className={`self-end text-xs tabular-nums ${noteTooLong ? "text-danger" : "text-muted-foreground"}`}
-                        aria-live="polite"
-                    >
-                        {noteTooLong
-                            ? t("friends.noteTooLong", { max: FRIEND_NOTE_MAX })
-                            : t("friends.noteCount", { count: noteLength, max: FRIEND_NOTE_MAX })}
-                    </span>
-                </div>
-            )}
-
-            {offered.length > 0 && (
-                <ul className="flex flex-col">
-                    {offered.map((person) => (
-                        <li key={person.id}>
-                            <PersonRow
-                                as="button"
-                                personId={person.id}
-                                type="button"
-                                disabled={noteTooLong}
-                                onClick={async () => {
-                                    const words = note;
-                                    setQuery("");
-                                    setSaid("");
-                                    if (await onAsk(() => requestFriendAction(person.id, words)))
-                                        sent();
-                                }}
-                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm transition-colors hover:bg-muted"
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t("friends.addFriend")}</DialogTitle>
+                        <DialogDescription>{t("friends.addDescription")}</DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                            <div className="relative min-w-0 flex-1">
+                                <Search className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    value={query}
+                                    onChange={(event) => {
+                                        setQuery(event.target.value);
+                                        setSaid("");
+                                    }}
+                                    onKeyDown={(event) => {
+                                        if (event.key !== "Enter") return;
+                                        event.preventDefault();
+                                        void askByHandle();
+                                    }}
+                                    placeholder={t("friends.searchPlaceholder")}
+                                    aria-label={t("friends.add")}
+                                    className="ps-7"
+                                />
+                                {looking && (
+                                    <Loader2 className="absolute end-2 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
+                                )}
+                            </div>
+                            <Button
+                                size="icon"
+                                variant={writing ? "secondary" : "ghost"}
+                                aria-label={t("friends.addNote")}
+                                title={t("friends.addNote")}
+                                aria-pressed={writing}
+                                onClick={() => setWriting((open) => !open)}
                             >
-                                <Avatar person={person} size={20} />
-                                <span className="min-w-0 flex-1 truncate">
-                                    <PersonName id={person.id} name={person.name} />
-                                </span>
-                                <UserPlus className="size-3.5 shrink-0 text-muted-foreground" />
-                            </PersonRow>
-                        </li>
-                    ))}
-                </ul>
-            )}
+                                <MessageSquarePlus className="size-4 shrink-0" />
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                disabled={!query.trim() || noteTooLong}
+                                onClick={() => void askByHandle()}
+                                title={t("friends.askTitle")}
+                            >
+                                {t("friends.ask")}
+                            </Button>
+                        </div>
 
-            <span className="text-xs text-muted-foreground">{said || t("friends.hint")}</span>
-        </div>
+                        {writing && (
+                            <div className="flex flex-col gap-1">
+                                <Textarea
+                                    value={note}
+                                    onChange={(event) => setNote(event.target.value)}
+                                    rows={3}
+                                    aria-label={t("friends.noteLabel")}
+                                    aria-invalid={noteTooLong || undefined}
+                                    placeholder={t("friends.notePlaceholder")}
+                                />
+                                <span
+                                    className={`self-end text-xs tabular-nums ${noteTooLong ? "text-danger" : "text-muted-foreground"}`}
+                                    aria-live="polite"
+                                >
+                                    {noteTooLong
+                                        ? t("friends.noteTooLong", { max: FRIEND_NOTE_MAX })
+                                        : t("friends.noteCount", { count: noteLength, max: FRIEND_NOTE_MAX })}
+                                </span>
+                            </div>
+                        )}
+
+                        {offered.length > 0 && (
+                            <ul className="flex flex-col">
+                                {offered.map((person) => (
+                                    <li key={person.id}>
+                                        <PersonRow
+                                            as="button"
+                                            personId={person.id}
+                                            type="button"
+                                            disabled={noteTooLong}
+                                            onClick={async () => {
+                                                const words = note;
+                                                setQuery("");
+                                                setSaid("");
+                                                if (await onAsk(() => requestFriendAction(person.id, words)))
+                                                    sent();
+                                            }}
+                                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm transition-colors hover:bg-muted"
+                                        >
+                                            <Avatar person={person} size={20} />
+                                            <span className="min-w-0 flex-1 truncate">
+                                                <PersonName id={person.id} name={person.name} />
+                                            </span>
+                                            <UserPlus className="size-3.5 shrink-0 text-muted-foreground" />
+                                        </PersonRow>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+
+                        <span className="text-xs text-muted-foreground">{said || t("friends.hint")}</span>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }

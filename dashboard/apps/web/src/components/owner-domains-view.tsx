@@ -27,7 +27,19 @@ import { DomainSecurityPanel } from "@/components/domain-security/domain-securit
 import { domainProblem, instanceDomainConflict } from "@/lib/owner-domains-policy";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { Badge, Button, ConfirmDeleteDialog, DnsRecordTable, EmptyState, Input } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DnsRecordTable,
+    EmptyState,
+    Input
+} from "@polaris/ui";
 import {
     AlertTriangle,
     CheckCircle2,
@@ -105,6 +117,7 @@ export function OwnerDomainsView({
     const [value, setValue] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    const [adding, setAdding] = useState(false);
 
     // Empty until something has been typed: a field nobody has filled in yet is
     // incomplete, not wrong.
@@ -131,7 +144,17 @@ export function OwnerDomainsView({
 
     return (
         <div className="flex flex-col gap-6">
-            {error && (
+            {canAdd ? (
+                <div className="flex justify-end">
+                    <Button size="sm" onClick={() => setAdding(true)}>
+                        <Plus className="size-4 shrink-0" /> {t("ownerDomains.addButton")}
+                    </Button>
+                </div>
+            ) : (
+                <p className="text-muted-foreground text-sm">{blockedReason}</p>
+            )}
+
+            {error && !adding && (
                 <p
                     role="alert"
                     className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
@@ -163,10 +186,14 @@ export function OwnerDomainsView({
                 ))
             )}
 
-            {canAdd ? (
-                <PageSection title={t("ownerDomains.add")}>
+            <Dialog open={adding} onOpenChange={(open) => !busy && setAdding(open)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t("ownerDomains.add")}</DialogTitle>
+                        <DialogDescription>{t("ownerDomains.addHint")}</DialogDescription>
+                    </DialogHeader>
                     <form
-                        className="flex flex-wrap items-end gap-2"
+                        className="flex flex-col gap-3"
                         onSubmit={async (event) => {
                             event.preventDefault();
                             if (!value.trim() || refusal) return;
@@ -184,11 +211,13 @@ export function OwnerDomainsView({
                             if (result.domain)
                                 setDomains((current) => [...current, result.domain!]);
                             setValue("");
+                            setAdding(false);
                         }}
                     >
-                        <label className="text-muted-foreground flex min-w-56 flex-1 flex-col gap-1 text-xs">
+                        <label className="text-muted-foreground flex flex-col gap-1 text-xs">
                             {t("ownerDomains.domain")}
                             <Input
+                                autoFocus
                                 value={value}
                                 placeholder="example.com" // i18n-ignore an example domain
                                 className="h-9"
@@ -197,28 +226,32 @@ export function OwnerDomainsView({
                                 onChange={(event) => setValue(event.target.value)}
                             />
                         </label>
-                        <Button
-                            type="submit"
-                            size="sm"
-                            aria-disabled={busy || !value.trim() || refusal !== null}
-                            disabled={busy || !value.trim() || refusal !== null}
-                        >
-                            <Plus className="size-4 shrink-0" /> {t("ownerDomains.addShort")}
-                        </Button>
                         {refusal ? (
                             <p id="owner-domain-refusal" className="text-danger w-full text-xs">
                                 {refusal}
                             </p>
-                        ) : (
-                            <p className="text-muted-foreground w-full text-xs">
-                                {t("ownerDomains.addHint")}
+                        ) : null}
+                        {error && (
+                            <p role="alert" className="text-danger text-xs">
+                                {error}
                             </p>
                         )}
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" disabled={busy} onClick={() => setAdding(false)}>
+                                {t("ownerDomains.cancel")}
+                            </Button>
+                            <Button
+                                type="submit"
+                                aria-disabled={!value.trim() || refusal !== null}
+                                disabled={busy}
+                                aria-busy={busy}
+                            >
+                                {t("ownerDomains.addShort")}
+                            </Button>
+                        </div>
                     </form>
-                </PageSection>
-            ) : (
-                <p className="text-muted-foreground text-sm">{blockedReason}</p>
-            )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

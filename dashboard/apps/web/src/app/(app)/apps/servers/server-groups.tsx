@@ -11,8 +11,8 @@
  * right: a checkbox is the whole edit, and a failure puts the tick back.
  */
 
-import { useEffect, useState, useTransition } from "react";
-import { Layers, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { Layers, Pencil, Plus, Trash2 } from "lucide-react";
 import {
     Button,
     Card,
@@ -21,6 +21,11 @@ import {
     CardTitle,
     Checkbox,
     ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
     Input
 } from "@polaris/ui";
 import {
@@ -52,7 +57,7 @@ export function ServerGroups({
     const [renaming, setRenaming] = useState<string | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<Group | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [, start] = useTransition();
+    const [saving, start] = useTransition();
 
     // Only enrolled machines can be grouped: the local row before anybody enrolls it
     // is built from detection and has no id a rule could be attached to.
@@ -66,7 +71,8 @@ export function ServerGroups({
         void listHostGroupsAction().then(setGroups);
     }
 
-    function create() {
+    function create(event: FormEvent) {
+        event.preventDefault();
         const name = draftName.trim();
         if (!name) return;
         setError(null);
@@ -109,49 +115,12 @@ export function ServerGroups({
                     <Layers className="size-4 text-muted-foreground" />
                     {t("groups.title")}
                 </CardTitle>
-                {!creating ? (
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setCreating(true)}
-                    >
-                        <Plus className="size-4" /> {t("groups.new")}
-                    </Button>
-                ) : null}
+                <Button type="button" size="sm" onClick={() => setCreating(true)}>
+                    <Plus className="size-4" /> {t("groups.new")}
+                </Button>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">{t("groups.intro")}</p>
-
-                {creating ? (
-                    <div className="flex gap-2">
-                        <Input
-                            autoFocus
-                            value={draftName}
-                            placeholder={t("groups.placeholder")}
-                            onChange={(event) => setDraftName(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                    event.preventDefault();
-                                    create();
-                                }
-                                if (event.key === "Escape") setCreating(false);
-                            }}
-                        />
-                        <Button type="button" onClick={create} disabled={draftName.trim() === ""}>
-                            {t("groups.create")}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            aria-label={tcommon("actions.cancel")}
-                            title={tcommon("actions.cancel")}
-                            onClick={() => setCreating(false)}
-                        >
-                            <X className="size-4" />
-                        </Button>
-                    </div>
-                ) : null}
 
                 {groups === null ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">
@@ -241,8 +210,35 @@ export function ServerGroups({
                     ))
                 )}
 
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error && !creating ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>
+
+            <Dialog open={creating} onOpenChange={(open) => !saving && setCreating(open)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t("groups.newTitle")}</DialogTitle>
+                        <DialogDescription>{t("groups.intro")}</DialogDescription>
+                    </DialogHeader>
+                    <form className="flex flex-col gap-3" onSubmit={create}>
+                        <Input
+                            autoFocus
+                            value={draftName}
+                            aria-label={t("groups.nameLabel")}
+                            placeholder={t("groups.placeholder")}
+                            onChange={(event) => setDraftName(event.target.value)}
+                        />
+                        {error ? <p className="text-xs text-danger">{error}</p> : null}
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" disabled={saving} onClick={() => setCreating(false)}>
+                                {tcommon("actions.cancel")}
+                            </Button>
+                            <Button type="submit" aria-disabled={draftName.trim() === ""} disabled={saving} aria-busy={saving}>
+                                {t("groups.create")}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             <ConfirmDeleteDialog
                 open={confirmDelete !== null}

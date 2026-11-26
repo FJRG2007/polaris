@@ -1069,7 +1069,9 @@
         "noteLabel": "Note",
         "notePlaceholder": "Say where you know each other from (optional)",
         "noteCount": "{count}/{max}",
-        "noteTooLong": "Up to {max} characters"
+        "noteTooLong": "Up to {max} characters",
+        "addFriend": "Add friend",
+        "addDescription": "Find someone by name, or type their username."
     },
     "scan": {
         "page": {

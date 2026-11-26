@@ -305,6 +305,7 @@ describe("DnsBlockerView device names", () => {
     it("adds a name only when both fields are valid, and says which one is not", async () => {
         standing("off");
         await shown(DnsDevicesSection);
+        fireEvent.click(screen.getByRole("button", { name: "Name a device" }));
         const add = screen.getByRole("button", { name: "Name it" });
         fireEvent.change(screen.getByRole("textbox", { name: "Device name" }), {
             target: { value: "ana laptop" }

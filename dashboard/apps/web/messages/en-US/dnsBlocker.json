@@ -77,7 +77,8 @@
         "remove": "Remove list",
         "url": "List address",
         "category": "Category",
-        "add": "Add list"
+        "add": "Add list",
+        "addTitle": "Add a list of your own"
     },
     "categories": {
         "ads": "Advertising",
@@ -172,7 +173,8 @@
         "remove": "Remove name",
         "name": "Name",
         "address": "Address",
-        "add": "Add name"
+        "add": "Add name",
+        "addTitle": "New local name"
     },
     "settings": {
         "refresh": "Refresh lists every (hours)",
@@ -307,7 +309,8 @@
         "remove": "Remove alias",
         "name": "Alias",
         "target": "Points to",
-        "add": "Add alias"
+        "add": "Add alias",
+        "addTitle": "New alias"
     },
     "groups": {
         "title": "Device groups",
@@ -320,7 +323,8 @@
         "clients": "Devices: an address, a range or a name, one per line",
         "add": "Add group",
         "addService": "Block a service too",
-        "removeService": "Stop blocking {name}"
+        "removeService": "Stop blocking {name}",
+        "addTitle": "New device group"
     },
     "history": {
         "title": "Long-term statistics",
@@ -377,7 +381,12 @@
         "namePlaceholder": "ana-laptop",
         "address": "Device address",
         "add": "Name it",
-        "remove": "Remove name"
+        "remove": "Remove name",
+        "addDevice": "Name a device",
+        "addTitle": "Name a device",
+        "cancel": "Cancel",
+        "actions": "Actions",
+        "full": "The list is full. Remove one to add another."
     },
     "forwards": {
         "title": "Local domains",
@@ -386,7 +395,8 @@
         "domain": "Domain",
         "server": "Its server",
         "add": "Forward",
-        "remove": "Stop forwarding"
+        "remove": "Stop forwarding",
+        "addTitle": "Ask another server"
     },
     "safe": {
         "title": "Safe search filters",

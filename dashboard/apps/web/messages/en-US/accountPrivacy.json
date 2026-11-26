@@ -275,7 +275,9 @@
         "namePlaceholder": "My game",
         "add": "Add",
         "nothingListed": "Nothing could be listed.",
-        "chooseRunning": "Choose from what is running on this computer"
+        "chooseRunning": "Choose from what is running on this computer",
+        "addButton": "Add game",
+        "cancel": "Cancel"
     },
     "auto": {
         "title": "Automatic status",

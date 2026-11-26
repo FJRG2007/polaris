@@ -28,40 +28,24 @@ const ROOTS = [join(APPS, "web", "src"), join(APPS, "..", "packages", "ui", "src
 
 /** Files allowed to keep a site, by path under `apps/`, with the exact count. */
 const KNOWN: Record<string, { count: number; why: string }> = {
-    "web/src/app/(app)/account/friends/friends-view.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/account/organizations/[slug]/people/people-view.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/account/privacy/activity-sharing-card.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
     "web/src/app/(app)/admin/domains/domains-view.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
     "web/src/app/(app)/admin/domains/setup-wizard.tsx": { count: 1, why: "a setup wizard step, not a list screen" },
-    "web/src/app/(app)/admin/uploads/network-card.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/analytics/annotations.tsx": { count: 2, why: "PENDING: convert to a header button and a dialog" },
     "web/src/app/(app)/analytics/sites/new/add-site-flow.tsx": { count: 1, why: "a creation page of its own" },
-    "web/src/app/(app)/apps/backups/keys-panel.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/apps/deploy/database-accounts-panel.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
     "web/src/app/(app)/apps/deploy/database-panel.tsx": { count: 3, why: "PENDING: convert to a header button and a dialog" },
     "web/src/app/(app)/apps/deploy/deploy-view.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
     "web/src/app/(app)/apps/deploy/private-network-panel.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
     "web/src/app/(app)/apps/deploy/variable-groups.tsx": { count: 2, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/apps/servers/server-groups.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/automations/code-review/repo-schedules-section.tsx": { count: 2, why: "PENDING: convert to a header button and a dialog" },
+    "web/src/app/(app)/automations/code-review/repo-schedules-section.tsx": { count: 1, why: "inside the repository dialog: the form swaps in for the list, one modal at a time" },
     "web/src/app/(app)/automations/[id]/alert-fields.tsx": { count: 1, why: "one generated address inside an automation form" },
     "web/src/app/(app)/automations/[id]/flow-fields.tsx": { count: 1, why: "value rows inside an automation step form" },
     "web/src/app/(app)/automations/[id]/polar-fields.tsx": { count: 2, why: "outcome and field rows inside an automation step form" },
     "web/src/app/(app)/automations/[id]/webhook-fields.tsx": { count: 1, why: "limit rows inside an automation step form" },
-    "web/src/app/(app)/chat/forum-settings.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/mail/settings/labels/labels-view.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/network-filter/devices-section.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/network-filter/lists-section.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/network-filter/local-dns-section.tsx": { count: 3, why: "PENDING: convert to a header button and a dialog" },
     "web/src/app/(app)/office/c/[id]/comparison-editor.tsx": { count: 2, why: "columns of a document being edited, not records" },
     "web/src/app/(app)/tasks/planning-view.tsx": { count: 2, why: "quick-add inside a task board, the task-app standard" },
     "web/src/app/(app)/tasks/space-view.tsx": { count: 3, why: "quick-add inside a task board, the task-app standard" },
     "web/src/app/(app)/tasks/task-subwork.tsx": { count: 1, why: "quick-add of sub-work inside one task, the task-app standard" },
-    "web/src/app/(app)/vault/sends/sends-view.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
     "web/src/app/(app)/vault/vaults/vaults-view.tsx": { count: 2, why: "PENDING: convert to a header button and a dialog" },
     "web/src/components/agents/review-output-fields.tsx": { count: 1, why: "output rows inside an agent form" },
-    "web/src/components/owner-domains-view.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/components/project-webhooks.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
     "web/src/components/rule-list-input.tsx": { count: 1, why: "a multi-value form field" },
     "web/src/components/rules/chip-list.tsx": { count: 1, why: "a multi-value form field" },
     "web/src/components/rules/value-pickers.tsx": { count: 1, why: "a multi-value form field" },
@@ -69,7 +53,7 @@ const KNOWN: Record<string, { count: number; why: string }> = {
 
 const OVERLAY = /<(DialogContent|SheetContent|PopoverContent|AlertDialogContent|DropdownMenuContent)\b/g;
 const OVERLAY_END = /<\/(DialogContent|SheetContent|PopoverContent|AlertDialogContent|DropdownMenuContent)>/g;
-const ADD = /<Plus\b|t\("[\w.]*\.(add|create|new)\w*"\)|t\("[\w.]*(Add|Create)\w*"\)/;
+const ADD = /<Plus\b|t\("[\w.]*\.(add|create|new)(?![a-z])\w*"\)|t\("[\w.]*(Add|Create)\w*"\)/;
 const FIELD = /<(Input|PhoneInput|Textarea|[A-Z]\w*Fields)\b/;
 const LOOKUP = /search|find|filter|match/i;
 const LIST = /<table\b|<ul\b|<tbody\b|\.map\(/;

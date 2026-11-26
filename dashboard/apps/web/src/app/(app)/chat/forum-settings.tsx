@@ -11,7 +11,18 @@ import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
-import { Button, Input, Skeleton, Switch, Textarea } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Skeleton,
+    Switch,
+    Textarea
+} from "@polaris/ui";
 import type { ChatForumTagView, ChatForumView } from "@/lib/chat/forum";
 import {
     createForumTagAction,
@@ -27,6 +38,7 @@ export function ForumSettings({ channelId }: { channelId: string }) {
     const [guidelines, setGuidelines] = useState("");
     const [saving, setSaving] = useState(false);
     const [newTag, setNewTag] = useState("");
+    const [addingTag, setAddingTag] = useState(false);
     const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
     const [error, setError] = useState("");
 
@@ -91,6 +103,7 @@ export function ForumSettings({ channelId }: { channelId: string }) {
         const placeholder = { id: `pending-${newTagName}`, name: newTagName };
         setTags([...before, placeholder]);
         setNewTag("");
+        setAddingTag(false);
         const result = await createForumTagAction({ channelId, name: newTagName });
         if (!result.tag) {
             setTags(before);
@@ -180,9 +193,20 @@ export function ForumSettings({ channelId }: { channelId: string }) {
             </label>
 
             <div className="flex flex-col gap-2">
-                <p className="text-[0.75rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {t("forum.tags")}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[0.75rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {t("forum.tags")}
+                    </p>
+                    <Button
+                        size="sm"
+                        disabled={forum.tags.length >= core.MAX_FORUM_TAGS}
+                        title={forum.tags.length >= core.MAX_FORUM_TAGS ? t("forum.tagsFull") : undefined}
+                        onClick={() => setAddingTag(true)}
+                    >
+                        <Plus className="size-4" />
+                        {t("forum.addTag")}
+                    </Button>
+                </div>
                 {forum.tags.length === 0 && (
                     <p className="text-sm text-muted-foreground">{t("forum.noTagsYet")}</p>
                 )}
@@ -237,24 +261,6 @@ export function ForumSettings({ channelId }: { channelId: string }) {
                         </li>
                     ))}
                 </ul>
-                {forum.tags.length < core.MAX_FORUM_TAGS && (
-                    <div className="flex min-w-0 items-center gap-2">
-                        <Input
-                            value={newTag}
-                            maxLength={core.MAX_FORUM_TAG}
-                            placeholder={t("forum.newTag")}
-                            aria-label={t("forum.newTag")}
-                            onChange={(event) => setNewTag(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key === "Enter") void addTag();
-                            }}
-                        />
-                        <Button size="sm" variant="outline" disabled={!newTagName} onClick={() => void addTag()}>
-                            <Plus className="size-4" />
-                            {t("forum.addTag")}
-                        </Button>
-                    </div>
-                )}
             </div>
 
             {error && (
@@ -262,6 +268,39 @@ export function ForumSettings({ channelId }: { channelId: string }) {
                     {error}
                 </p>
             )}
+
+            <Dialog open={addingTag} onOpenChange={setAddingTag}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t("forum.addTagTitle")}</DialogTitle>
+                        <DialogDescription>{t("forum.addTagDescription")}</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="flex flex-col gap-3"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            void addTag();
+                        }}
+                    >
+                        <Input
+                            autoFocus
+                            value={newTag}
+                            maxLength={core.MAX_FORUM_TAG}
+                            placeholder={t("forum.newTag")}
+                            aria-label={t("forum.newTag")}
+                            onChange={(event) => setNewTag(event.target.value)}
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" onClick={() => setAddingTag(false)}>
+                                {t("newChannel.cancel")}
+                            </Button>
+                            <Button type="submit" aria-disabled={!newTagName}>
+                                {t("forum.addTag")}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </section>
     );
 }

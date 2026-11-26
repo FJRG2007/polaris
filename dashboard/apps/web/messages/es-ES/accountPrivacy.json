@@ -275,7 +275,9 @@
         "namePlaceholder": "Mi juego",
         "add": "Añadir",
         "nothingListed": "No se ha podido listar nada.",
-        "chooseRunning": "Elegir entre lo que se está ejecutando en este ordenador"
+        "chooseRunning": "Elegir entre lo que se está ejecutando en este ordenador",
+        "addButton": "Nuevo juego",
+        "cancel": "Cancelar"
     },
     "auto": {
         "title": "Estado automático",

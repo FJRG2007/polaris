@@ -784,7 +784,9 @@
             "notFound": "That schedule is gone. Reopen the repository.",
             "tooMany": "A repository can keep {max} schedules. Remove one first.",
             "saveFailed": "The schedule could not be saved. Try again."
-        }
+        },
+        "newTitle": "New schedule",
+        "editTitle": "Edit schedule"
     },
     "repoRoles": {
         "title": "Agents per role",

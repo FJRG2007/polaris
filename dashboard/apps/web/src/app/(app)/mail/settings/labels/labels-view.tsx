@@ -10,13 +10,13 @@
  * labels are the same thing.
  */
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useBusy } from "@/app/(app)/mail/use-busy";
 import { useRouter } from "next/navigation";
 import { Plus, Tag, Trash2 } from "lucide-react";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailLabelView } from "@/lib/mailbox/labels";
-import { Button, ColorPicker, Input, useToast } from "@polaris/ui";
+import { Button, ColorPicker, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createLabelAction, deleteLabelAction } from "@/app/(app)/mail/actions";
 
@@ -27,94 +27,156 @@ export function LabelsView({ labels }: { labels: MailLabelView[] }) {
     const router = useRouter();
     const toast = useToast();
     const t = useTranslations("mailSettings");
-    const [name, setName] = useState("");
-    const [color, setColor] = useState(DEFAULT_COLOR);
-    const [problem, setProblem] = useState("");
-    const [saving, startSaving] = useBusy();
+    const [adding, setAdding] = useState(false);
 
     return (
         <div className="space-y-4">
-            <div>
-                <h2 className="text-[13px] font-medium">{t("nav.labels")}</h2>
-                <p className="text-[12px] text-muted-foreground">{t("labels.hint")}</p>
-            </div>
-
-            <div className="flex flex-wrap items-end gap-2">
-                <label className="block">
-                    <span className="mb-1 block text-[12px] text-muted-foreground">
-                        {t("labels.name")} <span aria-hidden>*</span>
-                    </span>
-                    <Input
-                        value={name}
-                        placeholder={t("labels.placeholder")}
-                        className="w-56"
-                        onChange={(event) => {
-                            setName(event.target.value);
-                            setProblem("");
-                        }}
-                    />
-                </label>
-                <ColorPicker value={color} onChange={setColor} aria-label={t("labels.colour")} />
-                <Button
-                    disabled={saving || !name.trim()}
-                    onClick={() =>
-                        startSaving(async () => {
-                            const answer = await createLabelAction({ name, color });
-                            const said = refusalOf(answer);
-                            if (said) {
-                                setProblem(said);
-                                return;
-                            }
-                            setName("");
-                            setColor(DEFAULT_COLOR);
-                            toast.show({ title: t("labels.made") });
-                            router.refresh();
-                        })
-                    }
-                >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h2 className="text-[13px] font-medium">{t("nav.labels")}</h2>
+                    <p className="text-[12px] text-muted-foreground">{t("labels.hint")}</p>
+                </div>
+                <Button size="sm" onClick={() => setAdding(true)}>
                     <Plus className="size-4 shrink-0" aria-hidden />
-                    {t("labels.make")}
+                    {t("labels.addLabel")}
                 </Button>
             </div>
-            {problem ? <p className="text-[13px] text-danger">{problem}</p> : null}
 
             {labels.length === 0 ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
                     {t("labels.empty")}
                 </p>
             ) : (
-                <ul className="space-y-1">
-                    {labels.map((label) => (
-                        <li
-                            key={label.id}
-                            className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2"
-                        >
-                            <Tag className="size-4 shrink-0" style={{ color: label.color }} aria-hidden />
-                            <span className="min-w-0 flex-1 truncate text-[13px]" title={label.name}>
-                                {label.name}
-                            </span>
-                            <span className="min-w-0 max-w-full shrink-0 truncate text-[12px] text-foreground-subtle" title={t("labels.count", { count: label.count })}>
-                                {t("labels.count", { count: label.count })}
-                            </span>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label={t("labels.deleteNamed", { name: label.name })}
-                                title={t("labels.deleteHint", { name: label.name })}
-                                onClick={() =>
-                                    void (async () => {
-                                        await deleteLabelAction(label.id);
-                                        toast.show({ title: t("labels.deleted", { name: label.name }) });
-                                        router.refresh();
-                                    })()
-                                }
-                            >
-                                <Trash2 className="size-4 shrink-0" aria-hidden />
-                            </Button>
-                        </li>
-                    ))}
-                </ul>
+                <div className="overflow-x-auto rounded-lg border border-border">
+                    <table className="w-full text-sm">
+                        <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                            <tr>
+                                <th scope="col" className="w-full max-w-0 px-3 py-2 text-start font-medium">
+                                    {t("labels.columns.name")}
+                                </th>
+                                <th scope="col" className="hidden px-3 py-2 text-start font-medium sm:table-cell">
+                                    {t("labels.columns.messages")}
+                                </th>
+                                <th scope="col" className="px-3 py-2">
+                                    <span className="sr-only">{t("labels.columns.actions")}</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {labels.map((label) => (
+                                <tr key={label.id} className="border-t border-border">
+                                    <td className="max-w-0 px-3 py-2 align-middle">
+                                        <span className="flex min-w-0 items-center gap-2">
+                                            <Tag className="size-4 shrink-0" style={{ color: label.color }} aria-hidden />
+                                            <span className="min-w-0 truncate text-[13px]" title={label.name}>
+                                                {label.name}
+                                            </span>
+                                        </span>
+                                    </td>
+                                    <td className="hidden whitespace-nowrap px-3 py-2 align-middle text-[12px] text-foreground-subtle sm:table-cell">
+                                        {t("labels.count", { count: label.count })}
+                                    </td>
+                                    <td className="px-3 py-2 align-middle">
+                                        <span className="flex justify-end">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                aria-label={t("labels.deleteNamed", { name: label.name })}
+                                                title={t("labels.deleteHint", { name: label.name })}
+                                                onClick={() =>
+                                                    void (async () => {
+                                                        await deleteLabelAction(label.id);
+                                                        toast.show({ title: t("labels.deleted", { name: label.name }) });
+                                                        router.refresh();
+                                                    })()
+                                                }
+                                            >
+                                                <Trash2 className="size-4 shrink-0" aria-hidden />
+                                            </Button>
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
+
+            <AddLabelDialog open={adding} onOpenChange={setAdding} />
         </div>
+    );
+}
+
+/** The name and colour of a new label, in a dialog opened from the header. */
+function AddLabelDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+    const router = useRouter();
+    const toast = useToast();
+    const t = useTranslations("mailSettings");
+    const [name, setName] = useState("");
+    const [color, setColor] = useState(DEFAULT_COLOR);
+    const [problem, setProblem] = useState("");
+    const [saving, startSaving] = useBusy();
+    const ready = name.trim().length > 0 && !saving;
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        if (!ready) return;
+        startSaving(async () => {
+            const answer = await createLabelAction({ name, color });
+            const said = refusalOf(answer);
+            if (said) {
+                setProblem(said);
+                return;
+            }
+            setName("");
+            setColor(DEFAULT_COLOR);
+            onOpenChange(false);
+            toast.show({ title: t("labels.made") });
+            router.refresh();
+        });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={(next) => !saving && onOpenChange(next)}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t("labels.addTitle")}</DialogTitle>
+                    <DialogDescription>{t("labels.addDescription")}</DialogDescription>
+                </DialogHeader>
+                <form className="flex flex-col gap-3" onSubmit={submit}>
+                    <div className="flex items-end gap-2">
+                        <label className="block min-w-0 flex-1">
+                            <span className="mb-1 block text-[12px] text-muted-foreground">
+                                {t("labels.name")} <span aria-hidden>*</span>
+                            </span>
+                            <Input
+                                value={name}
+                                autoFocus
+                                required
+                                placeholder={t("labels.placeholder")}
+                                onChange={(event) => {
+                                    setName(event.target.value);
+                                    setProblem("");
+                                }}
+                            />
+                        </label>
+                        <ColorPicker value={color} onChange={setColor} aria-label={t("labels.colour")} />
+                    </div>
+                    {problem ? (
+                        <p className="text-[13px] text-danger" role="alert">
+                            {problem}
+                        </p>
+                    ) : null}
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" disabled={saving} onClick={() => onOpenChange(false)}>
+                            {t("labels.cancel")}
+                        </Button>
+                        <Button type="submit" aria-disabled={!ready} disabled={saving} aria-busy={saving}>
+                            {t("labels.make")}
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }

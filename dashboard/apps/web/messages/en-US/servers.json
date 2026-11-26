@@ -313,7 +313,9 @@
         "renameNamed": "Rename {name}",
         "enrollFirst": "Enroll a server to put one in here.",
         "kind": "server group",
-        "deleteBody": "The servers themselves stay. Any firewall rules written for this group are deleted with it."
+        "deleteBody": "The servers themselves stay. Any firewall rules written for this group are deleted with it.",
+        "newTitle": "New server group",
+        "nameLabel": "Group name"
     },
     "usage": {
         "offMaybe": "It may be off or unreachable.",

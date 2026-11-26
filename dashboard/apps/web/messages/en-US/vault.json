@@ -662,7 +662,9 @@
         "whereItOpensHint": "Checked on every open, from Polaris and from any Bitwarden app.",
         "saveRules": "Save",
         "browserOnly": "With an account or named people set, it opens only on its web page. Bitwarden apps are refused.",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "newSend": "New send",
+        "newTitle": "New send"
     },
     "port": {
         "exportBody": "The file will hold every password in plain text. Put it somewhere you would put the passwords themselves, and delete it when you are done.",

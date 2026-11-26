@@ -201,7 +201,9 @@
         "rotateBody": "New copies are sealed under a new key. Copies already taken keep opening with the key they were sealed under.",
         "recoveryTitle": "Recovery key",
         "recoveryBody": "Opens every copy this key sealed. Keep it in a password manager, not on this machine.",
-        "theRecoveryKey": "the recovery key"
+        "theRecoveryKey": "the recovery key",
+        "addButton": "Add recovery key",
+        "cancel": "Cancel"
     },
     "activity": {
         "verbs": {

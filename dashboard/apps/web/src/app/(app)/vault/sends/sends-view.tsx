@@ -101,6 +101,7 @@ export function SendsView() {
     const [rows, setRows] = useState<SendRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [creating, setCreating] = useState(false);
+    const [composing, setComposing] = useState(false);
     const [link, setLink] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -195,7 +196,8 @@ export function SendsView() {
                 `${result.url}#${crypto.toBase64(urlKey).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`
             );
             setCopied(false);
-            event.currentTarget.reset();
+            // The dialog's form goes with it, so the next one opens empty.
+            setComposing(false);
             setAdvanced(EMPTY_LINK_ADVANCED);
             await load(key);
         } finally {
@@ -231,11 +233,23 @@ export function SendsView() {
 
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
-            <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
-                    {t("sends.title")}
-                </h1>
-                <p className="text-sm text-muted-foreground">{t("sends.intro")}</p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("sends.title")}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">{t("sends.intro")}</p>
+                </div>
+                <Button
+                    size="sm"
+                    onClick={() => {
+                        setError(null);
+                        setComposing(true);
+                    }}
+                >
+                    <Plus className="size-4" />
+                    {t("sends.newSend")}
+                </Button>
             </div>
 
             {link ? (
@@ -271,12 +285,16 @@ export function SendsView() {
                 </Card>
             ) : null}
 
-            <Card>
-                <CardBody>
+            <Dialog open={composing} onOpenChange={(open) => !creating && setComposing(open)}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{t("sends.newTitle")}</DialogTitle>
+                        <DialogDescription>{t("sends.intro")}</DialogDescription>
+                    </DialogHeader>
                     <form onSubmit={onCreate} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
                             {t("sends.what")}
-                            <Input name="name" placeholder={t("sends.whatPlaceholder")} />
+                            <Input name="name" autoFocus placeholder={t("sends.whatPlaceholder")} />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
                             {t("sends.text")}
@@ -307,22 +325,26 @@ export function SendsView() {
                             </p>
                         ) : null}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                disabled={creating}
+                                onClick={() => setComposing(false)}
+                            >
+                                {t("sends.cancel")}
+                            </Button>
                             <Button
                                 type="submit"
                                 disabled={creating || linkHoursIncomplete(advanced)}
                             >
-                                {creating ? (
-                                    <Loader2 className="size-4 animate-spin" />
-                                ) : (
-                                    <Plus className="size-4" />
-                                )}
+                                {creating ? <Loader2 className="size-4 animate-spin" /> : null}
                                 {t("sends.create")}
                             </Button>
                         </div>
                     </form>
-                </CardBody>
-            </Card>
+                </DialogContent>
+            </Dialog>
 
             {loading ? (
                 <Card>

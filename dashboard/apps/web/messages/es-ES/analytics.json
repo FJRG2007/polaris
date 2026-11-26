@@ -669,7 +669,9 @@
         "deleteTitle": "¿Quitar esta nota?",
         "invalid": "Escribe una nota de hasta 200 caracteres y elige cuándo pasó.",
         "tooMany": "Este sitio ya tiene 500 notas. Quita una antigua antes.",
-        "gone": "Esa nota ya se había quitado."
+        "gone": "Esa nota ya se había quitado.",
+        "addTitle": "Añadir una nota al gráfico",
+        "addDescription": "Se ve en el gráfico en el momento que elijas."
     },
     "rejections": {
         "title": "Sin registrar",

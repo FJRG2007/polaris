@@ -6,7 +6,7 @@
  */
 
 import { Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import {
     Badge,
     Button,
@@ -14,6 +14,11 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
     Input,
     SearchableSelect,
     Select,
@@ -39,8 +44,8 @@ export function DnsListsSection() {
     const { clientGroups } = useDnsBlocker().form;
     const [schedules, setSchedules] = useField("schedules");
     const [timeZone, setTimeZone] = useField("timeZone");
-    const [listUrl, setListUrl] = useState("");
-    const [listCategory, setListCategory] = useState<dns.DnsCategory>("ads");
+    const [addingList, setAddingList] = useState(false);
+    const listsFull = customLists.length >= dns.DNS_LIMITS.customLists;
     const [scheduleLists, setScheduleLists] = useState<string[]>([]);
     const [scheduleDays, setScheduleDays] = useState<dns.DnsWeekday[]>([]);
     const [scheduleWhole, setScheduleWhole] = useState(false);
@@ -48,7 +53,6 @@ export function DnsListsSection() {
     const [scheduleEnd, setScheduleEnd] = useState("07:00");
     const { checks, status } = useDnsBlocker();
     const { badAllow, badDeny, tooMany } = checks;
-    const newList = dns.dnsCustomListSchema.safeParse({ url: listUrl, category: listCategory });
     const listed = dns.dnsSchedulableLists({ sources, customLists, services, clientGroups });
     const newSchedule = dns.dnsScheduleSchema.safeParse({
         lists: scheduleLists.filter((list) => listed.includes(list)),
@@ -111,9 +115,20 @@ export function DnsListsSection() {
                         );
                     })}
                     <div className="flex flex-col gap-2">
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            {t("lists.custom")}
-                        </h4>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                {t("lists.custom")}
+                            </h4>
+                            <Button
+                                size="sm"
+                                disabled={listsFull}
+                                title={listsFull ? t("devices.full") : undefined}
+                                onClick={() => setAddingList(true)}
+                            >
+                                <Plus className="size-4" />
+                                {t("lists.add")}
+                            </Button>
+                        </div>
                         {customLists.map((list, index) => (
                             <div
                                 key={`${list.url}-${index}`}
@@ -138,49 +153,15 @@ export function DnsListsSection() {
                                 </Button>
                             </div>
                         ))}
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Input
-                                className="min-w-0 flex-1 basis-64"
-                                value={listUrl}
-                                placeholder="https://example.com/blocklist.txt"
-                                aria-label={t("lists.url")}
-                                aria-invalid={listUrl.trim() !== "" && !newList.success}
-                                onChange={(event) => setListUrl(event.target.value)}
-                            />
-                            <Select
-                                className="w-40"
-                                value={listCategory}
-                                aria-label={t("lists.category")}
-                                onValueChange={(value) => setListCategory(value as dns.DnsCategory)}
-                                options={dns.DNS_CATEGORIES.map((category) => ({
-                                    value: category,
-                                    label: t(`categories.${category}`)
-                                }))}
-                            />
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={
-                                    !newList.success ||
-                                    customLists.length >= dns.DNS_LIMITS.customLists
-                                }
-                                onClick={() => {
-                                    if (!newList.success) return;
-                                    setCustomLists((current) => [...current, newList.data]);
-                                    setListUrl("");
-                                }}
-                            >
-                                <Plus />
-                                {t("lists.add")}
-                            </Button>
-                        </div>
-                        {listUrl.trim() !== "" && !newList.success ? (
-                            <p className="text-xs text-danger">{t("validation.invalidUrl")}</p>
-                        ) : null}
                     </div>
                 </CardBody>
             </Card>
 
+            <ListDialog
+                open={addingList}
+                onClose={() => setAddingList(false)}
+                onAdd={(list) => setCustomLists((current) => [...current, list])}
+            />
             <DnsRulesEditor />
             {badAllow.length > 0 || badDeny.length > 0 || tooMany ? (
                 <p className="text-xs text-danger">
@@ -418,5 +399,69 @@ export function DnsListsSection() {
             </Card>
             <DnsSaveBar />
         </div>
+    );
+}
+
+/** A blocklist of your own: where it is downloaded from and what it blocks. */
+function ListDialog({
+    open,
+    onClose,
+    onAdd
+}: {
+    open: boolean;
+    onClose: () => void;
+    onAdd: (list: dns.DnsCustomList) => void;
+}) {
+    const t = useTranslations("dnsBlocker");
+    const [listUrl, setListUrl] = useState("");
+    const [listCategory, setListCategory] = useState<dns.DnsCategory>("ads");
+    const newList = dns.dnsCustomListSchema.safeParse({ url: listUrl, category: listCategory });
+    const wrong = listUrl.trim() !== "" && !newList.success;
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        if (!newList.success) return;
+        onAdd(newList.data);
+        setListUrl("");
+        onClose();
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t("lists.addTitle")}</DialogTitle>
+                    <DialogDescription>{t("lists.intro")}</DialogDescription>
+                </DialogHeader>
+                <form className="flex flex-col gap-3" onSubmit={submit}>
+                    <Input
+                        autoFocus
+                        value={listUrl}
+                        placeholder="https://example.com/blocklist.txt"
+                        aria-label={t("lists.url")}
+                        aria-invalid={wrong}
+                        onChange={(event) => setListUrl(event.target.value)}
+                    />
+                    <Select
+                        value={listCategory}
+                        aria-label={t("lists.category")}
+                        onValueChange={(value) => setListCategory(value as dns.DnsCategory)}
+                        options={dns.DNS_CATEGORIES.map((category) => ({
+                            value: category,
+                            label: t(`categories.${category}`)
+                        }))}
+                    />
+                    {wrong ? <p className="text-xs text-danger">{t("validation.invalidUrl")}</p> : null}
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            {t("devices.cancel")}
+                        </Button>
+                        <Button type="submit" disabled={!newList.success}>
+                            {t("lists.add")}
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }

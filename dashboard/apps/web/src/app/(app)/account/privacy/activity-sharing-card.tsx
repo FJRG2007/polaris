@@ -23,13 +23,24 @@ import { GameLogo } from "@/components/game-logo";
 import { IntegrationLogo } from "@/components/logos";
 import { RelativeTime } from "@/components/relative-time";
 import { usePresence } from "@/components/presence-store";
-import { useRef, useState } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { runAction } from "@/lib/run-action";
 import { saveActivitySettingsAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useConnectionsHref } from "@/components/use-connections-href";
 import { useDesktopBridge } from "@/components/desktop-app";
-import { Button, Card, CardBody, Input, Switch } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Switch
+} from "@polaris/ui";
 
 /** Whether Spotify can be shown for this account, and what is missing if not. */
 export type SpotifyReadiness = "linked" | "unlinked" | "unavailable";
@@ -406,6 +417,7 @@ function OwnGames({
     const [program, setProgram] = useState("");
     const [name, setName] = useState("");
     const [running, setRunning] = useState<readonly string[] | null>(null);
+    const [open, setOpen] = useState(false);
 
     // Checked as it is typed, against the same rules the server keeps. An empty
     // field is not wrong yet, only unfinished.
@@ -426,84 +438,107 @@ function OwnGames({
 
     // Drawn on the list at once, like every switch on this card; a refused save
     // takes it off again and says why under the card.
-    const add = () => {
+    const add = (event: FormEvent) => {
+        event.preventDefault();
         if (!candidate.success || !ready) return;
         onAdd(candidate.data);
         setProgram("");
         setName("");
+        setOpen(false);
     };
 
     return (
         <section className="flex flex-col gap-1.5">
-            <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                {t("ownGames.title")}
-            </h3>
-            <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
-                {t("ownGames.description")}
-            </p>
-            <div className="flex flex-wrap items-end gap-2">
-                <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[0.6875rem] text-muted-foreground">
-                    {t("ownGames.program")}
-                    <Input
-                        value={program}
-                        onChange={(event) => setProgram(event.target.value)}
-                        placeholder="mygame.exe"
-                        disabled={disabled}
-                        className="h-8 text-xs"
-                    />
-                </label>
-                <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[0.6875rem] text-muted-foreground">
-                    {t("ownGames.name")}
-                    <Input
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder={t("ownGames.namePlaceholder")}
-                        disabled={disabled}
-                        className="h-8 text-xs"
-                    />
-                </label>
-                <Button size="sm" onClick={add} disabled={disabled || !ready}>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                    <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                        {t("ownGames.title")}
+                    </h3>
+                    <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+                        {t("ownGames.description")}
+                    </p>
+                </div>
+                <Button
+                    size="sm"
+                    disabled={disabled || full}
+                    title={full ? t("ownGames.full", { count: core.MOST_CUSTOM_GAMES }) : undefined}
+                    onClick={() => setOpen(true)}
+                >
                     <Plus className="size-4 shrink-0" />
-                    {t("ownGames.add")}
+                    {t("ownGames.addButton")}
                 </Button>
             </div>
-            {problem ? <p className="text-[0.6875rem] text-danger">{problem}</p> : null}
-            {runningPrograms ? (
-                running ? (
-                    <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
-                        {running.length === 0 ? (
-                            <span className="text-[0.6875rem] text-muted-foreground">
-                                {t("ownGames.nothingListed")}
-                            </span>
-                        ) : (
-                            running.map((entry) => (
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t("ownGames.title")}</DialogTitle>
+                        <DialogDescription>{t("ownGames.description")}</DialogDescription>
+                    </DialogHeader>
+                    <form className="flex flex-col gap-3" onSubmit={add}>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            {t("ownGames.program")}
+                            <Input
+                                autoFocus
+                                value={program}
+                                onChange={(event) => setProgram(event.target.value)}
+                                placeholder="mygame.exe"
+                            />
+                        </label>
+                        {runningPrograms ? (
+                            running ? (
+                                <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
+                                    {running.length === 0 ? (
+                                        <span className="text-[0.6875rem] text-muted-foreground">
+                                            {t("ownGames.nothingListed")}
+                                        </span>
+                                    ) : (
+                                        running.map((entry) => (
+                                            <button
+                                                key={entry}
+                                                type="button"
+                                                onClick={() => setProgram(entry)}
+                                                className="max-w-[14rem] truncate rounded-full bg-muted px-2 py-0.5 text-[0.6875rem] transition-colors hover:bg-card-hover"
+                                                title={entry}
+                                            >
+                                                {entry}
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            ) : (
                                 <button
-                                    key={entry}
                                     type="button"
-                                    onClick={() => setProgram(entry)}
-                                    className="max-w-[14rem] truncate rounded-full bg-muted px-2 py-0.5 text-[0.6875rem] transition-colors hover:bg-card-hover"
-                                    title={entry}
+                                    onClick={() =>
+                                        void runningPrograms()
+                                            .then(setRunning)
+                                            .catch(() => setRunning([]))
+                                    }
+                                    className="self-start rounded text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
                                 >
-                                    {entry}
+                                    {t("ownGames.chooseRunning")}
                                 </button>
-                            ))
-                        )}
-                    </div>
-                ) : (
-                    <button
-                        type="button"
-                        disabled={disabled}
-                        onClick={() =>
-                            void runningPrograms()
-                                .then(setRunning)
-                                .catch(() => setRunning([]))
-                        }
-                        className="self-start rounded text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:opacity-50"
-                    >
-                        {t("ownGames.chooseRunning")}
-                    </button>
-                )
-            ) : null}
+                            )
+                        ) : null}
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            {t("ownGames.name")}
+                            <Input
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                placeholder={t("ownGames.namePlaceholder")}
+                            />
+                        </label>
+                        {problem ? <p className="text-xs text-danger">{problem}</p> : null}
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                                {t("ownGames.cancel")}
+                            </Button>
+                            <Button type="submit" aria-disabled={!ready}>
+                                {t("ownGames.add")}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </section>
     );
 }

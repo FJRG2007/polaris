@@ -14,13 +14,25 @@
  */
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { deliveryText } from "@/lib/notifications/delivery-words";
 import type { ProjectWebhookView } from "@/lib/deploy-project-service";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
-import { Button, Checkbox, Input, Select, Switch, ConfirmDeleteDialog } from "@polaris/ui";
+import {
+    Button,
+    Checkbox,
+    ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    Switch
+} from "@polaris/ui";
 import { CheckCircle2, CircleAlert, Loader2, Plus, Send, Trash2, Webhook } from "lucide-react";
 import { PROJECT_WEBHOOK_EVENTS, WEBHOOK_FORMAT_LABEL, WEBHOOK_FORMATS, type WebhookFormat } from "@polaris/core";
 
@@ -206,7 +218,7 @@ export function ProjectWebhooks({
                             )
                         })}
                     </p>
-                    <Button variant="secondary" size="sm" onClick={() => setAdding(true)}>
+                    <Button size="sm" onClick={() => setAdding(true)}>
                         <Plus className="size-4" /> {t("webhooks.add")}
                     </Button>
                 </div>
@@ -254,7 +266,11 @@ function AddWebhookForm({
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    function submit() {
+    const ready = name.trim() !== "" && url.trim() !== "";
+
+    function submit(event: FormEvent) {
+        event.preventDefault();
+        if (!ready || pending) return;
         setError(null);
         startTransition(async () => {
             const result = await createProjectWebhookAction({
@@ -279,65 +295,73 @@ function AddWebhookForm({
     }
 
     return (
-        <div className="flex flex-col gap-3 rounded-md border border-border/60 p-3">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">{t("modelKeys.name")}</span>
-                    <Input
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder={t("webhooks.namePlaceholder")}
-                    />
-                </label>
-                <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">{t("webhooks.format")}</span>
-                    <Select
-                        value={format}
-                        onValueChange={(value) => setFormat(value as WebhookFormat | "auto")}
-                        options={[
-                            { value: "auto", label: t("webhooks.detect") },
-                            ...WEBHOOK_FORMATS.map((value) => ({ value, label: WEBHOOK_FORMAT_LABEL[value] }))
-                        ]}
-                        aria-label={t("webhooks.format")}
-                    />
-                </label>
-            </div>
-            <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">{t("webhooks.url")}</span>
-                <Input
-                    value={url}
-                    onChange={(event) => setUrl(event.target.value)}
-                    placeholder="https://discord.com/api/webhooks/..." // i18n-ignore an example address
-                    className="font-mono text-xs"
-                />
-                <span className="text-xs text-muted-foreground">{t("webhooks.urlHint")}</span>
-            </label>
-            <fieldset className="flex flex-col gap-1.5">
-                <legend className="text-xs font-medium text-muted-foreground">{t("webhooks.eventsLabel")}</legend>
-                <div className="flex flex-wrap gap-3">
-                    {PROJECT_WEBHOOK_EVENTS.map((event) => (
-                        <label key={event.id} className="flex items-center gap-2 text-sm">
-                            <Checkbox
-                                checked={events.includes(event.id)}
-                                onChange={(input) => toggleEvent(event.id, input.target.checked)}
+        <Dialog open onOpenChange={(open) => !open && !pending && onCancel()}>
+            <DialogContent className="max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>{t("webhooks.addTitle")}</DialogTitle>
+                    <DialogDescription>{t("webhooks.addDescription")}</DialogDescription>
+                </DialogHeader>
+                <form className="flex flex-col gap-3" onSubmit={submit}>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <label className="flex flex-col gap-1.5">
+                            <span className="text-xs font-medium text-muted-foreground">{t("modelKeys.name")}</span>
+                            <Input
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                placeholder={t("webhooks.namePlaceholder")}
                             />
-                            {eventLabel(t, event.id)}
                         </label>
-                    ))}
-                </div>
-                <span className="text-xs text-muted-foreground">{t("webhooks.noneMeansAll")}</span>
-            </fieldset>
+                        <label className="flex flex-col gap-1.5">
+                            <span className="text-xs font-medium text-muted-foreground">{t("webhooks.format")}</span>
+                            <Select
+                                value={format}
+                                onValueChange={(value) => setFormat(value as WebhookFormat | "auto")}
+                                options={[
+                                    { value: "auto", label: t("webhooks.detect") },
+                                    ...WEBHOOK_FORMATS.map((value) => ({ value, label: WEBHOOK_FORMAT_LABEL[value] }))
+                                ]}
+                                aria-label={t("webhooks.format")}
+                            />
+                        </label>
+                    </div>
+                    <label className="flex flex-col gap-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">{t("webhooks.url")}</span>
+                        <Input
+                            value={url}
+                            onChange={(event) => setUrl(event.target.value)}
+                            placeholder="https://discord.com/api/webhooks/..." // i18n-ignore an example address
+                            className="font-mono text-xs"
+                        />
+                        <span className="text-xs text-muted-foreground">{t("webhooks.urlHint")}</span>
+                    </label>
+                    <fieldset className="flex flex-col gap-1.5">
+                        <legend className="text-xs font-medium text-muted-foreground">{t("webhooks.eventsLabel")}</legend>
+                        <div className="flex flex-wrap gap-3">
+                            {PROJECT_WEBHOOK_EVENTS.map((event) => (
+                                <label key={event.id} className="flex items-center gap-2 text-sm">
+                                    <Checkbox
+                                        checked={events.includes(event.id)}
+                                        onChange={(input) => toggleEvent(event.id, input.target.checked)}
+                                    />
+                                    {eventLabel(t, event.id)}
+                                </label>
+                            ))}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{t("webhooks.noneMeansAll")}</span>
+                    </fieldset>
 
-            {error && <p className="text-sm text-danger">{error}</p>}
+                    {error && <p className="text-sm text-danger">{error}</p>}
 
-            <div className="flex justify-end gap-2">
-                <Button variant="ghost" onClick={onCancel}>
-                    {tcommon("actions.cancel")}
-                </Button>
-                <Button onClick={submit} disabled={pending || !name.trim() || !url.trim()}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} {t("webhooks.add")}
-                </Button>
-            </div>
-        </div>
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" disabled={pending} onClick={onCancel}>
+                            {tcommon("actions.cancel")}
+                        </Button>
+                        <Button type="submit" aria-disabled={!ready} disabled={pending} aria-busy={pending}>
+                            {pending && <Loader2 className="size-4 animate-spin" />} {t("webhooks.add")}
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }

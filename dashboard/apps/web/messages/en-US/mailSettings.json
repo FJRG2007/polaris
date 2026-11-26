@@ -66,7 +66,16 @@
         "count": "{count, plural, =0 {on nothing} one {on # message} other {on # messages}}",
         "deleteNamed": "Delete the label {name}",
         "deleteHint": "Delete the label {name}. The mail it is on is not touched.",
-        "deleted": "{name} is gone. The mail it was on is not."
+        "deleted": "{name} is gone. The mail it was on is not.",
+        "addLabel": "Add a label",
+        "addTitle": "New mail label",
+        "addDescription": "Name it and pick a color.",
+        "cancel": "Cancel",
+        "columns": {
+            "name": "Label",
+            "messages": "Messages",
+            "actions": "Actions"
+        }
     },
     "blocked": {
         "noMailboxTitle": "No mailbox yet",

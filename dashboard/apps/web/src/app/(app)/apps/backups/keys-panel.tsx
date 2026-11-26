@@ -9,9 +9,9 @@
  * else, and a recovery key from another Polaris can be added to open its copies.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { BackupKeyView } from "@/lib/backups/keyring";
-import { KeyRound, Loader2, RefreshCw } from "lucide-react";
+import { KeyRound, Loader2, Plus, RefreshCw } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { addRecoveryKeyAction, revealRecoveryKeyAction, rotateBackupKeyAction } from "./actions";
@@ -45,6 +45,7 @@ export function KeysPanel() {
     const [revealing, setRevealing] = useState<string | null>(null);
     const [pasted, setPasted] = useState("");
     const [adding, setAdding] = useState(false);
+    const [addOpen, setAddOpen] = useState(false);
     const [note, setNote] = useState<string | null>(null);
 
     const load = useCallback(async () => {
@@ -83,7 +84,9 @@ export function KeysPanel() {
         await load();
     }
 
-    async function add() {
+    async function add(event: FormEvent) {
+        event.preventDefault();
+        if (adding || !trimmed || pastedProblem !== null) return;
         setAdding(true);
         setError(null);
         const result = await addRecoveryKeyAction(pasted);
@@ -93,6 +96,7 @@ export function KeysPanel() {
             return;
         }
         setPasted("");
+        setAddOpen(false);
         setNote(result.added ? t("keys.added") : t("keys.already"));
         await load();
     }
@@ -106,14 +110,19 @@ export function KeysPanel() {
                 <CardBody className="flex flex-col gap-3 text-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <p className="max-w-prose text-muted-foreground">{t("keys.intro")}</p>
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => setRotating(true)}
-                            disabled={keys === null}
-                        >
-                            <RefreshCw className="size-4" /> {t("keys.new")}
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setRotating(true)}
+                                disabled={keys === null}
+                            >
+                                <RefreshCw className="size-4" /> {t("keys.new")}
+                            </Button>
+                            <Button size="sm" onClick={() => setAddOpen(true)}>
+                                <Plus className="size-4" /> {t("keys.addButton")}
+                            </Button>
+                        </div>
                     </div>
                     {keys === null ? (
                         <div className="flex flex-col gap-2">
@@ -161,36 +170,41 @@ export function KeysPanel() {
                 </CardBody>
             </Card>
 
-            <Card>
-                <CardBody className="flex flex-col gap-2 text-sm">
-                    <label className="flex flex-col gap-1">
-                        <span className="font-medium">{t("keys.addTitle")}</span>
-                        <span className="text-xs text-muted-foreground">{t("keys.addHint")}</span>
-                        <div className="flex flex-wrap gap-2">
-                            <Input
-                                value={pasted}
-                                onChange={(event) => setPasted(event.target.value)}
-                                placeholder="polaris-backup-key:..." // i18n-ignore the key's own format
-                                autoComplete="off"
-                                spellCheck={false}
-                                className="min-w-0 flex-1 font-mono text-xs"
-                            />
-                            <Button
-                                size="sm"
-                                onClick={() => void add()}
-                                disabled={adding || !trimmed || pastedProblem !== null}
-                            >
-                                {adding && <Loader2 className="size-4 animate-spin" />}{" "}
+            {error && !addOpen && <p className="text-sm text-danger">{error}</p>}
+            {note && <p className="text-xs text-muted-foreground">{note}</p>}
+
+            <Dialog open={addOpen} onOpenChange={(open) => !adding && setAddOpen(open)}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{t("keys.addTitle")}</DialogTitle>
+                        <DialogDescription>{t("keys.addHint")}</DialogDescription>
+                    </DialogHeader>
+                    <form className="flex flex-col gap-3" onSubmit={(event) => void add(event)}>
+                        <Input
+                            autoFocus
+                            value={pasted}
+                            onChange={(event) => setPasted(event.target.value)}
+                            placeholder="polaris-backup-key:..." // i18n-ignore the key's own format
+                            aria-label={t("keys.addTitle")}
+                            aria-invalid={pastedProblem !== null || undefined}
+                            autoComplete="off"
+                            spellCheck={false}
+                            className="font-mono text-xs"
+                        />
+                        {pastedProblem && <p className="text-xs text-danger">{pastedProblem}</p>}
+                        {error && <p className="text-xs text-danger" role="alert">{error}</p>}
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" disabled={adding} onClick={() => setAddOpen(false)}>
+                                {t("keys.cancel")}
+                            </Button>
+                            <Button type="submit" aria-disabled={!trimmed || pastedProblem !== null} disabled={adding} aria-busy={adding}>
+                                {adding && <Loader2 className="size-4 animate-spin" />}
                                 {t("destinations.addShort")}
                             </Button>
                         </div>
-                    </label>
-                    {pastedProblem && <p className="text-xs text-danger">{pastedProblem}</p>}
-                </CardBody>
-            </Card>
-
-            {error && <p className="text-sm text-danger">{error}</p>}
-            {note && <p className="text-xs text-muted-foreground">{note}</p>}
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             <ConfirmDeleteDialog
                 open={rotating}

@@ -784,7 +784,9 @@
             "notFound": "Ese horario ya no existe. Vuelve a abrir el repositorio.",
             "tooMany": "Un repositorio admite {max} horarios. Quita uno antes.",
             "saveFailed": "No se pudo guardar el horario. Inténtalo de nuevo."
-        }
+        },
+        "newTitle": "Nuevo horario",
+        "editTitle": "Editar horario"
     },
     "repoRoles": {
         "title": "Agentes por rol",

@@ -1618,7 +1618,9 @@
             "tokenPlaceholder": "Only if the domain is in your own Cloudflare account",
             "saveToken": "Save token",
             "tokenHint": "Needs Zone: DNS: Edit and Zone: Read on {domain}. Without one, the token this Polaris has connected is used when it can edit this domain."
-        }
+        },
+        "cancel": "Cancel",
+        "addButton": "Add domain"
     },
     "statement": {
         "soFar": "{month} (so far)",
@@ -1848,7 +1850,9 @@
         "url": "Endpoint URL",
         "urlHint": "Stored encrypted and never shown again. Only a masked form appears in the list.",
         "eventsLabel": "Events",
-        "noneMeansAll": "Choosing none means every deploy event."
+        "noneMeansAll": "Choosing none means every deploy event.",
+        "addTitle": "New webhook endpoint",
+        "addDescription": "Where to send this project's events."
     },
     "delivery": {
         "noSmsSender": "No working SMS sender is configured.",

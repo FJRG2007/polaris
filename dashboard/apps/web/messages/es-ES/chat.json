@@ -3094,7 +3094,10 @@
         "renameTag": "Renombrar {name}",
         "deleteTag": "Borrar {name}",
         "newTag": "Añadir",
-        "addTag": "Añadir"
+        "addTag": "Añadir",
+        "addTagTitle": "Nueva etiqueta",
+        "addTagDescription": "Los posts del foro pueden llevarla.",
+        "tagsFull": "Este foro ya tiene todas las etiquetas posibles."
     },
     "follow": {
         "menu": "Seguir",

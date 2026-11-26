@@ -201,7 +201,9 @@
         "rotateBody": "Las copias nuevas se sellan con una clave nueva. Las ya hechas se siguen abriendo con la clave con la que se sellaron.",
         "recoveryTitle": "Clave de recuperación",
         "recoveryBody": "Abre todas las copias que selló esta clave. Guárdala en un gestor de contraseñas, no en esta máquina.",
-        "theRecoveryKey": "la clave de recuperación"
+        "theRecoveryKey": "la clave de recuperación",
+        "addButton": "Añadir clave",
+        "cancel": "Cancelar"
     },
     "activity": {
         "verbs": {

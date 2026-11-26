@@ -2,12 +2,12 @@
 
 /**
  * The notes pinned to the traffic chart, under it: each one with its moment,
- * removable by an editor, and a one-line form to add another.
+ * removable by an editor, and a button that adds another in a dialog.
  */
 
 import { useState, useTransition } from "react";
 import { Plus, X } from "lucide-react";
-import { Button, Input } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { AnnotationView } from "@/lib/analytics-annotations";
 import { useDisplayFormat } from "@/components/display-format";
@@ -115,45 +115,53 @@ export function Annotations({
                     ))}
                 </ul>
             ) : null}
-            {canEdit && adding ? (
-                <form
-                    className="flex min-w-0 flex-wrap items-center gap-2"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        add();
-                    }}
-                >
-                    <Input
-                        type="datetime-local"
-                        value={when}
-                        aria-label={t("annotations.when")}
-                        className="h-8 w-52"
-                        onChange={(event) => setWhen(event.target.value)}
-                    />
-                    <Input
-                        value={text}
-                        maxLength={200}
-                        autoFocus
-                        aria-label={t("annotations.text")}
-                        placeholder={t("annotations.placeholder")}
-                        className="h-8 min-w-0 flex-1 basis-48"
-                        onChange={(event) => setText(event.target.value)}
-                    />
-                    <Button type="submit" size="sm" disabled={!ready || pending}>
-                        {t("annotations.add")}
-                    </Button>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(false)}>
-                        {t("annotations.cancel")}
-                    </Button>
-                </form>
-            ) : canEdit ? (
+            {canEdit ? (
                 <div>
                     <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(true)}>
                         <Plus className="size-3.5" aria-hidden /> {t("annotations.new")}
                     </Button>
                 </div>
             ) : null}
-            {failure ? <p className="text-xs text-danger">{failure}</p> : null}
+            <Dialog open={canEdit && adding} onOpenChange={(open) => !pending && setAdding(open)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t("annotations.addTitle")}</DialogTitle>
+                        <DialogDescription>{t("annotations.addDescription")}</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="flex min-w-0 flex-col gap-3"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            add();
+                        }}
+                    >
+                        <Input
+                            type="datetime-local"
+                            value={when}
+                            aria-label={t("annotations.when")}
+                            onChange={(event) => setWhen(event.target.value)}
+                        />
+                        <Input
+                            value={text}
+                            maxLength={200}
+                            autoFocus
+                            aria-label={t("annotations.text")}
+                            placeholder={t("annotations.placeholder")}
+                            onChange={(event) => setText(event.target.value)}
+                        />
+                        {failure ? <p className="text-xs text-danger">{failure}</p> : null}
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" disabled={pending} onClick={() => setAdding(false)}>
+                                {t("annotations.cancel")}
+                            </Button>
+                            <Button type="submit" aria-disabled={!ready} disabled={pending} aria-busy={pending}>
+                                {t("annotations.add")}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+            {failure && !adding ? <p className="text-xs text-danger">{failure}</p> : null}
         </div>
     );
 }

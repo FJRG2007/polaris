@@ -313,7 +313,9 @@
         "renameNamed": "Renombrar {name}",
         "enrollFirst": "Registra un servidor para poder añadirlo aquí.",
         "kind": "grupo de servidores",
-        "deleteBody": "Los servidores se quedan. Las reglas de cortafuegos escritas para este grupo se eliminan con él."
+        "deleteBody": "Los servidores se quedan. Las reglas de cortafuegos escritas para este grupo se eliminan con él.",
+        "newTitle": "Nuevo grupo",
+        "nameLabel": "Nombre"
     },
     "usage": {
         "offMaybe": "Puede que esté apagado o inaccesible.",

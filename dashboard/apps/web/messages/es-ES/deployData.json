@@ -278,7 +278,10 @@
                 "owner": "Total",
                 "readwrite": "Leer y escribir",
                 "readonly": "Solo lectura"
-            }
+            },
+            "addUser": "Nueva cuenta",
+            "addTitle": "Nueva cuenta de base de datos",
+            "cancel": "Cancelar"
         },
         "processes": {
             "title": "Conexiones abiertas",

@@ -669,7 +669,9 @@
         "deleteTitle": "Remove this note?",
         "invalid": "Write a note of up to 200 characters and pick when it happened.",
         "tooMany": "This site already has 500 notes. Remove an old one first.",
-        "gone": "That note was already removed."
+        "gone": "That note was already removed.",
+        "addTitle": "Add a note to the chart",
+        "addDescription": "It shows on the chart at the moment you pick."
     },
     "rejections": {
         "title": "Not recorded",
