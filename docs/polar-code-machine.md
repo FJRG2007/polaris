@@ -183,7 +183,7 @@ inbox that steers by default, queues on Mod+Enter (`packages/core/src/session/in
 | Behaviour | Claude Code | Codex | Polaris |
 | --- | --- | --- | --- |
 | Message mid-turn goes into the running turn | yes | yes (`turn/steer`) | yes in Chat, when the agent advertises steering (Claude Code adapter, Codex app-server); a runner turn (`claude -p`) and agents without it queue |
-| Waiting list: send now / edit / delete / reorder | yes | partial | yes, in one "..." menu per row (`QueueItem`, shared by Chat and Code); the row shows the message as typed, line breaks kept, and saving unchanged words is no change |
+| Waiting list: send now / edit / delete / reorder | yes | partial | yes on every row (`QueueItem`, shared by Chat and Code): Send now, Edit and Remove as buttons, reordering in a "..." menu; the row shows the message as typed, line breaks kept, and saving unchanged words is no change |
 | Stop and send what is waiting, or stop and send nothing | Esc | Esc | composer Stop, Esc for whoever manages the session, "Stop, send nothing" |
 | Stop reaches the turn wherever it runs | - | - | Chat cancel, runner, Ctrl+C; says so when nothing stopped |
 | Slash commands handed to the CLI actually run | yes | TUI only | terminal: yes; Chat: only where the protocol runs them (`runsInChat`), otherwise it says to use the Terminal view |
@@ -193,6 +193,10 @@ inbox that steers by default, queues on Mod+Enter (`packages/core/src/session/in
 | Approval or question waiting is not the agent's prompt | - | - | `isSessionListening` is `idle` only; `waiting` is `isSessionAsking`, so a message there is routed through the denial instead of landing in the prompt |
 | A message with files at an approval | - | - | denied without a reason, then the message goes with its files, since a reason holds only words |
 | Chat queue keeps the message whole | yes | yes | yes: context, files and the chosen model wait with the words, and a full queue says so and keeps the box |
+| A turn the agent starts on its own ends | yes | yes | yes: in Chat, activity with no prompt open (a background task finishing, a scheduled wake-up) is followed as a cycle that ends after a quiet spell, so the session leaves "working" and the waiting list is sent (`afterTurnEnd`, also on Codex `turn/completed`) |
+| Stop when the agent does not answer it | Esc, then Ctrl+C | Esc | Stop says "Stopping..." and the session leaves working at once; `session/cancel` first, then INT and TERM to the agent's processes every 3 s (`acpSignalCommand`), then the connection is closed |
+| The agent's process ends mid-turn | the CLI exits | the TUI exits | the turn fails with "The agent's process ended"; the next message starts it again and loads the session |
+| AskUserQuestion in Chat | yes, with option previews | - | yes: the ACP adapter's form request (`elicitation/create`) opens the same question card as the terminal, with each option's preview; one question takes a typed message as its "Other" answer |
 
 Not exercised against a real CLI in a container (no Docker on the development
 machine): the steering calls are checked against the adapter's recorded
