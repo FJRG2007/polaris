@@ -45,6 +45,10 @@
             "types": "./dist/platform-store.d.ts",
             "import": "./dist/platform-store.js"
         },
+        "./key-log": {
+            "types": "./dist/key-log.d.ts",
+            "import": "./dist/key-log.js"
+        },
         "./safety-number": {
             "types": "./dist/safety-number.d.ts",
             "import": "./dist/safety-number.js"
@@ -55,7 +59,7 @@
         }
     },
     "scripts": {
-        "build": "tsup src/account-key.ts src/locks.ts src/device-lock.ts src/password-lock.ts src/passkey-lock.ts src/hybrid-envelope.ts src/message-content.ts src/file-content.ts src/opaque-server.ts src/qr-approval.ts src/platform-store.ts src/safety-number.ts --format esm --dts --clean",
+        "build": "tsup src/account-key.ts src/locks.ts src/device-lock.ts src/password-lock.ts src/passkey-lock.ts src/hybrid-envelope.ts src/message-content.ts src/file-content.ts src/opaque-server.ts src/qr-approval.ts src/platform-store.ts src/safety-number.ts src/key-log.ts --format esm --dts --clean",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
