@@ -136,6 +136,7 @@ import * as chatCache from "@/lib/chat/offline/chat-cache";
 import * as outbox from "./outbox";
 import * as readMarks from "@/lib/chat/read-marks";
 import { prefetchMedia } from "./media-download";
+import { OutdatedAppGate } from "./outdated-app-gate";
 import { isChatChange, newClientKey, withChanges, withReaction, type ChatQueued, type OutboxEntry } from "@/lib/chat/offline/outbox";
 import { mayStartThread } from "@/lib/chat/thread-rules";
 
@@ -2879,7 +2880,7 @@ export function ChannelView({
                     </Button>
                 </div>
             ) : (
-                <>
+                <OutdatedAppGate>
                     {/* Above the box rather than in the room: what is waiting is
                         not a message yet, and the only person it concerns is the
                         one who wrote it. Nothing at all when nothing is. */}
@@ -3071,7 +3072,7 @@ export function ChannelView({
                             }}
                         />
                     ) : null}
-                </>
+                </OutdatedAppGate>
             )}
         </HideMessage.Provider>
     );

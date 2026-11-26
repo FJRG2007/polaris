@@ -839,6 +839,8 @@
         "newMessages": "{count, plural, one {1 mensaje nuevo} other {{count} mensajes nuevos}}",
         "opening": "Abriendo tu conversación con {name}",
         "youBlocked": "Has bloqueado a {name}. No puede contactarte y tú no puedes escribirle.",
+        "updateAppToChat": "Esta versión de la app de Polaris ya no puede enviar ni leer mensajes cifrados. Actualízala para seguir chateando.",
+        "updateApp": "Actualizar",
         "messagePlaceholder": "Escribe a {name}",
         "leaveAndJoin": "¿Salir de tu llamada y entrar en {name}?",
         "roomCount": "{count, plural, =0 { - no hay nadie} one { - hay una persona} other { - hay {count} personas}}",
