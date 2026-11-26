@@ -11,6 +11,7 @@
  */
 
 import { prisma, Prisma } from "@polaris/db";
+import * as keyLog from "./key-log";
 
 export const PASSWORD_LOCK_ID = "password";
 
@@ -61,6 +62,10 @@ export async function createAccountKey(
                 signPublicKey: Buffer.from(input.signPublicKey),
                 hpkePublicKey: Buffer.from(input.hpkePublicKey)
             }
+        });
+        // Into the key log at once; a failure here is repaired by the first proof anybody asks for.
+        await keyLog.appendEntry({ userId, ...input }).catch((caught: unknown) => {
+            console.error("polaris: an account key could not be appended to the key log:", caught);
         });
         return true;
     } catch (caught) {

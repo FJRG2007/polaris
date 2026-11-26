@@ -19326,6 +19326,32 @@ model ChatAccountKeyLock {
     @@unique([userId, kind, lockId])
 }
 
+// The account key log (design 4.6): every account key version the server has
+// published, as the leaves of an append-only RFC 6962 Merkle tree. Never
+// updated or deleted - not even with the account, since removing a leaf would
+// change every root a browser has already seen. `index` is the leaf's position.
+model ChatKeyLogEntry {
+    index         Int      @id
+    userId        String   @db.Uuid
+    akVersion     Int
+    signPublicKey Bytes
+    hpkePublicKey Bytes
+    createdAt     DateTime @default(now())
+
+    @@unique([userId, akVersion])
+}
+
+// The hash of each complete subtree of the key log: level 0 the leaves, level l
+// the subtree of 2^l leaves at position index. Every root and proof is built
+// from O(log n) of these, so nothing reads the whole log.
+model ChatKeyLogNode {
+    level Int
+    index Int
+    hash  Bytes
+
+    @@id([level, index])
+}
+
 // An account's OPAQUE (RFC 9807) registration record. Used to sign in only once
 // verifiedAt is set and passwordTag still matches the account's current password
 // hash, so any password change - reset, admin reset, recovery - retires the

@@ -34,7 +34,6 @@ export interface EdgeSigningKey {
     readonly publicKey: string;
 }
 
-let cached: Promise<EdgeSigningKey> | null = null;
 
 /** Sealed with the master key, as every other stored credential is. The same envelope
  *  the managed certificates use, written here rather than imported so the deploy path
@@ -79,8 +78,8 @@ function readKey(raw: string | null): EdgeSigningKey | null {
     }
 }
 
-async function loadOrCreate(): Promise<EdgeSigningKey> {
-    const raw = await getSetting(KEY_SETTING);
+async function loadOrCreate(setting: string): Promise<EdgeSigningKey> {
+    const raw = await getSetting(setting);
     const existing = readKey(raw);
     if (existing) return existing;
     // Missing, or unreadable (a master key that changed): make a new pair. Tokens signed
@@ -89,30 +88,41 @@ async function loadOrCreate(): Promise<EdgeSigningKey> {
     const value = seal(privateKey.export({ format: "pem", type: "pkcs8" }).toString());
     if (raw === null) {
         await prisma.setting.createMany({
-            data: [{ key: KEY_SETTING, value, scope: "global" }],
+            data: [{ key: setting, value, scope: "global" }],
             skipDuplicates: true
         });
     } else {
         await prisma.setting.updateMany({
-            where: { key: KEY_SETTING, value: raw },
+            where: { key: setting, value: raw },
             data: { value }
         });
     }
     // Read back by a fresh query, never one another caller started before this write.
     forgetSettingReads();
-    const settled = readKey(await getSetting(KEY_SETTING));
-    if (!settled) throw new Error("The edge signing key could not be stored");
+    const settled = readKey(await getSetting(setting));
+    if (!settled) throw new Error(`The signing key ${setting} could not be stored`);
     return settled;
 }
 
-/** The signing key, made on first use. */
-export function edgeSigningKey(): Promise<EdgeSigningKey> {
-    cached ??= loadOrCreate().catch((error: unknown) => {
-        cached = null;
-        throw error;
-    });
-    return cached;
+/**
+ * An Ed25519 key kept the way this file keeps the edge's - sealed in `setting`,
+ * made on first use, cached per process - for anything else Polaris signs with
+ * and has to keep across restarts with no `.env` key (the chat key log's tree
+ * heads). One getter per setting.
+ */
+export function storedSigningKey(setting: string): () => Promise<EdgeSigningKey> {
+    let cached: Promise<EdgeSigningKey> | null = null;
+    return () => {
+        cached ??= loadOrCreate(setting).catch((error: unknown) => {
+            cached = null;
+            throw error;
+        });
+        return cached;
+    };
 }
+
+/** The signing key, made on first use. */
+export const edgeSigningKey: () => Promise<EdgeSigningKey> = storedSigningKey(KEY_SETTING);
 
 /** The public keys a login-protected route trusts, current first. Empty when the key
  *  cannot be read, which leaves routes on the HMAC token they always used. */
