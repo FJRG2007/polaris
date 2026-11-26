@@ -10,6 +10,11 @@
  * launched the way its store launches it: a fixed URI scheme with ids that were
  * checked here, or, for GOG, the primary executable its own `goggame-*.info`
  * names inside the game's folder. Nothing is ever run through a shell.
+ *
+ * A game its store is updating stays listed, marked `updating`: its old build
+ * is still on disk and the store's own link finishes the update before it
+ * starts. Only a first install that never completed is left out. GOG and
+ * Ubisoft keep a game's registry entry through an update, so they never hid one.
  */
 
 import { z } from "zod";
@@ -47,6 +52,8 @@ export interface StoreApp {
     /** The store's own id for the game (`steam:252950`, `epic:<namespace>:<catalog item>`),
      *  reported beside a running game so the dashboard can find the store's art. */
     readonly store?: string;
+    /** Its store is updating it: still listed and opened as usual, the store finishing the update first. */
+    readonly updating?: true;
 }
 
 /** The largest store file read: a manifest is a few KB, a library list a few more. */
@@ -286,7 +293,7 @@ export async function epicGames(programData: string): Promise<StoreApp[]> {
     const out: StoreApp[] = [];
     for (const name of names) {
         const manifest = await readJson(join(dir, name), epicManifestSchema);
-        if (!manifest || manifest.bIsIncompleteInstall) continue;
+        if (!manifest) continue;
         const categories = manifest.AppCategories ?? [];
         if (categories.includes("addons") && !categories.includes("addons/launchable")) continue;
         if (categories.some((category) => category === "plugins" || category === "plugins/engine")) continue;
@@ -295,6 +302,9 @@ export async function epicGames(programData: string): Promise<StoreApp[]> {
         if (manifest.bIsApplication === false) continue;
         if (!(await exists(manifest.InstallLocation))) continue;
         const exe = manifest.LaunchExecutable && /\.exe$/i.test(manifest.LaunchExecutable) ? inside(manifest.InstallLocation, manifest.LaunchExecutable) : null;
+        // Epic marks a game incomplete for the whole of an update as well as
+        // a first install: one whose executable is already there is installed.
+        if (manifest.bIsIncompleteInstall && !(exe && (await exists(exe)))) continue;
         const uri = `com.epicgames.launcher://apps/${manifest.CatalogNamespace}%3A${manifest.CatalogItemId}%3A${manifest.AppName}?action=launch&silent=true`;
         out.push({
             label: manifest.DisplayName ?? basename(manifest.InstallLocation),
@@ -302,6 +312,7 @@ export async function epicGames(programData: string): Promise<StoreApp[]> {
             launch: { kind: "uri", uri },
             store: `epic:${manifest.CatalogNamespace}:${manifest.CatalogItemId}`,
             ...(exe ? { icon: exe } : {}),
+            ...(manifest.bIsIncompleteInstall ? { updating: true as const } : {}),
             // An engine (`UE_5.3`) is not a game somebody is playing.
             ...(/^UE_/i.test(manifest.AppName) ? {} : { folder: manifest.InstallLocation })
         });
@@ -313,6 +324,17 @@ export async function epicGames(programData: string): Promise<StoreApp[]> {
 
 /** Steam's own tools, which its library lists beside the games. */
 const STEAM_TOOLS = new Set(["228980", "1070560", "1391110", "1628350", "1493710", "2180100"]);
+
+/** `StateFlags` bits of a Steam app manifest (Steamworks `EAppState`). */
+const STEAM_FULLY_INSTALLED = 4;
+/** Update running, paused or started. */
+const STEAM_UPDATING = 256 | 512 | 1024;
+const STEAM_UNINSTALLING = 2048;
+
+/** Whether a folder holds anything at all: a build already installed in it. */
+async function hasFiles(dir: string): Promise<boolean> {
+    return (await readdir(dir).catch(() => [] as string[])).length > 0;
+}
 
 async function steamRoots(programFilesX86: string | undefined): Promise<string[]> {
     const roots: string[] = [];
@@ -326,8 +348,10 @@ async function steamRoots(programFilesX86: string | undefined): Promise<string[]
 /**
  * Steam's installed games: every library folder `steamapps\libraryfolders.vdf`
  * lists, and an `appmanifest_<id>.acf` per game in each, launched with
- * `steam://rungameid/<id>` (Playnite's `SteamLibrary`). A game still
- * downloading is left out until its manifest says it is fully installed, and a
+ * `steam://rungameid/<id>` (Playnite's `SteamLibrary`). A first download is
+ * left out until its manifest says it is fully installed; a game being updated
+ * - no longer flagged fully installed, but with a build already installed in
+ * its folder - stays listed as `updating`. A
  * soundtrack - installed under `steamapps\music` rather than `common` - is
  * music that belongs to a game, not a program.
  */
@@ -355,13 +379,16 @@ export async function steamGames(programFilesX86: string | undefined): Promise<S
                 const title = label.safeParse(vdfGet(state, "name"));
                 const flags = Number(vdfGet(state, "StateFlags"));
                 if (typeof id !== "string" || !/^\d{1,10}$/.test(id) || !title.success || STEAM_TOOLS.has(id) || seen.has(id)) continue;
-                if (!Number.isFinite(flags) || (flags & 4) === 0) continue;
+                if (!Number.isFinite(flags) || (flags & STEAM_UNINSTALLING) !== 0) continue;
                 if (/^(Steamworks|Steam Linux Runtime|Proton )/i.test(title.data)) continue;
-                seen.add(id);
-                const icon = join(root, "appcache", "librarycache", `${id}_icon.jpg`);
                 const installdir = vdfGet(state, "installdir");
                 const home = typeof installdir === "string" ? inside(join(apps, "common"), installdir) : null;
                 const music = typeof installdir === "string" ? inside(join(apps, "music"), installdir) : null;
+                const installed = (flags & STEAM_FULLY_INSTALLED) !== 0;
+                if (!installed && !(Number(vdfGet(state, "buildid")) > 0 && home && (await hasFiles(home)))) continue;
+                const updating = !installed || (flags & STEAM_UPDATING) !== 0;
+                seen.add(id);
+                const icon = join(root, "appcache", "librarycache", `${id}_icon.jpg`);
                 if (music && !(home && (await exists(home))) && (await exists(music))) continue;
                 out.push({
                     label: title.data,
@@ -369,7 +396,8 @@ export async function steamGames(programFilesX86: string | undefined): Promise<S
                     launch: { kind: "uri", uri: `steam://rungameid/${id}` },
                     store: `steam:${id}`,
                     ...((await exists(icon)) ? { icon } : {}),
-                    ...(home ? { folder: home } : {})
+                    ...(home ? { folder: home } : {}),
+                    ...(updating ? { updating: true as const } : {})
                 });
             }
         }

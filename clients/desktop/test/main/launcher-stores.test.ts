@@ -37,6 +37,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 const stores = await import("../../src/main/launcher-stores");
+const { rankedMatches } = await import("../../src/shared/launcher");
 
 const { join } = win32;
 const base = "C:\\fixture";
@@ -143,6 +144,55 @@ describe("Epic Games", () => {
         expect((await stores.epicGames(base)).map((game) => game.label)).toEqual(["Fortnite"]);
     });
 
+    it("ranks Fortnite first for \"fortnite\" and \"fort\", ahead of other installed games that share the letters", async () => {
+        const other = (name: string) => join(base, "Games", name);
+        dir(fortnite);
+        for (const name of ["FortSolis", "ComfortZone", "RocketLeague"]) dir(other(name));
+        // The other games come first on disk, so listing order cannot be what puts Fortnite on top.
+        dir(manifests, ["1.item", "2.item", "3.item", "4.item", "5.item"]);
+        file(join(manifests, "1.item"), JSON.stringify({ DisplayName: "Fort Solis", AppName: "FortSolis", CatalogNamespace: "fs", CatalogItemId: "i1", InstallLocation: other("FortSolis"), AppCategories: ["games"] }));
+        file(join(manifests, "2.item"), JSON.stringify({ DisplayName: "Comfort Zone", AppName: "ComfortZone", CatalogNamespace: "cz", CatalogItemId: "i2", InstallLocation: other("ComfortZone"), AppCategories: ["games"] }));
+        file(join(manifests, "3.item"), JSON.stringify({ DisplayName: "Rocket League", AppName: "Sugar", CatalogNamespace: "rl", CatalogItemId: "i3", InstallLocation: other("RocketLeague"), AppCategories: ["games"] }));
+        file(join(manifests, "4.item"), JSON.stringify({
+            DisplayName: "Fortnite Save the World Content", AppName: "aa31f9e94e844b299ca757d1d0b97a09", CatalogNamespace: "fn",
+            CatalogItemId: "0b41f0192f7f4f2691684581aedc0778", InstallLocation: fortnite, AppCategories: ["hidden"],
+            MainGameAppName: "Fortnite", bIsApplication: false
+        }));
+        // Fortnite as it was when it went missing: Epic updating it.
+        file(join(manifests, "5.item"), JSON.stringify({
+            DisplayName: "Fortnite", AppName: "Fortnite", CatalogNamespace: "fn", CatalogItemId: "4fe75bbc5a674f4f9b356b5c90567da5",
+            InstallLocation: fortnite, LaunchExecutable: "FortniteGame/Binaries/Win64/FortniteLauncher.exe",
+            AppCategories: ["public", "games", "applications"], MainGameAppName: "", bIsApplication: true, bIsIncompleteInstall: true
+        }));
+        file(join(fortnite, "FortniteGame", "Binaries", "Win64", "FortniteLauncher.exe"), "exe");
+        const games = (await stores.epicGames(base)).map((game) => ({ ...game, context: "" }));
+        expect(games.map((game) => game.label)).toEqual(["Fort Solis", "Comfort Zone", "Rocket League", "Fortnite"]);
+        for (const query of ["fortnite", "fort", "Fortnite", "FORT"]) {
+            const [first] = rankedMatches(query, games, 8, (game) => `app:${game.path}`, new Map());
+            expect(first?.path, query).toBe("epic:Fortnite");
+        }
+    });
+
+    it("keeps a game listed while Epic updates it, and hides a first install that never finished", async () => {
+        const fresh = join(base, "Games", "NewGame");
+        dir(fortnite);
+        dir(fresh);
+        dir(manifests, ["A.item", "B.item"]);
+        // Epic sets the same flag for an update and a first install; only the update has its executable on disk.
+        file(join(manifests, "A.item"), JSON.stringify({
+            DisplayName: "Fortnite", AppName: "Fortnite", CatalogNamespace: "fn", CatalogItemId: "4fe75bbc5a674f4f9b356b5c90567da5",
+            InstallLocation: fortnite, LaunchExecutable: "FortniteGame/Binaries/Win64/FortniteLauncher.exe", bIsIncompleteInstall: true
+        }));
+        file(join(fortnite, "FortniteGame", "Binaries", "Win64", "FortniteLauncher.exe"), "exe");
+        file(join(manifests, "B.item"), JSON.stringify({
+            DisplayName: "New Game", AppName: "NewGame", CatalogNamespace: "ng", CatalogItemId: "i", InstallLocation: fresh,
+            LaunchExecutable: "Binaries/NewGame.exe", bIsIncompleteInstall: true
+        }));
+        const games = await stores.epicGames(base);
+        expect(games.map((game) => [game.label, game.updating])).toEqual([["Fortnite", true]]);
+        expect(games[0]?.launch).toEqual({ kind: "uri", uri: "com.epicgames.launcher://apps/fn%3A4fe75bbc5a674f4f9b356b5c90567da5%3AFortnite?action=launch&silent=true" });
+    });
+
     it("gives no folder to an engine, so running it is never a game", async () => {
         const engine = join(base, "Epic Games", "UE_5.3");
         dir(engine);
@@ -202,6 +252,30 @@ describe("Steam", () => {
         expect((await stores.steamGames(undefined)).map((game) => game.label)).toEqual(["Hades II"]);
     });
 
+    it("keeps a game listed while Steam updates it, and hides a first download", async () => {
+        commands.set("reg.exe query HKCU\\Software\\Valve\\Steam /v SteamPath", `\r\nHKEY_CURRENT_USER\\Software\\Valve\\Steam\r\n    SteamPath    REG_SZ    ${steam}\r\n\r\n`);
+        const acf = (id: string, name: string, flags: number, buildid: string) =>
+            `"AppState"\n{\n\t"appid"\t\t"${id}"\n\t"name"\t\t"${name}"\n\t"StateFlags"\t\t"${flags}"\n\t"installdir"\t\t"${name}"\n\t"buildid"\t\t"${buildid}"\n}\n`;
+        dir(join(steam, "steamapps"), ["appmanifest_1.acf", "appmanifest_2.acf", "appmanifest_3.acf", "appmanifest_4.acf", "appmanifest_5.acf"]);
+        // Update downloading: no longer fully installed, the old build still in its folder.
+        file(join(steam, "steamapps", "appmanifest_1.acf"), acf("1", "Updating", 1026, "15821234"));
+        dir(join(steam, "steamapps", "common", "Updating"), ["Updating.exe"]);
+        // Fully installed with an update running.
+        file(join(steam, "steamapps", "appmanifest_2.acf"), acf("2", "Patching", 4 | 256, "900"));
+        dir(join(steam, "steamapps", "common", "Patching"), ["Patching.exe"]);
+        // First download: no build installed yet, even with files already preallocated.
+        file(join(steam, "steamapps", "appmanifest_3.acf"), acf("3", "Downloading", 1026, "0"));
+        dir(join(steam, "steamapps", "common", "Downloading"), ["Downloading.exe"]);
+        // A build id but an empty folder: nothing to play.
+        file(join(steam, "steamapps", "appmanifest_4.acf"), acf("4", "Empty", 1026, "77"));
+        dir(join(steam, "steamapps", "common", "Empty"));
+        // Being uninstalled.
+        file(join(steam, "steamapps", "appmanifest_5.acf"), acf("5", "Leaving", 4 | 2048, "88"));
+        dir(join(steam, "steamapps", "common", "Leaving"), ["Leaving.exe"]);
+        const games = await stores.steamGames(undefined);
+        expect(games.map((game) => [game.label, game.updating])).toEqual([["Updating", true], ["Patching", true]]);
+        expect(games[0]?.launch).toEqual({ kind: "uri", uri: "steam://rungameid/1" });
+    });
     it("reads Valve's format strictly, and gives up on a broken file", () => {
         expect(stores.parseVdf(`"a" { "b" "c\\"d" }`)).toEqual({ a: { b: "c\"d" } });
         expect(stores.parseVdf(`"a" { "b" "c"`)).toBeNull();

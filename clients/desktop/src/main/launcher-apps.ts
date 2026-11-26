@@ -49,6 +49,8 @@ export interface InstalledApp {
     readonly aliases?: readonly string[];
     /** What a shortcut or entry starts, when known. */
     readonly target?: string;
+    /** Its store is updating it (`StoreApp.updating`). */
+    readonly updating?: boolean;
 }
 
 /** How long a listing is trusted before the next open reads it again. */
@@ -94,7 +96,8 @@ const indexSchema = z.object({
         icon: text(2000).optional(),
         folder: text(2000).optional(),
         aliases: z.array(text(300)).max(12).optional(),
-        target: text(2000).optional()
+        target: text(2000).optional(),
+        updating: z.boolean().optional()
     })).max(MAX_APPS),
     games: z.array(z.object({ name: text(300), folder: text(2000), store: text(300).optional() })).max(MAX_APPS)
 });

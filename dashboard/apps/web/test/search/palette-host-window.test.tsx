@@ -140,6 +140,10 @@ describe("the palette in the desktop's search window", () => {
     });
 
     it("paints an index it already has at once when stale, and asks again only after the panel is up", async () => {
+        // The index is kept for the whole page, so an earlier test may have left one:
+        // opening past its freshness window makes this one load it either way.
+        const now = Date.now();
+        const clock = vi.spyOn(Date, "now").mockReturnValue(now + 10 * 60_000);
         const { host, open } = fakeHost();
         render(<CommandPalette appIds={[]} host={host} />, { wrapper: MessagesWrapper });
         await focusedField();
@@ -149,8 +153,7 @@ describe("the palette in the desktop's search window", () => {
         await waitFor(() => expect(screen.queryByRole("combobox")).toBeNull());
 
         // Past the index's freshness window, as after a while idle.
-        const now = Date.now();
-        vi.spyOn(Date, "now").mockReturnValue(now + 10 * 60_000);
+        clock.mockReturnValue(now + 20 * 60_000);
         open();
         const field = await focusedField();
         fireEvent.change(field, { target: { value: "zephyr" } });

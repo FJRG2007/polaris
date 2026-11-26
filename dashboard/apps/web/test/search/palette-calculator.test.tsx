@@ -88,7 +88,7 @@ describe("the search panel's calculator", () => {
 
         const options = screen.getAllByRole("option");
         expect(options[0]?.getAttribute("aria-label")).toBe("Use 40. Ctrl+C or Cmd+C copies it.");
-        expect(screen.getByText("Enter or Tab to use the result")).toBeTruthy();
+        expect(screen.getByText("Use the result")).toBeTruthy();
     });
 
     it.each(["12*", "abc", "42", "/tasks", "@ana", "1/0", "1,000 + 1", "12,345"])(

@@ -249,7 +249,7 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     const pageKey = (page: { path: string; }) => `page:${page.path}`;
     const appKey = (app: { path: string; }) => `app:${app.path}`;
     const addApp = (app: ReturnType<typeof listedApps>[number]) => {
-        add({ kind: "app", title: app.label, subtitle: app.launch && app.launch.kind !== "open" ? appSource(app.path) : "Application" }, () => void openListedApp(app.path), appKey(app));
+        add({ kind: "app", title: app.label, subtitle: appSubtitle(app) }, () => void openListedApp(app.path), appKey(app));
         paths.set(String(rows.length - 1), app.icon ?? app.path);
     };
     const addPage = (page: { label: string; path: string; }) => add({ kind: "page", title: page.label, subtitle: "Open in Polaris" }, () => host?.showPolaris(page.path), pageKey(page));
@@ -385,6 +385,12 @@ async function upgradeOwnPanel(kept: BrowserWindow): Promise<void> {
 }
 
 /** What a store's row says under its name, from the `store:id` it is listed by. */
+/** Where a listed app comes from, and that its store is updating it. */
+function appSubtitle(app: { path: string; launch?: { kind: string; }; updating?: boolean; }): string {
+    const source = app.launch && app.launch.kind !== "open" ? appSource(app.path) : "Application";
+    return app.updating ? `${source} - updating` : source;
+}
+
 function appSource(path: string): string {
     const store = path.slice(0, path.indexOf(":"));
     return { packaged: "Application", epic: "Epic Games", steam: "Steam", gog: "GOG", ubisoft: "Ubisoft Connect" }[store] ?? "Application";
