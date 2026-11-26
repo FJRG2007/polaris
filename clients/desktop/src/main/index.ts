@@ -58,7 +58,7 @@ import { restoredPlace } from "@/shared/window-place";
 import * as settings from "./settings";
 import { cancelRelaunch, holdCall, loadRelaunch, markRelaunch, relaunched } from "./relaunch";
 import { savedServers, serverAddress, setSavedServers, setServerAddress } from "./settings";
-import { backIndex, isServerUrl, serverPath } from "./navigation";
+import { backIndex, isDashboardPage, serverPath } from "./navigation";
 import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, warmLocalSheet, type LocalSheet } from "./windows";
 import { app, autoUpdater, BrowserWindow, dialog, net, powerMonitor, screen, session, type WebContents } from "electron";
 import { describeNetError, describeOfflinePage, errorText, finishedLoad, isCertificateError, netErrorCode, RECONNECTS_WORDS } from "./reachability";
@@ -144,7 +144,7 @@ function frontPage(): number | null {
     const focused = BrowserWindow.getFocusedWindow();
     const window = focused && kindOf(focused.webContents) === "polaris" ? focused : main;
     const origin = server();
-    if (!window || window.isDestroyed() || !origin || !isServerUrl(window.webContents.getURL(), origin)) return null;
+    if (!window || window.isDestroyed() || !origin || !isDashboardPage(window.webContents.getURL(), origin)) return null;
     return window.webContents.id;
 }
 
@@ -153,7 +153,7 @@ const updates = new UpdateReadyState((state) => {
         const contents = window.webContents;
         if (contents.isDestroyed() || kindOf(contents) !== "polaris") continue;
         const origin = server();
-        if (origin && isServerUrl(contents.getURL(), origin)) contents.send(CHANNELS.updateReady, state);
+        if (origin && isDashboardPage(contents.getURL(), origin)) contents.send(CHANNELS.updateReady, state);
     }
 });
 
