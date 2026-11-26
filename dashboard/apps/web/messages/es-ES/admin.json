@@ -3566,7 +3566,7 @@
         },
         "recovery": {
             "title": "Sin acceso",
-            "hint": "Al aprobar, podrán elegir una contraseña nueva y se cerrarán todas las sesiones abiertas en la cuenta. Asegúrate de saber quién lo pide.",
+            "hint": "Al aprobar, podrán elegir una contraseña nueva y se cerrarán todas las sesiones abiertas en la cuenta. Durante 7 días podrán pedir a sus administradores que recuperen sus chats cifrados. Asegúrate de saber quién lo pide.",
             "verified": "respondió a sus preguntas",
             "unverified": "nada verificado",
             "asked": "Pedido el {asked} - caduca el {expires}",

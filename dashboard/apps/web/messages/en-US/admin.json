@@ -3566,7 +3566,7 @@
         },
         "recovery": {
             "title": "Locked out",
-            "hint": "Approving lets them set a new password themselves and signs out everything already on the account. Make sure you know who is asking.",
+            "hint": "Approving lets them set a new password themselves and signs out everything already on the account. For 7 days they can also ask their administrators to recover their encrypted chats. Make sure you know who is asking.",
             "verified": "answered their questions",
             "unverified": "nothing verified",
             "asked": "Asked {asked} - expires {expires}",
