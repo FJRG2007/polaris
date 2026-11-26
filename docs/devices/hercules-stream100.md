@@ -29,6 +29,7 @@ exists. No source code was copied from either.
 | Byte | Meaning |
 | --- | --- |
 | 1 | buttons. Knob presses: knob 1 `0x08`, knob 2 `0x01`, knob 3 `0x04`, knob 4 `0x02`. Lit buttons 1-4: `0x10`, `0x20`, `0x40`, `0x80` |
+| 2 | bit 0: the power button (New-Hera-lunx, `docs/protocol/inputs.md`) |
 | 3-10 | four signed 16-bit little-endian encoder positions, knob 1 to 4 |
 
 Encoder positions are absolute and wrap at 16 bits; only the difference between
@@ -121,7 +122,7 @@ Polaris checks which service is bound to the device and whether
 | State | What Polaris does |
 | --- | --- |
 | Hercules driver, Stream Control running | says so, and asks to close Stream Control. It never closes it itself |
-| Hercules driver, Stream Control closed | can drive the device through the installed Hercules SDK (loaded from its install folder, never redistributed), as the Wave Link bridge does |
+| Hercules driver, Stream Control closed | reads the knobs and buttons through the installed Hercules SDK (loaded from its install folder, never redistributed). If that fails, it says so and offers no driver change |
 | Windows' own drivers or WinUSB | opens the device directly |
 | anything else | names the driver and does nothing |
 
@@ -300,4 +301,34 @@ interface `{abee8c27-397b-409d-b6dc-6161ca409d8d}`, sends `DeviceIoControl`
 `0x001E200C`, `0x001E2008`, `0x001E2010` (4-byte answers), `0x001E2024` and
 `0x001E2034` (4 zero bytes in), then polls `0x001E2000` for a 64-byte input
 packet every few milliseconds. The display goes through `hsm_api_core_x64.dll`
-from `<Program Files>\Hercules\HSM Series\sdk`. Polaris does not do this yet.
+from `<Program Files>\Hercules\HSM Series\sdk`.
+
+### Input through the Hercules SDK
+
+What Polaris does (`crates/polaris-stream100/src/native/sdk.rs`, layouts in
+`src/sdk.rs`), only when Windows has no HID collection for the device and
+Stream Control is not running:
+
+1. Loads `tlusbapi_x64.dll`, then `hsm_api_core_x64.dll`, by full path from
+   `<Program Files>\Hercules\HSM Series\sdk`, each only after its
+   Authenticode signature is valid and signed by Guillemot (the file is held
+   open against writes from the check to the load).
+2. Binds eight exports: `HSM_Get_SDK_Version`, `HSM_Init`, `HSM_Exit`,
+   `HSM_IsDeviceChanged`, `HSM_GetDeviceCount`, `HSM_GetDeviceInfo` (a 0x640
+   structure whose first field is its size; VID at 0x20C, PID at 0x20E),
+   `HSM_OpenDevice(index, int* handle, callback, user)`, `HSM_CloseDevice`.
+   Nothing that sets the screen, the LEDs or the firmware.
+3. `HSM_Init`, then polls `HSM_IsDeviceChanged` and the count every 100 ms for
+   up to 3 s, opens the Stream 100's index, and lets the SDK's own thread keep
+   the session alive (its 500 ms keep-alive).
+4. The callback `int cb(int handle, const HSM_INPUT*, void* user)` hands over a
+   0x60-byte state: `+0x00` u32 time, `+0x04` u32 buttons, `+0x0C` four i16
+   encoders, `+0x1C`/`+0x3C` VU floats, `+0x5C` screen state. Button bits
+   (New-Hera-lunx, not yet confirmed through the SDK here): knob presses
+   0x01-0x08, lit buttons 0x10-0x80, power 0x100. Each is moved to the HID
+   layout's bit, so both routes share one decoder, its 16-bit wrap and the
+   press-jitter filter (a press nudges its encoder by 1-4 counts).
+5. The SDK calls back only on a change, so the first state is preceded by a
+   baseline with nothing held.
+
+Not exercised against a device from the development machine.

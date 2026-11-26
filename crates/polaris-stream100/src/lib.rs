@@ -16,6 +16,7 @@
 //! - [`ownership`]: who holds the device on this machine, and what to offer.
 //! - [`settings`]: stored values, defaults, and the declarative settings schema.
 //! - [`addon`]: the same settings as the add-on page's flat fields.
+//! - [`sdk`]: the Hercules SDK's input state, as the same reports.
 //! - [`engine`]: reports in, volume changes and Polaris actions out.
 //!
 //! Everything above is pure. The USB transport is behind the `usb` feature;
@@ -30,6 +31,7 @@ pub mod engine;
 pub mod manifest;
 pub mod ownership;
 pub mod report;
+pub mod sdk;
 pub mod settings;
 
 #[cfg(feature = "native")]

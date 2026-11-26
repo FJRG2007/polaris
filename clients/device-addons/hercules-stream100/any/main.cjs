@@ -31,12 +31,13 @@ function describe(error, ownership) {
     const held = ownership?.ownership;
     if (!held || held.state === "absent") return { state: "sleeping", code: "unplugged", detail: "Not plugged in." };
     if (held.state === "herculesBusy") {
-        return { state: "busy", code: "herculesApp", detail: "Hercules Stream Control is running the Stream 100, so its knobs follow that app for now." };
+        return { state: "busy", code: "herculesApp", detail: "Close Hercules Stream Control to use the Stream 100 here. While it runs, it has the controller." };
     }
-    // Closing Stream Control does not free the device: the Hercules driver stays
-    // bound to all of it, and Polaris does not read through that driver yet.
+    // Stream Control is closed and the Hercules driver is bound, yet the native
+    // module could not read through the Hercules SDK either (missing, refused,
+    // or the device did not answer it).
     if (held.state === "herculesSdk") {
-        return { state: "busy", code: "herculesDriver", detail: "Polaris can't use the Stream 100 yet: the Hercules software has it. Until then, use Hercules Stream Control." };
+        return { state: "busy", code: "herculesDriver", detail: "Polaris could not read the Stream 100 through the Hercules software. Plug it in again, or reinstall Hercules Stream Control." };
     }
     if (held.state === "unknown") return { state: "busy", detail: `Another driver holds the Stream 100 (${String(held.service).slice(0, 60)}).` };
     return { state: "error", code: "noControls", detail: "The Stream 100 is plugged in, but its controls were not found." };

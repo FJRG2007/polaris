@@ -64,7 +64,7 @@ describe("Hercules Stream 100 add-on", () => {
 
     it("says who holds the controller when it cannot be read", () => {
         expect(entry.describe("notFound", { ownership: { state: "absent" } }).state).toBe("sleeping");
-        expect(entry.describe("notFound", { ownership: { state: "herculesBusy" } }).detail).toMatch(/Stream Control is running/);
+        expect(entry.describe("notFound", { ownership: { state: "herculesBusy" } }).detail).toMatch(/Close Hercules Stream Control/);
         expect(entry.describe("notFound", { ownership: { state: "unknown", service: "Foo" } }).detail).toMatch(/Foo/);
         expect(entry.describe("busy", null).state).toBe("busy");
         expect(entry.describe("unsupported", null).state).toBe("error");
@@ -91,7 +91,7 @@ describe("Hercules Stream 100 add-on", () => {
 
         for (const message of sent) expect(addonMessageSchema.safeParse(message).success).toBe(true);
         expect(sent[0]).toEqual({ type: "ready" });
-        expect(sent).toContainEqual({ type: "status", state: "busy", code: "herculesDriver", detail: "Polaris can't use the Stream 100 yet: the Hercules software has it. Until then, use Hercules Stream Control." });
+        expect(sent).toContainEqual({ type: "status", state: "busy", code: "herculesDriver", detail: "Polaris could not read the Stream 100 through the Hercules software. Plug it in again, or reinstall Hercules Stream Control." });
         expect(sent).toContainEqual({ type: "status", state: "connected" });
         expect(fake.feed).toHaveBeenCalledWith(report, 1_000);
         const calls = sent.filter((message) => (message as { type: string; }).type === "call") as { id: number; params: unknown; }[];

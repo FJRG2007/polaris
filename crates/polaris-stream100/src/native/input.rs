@@ -4,12 +4,16 @@
 //! - **Windows**: the HID API. With Windows' own drivers bound, interface 0 is
 //!   a HID device that Windows' HID driver holds, so it is opened as a HID
 //!   collection (read access only, shared) rather than claimed over USB. With
-//!   the Hercules driver bound there is no HID collection at all and opening
-//!   answers [`TransportError::NotFound`]; [`crate::ownership`] says why.
+//!   the Hercules driver bound there is no HID collection at all; the input
+//!   is then read through the Hercules SDK ([`super::sdk`]), and when that is
+//!   not possible either, opening answers [`TransportError::NotFound`] and
+//!   [`crate::ownership`] says why.
 //! - **Linux**: the USB transport ([`crate::transport`]).
 //! - **macOS**: not yet; the HID manager route is not written.
 //!
 //! Nothing here writes to the device: no output or feature report is sent.
+//! (Through the SDK, the SDK's own thread keeps its session alive while the
+//! device is open; Polaris sets nothing on it.)
 
 use crate::report::Report;
 use crate::transport::TransportError;
@@ -18,7 +22,7 @@ use std::time::Duration;
 /// The controller's input, opened.
 pub struct Input {
     #[cfg(windows)]
-    inner: hid::HidInput,
+    inner: Windows,
     #[cfg(target_os = "linux")]
     inner: crate::transport::Input,
     #[cfg(not(any(windows, target_os = "linux")))]
@@ -29,7 +33,11 @@ impl Input {
     pub fn open() -> Result<Self, TransportError> {
         #[cfg(windows)]
         return Ok(Self {
-            inner: hid::HidInput::open()?,
+            inner: match hid::HidInput::open() {
+                Ok(input) => Windows::Hid(input),
+                Err(TransportError::NotFound) => Windows::Sdk(super::sdk::SdkInput::open()?),
+                Err(error) => return Err(error),
+            },
         });
         #[cfg(target_os = "linux")]
         return Ok(Self {
@@ -41,11 +49,23 @@ impl Input {
 
     /// Waits up to `timeout` for the next report; `Ok(None)` when none came.
     pub fn next(&mut self, timeout: Duration) -> Result<Option<Report>, TransportError> {
-        #[cfg(any(windows, target_os = "linux"))]
+        #[cfg(windows)]
+        return match &mut self.inner {
+            Windows::Hid(input) => input.next(timeout),
+            Windows::Sdk(input) => input.next(timeout),
+        };
+        #[cfg(target_os = "linux")]
         return self.inner.next(timeout);
         #[cfg(not(any(windows, target_os = "linux")))]
         match self.inner {}
     }
+}
+
+/// The two Windows routes: Windows' HID driver, or the Hercules SDK.
+#[cfg(windows)]
+enum Windows {
+    Hid(hid::HidInput),
+    Sdk(super::sdk::SdkInput),
 }
 
 #[cfg(windows)]

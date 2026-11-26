@@ -5,6 +5,7 @@
 //! | Byte | Meaning |
 //! | ---- | ------- |
 //! | 1    | button bitmask: four knob presses in the low nibble, the four lit buttons in the high one |
+//! | 2    | bit 0: the power button (CataclysmX/New-Hera-lunx, `docs/protocol/inputs.md`) |
 //! | 3-10 | four signed 16-bit encoder positions, knob 1 to 4 |
 //!
 //! Encoder positions are absolute and wrap at 16 bits; only the difference
@@ -18,7 +19,18 @@ pub const MIN_REPORT_LEN: usize = 11;
 pub const REPORT_LEN: usize = 64;
 
 const BUTTONS: usize = 1;
+const EXTRA: usize = 2;
 const ENCODERS: usize = 3;
+/// The power button's bit in byte 2.
+const POWER_BIT: u8 = 0x01;
+
+/// Pressing or releasing a knob nudges its encoder by a few counts
+/// (New-Hera-lunx measured 1-4). Movements this small, in the reports right
+/// after a knob's press changed, are that nudge and not a turn.
+pub const PRESS_JITTER_COUNTS: i32 = 4;
+/// How many reports after a press change the nudge is filtered for. Reports
+/// come every 3-16 ms, so this is well under a tenth of a second.
+pub const PRESS_JITTER_REPORTS: u8 = 3;
 
 /// Which bit of byte 1 each knob press uses, knob 1 first. The hardware's bit
 /// order does not follow the printed knob numbers; this is the order measured
@@ -56,6 +68,8 @@ impl KnobMap {
 pub struct Report {
     pub buttons: u8,
     pub positions: [i16; 4],
+    /// The power button is held.
+    pub power: bool,
 }
 
 /// A report as an operating system's HID API reads it, brought to the bytes
@@ -84,6 +98,7 @@ impl Report {
         Some(Self {
             buttons: bytes[BUTTONS],
             positions,
+            power: bytes[EXTRA] & POWER_BIT != 0,
         })
     }
 
@@ -93,6 +108,9 @@ impl Report {
     pub fn to_bytes(&self) -> [u8; MIN_REPORT_LEN] {
         let mut bytes = [0u8; MIN_REPORT_LEN];
         bytes[BUTTONS] = self.buttons;
+        if self.power {
+            bytes[EXTRA] = POWER_BIT;
+        }
         for (index, position) in self.positions.iter().enumerate() {
             let at = ENCODERS + index * 2;
             bytes[at..at + 2].copy_from_slice(&position.to_le_bytes());
@@ -123,6 +141,9 @@ pub enum Event {
         button: u8,
         pressed: bool,
     },
+    Power {
+        pressed: bool,
+    },
 }
 
 /// Turns consecutive reports into events. The first report only sets the
@@ -131,6 +152,8 @@ pub enum Event {
 pub struct Decoder {
     previous: Option<Report>,
     knobs: KnobMap,
+    /// Per knob: reports left in which a small movement is press jitter.
+    settling: [u8; 4],
 }
 
 impl Decoder {
@@ -143,6 +166,7 @@ impl Decoder {
         Self {
             previous: None,
             knobs,
+            settling: [0; 4],
         }
     }
 
@@ -151,6 +175,7 @@ impl Decoder {
     /// made meanwhile are never replayed.
     pub fn reset(&mut self) {
         self.previous = None;
+        self.settling = [0; 4];
     }
 
     pub fn feed(&mut self, report: Report) -> Vec<Event> {
@@ -158,16 +183,23 @@ impl Decoder {
             return Vec::new();
         };
         let mut events = Vec::new();
-        for knob in 0..4 {
+        let changed = report.buttons ^ previous.buttons;
+        for (knob, bit) in self.knobs.0.iter().enumerate() {
+            let settling = self.settling[knob];
+            self.settling[knob] = if changed & bit != 0 {
+                PRESS_JITTER_REPORTS
+            } else {
+                settling.saturating_sub(1)
+            };
             let counts = report.delta(&previous, knob);
-            if counts != 0 {
+            let jitter = self.settling[knob] > 0 && counts.abs() <= PRESS_JITTER_COUNTS;
+            if counts != 0 && !jitter {
                 events.push(Event::Turn {
                     knob: knob as u8,
                     counts,
                 });
             }
         }
-        let changed = report.buttons ^ previous.buttons;
         for (knob, bit) in self.knobs.0.iter().enumerate() {
             if changed & bit != 0 {
                 events.push(Event::KnobPress {
@@ -183,6 +215,11 @@ impl Decoder {
                     pressed: report.buttons & bit != 0,
                 });
             }
+        }
+        if report.power != previous.power {
+            events.push(Event::Power {
+                pressed: report.power,
+            });
         }
         events
     }

@@ -2591,8 +2591,8 @@
             "unsupported": "The Stream 100 cannot be read on this system yet.",
             "stopped": "The Stream 100 stopped answering. Trying again.",
             "unplugged": "Not plugged in.",
-            "herculesApp": "Hercules Stream Control is running the Stream 100, so its knobs follow that app for now.",
-            "herculesDriver": "Polaris can't use the Stream 100 yet: the Hercules software has it. Until then, use Hercules Stream Control.",
+            "herculesApp": "Close Hercules Stream Control to use the Stream 100 here. While it runs, it has the controller.",
+            "herculesDriver": "Polaris could not read the Stream 100 through the Hercules software. Plug it in again, or reinstall Hercules Stream Control.",
             "noControls": "The Stream 100 is plugged in, but its controls were not found."
         },
         "official": {

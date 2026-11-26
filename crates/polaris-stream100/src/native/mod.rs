@@ -14,6 +14,8 @@ pub mod input;
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(windows)]
+pub mod sdk;
+#[cfg(windows)]
 pub mod windows;
 
 /// This system's per-app volume, opened on the calling thread.

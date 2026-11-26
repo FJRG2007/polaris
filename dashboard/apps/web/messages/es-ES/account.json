@@ -2591,8 +2591,8 @@
             "unsupported": "El Stream 100 aún no se puede leer en este sistema.",
             "stopped": "El Stream 100 dejó de responder. Reintentando.",
             "unplugged": "No está conectado.",
-            "herculesApp": "Hercules Stream Control controla el Stream 100; sus ruedas siguen esa app por ahora.",
-            "herculesDriver": "Polaris aún no puede usar el Stream 100: lo tiene el software de Hercules. Mientras, usa Hercules Stream Control.",
+            "herculesApp": "Cierra Hercules Stream Control para usar el Stream 100 aquí. Mientras está abierto, tiene el control.",
+            "herculesDriver": "Polaris no pudo leer el Stream 100 con el software de Hercules. Vuelve a conectarlo o reinstala Hercules Stream Control.",
             "noControls": "El Stream 100 está conectado, pero no se encontraron sus controles."
         },
         "official": {

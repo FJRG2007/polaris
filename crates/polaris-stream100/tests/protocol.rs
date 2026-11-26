@@ -94,6 +94,65 @@ fn presses_follow_the_measured_bit_order() {
 }
 
 #[test]
+fn a_knob_press_does_not_nudge_its_encoder() {
+    let press = KnobMap::default().0[0];
+    let mut decoder = Decoder::default();
+    decoder.feed(report(0, [100, 100, 0, 0]));
+    // The press moves knob 1 by 3 counts: only the press comes out. Knob 2,
+    // not pressed, still turns by as little as that.
+    assert_eq!(
+        decoder.feed(report(press, [103, 102, 0, 0])),
+        vec![
+            Event::Turn { knob: 1, counts: 2 },
+            Event::KnobPress {
+                knob: 0,
+                pressed: true
+            }
+        ]
+    );
+    // The nudge can arrive in the next reports too.
+    assert!(decoder.feed(report(press, [99, 102, 0, 0])).is_empty());
+    // A real turn while held is not jitter.
+    assert_eq!(
+        decoder.feed(report(press, [130, 102, 0, 0])),
+        vec![Event::Turn {
+            knob: 0,
+            counts: 31
+        }]
+    );
+    // Past the window, a slow turn of one count is a turn again.
+    assert_eq!(
+        decoder.feed(report(press, [131, 102, 0, 0])),
+        vec![Event::Turn { knob: 0, counts: 1 }]
+    );
+    // The release filters again.
+    assert_eq!(
+        decoder.feed(report(0, [129, 102, 0, 0])),
+        vec![Event::KnobPress {
+            knob: 0,
+            pressed: false
+        }]
+    );
+}
+
+#[test]
+fn the_power_button_is_byte_2() {
+    let mut bytes = [0u8; 64];
+    bytes[2] = 0x01;
+    let held = Report::parse(&bytes).unwrap();
+    assert!(held.power);
+    assert_eq!(held.buttons, 0);
+    assert_eq!(Report::parse(&held.to_bytes()), Some(held));
+    let mut decoder = Decoder::default();
+    decoder.feed(report(0, [0; 4]));
+    assert_eq!(decoder.feed(held), vec![Event::Power { pressed: true }]);
+    assert_eq!(
+        decoder.feed(report(0, [0; 4])),
+        vec![Event::Power { pressed: false }]
+    );
+}
+
+#[test]
 fn a_bad_knob_map_falls_back_to_the_measured_one() {
     assert!(!KnobMap([0x01, 0x01, 0x04, 0x08]).is_valid());
     assert!(!KnobMap([0x10, 0x01, 0x04, 0x08]).is_valid());

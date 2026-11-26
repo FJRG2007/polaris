@@ -280,7 +280,7 @@ fn device_service() -> (bool, Option<String>) {
     }
 }
 
-fn stream_control_running() -> bool {
+pub(crate) fn stream_control_running() -> bool {
     let wanted = format!("{}.exe", STREAM_CONTROL_PROCESS).to_ascii_lowercase();
     unsafe {
         let Ok(snapshot) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else {
