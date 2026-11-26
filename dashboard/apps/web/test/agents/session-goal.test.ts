@@ -45,7 +45,7 @@ vi.mock("@/lib/polar/models", () => ({ resolvePolarModel: vi.fn() }));
 vi.mock("@/lib/polar/preferences", () => ({ polarPreferences: vi.fn() }));
 vi.mock("@/lib/polar/helper-model", () => ({ polarHelperModel: vi.fn() }));
 vi.mock("@/lib/polar/goal-service", () => ({ judgeGoalTranscript: vi.fn() }));
-vi.mock("@/lib/polar/automatic", () => ({ PLAIN_TURN: {} }));
+vi.mock("@/lib/polar/automatic", () => ({ PLAIN_TURN: {}, shareCooldownsWith: () => undefined }));
 vi.mock("@/lib/polar/shared", () => ({ automaticChoice: () => ({}) }));
 
 const { judgeSessionGoal, clearSessionGoal, setSessionGoal } = await import("@/lib/agents/session-goal");

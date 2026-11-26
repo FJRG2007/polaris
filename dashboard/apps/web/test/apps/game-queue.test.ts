@@ -72,6 +72,25 @@ describe("reading a stored payload back", () => {
         expect(parseQueuedPayload("pardon", "{}")).toEqual({ kind: "pardon" });
     });
 
+    it("keeps an item's data on a give or a take, and reads a row written before data existed", () => {
+        expect(
+            parseQueuedPayload("give", '{"item":"minecraft:diamond_sword","count":1,"data":"minecraft:damage=5"}')
+        ).toEqual({ kind: "give", item: "minecraft:diamond_sword", count: 1, data: "minecraft:damage=5" });
+        expect(parseQueuedPayload("clear", '{"item":"minecraft:diamond_sword","count":2,"data":"{Damage:5}"}')).toEqual({
+            kind: "clear",
+            item: "minecraft:diamond_sword",
+            count: 2,
+            data: "{Damage:5}"
+        });
+        expect(parseQueuedPayload("clear", '{"item":"minecraft:dirt","count":3}')).toEqual({
+            kind: "clear",
+            item: "minecraft:dirt",
+            count: 3
+        });
+        // Empty data is not "the plain item" written oddly; it is a row nobody wrote.
+        expect(parseQueuedPayload("give", '{"item":"minecraft:dirt","count":1,"data":"  "}')).toBeNull();
+    });
+
     it("applies nothing for a row it cannot read", () => {
         // A row written by an older version, or edited by hand. Applying the half
         // that parsed would be carrying out something nobody asked for.

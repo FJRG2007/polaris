@@ -1023,7 +1023,12 @@
             "recipient": "El otro jugador tiene que estar en el servidor para recibirlo. No se movió nada.",
             "same": "Elige otro jugador al que enviarlo.",
             "rejected": "El servidor ha rechazado ese objeto. Puede que uno de los encantamientos no exista en esta versión.",
-            "enchantUnsupported": "Este servidor no acepta encantamientos desde Polaris: hace falta Java Edition 1.13 o posterior."
+            "enchantUnsupported": "Este servidor no acepta encantamientos desde Polaris: hace falta Java Edition 1.13 o posterior.",
+            "dataUnsupported": "Este servidor no acepta datos de objeto desde Polaris: hace falta Java Edition 1.13 o posterior.",
+            "dataComponents": "Este servidor es 1.20.5 o posterior: escribe los datos como componentes, p. ej. minecraft:damage=5, no como compuesto NBT.",
+            "dataTag": "Este servidor es anterior a 1.20.5: escribe los datos como compuesto NBT justo tras el id, no como componentes.",
+            "dataRejected": "El servidor ha rechazado ese objeto. Puede que un componente o etiqueta no exista en esta versión.",
+            "dataUnreadable": "Esos datos de objeto no están completos: queda un corchete o unas comillas abiertas, o una parte sin valor."
         },
         "blueprints": {
             "survival": {

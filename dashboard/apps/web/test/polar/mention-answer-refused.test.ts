@@ -20,6 +20,9 @@ vi.mock("@/lib/polar/access", () => ({
 }));
 vi.mock("@/lib/polar/automatic", () => ({
     PLAIN_TURN: {},
+    // models.ts registers the cooldown store as it loads.
+    shareCooldownsWith: () => undefined,
+    adoptCooldown: () => undefined,
     noteModelEchoed: () => undefined,
     noteToolMarkup: () => undefined,
     toolMarkupIn: () => false

@@ -21,7 +21,13 @@ import { askerOf, readLiveInventory } from "./inventory-service";
 import { EQUIPMENT_SLOTS, parseStack, type InventoryItem } from "./inventory";
 import { withServerContainer, type ServerContainer } from "./service";
 import { recentlyGivenItems as recentlyGiven } from "../recent-items";
-import { AIR, itemArgument, replaceSlot, type ItemArgumentRefusal } from "./item-argument";
+import {
+    AIR,
+    itemArgument,
+    itemDataArgument,
+    replaceSlot,
+    type ItemArgumentRefusal
+} from "./item-argument";
 import { host } from "@polaris/app-host";
 import { serverVersion } from "./server-version";
 import { versionAtLeast } from "./version-compare";
@@ -57,7 +63,12 @@ export type WriteRefusal =
     | "recipient"
     | "same"
     | "rejected"
-    | "enchantUnsupported";
+    | "enchantUnsupported"
+    | "dataUnsupported"
+    | "dataComponents"
+    | "dataTag"
+    | "dataRejected"
+    | "dataUnreadable";
 
 export class ItemWriteError extends Error {
     constructor(
@@ -79,7 +90,12 @@ const REFUSALS: Record<WriteRefusal, string> = {
     recipient: gameMessage("games", "lib.move.recipient"),
     same: gameMessage("games", "lib.move.same"),
     rejected: gameMessage("games", "lib.move.rejected"),
-    enchantUnsupported: gameMessage("games", "lib.move.enchantUnsupported")
+    enchantUnsupported: gameMessage("games", "lib.move.enchantUnsupported"),
+    dataUnsupported: gameMessage("games", "lib.move.dataUnsupported"),
+    dataComponents: gameMessage("games", "lib.move.dataComponents"),
+    dataTag: gameMessage("games", "lib.move.dataTag"),
+    dataRejected: gameMessage("games", "lib.move.dataRejected"),
+    dataUnreadable: gameMessage("games", "lib.move.dataUnreadable")
 };
 
 function refuse(why: WriteRefusal): never {
@@ -246,12 +262,39 @@ export async function enchantContextOf(server: ServerContainer): Promise<Enchant
     return { format, version, available: availableEnchantments(version, format, versionAtLeast) };
 }
 
-/** What an item is given as: its id, or the id with these enchantments on it. */
+/**
+ * The item with this data written after its id, the way this server's version
+ * reads it (`itemDataArgument`): components from 1.20.5, a compound before.
+ * The era is the one enchanting finds (`enchantContextOf`), which needs Java
+ * 1.13 or later.
+ */
+async function dataArgumentFor(server: ServerContainer, itemId: string, data: string): Promise<string> {
+    const format = await enchantContextOf(server)
+        .then((context) => context.format)
+        .catch((caught: unknown) => {
+            if (caught instanceof ItemWriteError && caught.why === "enchantUnsupported")
+                refuse("dataUnsupported");
+            throw caught;
+        });
+    const era = format === "tag" ? "tag" : "components";
+    const argument = itemDataArgument(itemId, data, era);
+    if (argument.ok) return argument.value;
+    if (argument.why === "wrong-form") refuse(era === "tag" ? "dataTag" : "dataComponents");
+    refuse("dataUnreadable");
+}
+
+/** What an item is given as: its id, the id with these enchantments on it, or
+ *  the id with the data somebody asked for. */
 async function argumentFor(
     server: ServerContainer,
     itemId: string,
-    enchantments: readonly Enchantment[]
+    enchantments: readonly Enchantment[],
+    data?: string
 ): Promise<string> {
+    if (data) {
+        if (enchantments.length > 0) refuse("dataUnreadable");
+        return dataArgumentFor(server, itemId, data);
+    }
     if (enchantments.length === 0) return itemId;
     const { format } = await enchantContextOf(server);
     const stack = enchantedStack(itemId, enchantments, format);
@@ -373,11 +416,14 @@ export async function clearItem(
     installedAppId: string,
     player: string,
     itemId: string,
-    count: number
+    count: number,
+    /** Only the stacks with this data (`itemDataArgument`). None is every one. */
+    data?: string
 ): Promise<string> {
-    return withServerContainer(ownerId, installedAppId, (server) =>
-        server.say(["clear", player, itemId, String(count)])
-    );
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        const argument = data ? await dataArgumentFor(server, itemId, data) : itemId;
+        return server.say(["clear", player, argument, String(count)]);
+    });
 }
 
 /**
@@ -398,11 +444,14 @@ export async function giveItem(
     itemId: string,
     total: number,
     /** Put on every stack given. None, or absent, is the plain item. */
-    enchantments: readonly Enchantment[] = []
+    enchantments: readonly Enchantment[] = [],
+    /** Data written on every stack given (`itemDataArgument`), in place of
+     *  enchantments. */
+    data?: string
 ): Promise<{ given: number; output: string }> {
     const stacks = stacksFor(itemId, total);
     return withServerContainer(ownerId, installedAppId, async (server) => {
-        const argument = await argumentFor(server, itemId, enchantments);
+        const argument = await argumentFor(server, itemId, enchantments, data);
         const said: string[] = [];
         let given = 0;
         for (const stack of stacks) {
@@ -412,8 +461,8 @@ export async function giveItem(
             said.push(reply);
             // A stack the server refused - an enchantment this version does not
             // have - is not counted as given, and the rest are not tried.
-            if (enchantments.length > 0 && !GAVE.test(reply)) {
-                if (given === 0) refuse("rejected");
+            if ((enchantments.length > 0 || data) && !GAVE.test(reply)) {
+                if (given === 0) refuse(data ? "dataRejected" : "rejected");
                 break;
             }
             given += stack;

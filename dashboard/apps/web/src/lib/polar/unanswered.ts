@@ -54,14 +54,8 @@ export function failureIntoAnswer(): TransformStream<UIMessageChunk, UIMessageCh
     const parts: AnswerPart[] = [{ type: "text", text: "" }];
     return new TransformStream({
         transform(chunk, controller) {
-            if (chunk.type === "text-delta") parts[0]!.text += chunk.delta;
-            else if (chunk.type === "tool-input-start" || chunk.type === "tool-input-available") {
-                const type = chunk.dynamic ? "dynamic-tool" : `tool-${chunk.toolName}`;
-                parts.push({ type, toolName: chunk.toolName });
-            } else if (chunk.type === "tool-approval-request") {
-                parts.push({ type: "tool-approval", state: "approval-requested" });
-            } else if (chunk.type === "file") parts.push({ type: "file" });
-            else if (chunk.type === "error" && !answered(parts)) {
+            trackPart(parts, chunk);
+            if (chunk.type === "error" && !answered(parts)) {
                 const failure =
                     decodePolarFailure(chunk.errorText) ??
                     decodeSubscriptionFailure(chunk.errorText) ??
@@ -69,6 +63,71 @@ export function failureIntoAnswer(): TransformStream<UIMessageChunk, UIMessageCh
                 if (failure) controller.enqueue({ type: FAILURE_PART, data: failure });
             }
             controller.enqueue(chunk);
+        }
+    });
+}
+
+/** Adds what a chunk puts in the answer to `parts`, whose first entry holds the
+ *  answer's text so far. */
+function trackPart(parts: AnswerPart[], chunk: UIMessageChunk): void {
+    if (chunk.type === "text-delta") parts[0]!.text += chunk.delta;
+    else if (chunk.type === "tool-input-start" || chunk.type === "tool-input-available") {
+        const type = chunk.dynamic ? "dynamic-tool" : `tool-${chunk.toolName}`;
+        parts.push({ type, toolName: chunk.toolName });
+    } else if (chunk.type === "tool-approval-request") {
+        parts.push({ type: "tool-approval", state: "approval-requested" });
+    } else if (chunk.type === "file") parts.push({ type: "file" });
+}
+
+/**
+ * The message the one step after an empty ending is asked with: the model
+ * has what its tools returned and is told to answer from it.
+ */
+export const FINAL_ANSWER_NUDGE =
+    "Answer the request above now, in plain words, from what your tool calls returned. Do not call any more tools.";
+
+/**
+ * A turn that ends on its tool steps with nothing for the person gets one more
+ * step: `more` is asked for it (a call with no tools offered), its chunks
+ * follow the answer's own, and the answer's finish comes last - through
+ * `finished`, so what it says (the usage) can count that step too. Nothing
+ * more is asked after a failure or a stop, or when the answer did say
+ * something.
+ */
+export function finalAnswer(
+    more: () => Promise<ReadableStream<UIMessageChunk> | null>,
+    finished?: (held: UIMessageChunk) => Promise<UIMessageChunk>
+): TransformStream<UIMessageChunk, UIMessageChunk> {
+    const parts: AnswerPart[] = [{ type: "text", text: "" }];
+    let held: UIMessageChunk | null = null;
+    let ended = false;
+    return new TransformStream({
+        transform(chunk, controller) {
+            trackPart(parts, chunk);
+            if (chunk.type === "error" || chunk.type === "abort") ended = true;
+            if (chunk.type === "finish") held = chunk;
+            else controller.enqueue(chunk);
+        },
+        async flush(controller) {
+            if (held && !ended && answeredNothing(parts)) {
+                let extra: ReadableStream<UIMessageChunk> | null = null;
+                try {
+                    extra = await more();
+                } catch (error) {
+                    console.error("polar: could not ask for the answer after the tool steps", error);
+                }
+                if (extra) {
+                    const reader = extra.getReader();
+                    for (;;) {
+                        const next = await reader.read();
+                        if (next.done) break;
+                        if (next.value.type === "start" || next.value.type === "finish") continue;
+                        controller.enqueue(next.value);
+                    }
+                    if (finished) held = await finished(held).catch(() => held!);
+                }
+            }
+            if (held) controller.enqueue(held);
         }
     });
 }

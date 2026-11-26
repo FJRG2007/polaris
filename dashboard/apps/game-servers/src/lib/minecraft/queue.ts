@@ -14,6 +14,7 @@
 import { z } from "zod";
 import { IMPORT_MODES, transferStackSchema } from "./inventory-transfer";
 import { enchantmentListSchema } from "./enchantments";
+import { MAX_ARGUMENT_LENGTH } from "./item-argument";
 
 /** Every kind of thing that can wait. */
 export const QUEUED_KINDS = [
@@ -69,12 +70,17 @@ const itemPayload = z.object({
  *  before enchanting a give existed, which is the plain item. */
 const enchanted = z.object({ enchantments: enchantmentListSchema.optional() });
 
+/** Data written after the item's id (`itemDataArgument`), checked against the
+ *  server's version when it is handed over. Absent is the plain item. */
+const withData = z.object({ data: z.string().trim().min(1).max(MAX_ARGUMENT_LENGTH).optional() });
+
 export const queuePayloadSchema = z.discriminatedUnion("kind", [
     z
         .object({ kind: z.literal("give") })
         .merge(itemPayload)
-        .merge(enchanted),
-    z.object({ kind: z.literal("clear") }).merge(itemPayload),
+        .merge(enchanted)
+        .merge(withData),
+    z.object({ kind: z.literal("clear") }).merge(itemPayload).merge(withData),
     z.object({ kind: z.literal("clear-all") }),
     z
         .object({ kind: z.literal("set-slot"), slot: z.number().int().min(-128).max(127) })
@@ -133,9 +139,9 @@ export function describeQueued(action: QueuedAction): string {
     const payload = action.payload;
     switch (payload.kind) {
         case "give":
-            return `Give ${payload.count} x ${payload.item}${enchantedNote(payload.enchantments)}`;
+            return `Give ${payload.count} x ${payload.item}${payload.data ?? ""}${enchantedNote(payload.enchantments)}`;
         case "clear":
-            return `Take away ${payload.count} x ${payload.item}`;
+            return `Take away ${payload.count} x ${payload.item}${payload.data ?? ""}`;
         case "clear-all":
             return "Empty their inventory";
         case "set-slot":

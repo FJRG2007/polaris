@@ -18,6 +18,7 @@
 import { z } from "zod";
 import { host } from "@polaris/app-host";
 import { ITEM_ID_PATTERN } from "./minecraft/items";
+import { MAX_ARGUMENT_LENGTH, itemDataArgument } from "./minecraft/item-argument";
 import type { AppHostTypes } from "@polaris/app-host";
 import { attempt, onlyFor, refuse, serverFor, serverId } from "./mcp-common";
 
@@ -48,6 +49,37 @@ const item = z
 
 const count = z.number().int().min(1).max(MAX_ITEMS);
 
+/**
+ * Data on the item, written right after its id the way the server's version
+ * reads it (minecraft.wiki/w/Argument_types, `item_stack`; and
+ * minecraft.wiki/w/Data_component_format for 1.20.5 on). Checked again against
+ * that version when it is handed over (`itemDataArgument`).
+ */
+const data = z
+    .string()
+    .trim()
+    .min(1)
+    .max(MAX_ARGUMENT_LENGTH)
+    .optional()
+    .describe(
+        // i18n-ignore read by the calling model, not shown to a person
+        "Optional data on the item, written as the server's version reads it right after the id. Java 1.20.5 and later: data components, as minecraft:custom_name='\"Sword\"',minecraft:damage=5 (brackets optional). Before 1.20.5: an NBT compound, as {display:{Name:'\"Sword\"'},Damage:5}. The components games_player_inventory shows for a stack can be passed as they are. A refusal says which form the server takes. Leave it out for the plain item."
+    );
+
+/** Refuses data no Minecraft version could read - a bracket left open, a
+ *  control character - before anything is sent or written down. */
+function checkData(item: string, value: string | undefined): void {
+    if (value === undefined) return;
+    const readable = (["components", "tag"] as const).some(
+        (era) => itemDataArgument(item, value, era).ok
+    );
+    if (!readable)
+        refuse(
+            // i18n-ignore read by the calling model, not shown to a person
+            "That item data cannot be read: write data components (1.20.5 and later) or one NBT compound (before), with every bracket and quote closed."
+        );
+}
+
 /** The caller's standing to change a bag on a Minecraft server, and who for. */
 async function targetFor(caller: McpCaller, server: string, name: string) {
     const { user, access } = await serverFor(caller, server, "games.moderate");
@@ -77,21 +109,25 @@ const giveTool = () =>
         title: "Give a Minecraft player items",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Put a number of one item in a Minecraft player's inventory, as the player panel's Give does. Arrives as full stacks. When the player is not on, it is queued and handed over when they next join.",
+            "Put a number of one item in a Minecraft player's inventory, as the player panel's Give does. Arrives as full stacks. When the person refers to something a player already holds - \"another one like the one in his hand\", \"the sword in slot 3\" - read games_player_inventory first and give that stack's id and data, rather than guessing them. When the player is not on, it is queued and handed over when they next join.",
         input: z.object({
             serverId,
             player,
             item,
-            count: count.describe(`How many in total, up to ${MAX_ITEMS} (a full inventory).`)
+            count: count.describe(`How many in total, up to ${MAX_ITEMS} (a full inventory).`),
+            data
         }),
         category: "games",
         scope: ["gameservers.moderate", "gameservers.manage"],
         readOnly: false,
         destructive: false,
         async run(input, caller) {
+            checkData(input.item, input.data);
             const { name, target } = await targetFor(caller, input.serverId, input.player);
             const { givePlayerItems } = await operations();
-            const done = await attempt(() => givePlayerItems(target, input.item, input.count));
+            const done = await attempt(() =>
+                givePlayerItems(target, input.item, input.count, [], input.data)
+            );
             return {
                 text: outcomeText(
                     done,
@@ -110,21 +146,28 @@ const takeTool = () =>
         title: "Take items from a Minecraft player",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Remove a number of one item from a Minecraft player's inventory, wherever it is in it, as the player panel's Take does. When the player is not on, it is queued for their next join. Confirm with the person first.",
+            "Remove a number of one item from a Minecraft player's inventory, wherever it is in it, as the player panel's Take does. With data, only the stacks carrying it are taken. When the person refers to a stack the player holds, read games_player_inventory first for its id and data. When the player is not on, it is queued for their next join. Confirm with the person first.",
         input: z.object({
             serverId,
             player,
             item,
-            count: count.describe(`How many to take, up to ${MAX_ITEMS}.`)
+            count: count.describe(`How many to take, up to ${MAX_ITEMS}.`),
+            data: data.describe(
+                // i18n-ignore read by the calling model, not shown to a person
+                "Optional: take only the stacks with this data, written as for games_player_give. Leave it out to take any."
+            )
         }),
         category: "games",
         scope: ["gameservers.moderate", "gameservers.manage"],
         readOnly: false,
         destructive: true,
         async run(input, caller) {
+            checkData(input.item, input.data);
             const { name, target } = await targetFor(caller, input.serverId, input.player);
             const { takePlayerItems } = await operations();
-            const done = await attempt(() => takePlayerItems(target, input.item, input.count));
+            const done = await attempt(() =>
+                takePlayerItems(target, input.item, input.count, input.data)
+            );
             return {
                 text: outcomeText(
                     done,

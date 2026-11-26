@@ -69,9 +69,15 @@ export async function givePlayerItems(
     item: string,
     count: number,
     /** Put on what is given. None is the plain item. */
-    enchantments: readonly Enchantment[] = []
+    enchantments: readonly Enchantment[] = [],
+    /** Written after the id (`itemDataArgument`): a name, damage, a book's
+     *  pages. Checked against the server's version when it is handed over. */
+    data?: string
 ): Promise<ItemOutcome> {
-    const enchanted = enchantments.length > 0 ? { enchantments: [...enchantments] } : {};
+    const enchanted = {
+        ...(enchantments.length > 0 ? { enchantments: [...enchantments] } : {}),
+        ...(data ? { data } : {})
+    };
     const { ownerId, installedAppId, player } = target;
     // `/give` needs somebody standing there. Deciding at four in the afternoon
     // to hand something to a player who is asleep is the ordinary case, so it
@@ -91,7 +97,8 @@ export async function givePlayerItems(
         player,
         item,
         count,
-        enchantments
+        enchantments,
+        data
     );
     await audit(target, "minecraft.give", { player, item, count: given, ...enchanted });
     return { queued: false, output: output.trim() };
@@ -127,24 +134,27 @@ export async function enchantPlayerStack(
     return changed;
 }
 
-/** Take a number of one item away, wherever it is in the bag. */
+/** Take a number of one item away, wherever it is in the bag - only the
+ *  stacks with this data when there is some (`itemDataArgument`). */
 export async function takePlayerItems(
     target: ItemTarget,
     item: string,
-    count: number
+    count: number,
+    data?: string
 ): Promise<ItemOutcome> {
     const { ownerId, installedAppId, player } = target;
+    const matching = data ? { data } : {};
     if (!(await isPlayerOnline(ownerId, installedAppId, player))) {
         await queueAction({
             installedAppId,
             username: player,
-            payload: { kind: "clear", item, count },
+            payload: { kind: "clear", item, count, ...matching },
             requestedById: target.actorId
         });
         return { queued: true };
     }
-    const output = await clearItem(ownerId, installedAppId, player, item, count);
-    await audit(target, "minecraft.inventory-take", { player, item, count });
+    const output = await clearItem(ownerId, installedAppId, player, item, count, data);
+    await audit(target, "minecraft.inventory-take", { player, item, count, ...matching });
     return { queued: false, output: output.trim() };
 }
 

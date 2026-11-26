@@ -31,7 +31,9 @@ import {
     isStepCount,
     safeValidateUIMessages,
     streamText,
-    type UIMessage
+    type SystemModelMessage,
+    type UIMessage,
+    type UIMessageChunk
 } from "ai";
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
@@ -109,7 +111,7 @@ import {
     type PolarHelper
 } from "@/lib/polar/helper-model";
 import { fenceSummary, splitAtCompaction } from "@/lib/polar/compaction";
-import { noteToolMarkup, toolMarkupIn, turnSignals } from "@/lib/polar/automatic";
+import { noteNoFinalAnswer, noteToolMarkup, toolMarkupIn, turnSignals } from "@/lib/polar/automatic";
 import {
     answerUsage,
     stepContext,
@@ -136,7 +138,7 @@ import { polarGoal, savePolarGoal, setPolarGoal } from "@/lib/polar/goal-store";
 import { noticePolarRunEnd } from "@/lib/polar/run-notices";
 import { polarOutputTokens } from "@/lib/polar/credit";
 import { withoutEarlierReasoning } from "@/lib/polar/reasoning-replay";
-import { failureIntoAnswer } from "@/lib/polar/unanswered";
+import { FINAL_ANSWER_NUDGE, failureIntoAnswer, finalAnswer } from "@/lib/polar/unanswered";
 import {
     FAILURE_PART,
     classifyProviderFailure,
@@ -671,33 +673,38 @@ export async function POST(request: Request): Promise<Response> {
     // The newest step's own counts: what the conversation measures now, for
     // the context bar. `totalUsage` sums every step and overstates it.
     let lastStep: { inputTokens: number | undefined; outputTokens: number | undefined } | undefined;
+    // One breakpoint after the tools and the system prompt: Anthropic caches
+    // that prefix (docs.anthropic.com prompt caching); OpenAI and Gemini
+    // cache a byte-identical prefix on their own.
+    const system: SystemModelMessage = {
+        role: "system",
+        content: [
+            polarSystemPrompt(user.name, instructions, memories, web),
+            agent ? agentPrompt(agent) : "",
+            connectorsPrompt(connectorSet, offeredConnectors),
+            codeTaskPrompt(body.data.code),
+            skillsPrompt(skills),
+            enigma ? enigmaPrompt(enigmaSkills) : "",
+            fenceSummary(compacted.summary),
+            subagentTasks.finishedBackgroundPrompt(finishedBackground),
+            // Only on a turn asked again from an answer's row: that turn's
+            // prefix is not cached, every other one is.
+            refineLine(body.data.refine)
+        ]
+            .filter(Boolean)
+            .join("\n\n"),
+        providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } }
+    };
+    const reasoning = reasoningFor(
+        resolved.automatic === "fast" ? "fast" : choice.intelligence,
+        resolved.option
+    );
     const result = streamText({
         // The router retries and walks keys and fallbacks itself
         // (`router/chain.ts`); the SDK's own retries would walk it all again.
         maxRetries: 0,
         model: resolved.model,
-        // One breakpoint after the tools and the system prompt: Anthropic caches
-        // that prefix (docs.anthropic.com prompt caching); OpenAI and Gemini
-        // cache a byte-identical prefix on their own.
-        system: {
-            role: "system",
-            content: [
-                polarSystemPrompt(user.name, instructions, memories, web),
-                agent ? agentPrompt(agent) : "",
-                connectorsPrompt(connectorSet, offeredConnectors),
-                codeTaskPrompt(body.data.code),
-                skillsPrompt(skills),
-                enigma ? enigmaPrompt(enigmaSkills) : "",
-                fenceSummary(compacted.summary),
-                subagentTasks.finishedBackgroundPrompt(finishedBackground),
-                // Only on a turn asked again from an answer's row: that turn's
-                // prefix is not cached, every other one is.
-                refineLine(body.data.refine)
-            ]
-                .filter(Boolean)
-                .join("\n\n"),
-            providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } }
-        },
+        system,
         messages: modelMessages,
         tools: turnTools,
         activeTools: activeFor(new Set()),
@@ -711,10 +718,7 @@ export async function POST(request: Request): Promise<Response> {
         maxOutputTokens: polarOutputTokens(resolved.option),
         stopWhen: isStepCount(STEP_MAX),
         // Automatic sends a quick question at the lowest effort.
-        reasoning: reasoningFor(
-            resolved.automatic === "fast" ? "fast" : choice.intelligence,
-            resolved.option
-        ),
+        reasoning,
         abortSignal: run.signal
     });
 
@@ -729,6 +733,40 @@ export async function POST(request: Request): Promise<Response> {
                   standInFor: resolved.option.name,
                   ...(passedOver.length > 0 ? { passedOver } : {})
               };
+    };
+
+    // The provider's refusal is classified and named, never forwarded: its
+    // body is the provider's own words about the account it belongs to.
+    const onError = (error: unknown): string => {
+        // The SDK sends a tool call's own failure through here too: it is
+        // the tool's, said as such, and never held against the provider.
+        if (isToolFailure(error)) {
+            console.warn("polar: a tool call failed", error);
+            return toolFailureText(error);
+        }
+        // The person's own Claude subscription said why, in its own words
+        // (`claude-subscription/model.ts`); no provider is held to it.
+        const subscription = subscriptionFailureOf(error);
+        if (subscription) return JSON.stringify({ code: "subscription", reason: subscription });
+        // A model on the person's own computer, in words about that server.
+        const local = localFailureOf(error);
+        if (local) return JSON.stringify({ code: "local", reason: local.reason, server: local.server });
+        // Named for what happened: the model that last answered, else the
+        // last one refused, with every refusal listed when the turn asked
+        // more than one. Automatic tries that provider last for a few
+        // minutes, and one out of credit only for its free models.
+        const { option, credential, tried } = failedTurn(resolved);
+        const failure = classifyProviderFailure(error);
+        rememberRefusal(user.id, option.provider, failure.kind);
+        console.warn(failureLogLine("a turn", option.providerName, failure, error));
+        return encodePolarFailure({
+            code: "provider",
+            kind: failure.kind,
+            provider: option.providerName,
+            slug: option.provider,
+            payer: credential.source,
+            ...(tried.length > 0 ? { tried } : {})
+        });
     };
 
     const answer = result.toUIMessageStream({
@@ -760,40 +798,53 @@ export async function POST(request: Request): Promise<Response> {
                     }
                   : undefined;
         },
-        // The provider's refusal is classified and named, never forwarded: its
-        // body is the provider's own words about the account it belongs to.
-        onError: (error) => {
-            // The SDK sends a tool call's own failure through here too: it is
-            // the tool's, said as such, and never held against the provider.
-            if (isToolFailure(error)) {
-                console.warn("polar: a tool call failed", error);
-                return toolFailureText(error);
-            }
-            // The person's own Claude subscription said why, in its own words
-            // (`claude-subscription/model.ts`); no provider is held to it.
-            const subscription = subscriptionFailureOf(error);
-            if (subscription) return JSON.stringify({ code: "subscription", reason: subscription });
-            // A model on the person's own computer, in words about that server.
-            const local = localFailureOf(error);
-            if (local) return JSON.stringify({ code: "local", reason: local.reason, server: local.server });
-            // Named for what happened: the model that last answered, else the
-            // last one refused, with every refusal listed when the turn asked
-            // more than one. Automatic tries that provider last for a few
-            // minutes, and one out of credit only for its free models.
-            const { option, credential, tried } = failedTurn(resolved);
-            const failure = classifyProviderFailure(error);
-            rememberRefusal(user.id, option.provider, failure.kind);
-            console.warn(failureLogLine("a turn", option.providerName, failure, error));
-            return encodePolarFailure({
-                code: "provider",
-                kind: failure.kind,
-                provider: option.providerName,
-                slug: option.provider,
-                payer: credential.source,
-                ...(tried.length > 0 ? { tried } : {})
-            });
-        }
+        onError
     });
+
+    // A model can end on its tool steps with nothing said - it stopped, or
+    // ignored the last step's "answer now". It is asked once more with no
+    // tools offered and what they returned in front of it, and Automatic
+    // keeps it off turns with tools for a while, like one that writes its
+    // tool calls as text.
+    let finalStep: ReturnType<typeof streamText> | null = null;
+    const finalAnswerStep = async () => {
+        if (run.signal.aborted) return null;
+        const answered = answeredBy(resolved);
+        noteNoFinalAnswer(user.id, answered.option.provider, answered.option.model);
+        const { messages: stepMessages } = await result.response;
+        finalStep = streamText({
+            maxRetries: 0,
+            model: resolved.model,
+            system,
+            messages: [...modelMessages, ...stepMessages, { role: "user", content: FINAL_ANSWER_NUDGE }],
+            tools: turnTools,
+            toolChoice: "none",
+            maxOutputTokens: polarOutputTokens(resolved.option),
+            reasoning,
+            abortSignal: run.signal
+        });
+        return finalStep.toUIMessageStream({
+            sendReasoning: true,
+            sendSources: true,
+            sendStart: false,
+            sendFinish: false,
+            onError
+        });
+    };
+    // What the answer's finish says, counting the step after it.
+    const countFinalStep = async (held: UIMessageChunk): Promise<UIMessageChunk> => {
+        if (held.type !== "finish" || !finalStep || !spent) return held;
+        const extra = answerUsage(await finalStep.totalUsage, answeredBy(resolved).option);
+        spent = {
+            ...spent,
+            inputTokens: spent.inputTokens + extra.inputTokens,
+            outputTokens: spent.outputTokens + extra.outputTokens,
+            costUsd:
+                spent.costUsd === null || extra.costUsd === null ? spent.costUsd : spent.costUsd + extra.costUsd
+        };
+        const metadata = (held.messageMetadata ?? {}) as Record<string, unknown>;
+        return { ...held, messageMetadata: { ...metadata, usage: spent } };
+    };
 
     const activeGoal = goal?.status === "active" ? goal : null;
     const stream = createUIMessageStream({
@@ -804,7 +855,7 @@ export async function POST(request: Request): Promise<Response> {
         // A turn that continues an answer keeps that answer's id.
         generateId,
         execute: ({ writer }) => {
-            const told = answer.pipeThrough(failureIntoAnswer());
+            const told = answer.pipeThrough(finalAnswer(finalAnswerStep, countFinalStep)).pipeThrough(failureIntoAnswer());
             writer.merge(
                 activeGoal
                     ? told.pipeThrough(

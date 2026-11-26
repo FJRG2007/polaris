@@ -14,7 +14,7 @@
 import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { applyOnContainer } from "./player-access";
-import { giveItem, giveToSlot } from "./item-service";
+import { clearItem, giveItem, giveToSlot } from "./item-service";
 import { applyQueuedImport } from "./inventory-transfer-service";
 import { withServerContainer, type ServerContainer } from "./service";
 import { liftSanctions, recordSanction } from "../sanctions-service";
@@ -283,7 +283,21 @@ async function apply(
             action.username,
             action.payload.item,
             action.payload.count,
-            action.payload.enchantments
+            action.payload.enchantments,
+            action.payload.data
+        );
+        return;
+    }
+    // Taking only the stacks with some data needs the server's version to
+    // write that data the way it reads it.
+    if (action.payload.kind === "clear" && action.payload.data) {
+        await clearItem(
+            ownerId,
+            installedAppId,
+            action.username,
+            action.payload.item,
+            action.payload.count,
+            action.payload.data
         );
         return;
     }

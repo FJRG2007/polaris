@@ -458,7 +458,7 @@ describe("the Game servers tools", () => {
             ["gameservers.moderate"]
         );
         expect(mocks.gameServerAccess).toHaveBeenCalledWith(ADA, GAME, "games.moderate");
-        expect(mocks.givePlayerItems).toHaveBeenCalledWith(target, "diamond", 64);
+        expect(mocks.givePlayerItems).toHaveBeenCalledWith(target, "diamond", 64, [], undefined);
         expect(given.content[0]?.text).toContain("Gave 64 [Diamond]");
 
         // The managers' scope reaches it too: their console already does.
@@ -468,7 +468,7 @@ describe("the Game servers tools", () => {
             { serverId: GAME, player: "Steve", item: "minecraft:dirt", count: 5 },
             ["gameservers.manage"]
         );
-        expect(mocks.takePlayerItems).toHaveBeenCalledWith(target, "minecraft:dirt", 5);
+        expect(mocks.takePlayerItems).toHaveBeenCalledWith(target, "minecraft:dirt", 5, undefined);
         expect(taken.content[0]?.text).toContain("when they next join");
 
         mocks.emptyPlayerInventory.mockResolvedValue({ queued: false, output: "" });
@@ -532,6 +532,61 @@ describe("the Game servers tools", () => {
         expect(mocks.takePlayerItems).not.toHaveBeenCalled();
         expect(mocks.emptyPlayerInventory).not.toHaveBeenCalled();
         expect(mocks.sendPlayerInventory).not.toHaveBeenCalled();
+    });
+
+    it("pass an item's data through to Give and Take, and refuse data no version can read", async () => {
+        const minecraft = { ...STANDING, install: { ...STANDING.install, catalogId: "minecraft" } };
+        mocks.gameServerAccess.mockResolvedValue(minecraft);
+        const target = {
+            ownerId: "owner-1",
+            installedAppId: GAME,
+            actorId: "user-1",
+            player: "Steve",
+            via: "mcp"
+        };
+        mocks.givePlayerItems.mockResolvedValue({ queued: true });
+        await call(
+            "games_player_give",
+            {
+                serverId: GAME,
+                player: "Steve",
+                item: "minecraft:diamond_sword",
+                count: 1,
+                data: "minecraft:damage=5"
+            },
+            ["gameservers.moderate"]
+        );
+        expect(mocks.givePlayerItems).toHaveBeenCalledWith(
+            target,
+            "minecraft:diamond_sword",
+            1,
+            [],
+            "minecraft:damage=5"
+        );
+        mocks.takePlayerItems.mockResolvedValue({ queued: true });
+        await call(
+            "games_player_take",
+            { serverId: GAME, player: "Steve", item: "minecraft:diamond_sword", count: 1, data: "{Damage:5}" },
+            ["gameservers.moderate"]
+        );
+        expect(mocks.takePlayerItems).toHaveBeenCalledWith(target, "minecraft:diamond_sword", 1, "{Damage:5}");
+
+        mocks.givePlayerItems.mockClear();
+        mocks.takePlayerItems.mockClear();
+        const open = await call(
+            "games_player_give",
+            { serverId: GAME, player: "Steve", item: "minecraft:diamond_sword", count: 1, data: "{display:{Name:" },
+            ["gameservers.moderate"]
+        );
+        expect(open.content[0]?.text).toContain("item data cannot be read");
+        const unreadable = await call(
+            "games_player_take",
+            { serverId: GAME, player: "Steve", item: "minecraft:diamond_sword", count: 1, data: "{Damage:5" },
+            ["gameservers.moderate"]
+        );
+        expect(unreadable.content[0]?.text).toContain("item data cannot be read");
+        expect(mocks.givePlayerItems).not.toHaveBeenCalled();
+        expect(mocks.takePlayerItems).not.toHaveBeenCalled();
     });
 
     it("stop and restart through the same functions as the page's buttons", async () => {

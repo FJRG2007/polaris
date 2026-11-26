@@ -17,7 +17,7 @@
  * the first place.
  */
 
-import { splitTopLevel, topLevelColon, unquote } from "./snbt";
+import { readBalanced, splitTopLevel, topLevelColon, unquote } from "./snbt";
 import {
     ARMOUR_SLOTS,
     HOTBAR_SLOTS,
@@ -129,4 +129,71 @@ export function replaceSlot(slot: number): string | null {
 /** Every slot the grid draws, which is every slot that can be written to. */
 export function writableSlots(): number[] {
     return [...ARMOUR_SLOTS, OFFHAND_SLOT, ...HOTBAR_SLOTS, ...MAIN_SLOT_ROWS.flat()];
+}
+
+/** Which way a server writes an item's data, by its version: data components
+ *  from Java 1.20.5 on, an NBT compound before it. */
+export type ItemDataEra = "components" | "tag";
+
+/** Why data asked for on an item cannot be sent. `wrong-form` is data written
+ *  the other era's way. */
+export type ItemDataRefusal = "unreadable" | "too-long" | "wrong-form";
+
+/** One component as `/give` takes it: `minecraft:damage=5`, `damage=5`, or the
+ *  bare `!minecraft:food` that takes a default one off. */
+const COMPONENT_FIELD = /^(?:!(?:[a-z0-9_.-]+:)?[a-z0-9_./-]+|(?:[a-z0-9_.-]+:)?[a-z0-9_./-]+=[\s\S]+)$/;
+
+/**
+ * Data somebody asked for on an item - a name, damage, a book's pages -
+ * checked and written right after the id, the one shape this server reads
+ * (minecraft.wiki/w/Argument_types, `item_stack` and `item_predicate`): from
+ * Java 1.20.5, `id[component=value,...]` (minecraft.wiki/w/Data_component_format);
+ * before it, the NBT compound as `id{...}`. `/give` and `/clear` both take it,
+ * `/clear` as a match on the stacks it removes.
+ *
+ * The components are taken with or without their brackets, or as the quoted
+ * compound an inventory reads them back as (`games_player_inventory`). Data in the other
+ * era's form, a bracket or a quote left open, or a control character is
+ * refused rather than sent: the server would reject it or read something else.
+ */
+export function itemDataArgument(
+    id: string,
+    data: string,
+    era: ItemDataEra
+): { ok: true; value: string } | { ok: false; why: ItemDataRefusal } {
+    const raw = data.trim();
+    // eslint-disable-next-line no-control-regex
+    if (!raw || /[\u0000-\u001f\u007f]/.test(raw)) return { ok: false, why: "unreadable" };
+    const built = era === "tag" ? tagArgument(id, raw) : componentsArgument(id, raw);
+    if ("why" in built) return { ok: false, why: built.why };
+    if (built.value.length > MAX_ARGUMENT_LENGTH) return { ok: false, why: "too-long" };
+    return { ok: true, value: built.value };
+}
+
+type Built = { value: string } | { why: ItemDataRefusal };
+
+/** `id{...}`: one whole compound, or the refusal. */
+function tagArgument(id: string, raw: string): Built {
+    if (!raw.startsWith("{")) return { why: "wrong-form" };
+    return readBalanced(raw, 0) === raw ? { value: `${id}${raw}` } : { why: "unreadable" };
+}
+
+/**
+ * `id[a=1,b=2]`, from the list with or without its brackets, or from the
+ * components as an inventory reads them back, `{"minecraft:x": v}` - the same
+ * data. Any other compound is the older NBT form.
+ */
+function componentsArgument(id: string, raw: string): Built {
+    if (raw.startsWith("{")) {
+        if (readBalanced(raw, 0) !== raw) return { why: "unreadable" };
+        const read = componentList(raw);
+        if (read === null) return { why: "wrong-form" };
+        return read ? { value: `${id}[${read}]` } : { why: "unreadable" };
+    }
+    const list = raw.startsWith("[") ? raw : `[${raw}]`;
+    if (readBalanced(list, 0) !== list) return { why: "unreadable" };
+    const fields = splitTopLevel(list.slice(1, -1));
+    if (fields.length === 0 || !fields.every((field) => COMPONENT_FIELD.test(field)))
+        return { why: "unreadable" };
+    return { value: `${id}[${fields.join(",")}]` };
 }

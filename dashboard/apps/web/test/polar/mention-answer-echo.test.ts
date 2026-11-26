@@ -22,6 +22,9 @@ vi.mock("@/lib/polar/access", () => ({
 const garbled = new Set<string>();
 vi.mock("@/lib/polar/automatic", async (original) => ({
     PLAIN_TURN: {},
+    // models.ts registers the cooldown store as it loads.
+    shareCooldownsWith: () => undefined,
+    adoptCooldown: () => undefined,
     noteModelEchoed: (_user: string, provider: string, model: string) => echoed.add(`${provider}/${model}`),
     // Automatic leaves a model that wrote its calls as text off a turn with
     // tools; here that is the same set the resolver below skips.

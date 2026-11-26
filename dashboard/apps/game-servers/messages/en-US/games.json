@@ -1023,7 +1023,12 @@
             "recipient": "The other player has to be on the server to receive it. Nothing was moved.",
             "same": "Pick a different player to send it to.",
             "rejected": "The server refused that stack. One of the enchantments may not exist on this version.",
-            "enchantUnsupported": "This server cannot take enchantments from Polaris: that needs Java Edition 1.13 or later."
+            "enchantUnsupported": "This server cannot take enchantments from Polaris: that needs Java Edition 1.13 or later.",
+            "dataUnsupported": "This server cannot take item data from Polaris: that needs Java Edition 1.13 or later.",
+            "dataComponents": "This server is 1.20.5 or later: write the data as components, such as minecraft:damage=5, not as an NBT compound.",
+            "dataTag": "This server is older than 1.20.5: write the data as an NBT compound right after the id, not as components.",
+            "dataRejected": "The server refused that item. One of its components or tags may not exist on this version.",
+            "dataUnreadable": "That item data is not complete: a bracket or a quote is left open, or a part has no value."
         },
         "blueprints": {
             "survival": {
