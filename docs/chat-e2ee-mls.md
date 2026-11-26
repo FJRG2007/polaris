@@ -944,7 +944,7 @@ action and route are never used there, and the plain `scheduleMessage` still
 refuses a sealed conversation (`errors.sealedOnly`). Not knowing whether the
 conversation seals fails the schedule; it never falls back to the clear.
 
-Tables (migration `20281214000000_chat_sealed_scheduled`, additive):
+Tables (migration `20290102000000_chat_sealed_scheduled`, additive):
 `ChatScheduledMessage` gains `clientKey` and the `e2ee*` columns `send-sealed`
 takes (ciphertext, epoch, sender leaf, device, signature), with `body` empty;
 `ChatScheduledFile.sealed` marks a sealed upload, kept under the upload's own id
