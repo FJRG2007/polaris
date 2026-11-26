@@ -8,8 +8,9 @@
  * packages/elements/src/queue.tsx at ca8be60), Apache-2.0 - see the LICENSE
  * beside this file. Changed: Tailwind 3 and Polaris tokens, a plain list
  * instead of the collapsible scroll area, and items that read as the message
- * typed (clamped, line breaks kept) with their actions in one "..." menu, because
- * Polar's queue is the user's own words rather than a plan's steps.
+ * typed (clamped, line breaks kept) with Send now, Edit and Remove as buttons on the row and the
+ * reordering in a "..." menu, because Polar's queue is the user's own words
+ * rather than a plan's steps (OpenCode's queue rows work the same way).
  */
 
 import {
@@ -39,6 +40,8 @@ export interface QueueItemLabels {
     menu: string;
     sendNow: string;
     edit: string;
+    /** The edit box's name where it differs from the Edit button's. */
+    editField?: string;
     up: string;
     down: string;
     remove: string;
@@ -83,7 +86,7 @@ export function QueueItem({
         return (
             <li className="space-y-1 rounded-md bg-card px-2 py-1.5">
                 <textarea
-                    aria-label={labels.edit}
+                    aria-label={labels.editField ?? labels.edit}
                     value={draft}
                     autoFocus
                     rows={Math.min(6, Math.max(2, draft.split("\n").length))}
@@ -114,6 +117,8 @@ export function QueueItem({
             </li>
         );
     }
+    const icon =
+        "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 [@media(pointer:coarse)]:size-11";
     return (
         <li className="flex min-w-0 items-start gap-2 rounded-md bg-card px-2 py-1.5">
             <div className="min-w-0 flex-1">
@@ -122,47 +127,42 @@ export function QueueItem({
                 </p>
                 {labels.files ? <p className="text-xs text-foreground-subtle">{labels.files}</p> : null}
             </div>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <button
-                        type="button"
-                        aria-label={labels.menu}
-                        title={labels.menu}
-                        disabled={disabled}
-                        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50 [@media(pointer:coarse)]:size-11"
-                    >
-                        <MoreHorizontal className="size-4" />
+            <div className="flex shrink-0 items-center gap-0.5">
+                {onSendNow ? (
+                    <button type="button" aria-label={labels.sendNow} title={labels.sendNow} disabled={disabled} onClick={onSendNow} className={icon}>
+                        <Send className="size-4" />
                     </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-44">
-                    {onSendNow ? (
-                        <DropdownMenuItem onSelect={onSendNow}>
-                            <Send />
-                            {labels.sendNow}
-                        </DropdownMenuItem>
-                    ) : null}
-                    <DropdownMenuItem onSelect={() => setDraft(value)}>
-                        <Pencil />
-                        {labels.edit}
-                    </DropdownMenuItem>
-                    {first ? null : (
-                        <DropdownMenuItem onSelect={onUp}>
-                            <ArrowUp />
-                            {labels.up}
-                        </DropdownMenuItem>
-                    )}
-                    {last ? null : (
-                        <DropdownMenuItem onSelect={onDown}>
-                            <ArrowDown />
-                            {labels.down}
-                        </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onSelect={onRemove}>
-                        <X />
-                        {labels.remove}
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+                ) : null}
+                <button type="button" aria-label={labels.edit} title={labels.edit} disabled={disabled} onClick={() => setDraft(value)} className={icon}>
+                    <Pencil className="size-4" />
+                </button>
+                <button type="button" aria-label={labels.remove} title={labels.remove} disabled={disabled} onClick={onRemove} className={icon}>
+                    <X className="size-4" />
+                </button>
+                {first && last ? null : (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button type="button" aria-label={labels.menu} title={labels.menu} disabled={disabled} className={icon}>
+                                <MoreHorizontal className="size-4" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-40">
+                            {first ? null : (
+                                <DropdownMenuItem onSelect={onUp}>
+                                    <ArrowUp />
+                                    {labels.up}
+                                </DropdownMenuItem>
+                            )}
+                            {last ? null : (
+                                <DropdownMenuItem onSelect={onDown}>
+                                    <ArrowDown />
+                                    {labels.down}
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
+            </div>
         </li>
     );
 }

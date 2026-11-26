@@ -210,6 +210,7 @@
         "down": "Bajar",
         "remove": "Quitar de la cola",
         "menu": "Más opciones",
+        "editAction": "Editar",
         "sendNow": "Enviar ya",
         "stopAndSend": "Parar y enviar ya",
         "save": "Guardar",

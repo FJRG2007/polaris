@@ -665,6 +665,15 @@ describe("a message's copy button", () => {
     });
 });
 
+/** The words of each queued message, in the order the queue shows them. */
+function queued() {
+    const section = screen.queryByRole("region", { name: "Sends next" });
+    if (!section) return [];
+    return within(section)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector("p")?.textContent ?? "");
+}
+
 describe("the queue", () => {
     const busyThread = () => {
         chat.status = "streaming";
@@ -678,8 +687,7 @@ describe("the queue", () => {
         await type("second");
         await type("third");
         expect(chat.sent).toEqual([]);
-        const items = screen.getAllByLabelText("Queued message") as HTMLInputElement[];
-        expect(items.map((item) => item.value)).toEqual(["second", "third"]);
+        expect(queued()).toEqual(["second", "third"]);
         expect(patches.at(-1)).toMatchObject({ queue: [{ text: "second" }, { text: "third" }] });
     });
 
@@ -689,13 +697,19 @@ describe("the queue", () => {
         await ready();
         await type("second");
         await type("third");
-        const [first] = screen.getAllByLabelText("Queued message") as HTMLInputElement[];
-        fireEvent.change(first!, { target: { value: "second, edited" } });
-        fireEvent.blur(first!);
+        fireEvent.click(screen.getAllByLabelText("Edit")[0]!);
+        const box = screen.getByLabelText("Queued message");
+        fireEvent.change(box, { target: { value: "second, edited" } });
+        fireEvent.keyDown(box, { key: "Enter" });
         expect(patches.at(-1)).toMatchObject({
             queue: [{ text: "second, edited" }, { text: "third" }]
         });
-        fireEvent.click(screen.getAllByLabelText("Move down")[0]!);
+        fireEvent.pointerDown(screen.getAllByLabelText("Message options")[0]!, {
+            button: 0,
+            ctrlKey: false,
+            pointerType: "mouse"
+        });
+        fireEvent.click(await screen.findByText("Move down"));
         expect(patches.at(-1)).toMatchObject({
             queue: [{ text: "third" }, { text: "second, edited" }]
         });
@@ -711,15 +725,11 @@ describe("the queue", () => {
         await type("third");
         fireEvent.click(screen.getByLabelText("Stop"));
         expect(chat.stopped).toBe(1);
-        expect(screen.getAllByLabelText("Queued message")).toHaveLength(2);
+        expect(queued()).toHaveLength(2);
         chat.status = "ready";
         act(() => view.again());
         await waitFor(() => expect(chat.sent.map((message) => message.text)).toEqual(["second"]));
-        expect(
-            (screen.getAllByLabelText("Queued message") as HTMLInputElement[]).map(
-                (item) => item.value
-            )
-        ).toEqual(["third"]);
+        expect(queued()).toEqual(["third"]);
     });
 
     it("comes back with the thread after a reload", async () => {
@@ -737,9 +747,7 @@ describe("the queue", () => {
         fireEvent.click(screen.getByLabelText("Conversations"));
         fireEvent.click(await screen.findByText("Old chat"));
         await waitFor(() =>
-            expect((screen.getByLabelText("Queued message") as HTMLInputElement).value).toBe(
-                "waiting since before the reload"
-            )
+            expect(queued()).toEqual(["waiting since before the reload"])
         );
     });
 });
@@ -781,9 +789,7 @@ describe("the open conversation after a reload", () => {
         chat.status = "streaming";
         mount();
         await waitFor(() =>
-            expect((screen.getByLabelText("Queued message") as HTMLInputElement).value).toBe(
-                "still here after the reload"
-            )
+            expect(queued()).toEqual(["still here after the reload"])
         );
     });
 

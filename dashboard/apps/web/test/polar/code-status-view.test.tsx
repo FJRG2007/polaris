@@ -40,12 +40,8 @@ describe("CodeQueuedList", () => {
         return { ...calls, ...view };
     }
 
-    function openMenu(index: number) {
-        fireEvent.pointerDown(screen.getAllByRole("button", { name: "Message options" })[index]!, {
-            button: 0,
-            ctrlKey: false,
-            pointerType: "mouse"
-        });
+    function button(name: string, index = 0) {
+        return screen.getAllByRole("button", { name })[index]!;
     }
 
     it("lists the waiting messages in order, with their files", () => {
@@ -57,11 +53,9 @@ describe("CodeQueuedList", () => {
 
     it("takes one back, and saves an edit only once the words changed", async () => {
         const { onEdit, onTakeBack } = list();
-        openMenu(1);
-        fireEvent.click(await screen.findByText("Take back"));
+        fireEvent.click(button("Take back", 1));
         expect(onTakeBack).toHaveBeenCalledWith("q2");
-        openMenu(0);
-        fireEvent.click(await screen.findByText("Edit"));
+        fireEvent.click(button("Edit", 0));
         const save = await screen.findByRole("button", { name: "Save" });
         expect(save).toHaveProperty("disabled", true);
         fireEvent.change(screen.getByRole("textbox", { name: "Edit" }), { target: { value: "then add more tests" } });
@@ -69,23 +63,27 @@ describe("CodeQueuedList", () => {
         expect(onEdit).toHaveBeenCalledWith("q1", "then add more tests");
     });
 
-    it("says Send now where the message joins the running turn, and that it stops the turn where it cannot", async () => {
+    it("moves one down from its menu", async () => {
+        const { onMove } = list();
+        fireEvent.pointerDown(button("Message options", 0), { button: 0, ctrlKey: false, pointerType: "mouse" });
+        fireEvent.click(await screen.findByText("Move down"));
+        expect(onMove).toHaveBeenCalledWith("q1", "down");
+    });
+
+    it("says Send now where the message joins the running turn, and that it stops the turn where it cannot", () => {
         const steering = list({ steers: true });
-        openMenu(0);
-        fireEvent.click(await screen.findByText("Send now"));
+        fireEvent.click(button("Send now", 0));
         expect(steering.onSendNow).toHaveBeenCalledWith("q1");
         steering.unmount();
         list({ steers: false });
-        openMenu(0);
-        expect(await screen.findByText("Stop the turn and send this now")).toBeTruthy();
+        expect(button("Stop the turn and send this now", 0)).toBeTruthy();
     });
 
-    it("offers no Send now where nobody may steer the session", async () => {
+    it("offers no Send now where nobody may steer the session", () => {
         list({ onSendNow: null });
-        openMenu(0);
-        expect(await screen.findByText("Edit")).toBeTruthy();
-        expect(screen.queryByText("Send now")).toBeNull();
-        expect(screen.queryByText("Stop the turn and send this now")).toBeNull();
+        expect(button("Edit", 0)).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Stop the turn and send this now" })).toBeNull();
     });
 
     it("offers Stop, send nothing only mid-turn", () => {

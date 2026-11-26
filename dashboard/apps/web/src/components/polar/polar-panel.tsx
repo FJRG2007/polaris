@@ -2555,7 +2555,8 @@ export function PolarChat({
                             labels={{
                                 menu: t("queue.menu"),
                                 sendNow: busy ? t("queue.stopAndSend") : t("queue.sendNow"),
-                                edit: t("queue.edit"),
+                                edit: t("queue.editAction"),
+                                editField: t("queue.edit"),
                                 up: t("queue.up"),
                                 down: t("queue.down"),
                                 remove: t("queue.remove"),

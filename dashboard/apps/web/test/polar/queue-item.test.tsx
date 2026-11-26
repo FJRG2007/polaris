@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 /**
  * A queued message reads as typed - line breaks kept, its files counted - with
- * its actions in one "..." menu; Send now is left out where nobody may send it
- * ahead, and saving the words it already has changes nothing.
+ * Send now, Edit and Remove on the row and the reordering in a "..." menu; Send
+ * now is left out where nobody may send it ahead, and saving the words it already
+ * has changes nothing.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -55,44 +56,60 @@ function openMenu() {
 describe("a queued message", () => {
     it("reads as typed, line breaks kept, with its files counted", () => {
         show({ labels: { ...LABELS, files: "+2 files" } });
-        const text = screen.getByTitle("first line\nsecond line");
+        const text = screen.getByTitle("first line\nsecond line", { normalizer: (title) => title });
         expect(text.textContent).toBe("first line\nsecond line");
         expect(text.className).toContain("whitespace-pre-wrap");
         expect(screen.getByText("+2 files")).toBeTruthy();
     });
 
-    it("keeps its actions in the menu", async () => {
+    it("sends, edits and removes from buttons on the row, reachable by keyboard", () => {
+        const calls = show();
+        const send = screen.getByRole("button", { name: "Send now" });
+        expect(send.tagName).toBe("BUTTON");
+        expect(send.getAttribute("tabindex")).toBeNull();
+        fireEvent.click(send);
+        expect(calls.sendNow).toHaveBeenCalledOnce();
+        fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+        expect(calls.remove).toHaveBeenCalledOnce();
+        expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+    });
+
+    it("keeps the reordering in the menu", async () => {
         const calls = show();
         openMenu();
-        fireEvent.click(await screen.findByText("Send now"));
-        expect(calls.sendNow).toHaveBeenCalledOnce();
+        fireEvent.click(await screen.findByText("Move up"));
+        expect(calls.up).toHaveBeenCalledOnce();
         openMenu();
-        expect(await screen.findByText("Move up")).toBeTruthy();
-        expect(screen.getByText("Move down")).toBeTruthy();
-        fireEvent.click(screen.getByText("Remove"));
-        expect(calls.remove).toHaveBeenCalledOnce();
+        fireEvent.click(await screen.findByText("Move down"));
+        expect(calls.down).toHaveBeenCalledOnce();
     });
 
-    it("offers no Send now where nobody may send it ahead, and no move past an end", async () => {
+    it("offers no Send now where nobody may send it ahead, and no menu with nothing to move", () => {
         show({ onSendNow: null, first: true, last: true });
-        openMenu();
-        expect(await screen.findByText("Edit")).toBeTruthy();
-        expect(screen.queryByText("Send now")).toBeNull();
-        expect(screen.queryByText("Move up")).toBeNull();
-        expect(screen.queryByText("Move down")).toBeNull();
+        expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "More options" })).toBeNull();
     });
 
-    it("waits for a change on its way before opening the menu", () => {
+    it("offers only the move that exists", async () => {
+        show({ first: true });
+        openMenu();
+        expect(await screen.findByText("Move down")).toBeTruthy();
+        expect(screen.queryByText("Move up")).toBeNull();
+    });
+
+    it("waits for a change on its way before acting", () => {
         show({ disabled: true });
-        expect((screen.getByRole("button", { name: "More options" }) as HTMLButtonElement).disabled).toBe(true);
+        for (const name of ["Send now", "Edit", "Remove", "More options"]) {
+            expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+        }
     });
 });
 
 describe("editing a queued message", () => {
     async function edit() {
         const calls = show();
-        openMenu();
-        fireEvent.click(await screen.findByText("Edit"));
+        fireEvent.click(screen.getByRole("button", { name: "Edit" }));
         return { calls, box: (await screen.findByLabelText("Edit")) as HTMLTextAreaElement };
     }
 
@@ -101,7 +118,7 @@ describe("editing a queued message", () => {
         fireEvent.change(box, { target: { value: "new words" } });
         fireEvent.click(screen.getByText("Save"));
         expect(calls.save).toHaveBeenCalledWith("new words");
-        expect(screen.queryByLabelText("Edit")).toBeNull();
+        expect(screen.queryByRole("textbox")).toBeNull();
     });
 
     it("changes nothing when the words are the same, and closes on Enter", async () => {
@@ -110,7 +127,7 @@ describe("editing a queued message", () => {
         fireEvent.change(box, { target: { value: "first line\nsecond line  " } });
         fireEvent.keyDown(box, { key: "Enter" });
         expect(calls.save).not.toHaveBeenCalled();
-        expect(screen.queryByLabelText("Edit")).toBeNull();
+        expect(screen.queryByRole("textbox")).toBeNull();
     });
 
     it("drops the edit on Escape", async () => {
@@ -118,6 +135,6 @@ describe("editing a queued message", () => {
         fireEvent.change(box, { target: { value: "other" } });
         fireEvent.keyDown(box, { key: "Escape" });
         expect(calls.save).not.toHaveBeenCalled();
-        expect(screen.getByTitle("first line\nsecond line")).toBeTruthy();
+        expect(screen.getByTitle("first line\nsecond line", { normalizer: (title) => title })).toBeTruthy();
     });
 });

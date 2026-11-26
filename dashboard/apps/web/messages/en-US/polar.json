@@ -210,6 +210,7 @@
         "down": "Move down",
         "remove": "Remove from queue",
         "menu": "Message options",
+        "editAction": "Edit",
         "sendNow": "Send now",
         "stopAndSend": "Stop and send now",
         "save": "Save",
