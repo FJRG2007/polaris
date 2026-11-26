@@ -41,7 +41,7 @@
  * 404 and no screen constructs a device.
  */
 
-import type { MlsBody } from "./schemas";
+import { MAX_TREE_PARTS, TREE_PART_BYTES, type MlsBody } from "./schemas";
 import { LEGACY_EPOCH, type MlsHistoryKeyStore } from "./mls-history-keys";
 import * as content from "@polaris/chat-crypto/message-content";
 
@@ -90,7 +90,15 @@ export interface MlsCommitOut {
     commit: Uint8Array;
     welcome?: Uint8Array | null;
     groupInfo?: Uint8Array | null;
+    /** The new epoch's tree, when the group is large enough that the Welcome and GroupInfo left it out. */
+    ratchetTree?: Uint8Array | null;
 }
+
+/**
+ * A commit as the outbox keeps it: with the tree the Welcome and GroupInfo
+ * left out, which goes up in parts (`put-tree-part`) before the commit itself.
+ */
+type CommitBody = Extract<MlsBody, { op: "commit" }> & { ratchetTree?: string };
 
 export interface MlsProcessedOut {
     kind: string;
@@ -113,9 +121,12 @@ export interface MlsMemberLike {
     signContent(payload: Uint8Array): Uint8Array;
     mergePendingCommit(groupId: Uint8Array): void;
     clearPendingCommit(groupId: Uint8Array): void;
-    joinByWelcome(welcome: Uint8Array): Uint8Array;
-    joinByExternalCommit(groupInfo: Uint8Array): { groupId: Uint8Array; commit: Uint8Array };
+    /** `ratchetTree`: that epoch's tree, for a Welcome that left it out (else it throws `MlsMissingTree`). */
+    joinByWelcome(welcome: Uint8Array, ratchetTree?: Uint8Array | null): Uint8Array;
+    joinByExternalCommit(groupInfo: Uint8Array, ratchetTree?: Uint8Array | null): { groupId: Uint8Array; commit: Uint8Array };
     groupInfo(groupId: Uint8Array): Uint8Array;
+    /** This epoch's GroupInfo, and the tree on its own once the group is large enough to leave it out. */
+    groupInfoParts(groupId: Uint8Array): { groupInfo: Uint8Array; ratchetTree?: Uint8Array | null };
     encrypt(groupId: Uint8Array, plaintext: Uint8Array): Uint8Array;
     process(groupId: Uint8Array, message: Uint8Array): MlsProcessedOut;
     epoch(groupId: Uint8Array): bigint;
@@ -419,14 +430,15 @@ export class MlsDevice {
             const out = this.member.addMembers(groupId, packages.map((p) => fromText(p.keyPackage)));
             if (!out.welcome || !out.groupInfo) throw new Error("an MLS add commit came back without its Welcome or GroupInfo");
             const welcome = toText(out.welcome);
-            const body: MlsBody = {
+            const body: CommitBody = {
                 op: "commit",
                 channelId,
                 device: this.options.device,
                 epoch: epoch.toString(),
                 commit: toText(out.commit),
                 groupInfo: toText(out.groupInfo),
-                welcomes: packages.map((p) => ({ recipient: p.address, welcome }))
+                welcomes: packages.map((p) => ({ recipient: p.address, welcome })),
+                ...(out.ratchetTree ? { ratchetTree: toText(out.ratchetTree) } : {})
             };
             if (await this.settleCommit(body, groupId)) {
                 await this.distributeHistoryKey(channelId, [...new Set(packages.map((p) => p.address.slice(0, p.address.indexOf("/"))))]);
@@ -553,14 +565,15 @@ export class MlsDevice {
             const epoch = this.member.epoch(groupId);
             const out = this.member.removeMembers(groupId, leaves.map((l) => l.leaf));
             if (!out.groupInfo) throw new Error("an MLS remove commit came back without its GroupInfo");
-            const body: MlsBody = {
+            const body: CommitBody = {
                 op: "commit",
                 channelId,
                 device: this.options.device,
                 epoch: epoch.toString(),
                 commit: toText(out.commit),
                 groupInfo: toText(out.groupInfo),
-                welcomes: []
+                welcomes: [],
+                ...(out.ratchetTree ? { ratchetTree: toText(out.ratchetTree) } : {})
             };
             if (await this.settleCommit(body, groupId)) {
                 await this.distributeHistoryKey(channelId, []);
@@ -862,20 +875,26 @@ export class MlsDevice {
     async rejoin(channelId: string): Promise<Uint8Array> {
         for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt++) {
             const answer = await this.send({ op: "group", channelId });
-            const group = answer.group as { groupId: string; epoch: string; groupInfo: string | null } | null;
+            const group = answer.group as { groupId: string; epoch: string; groupInfo: string | null; treeParts?: number | null } | null;
             if (!group?.groupInfo) throw new MlsRequestError(404, "unknownGroup");
+            // A large group's GroupInfo left the tree out: it is fetched beside it (and checked by the join).
+            const tree = group.treeParts ? await this.fetchTree(channelId, BigInt(group.epoch)) : null;
+            // Pruned or replaced under us: the group moved on, so start again from its newer GroupInfo.
+            if (group.treeParts && !tree) continue;
             // A copy of the group held from before (a fork, a device too far
             // behind, or the previous attempt's refused join) would refuse the join.
             this.forget(fromText(group.groupId));
-            const joined = this.member.joinByExternalCommit(fromText(group.groupInfo));
-            const body: MlsBody = {
+            const joined = this.member.joinByExternalCommit(fromText(group.groupInfo), tree);
+            const parts = this.member.groupInfoParts(joined.groupId);
+            const body: CommitBody = {
                 op: "commit",
                 channelId,
                 device: this.options.device,
                 epoch: group.epoch,
                 commit: toText(joined.commit),
-                groupInfo: toText(this.member.groupInfo(joined.groupId)),
-                welcomes: []
+                groupInfo: toText(parts.groupInfo),
+                welcomes: [],
+                ...(parts.ratchetTree ? { ratchetTree: toText(parts.ratchetTree) } : {})
             };
             try {
                 await this.commitAndSend(body);
@@ -1082,7 +1101,7 @@ export class MlsDevice {
         if (event.kind === "welcome") {
             if (groupId) return null;
             try {
-                groupId = this.member.joinByWelcome(payload);
+                groupId = await this.joinByWelcome(channelId, payload, epoch);
             } catch (caught) {
                 // A Welcome to this address under a key the device no longer holds (it lost its store).
                 console.warn("polaris: an MLS Welcome could not be opened and was skipped:", caught);
@@ -1152,10 +1171,76 @@ export class MlsDevice {
         }
     }
 
+    /**
+     * Join by a Welcome. A large group's Welcome left the tree out: the join
+     * says so (`MlsMissingTree`), and the tree of the Welcome's epoch comes
+     * from the server - checked by the join against the tree hash the Welcome
+     * commits to, so the server cannot swap it. A tree pruned by then (the
+     * Welcome waited too long) leaves the refusal standing; the device joins
+     * by external commit when the conversation is opened.
+     */
+    private async joinByWelcome(channelId: string, welcome: Uint8Array, epoch: bigint): Promise<Uint8Array> {
+        try {
+            return this.member.joinByWelcome(welcome);
+        } catch (caught) {
+            if ((caught as { code?: unknown } | null)?.code !== "MlsMissingTree") throw caught;
+            const tree = await this.fetchTree(channelId, epoch);
+            if (!tree) throw caught;
+            return this.member.joinByWelcome(welcome, tree);
+        }
+    }
+
+    /** The tree the server keeps for `epoch`, its parts put together; null when it holds none for that epoch. */
+    private async fetchTree(channelId: string, epoch: bigint): Promise<Uint8Array | null> {
+        const read = (part: number) =>
+            this.send({ op: "ratchet-tree", channelId, epoch: epoch.toString(), part }).then(
+                (answer) => answer as { parts: number; bytes: string },
+                (caught: unknown) => {
+                    if (caught instanceof MlsRequestError && caught.status === 404) return null;
+                    throw caught;
+                }
+            );
+        const first = await read(0);
+        if (!first) return null;
+        const chunks = [fromText(first.bytes)];
+        for (let part = 1; part < first.parts; part++) {
+            const next = await read(part);
+            // Replaced by a later epoch's tree while it was read: nothing to put together.
+            if (!next || next.parts !== first.parts) return null;
+            chunks.push(fromText(next.bytes));
+        }
+        const out = new Uint8Array(chunks.reduce((sum, c) => sum + c.length, 0));
+        let at = 0;
+        for (const chunk of chunks) {
+            out.set(chunk, at);
+            at += chunk.length;
+        }
+        return out;
+    }
+
+    /**
+     * Send a request the outbox kept. A commit carrying the tree its Welcome
+     * and GroupInfo left out sends the tree first, in parts staged for the
+     * epoch the commit moves into, then the commit naming how many there are.
+     */
+    private async sendKept(body: MlsBody | CommitBody): Promise<Record<string, unknown>> {
+        if (body.op !== "commit" || !("ratchetTree" in body) || !body.ratchetTree) return this.send(body);
+        const { ratchetTree, ...commit } = body;
+        const tree = fromText(ratchetTree);
+        const parts = Math.ceil(tree.length / TREE_PART_BYTES);
+        if (parts > MAX_TREE_PARTS) throw new Error("this conversation's group is past the largest tree the server keeps");
+        const epoch = (BigInt(body.epoch) + 1n).toString();
+        for (let part = 0; part < parts; part++) {
+            const bytes = toText(tree.subarray(part * TREE_PART_BYTES, (part + 1) * TREE_PART_BYTES));
+            await this.send({ op: "put-tree-part", channelId: body.channelId, device: body.device, epoch, part, parts, bytes });
+        }
+        return this.send({ ...commit, treeParts: parts });
+    }
+
     /** Persist the member's changes with the request, then send it and mark it sent. */
-    private async commitAndSend(body: MlsBody): Promise<Record<string, unknown>> {
+    private async commitAndSend(body: MlsBody | CommitBody): Promise<Record<string, unknown>> {
         const [id] = await this.options.store.commit(this.member.storeChanges(), [encoder.encode(JSON.stringify(body))]);
-        const answer = await this.send(body).catch(async (caught: unknown) => {
+        const answer = await this.sendKept(body).catch(async (caught: unknown) => {
             // A refusal is final for this request; a network failure leaves it in the outbox for the next start.
             if (caught instanceof MlsRequestError && id !== undefined) await this.options.store.sent(id);
             throw caught;
@@ -1168,7 +1253,7 @@ export class MlsDevice {
      * Send a commit made in `body.epoch` and settle the pending commit: merged
      * when the server took it, dropped when another commit won the epoch.
      */
-    private async settleCommit(body: Extract<MlsBody, { op: "commit" }>, groupId: Uint8Array): Promise<boolean> {
+    private async settleCommit(body: CommitBody, groupId: Uint8Array): Promise<boolean> {
         try {
             await this.commitAndSend(body);
         } catch (caught) {
@@ -1198,9 +1283,9 @@ export class MlsDevice {
         }
         const groupId = this.groupOf(body.channelId);
         // An external join records the group only once the server takes it.
-        if (!groupId) return void (await this.send(body).catch(() => undefined));
+        if (!groupId) return void (await this.sendKept(body).catch(() => undefined));
         try {
-            await this.send(body);
+            await this.sendKept(body);
         } catch (caught) {
             if (!(caught instanceof MlsRequestError) || caught.reason !== "staleEpoch") throw caught;
             if (!(await this.logHasCommit(body))) {

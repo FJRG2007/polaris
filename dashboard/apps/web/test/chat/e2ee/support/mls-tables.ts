@@ -20,7 +20,7 @@ export function memoryPrisma(state: MemoryTablesState) {
         Object.entries(where).every(([key, want]) => {
             if (key === "OR") return (want as Row[]).some((w) => matches(row, w));
             if (key === "AND") return (want as Row[]).every((w) => matches(row, w));
-            if (key === "userId_device" || key === "channelId_service") return matches(row, want as Row);
+            if (key === "userId_device" || key === "channelId_service" || key === "channelId_epoch_sender_part") return matches(row, want as Row);
             if (want && typeof want === "object" && !(want instanceof Uint8Array)) {
                 const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint; lte?: bigint; not?: unknown };
                 if (cond.in) return cond.in.some((value) => same(row[key], value));
@@ -112,6 +112,7 @@ export function memoryPrisma(state: MemoryTablesState) {
         // Read by `conversationSealed` (a conversation the migration cut is sealed only).
         chatMigration: table("chatMigration", ["channelId"]),
         mlsGroupEvent: table("mlsGroupEvent", []),
+        mlsTreePart: table("mlsTreePart", ["channelId", "epoch", "sender", "part"]),
         chatHistoryKey: table("chatHistoryKey", ["channelId", "epoch", "recipient"]),
         chatAccountKey: table("chatAccountKey", ["userId"]),
         chatMessage: table("chatMessage", []),

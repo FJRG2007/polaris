@@ -8,14 +8,16 @@
  * (`POLARIS_MLS_MEASURE=100,500,1000 npx vitest run test/chat/e2ee/mls-commit-size`).
  * Each size prints one line of byte counts; the run fails when a commit a
  * member sends in steady state (one leaves, one joins) is over what the route
- * takes (`mlsBytes` in `lib/chat/e2ee/schemas.ts`), and reports the Welcome and
- * GroupInfo, which carry the whole ratchet tree, beside that limit.
+ * takes (`mlsBytes` in `lib/chat/e2ee/schemas.ts`), or when a Welcome or GroupInfo
+ * is: past `INLINE_TREE_BYTES` both leave the ratchet tree out, and the tree
+ * (reported as `tree`) goes up on its own in `TREE_PART_BYTES` parts.
  */
 
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { MLS_SUITE } from "@/lib/chat/e2ee/mls-client";
+import { MAX_TREE_PARTS, TREE_PART_BYTES } from "@/lib/chat/e2ee/schemas";
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { existsSync, readdirSync } from "node:fs";
@@ -30,8 +32,8 @@ const sizes = (process.env.POLARIS_MLS_MEASURE ?? "")
     .map((s) => Number.parseInt(s.trim(), 10))
     .filter((n) => Number.isInteger(n) && n > 1);
 
-/** The route takes MLS objects as base64url text of at most 1 MiB, so this many bytes. */
-const WIRE_LIMIT = Math.floor((1024 * 1024 * 3) / 4);
+/** The route takes MLS objects of at most 1 MiB once decoded (`base64Url(1, 1024 * 1024)`). */
+const WIRE_LIMIT = 1024 * 1024;
 /** `ADD_BATCH` / `REMOVE_BATCH` in `mls-client.ts`. */
 const BATCH = 100;
 const encoder = new TextEncoder();
@@ -53,14 +55,15 @@ describe.skipIf(!nativeFile || sizes.length === 0)("MLS handshake size with a fu
 
             const others = Array.from({ length: size - 1 }, () => member().keyPackage());
             const keyPackage = others[0]!.length;
-            let lastAdd = { commit: 0, welcome: 0 };
+            let lastAdd = { commit: 0, welcome: 0, groupInfo: 0, tree: 0 };
             for (let i = 0; i < others.length; i += BATCH) {
                 const out = committer.addMembers(groupId, others.slice(i, i + BATCH));
                 committer.mergePendingCommit(groupId);
-                lastAdd = { commit: out.commit.length, welcome: out.welcome?.length ?? 0 };
+                lastAdd = { commit: out.commit.length, welcome: out.welcome?.length ?? 0, groupInfo: out.groupInfo?.length ?? 0, tree: out.ratchetTree?.length ?? 0 };
             }
             expect(committer.members(groupId)).toHaveLength(size);
             const groupInfo = committer.groupInfo(groupId).length;
+            const parts = committer.groupInfoParts(groupId);
 
             // Steady state: one leaves (a commit with a path), one joins.
             const leaf = committer.members(groupId).find((m) => m.leaf !== committer.ownLeaf(groupId))!.leaf;
@@ -83,7 +86,13 @@ describe.skipIf(!nativeFile || sizes.length === 0)("MLS handshake size with a fu
                 keyPackage,
                 addBatchCommit: lastAdd.commit,
                 addBatchWelcome: lastAdd.welcome,
+                addBatchGroupInfo: lastAdd.groupInfo,
+                addBatchTree: lastAdd.tree,
+                // With the tree inside (what an older device asks for), and the split an external joiner now gets.
                 groupInfo,
+                groupInfoBare: parts.groupInfo.length,
+                tree: parts.ratchetTree?.length ?? 0,
+                treeParts: Math.ceil((parts.ratchetTree?.length ?? 0) / TREE_PART_BYTES),
                 removeOneCommit: removeOne.commit.length,
                 addOneCommit: addOne.commit.length,
                 addOneWelcome: addOne.welcome?.length ?? 0,
@@ -93,6 +102,10 @@ describe.skipIf(!nativeFile || sizes.length === 0)("MLS handshake size with a fu
             console.log(`mls-size ${JSON.stringify(line)}`);
             expect(line.removeOneCommit).toBeLessThan(WIRE_LIMIT);
             expect(line.addOneCommit).toBeLessThan(WIRE_LIMIT);
+            expect(line.addOneWelcome).toBeLessThan(WIRE_LIMIT);
+            expect(line.addBatchWelcome).toBeLessThan(WIRE_LIMIT);
+            expect(line.groupInfoBare).toBeLessThan(WIRE_LIMIT);
+            expect(line.treeParts).toBeLessThanOrEqual(MAX_TREE_PARTS);
         }, 600_000);
     }
 });

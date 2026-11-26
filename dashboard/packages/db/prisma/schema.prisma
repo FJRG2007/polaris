@@ -19497,6 +19497,29 @@ model MlsGroup {
     epoch       BigInt   @default(0)
     groupInfo   Bytes?
     updatedAt   DateTime @updatedAt
+    treeParts   MlsTreePart[]
+}
+
+// A large group's ratchet tree, kept apart from its GroupInfo and Welcomes
+// (RFC 9420, 12.4.3.3): past a size the committer leaves the tree out of both
+// and uploads it in parts, staged (`committed` false) before its commit and
+// promoted by it. Public data, checked by every joiner against the tree hash
+// the signed GroupInfo commits to. Only the last few epochs are kept.
+model MlsTreePart {
+    channelId String   @db.Uuid
+    // The epoch the tree belongs to: the one its commit moves the group into.
+    epoch     BigInt
+    // The device address that uploaded it.
+    sender    String
+    part      Int
+    parts     Int
+    bytes     Bytes
+    committed Boolean  @default(false)
+    createdAt DateTime @default(now())
+    group     MlsGroup @relation(fields: [channelId], references: [channelId], onDelete: Cascade)
+
+    @@id([channelId, epoch, sender, part])
+    @@index([channelId, committed, epoch])
 }
 
 // The delivery service's ordered log for a conversation's group: commits and

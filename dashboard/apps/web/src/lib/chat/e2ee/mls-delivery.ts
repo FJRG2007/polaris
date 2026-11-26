@@ -24,6 +24,14 @@ export const MAX_KEY_PACKAGES_PER_DEVICE = 100;
 export const MAX_CLAIM_USERS = 100;
 export const MAX_EVENTS_PER_READ = 200;
 export const MAX_WELCOMES_PER_COMMIT = 100;
+/**
+ * How many epochs a large group's tree is kept for (`MlsTreePart`): a Welcome
+ * needs the tree of the epoch it was made in, so one that waits while the
+ * group moves this many epochs on is past it and its device joins by external
+ * commit from the latest tree instead. At ~2.6 MB of tree per thousand
+ * members, this bounds what one group holds.
+ */
+export const TREE_EPOCHS = 4n;
 /** Key-package rows `accountsWithKeyPackages` reads at most. */
 const MAX_KEY_PACKAGE_ROWS = 2_000;
 /**
@@ -40,7 +48,7 @@ const PRUNE_EVERY_EPOCHS = 32n;
 export const deviceAddress = (userId: string, device: string) => `${userId}/${device}`;
 
 export class MlsDeliveryRefusal extends Error {
-    constructor(readonly reason: "unknownDevice" | "tooManyKeyPackages" | "unknownGroup" | "groupExists" | "staleEpoch") {
+    constructor(readonly reason: "unknownDevice" | "tooManyKeyPackages" | "unknownGroup" | "groupExists" | "staleEpoch" | "treeMissing") {
         super(reason);
         this.name = "MlsDeliveryRefusal";
     }
@@ -278,6 +286,12 @@ export async function groupState(channelId: string) {
     });
 }
 
+/** How many parts the tree of the group's current epoch is kept in; null while it rides inside the GroupInfo. */
+export async function currentTreeParts(channelId: string, epoch: bigint): Promise<number | null> {
+    const row = await prisma.mlsTreePart.findFirst({ where: { channelId, epoch, part: 0, committed: true }, select: { parts: true } });
+    return row?.parts ?? null;
+}
+
 /**
  * Take a commit made in `epoch`: the group moves to `epoch + 1` and the commit,
  * then each Welcome, join the log - all or nothing. Refused with `staleEpoch`
@@ -289,7 +303,8 @@ export async function submitCommit(
     epoch: bigint,
     commit: Uint8Array,
     welcomes: readonly { recipient: string; welcome: Uint8Array }[],
-    groupInfo: Uint8Array
+    groupInfo: Uint8Array,
+    treeParts?: number
 ): Promise<{ epoch: bigint }> {
     return prisma.$transaction(async (tx) => {
         const moved = await tx.mlsGroup.updateMany({
@@ -302,6 +317,16 @@ export async function submitCommit(
         }
         await tx.mlsGroupEvent.create({ data: { channelId, epoch, kind: "commit", sender, payload: Buffer.from(commit) } });
         const next = epoch + 1n;
+        if (treeParts) {
+            // The tree this commit left out, every part staged by the committer for the epoch it moves into.
+            const staged = { channelId, epoch: next, sender, committed: false, parts: treeParts, part: { lt: treeParts } };
+            if ((await tx.mlsTreePart.count({ where: staged })) !== treeParts) throw new MlsDeliveryRefusal("treeMissing");
+            await tx.mlsTreePart.updateMany({ where: staged, data: { committed: true } });
+        }
+        // Staged parts nobody can commit any more (a lost race, a resend), and trees older than a Welcome still waits for.
+        await tx.mlsTreePart.deleteMany({
+            where: { channelId, OR: [{ committed: false, epoch: { lte: next } }, { epoch: { lte: next - TREE_EPOCHS } }] }
+        });
         if (next % PRUNE_EVERY_EPOCHS === 0n && next > RETAINED_EPOCHS)
             await tx.mlsGroupEvent.deleteMany({ where: { channelId, epoch: { lt: next - RETAINED_EPOCHS } } });
         if (welcomes.length)
@@ -317,6 +342,31 @@ export async function submitCommit(
             });
         return { epoch: epoch + 1n };
     });
+}
+
+/**
+ * Stage one part of the tree a large group's next commit leaves out
+ * (`epoch` is the epoch that commit moves into). Overwrites this device's own
+ * earlier upload of that part, so a retry or a resend never piles up; the
+ * commit promotes the parts and drops every other staged one.
+ */
+export async function putTreePart(channelId: string, sender: string, epoch: bigint, part: number, parts: number, bytes: Uint8Array): Promise<void> {
+    if (part >= parts) throw new MlsDeliveryRefusal("treeMissing");
+    const group = await prisma.mlsGroup.findUnique({ where: { channelId }, select: { epoch: true } });
+    if (!group) throw new MlsDeliveryRefusal("unknownGroup");
+    if (epoch !== group.epoch + 1n) throw new MlsDeliveryRefusal("staleEpoch");
+    const data = { parts, bytes: Buffer.from(bytes), committed: false, createdAt: new Date() };
+    await prisma.mlsTreePart.upsert({
+        where: { channelId_epoch_sender_part: { channelId, epoch, sender, part } },
+        create: { channelId, epoch, sender, part, ...data },
+        update: data
+    });
+}
+
+/** One part of the tree kept for `epoch`, and how many there are; null when that epoch's tree is inline or gone. */
+export async function readTreePart(channelId: string, epoch: bigint, part: number): Promise<{ parts: number; bytes: Uint8Array } | null> {
+    const row = await prisma.mlsTreePart.findFirst({ where: { channelId, epoch, part, committed: true }, select: { parts: true, bytes: true } });
+    return row && { parts: row.parts, bytes: new Uint8Array(row.bytes) };
 }
 
 /** An MLS application message (a history key, a control message) for the whole group. */

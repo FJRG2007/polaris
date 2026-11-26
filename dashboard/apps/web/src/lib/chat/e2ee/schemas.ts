@@ -89,6 +89,14 @@ export type KeysBody = z.infer<typeof keysBody>;
 
 /** MLS wire objects: a key package or Welcome at 1,000 members stays far under 1 MiB. */
 const mlsBytes = base64Url(1, 1024 * 1024);
+/**
+ * A large group's ratchet tree travels apart from its GroupInfo and Welcomes,
+ * in parts of this many bytes; at the hybrid suite a filled tree weighs about
+ * 2.6 KB a member, so 64 parts hold a tree of some 12,000 members.
+ */
+export const TREE_PART_BYTES = 512 * 1024;
+export const MAX_TREE_PARTS = 64;
+const treeParts = z.number().int().min(1).max(MAX_TREE_PARTS);
 /** The two suites polaris_core::mls speaks: hybrid 0x004F and RFC 9420's 0x0001. */
 const ciphersuite = z.union([z.literal(0x004f), z.literal(0x0001)]);
 /** A device id: what the device made for itself, never an address or a path. */
@@ -142,8 +150,24 @@ export const mlsBody = z.discriminatedUnion("op", [
         epoch,
         commit: mlsBytes,
         groupInfo: mlsBytes,
-        welcomes: z.array(z.object({ recipient: deviceAddressText, welcome: mlsBytes })).max(100).default([])
+        welcomes: z.array(z.object({ recipient: deviceAddressText, welcome: mlsBytes })).max(100).default([]),
+        // The new epoch's tree, left out of the GroupInfo and Welcomes, staged by this device in this many parts
+        // (`put-tree-part`) before the commit. Older callers and small groups send none.
+        treeParts: treeParts.optional()
     }),
+    // One part of the ratchet tree of `epoch` (the epoch the caller's next commit moves the group into); `part`
+    // below `parts` is checked by the handler.
+    z.object({
+        op: z.literal("put-tree-part"),
+        channelId,
+        device: deviceId,
+        epoch,
+        part: z.number().int().min(0).max(MAX_TREE_PARTS - 1),
+        parts: treeParts,
+        bytes: base64Url(1, TREE_PART_BYTES)
+    }),
+    // One part of the tree kept for `epoch`: a Welcome's (its event's epoch) or the latest, for an external join.
+    z.object({ op: z.literal("ratchet-tree"), channelId, epoch, part: z.number().int().min(0).max(MAX_TREE_PARTS - 1).default(0) }),
     z.object({ op: z.literal("application"), channelId, device: deviceId, epoch, payload: mlsBytes }),
     z.object({ op: z.literal("events"), channelId, device: deviceId, after: epoch.default("0") }),
     z.object({

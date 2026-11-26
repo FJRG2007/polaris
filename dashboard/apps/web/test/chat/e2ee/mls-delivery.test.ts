@@ -192,6 +192,52 @@ describe("/api/e2ee/mls", () => {
         expect(((await call({ op: "group", channelId: CHANNEL })).body.group as { epoch: string; groupInfo: string }).groupInfo).toBe(blob(11));
     });
 
+    it("keeps a large group's tree in parts: staged before the commit, promoted by it, served, and pruned", async () => {
+        await device(ALICE, "alice-laptop");
+        await device(BOB, "bob-phone-1");
+        await call({ op: "create-group", channelId: CHANNEL, groupId: blob(1, 16), ciphersuite: 0x004f, groupInfo: blob(2) });
+        const put = (epoch: string, part: number, parts: number, fill: number, as = ALICE, name = "alice-laptop") =>
+            call({ op: "put-tree-part", channelId: CHANNEL, device: name, epoch, part, parts, bytes: blob(fill, 64) }, as);
+        const commit = (epoch: string, treeParts?: number) =>
+            call({ op: "commit", channelId: CHANNEL, device: "alice-laptop", epoch, commit: blob(10), groupInfo: blob(11), ...(treeParts ? { treeParts } : {}) });
+        const tree = (epoch: string, part = 0, as = ALICE) => call({ op: "ratchet-tree", channelId: CHANNEL, epoch, part }, as);
+
+        // Only for the epoch the next commit moves into, by the session's own device, with the part inside the count.
+        expect((await put("0", 0, 2, 1)).body.error).toBe("staleEpoch");
+        expect((await put("2", 0, 2, 1)).body.error).toBe("staleEpoch");
+        expect((await put("1", 2, 2, 1)).body.error).toBe("treeMissing");
+        expect((await put("1", 0, 2, 1, BOB, "alice-laptop")).status).toBe(403);
+        expect((await call({ op: "put-tree-part", channelId: CHANNEL, device: "alice-laptop", epoch: "1", part: 0, parts: 65, bytes: blob(1) })).status).toBe(400);
+
+        // A commit naming more parts than were staged is refused whole: the epoch does not move.
+        expect((await put("1", 0, 2, 1)).status).toBe(200);
+        expect((await commit("0", 2)).body.error).toBe("treeMissing");
+        expect(((await call({ op: "group", channelId: CHANNEL })).body.group as { epoch: string }).epoch).toBe("0");
+        // Staged is not served.
+        expect((await tree("1")).status).toBe(404);
+
+        // A retry overwrites its own part; another device's staged copy is dropped by the commit that wins.
+        expect((await put("1", 0, 2, 3)).status).toBe(200);
+        expect((await put("1", 1, 2, 4)).status).toBe(200);
+        expect((await put("1", 0, 1, 9, BOB, "bob-phone-1")).status).toBe(200);
+        expect((await commit("0", 2)).status).toBe(200);
+        expect(state.tables.mlsTreePart).toHaveLength(2);
+        expect((await tree("1", 0)).body).toEqual({ parts: 2, bytes: blob(3, 64) });
+        expect((await tree("1", 1, BOB)).body).toEqual({ parts: 2, bytes: blob(4, 64) });
+        expect((await tree("1", 0, EVE)).status).toBe(403);
+        const group = (await call({ op: "group", channelId: CHANNEL })).body.group as { epoch: string; treeParts: number | null };
+        expect(group).toMatchObject({ epoch: "1", treeParts: 2 });
+
+        // A commit with the tree inline (a small group again, an older device) leaves the group's latest tree unnamed.
+        expect((await commit("1")).status).toBe(200);
+        expect(((await call({ op: "group", channelId: CHANNEL })).body.group as { treeParts: number | null }).treeParts).toBeNull();
+        // The tree a Welcome of epoch 1 needs is kept for a few epochs, then pruned.
+        expect((await tree("1")).status).toBe(200);
+        for (let epoch = 2; epoch < 5; epoch++) expect((await commit(String(epoch))).status).toBe(200);
+        expect((await tree("1")).status).toBe(404);
+        expect(state.tables.mlsTreePart).toHaveLength(0);
+    });
+
     it("gives a device the group log and only its own Welcomes", async () => {
         await device(ALICE, "alice-laptop");
         await device(BOB, "bob-phone-1");

@@ -214,9 +214,27 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                     groupId: text(group.groupId),
                     ciphersuite: group.ciphersuite,
                     epoch: group.epoch.toString(),
-                    groupInfo: group.groupInfo ? text(group.groupInfo) : null
+                    groupInfo: group.groupInfo ? text(group.groupInfo) : null,
+                    // A large group's GroupInfo leaves the tree out: it is kept in this many parts (`ratchet-tree`).
+                    treeParts: await delivery.currentTreeParts(body.channelId, group.epoch)
                 }
             });
+        }
+        case "put-tree-part":
+            if (!(await ownDevice(userId, body.device))) return json(REFUSED, 403);
+            await delivery.putTreePart(
+                body.channelId,
+                delivery.deviceAddress(userId, body.device),
+                BigInt(body.epoch),
+                body.part,
+                body.parts,
+                bytes(body.bytes)
+            );
+            return json({ ok: true });
+        case "ratchet-tree": {
+            const part = await delivery.readTreePart(body.channelId, BigInt(body.epoch), body.part);
+            if (!part) return json({ error: "notFound" }, 404);
+            return json({ parts: part.parts, bytes: text(part.bytes) });
         }
         case "create-group":
             // Held (the kill switch): nothing new becomes sealed - only a conversation sealed already gets its group.
@@ -232,7 +250,8 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                 BigInt(body.epoch),
                 bytes(body.commit),
                 body.welcomes.map((w) => ({ recipient: w.recipient, welcome: bytes(w.welcome) })),
-                bytes(body.groupInfo)
+                bytes(body.groupInfo),
+                body.treeParts
             );
             return json({ epoch: moved.epoch.toString() });
         }
