@@ -43,7 +43,11 @@ fn large_group(alice: &Member) -> Option<Vec<u8>> {
     tree
 }
 
-fn assert_kind<T: std::fmt::Debug>(result: polaris_core::mls::Result<T>, kind: ErrorKind, what: &str) {
+fn assert_kind<T: std::fmt::Debug>(
+    result: polaris_core::mls::Result<T>,
+    kind: ErrorKind,
+    what: &str,
+) {
     match result {
         Err(error) => assert_eq!(error.kind, kind, "{what}: {error}"),
         Ok(value) => panic!("{what}: accepted, got {value:?}"),
@@ -55,8 +59,13 @@ fn a_small_group_keeps_the_tree_inline() {
     let alice = member("alice");
     let bob = member("bob");
     alice.create_group(GROUP).unwrap();
-    let out = alice.add_members(GROUP, &[bob.key_package().unwrap()]).unwrap();
-    assert!(out.ratchet_tree.is_none(), "a two-member tree is far under the limit");
+    let out = alice
+        .add_members(GROUP, &[bob.key_package().unwrap()])
+        .unwrap();
+    assert!(
+        out.ratchet_tree.is_none(),
+        "a two-member tree is far under the limit"
+    );
     assert!(out.group_info.is_some());
     alice.merge_pending_commit(GROUP).unwrap();
     // A device that predates the split joins exactly as before.
@@ -71,13 +80,23 @@ fn past_the_limit_the_welcome_leaves_the_tree_out_and_the_joiner_brings_it() {
     let alice = member("alice");
     large_group(&alice);
     let (carol, dave) = (member("carol"), member("dave"));
-    let before = alice.group_info_parts(GROUP).unwrap().1.expect("the tree is past the limit");
+    let before = alice
+        .group_info_parts(GROUP)
+        .unwrap()
+        .1
+        .expect("the tree is past the limit");
     assert!(before.len() > INLINE_TREE_BYTES);
 
     let out = alice
-        .add_members(GROUP, &[carol.key_package().unwrap(), dave.key_package().unwrap()])
+        .add_members(
+            GROUP,
+            &[carol.key_package().unwrap(), dave.key_package().unwrap()],
+        )
         .unwrap();
-    let tree = out.ratchet_tree.clone().expect("the commit hands the new tree back");
+    let tree = out
+        .ratchet_tree
+        .clone()
+        .expect("the commit hands the new tree back");
     let welcome = out.welcome.clone().unwrap();
     assert!(
         welcome.len() < tree.len() / 4,
@@ -89,7 +108,11 @@ fn past_the_limit_the_welcome_leaves_the_tree_out_and_the_joiner_brings_it() {
     alice.merge_pending_commit(GROUP).unwrap();
 
     // Without the tree the join says what it is missing.
-    assert_kind(carol.join_by_welcome(&welcome), ErrorKind::MissingTree, "no tree");
+    assert_kind(
+        carol.join_by_welcome(&welcome),
+        ErrorKind::MissingTree,
+        "no tree",
+    );
     // The tree of another epoch does not hash to what the Welcome commits to.
     assert_kind(
         carol.join_by_welcome_with_tree(&welcome, Some(&before)),
@@ -102,13 +125,23 @@ fn past_the_limit_the_welcome_leaves_the_tree_out_and_the_joiner_brings_it() {
         "a cut tree",
     );
     // The right tree, from an untrusted store, joins - and the joiner agrees with the group.
-    assert_eq!(dave.join_by_welcome_with_tree(&welcome, Some(&tree)).unwrap(), GROUP);
+    assert_eq!(
+        dave.join_by_welcome_with_tree(&welcome, Some(&tree))
+            .unwrap(),
+        GROUP
+    );
     assert_eq!(dave.epoch(GROUP).unwrap(), alice.epoch(GROUP).unwrap());
-    assert_eq!(dave.epoch_authenticator(GROUP).unwrap(), alice.epoch_authenticator(GROUP).unwrap());
+    assert_eq!(
+        dave.epoch_authenticator(GROUP).unwrap(),
+        alice.epoch_authenticator(GROUP).unwrap()
+    );
     assert_eq!(dave.members(GROUP).unwrap().len(), MEMBERS + 2);
 
     let sealed = alice.encrypt(GROUP, b"to a large room").unwrap();
-    assert_eq!(dave.process(GROUP, &sealed).unwrap().plaintext, b"to a large room");
+    assert_eq!(
+        dave.process(GROUP, &sealed).unwrap().plaintext,
+        b"to a large room"
+    );
 }
 
 #[test]
@@ -141,9 +174,18 @@ fn an_external_join_takes_the_tree_beside_a_bare_group_info() {
     assert!(info.len() < tree.len() / 4);
 
     let erin = member("erin");
-    assert_kind(erin.join_by_external_commit(&info), ErrorKind::Rejected, "no tree");
-    let (group, commit) = erin.join_by_external_commit_with_tree(&info, Some(&tree)).unwrap();
+    assert_kind(
+        erin.join_by_external_commit(&info),
+        ErrorKind::Rejected,
+        "no tree",
+    );
+    let (group, commit) = erin
+        .join_by_external_commit_with_tree(&info, Some(&tree))
+        .unwrap();
     assert_eq!(group, GROUP);
     alice.process(GROUP, &commit).unwrap();
-    assert_eq!(erin.epoch_authenticator(GROUP).unwrap(), alice.epoch_authenticator(GROUP).unwrap());
+    assert_eq!(
+        erin.epoch_authenticator(GROUP).unwrap(),
+        alice.epoch_authenticator(GROUP).unwrap()
+    );
 }

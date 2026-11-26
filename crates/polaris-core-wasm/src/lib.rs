@@ -282,8 +282,8 @@ impl MlsMember {
             group_info,
             ratchet_tree.as_deref(),
         )
-            .map(|(group_id, commit)| MlsExternalJoin { group_id, commit })
-            .map_err(mls_error)
+        .map(|(group_id, commit)| MlsExternalJoin { group_id, commit })
+        .map_err(mls_error)
     }
 
     pub fn encrypt(&self, group_id: &[u8], plaintext: &[u8]) -> Result<Vec<u8>, JsValue> {

@@ -461,8 +461,8 @@ impl MlsMember {
             &welcome,
             ratchet_tree.as_deref(),
         )
-            .map(Uint8Array::from)
-            .map_err(mls_error)
+        .map(Uint8Array::from)
+        .map_err(mls_error)
     }
 
     #[napi(catch_unwind)]
@@ -473,7 +473,10 @@ impl MlsMember {
     }
 
     #[napi(catch_unwind)]
-    pub fn group_info_parts(&self, group_id: Uint8Array) -> napi::Result<MlsGroupInfoParts, ErrorClass> {
+    pub fn group_info_parts(
+        &self,
+        group_id: Uint8Array,
+    ) -> napi::Result<MlsGroupInfoParts, ErrorClass> {
         polaris_core::mls::Member::group_info_parts(&self.inner, &group_id)
             .map(|(group_info, ratchet_tree)| MlsGroupInfoParts {
                 group_info: group_info.into(),
@@ -493,11 +496,11 @@ impl MlsMember {
             &group_info,
             ratchet_tree.as_deref(),
         )
-            .map(|(group_id, commit)| MlsExternalJoin {
-                group_id: group_id.into(),
-                commit: commit.into(),
-            })
-            .map_err(mls_error)
+        .map(|(group_id, commit)| MlsExternalJoin {
+            group_id: group_id.into(),
+            commit: commit.into(),
+        })
+        .map_err(mls_error)
     }
 
     #[napi(catch_unwind)]
