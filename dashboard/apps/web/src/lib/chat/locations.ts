@@ -21,6 +21,7 @@ import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
 import * as history from "./history-visibility";
 import { follow, readCapped } from "@/lib/safe-fetch";
+import { conversationSealed } from "./e2ee/sealed-conversation";
 import { ChatAccessError, ChatRuleError, channelAccess, requireChannel } from "./access";
 
 /** A location as the message list draws it. */
@@ -179,9 +180,25 @@ export async function moveLive(
 
     const lost: string[] = [];
     const due: { messageId: string; channelId: string }[] = [];
+    // A share started before its conversation was sealed (the migration's cut,
+    // or a browser making its group) would go on writing coordinates in the
+    // clear beside sealed messages: ended instead, as `refusePlainIfSealed`
+    // refuses a new one. Asked once per conversation, not once per share.
+    const sealedChannels = new Map<string, Promise<boolean>>();
+    const sealedNow = (channelId: string) => {
+        let answer = sealedChannels.get(channelId);
+        if (!answer) sealedChannels.set(channelId, (answer = conversationSealed(channelId)));
+        return answer;
+    };
+    const sealedEnded: { messageId: string; channelId: string }[] = [];
     for (const share of shares) {
         if (!(await channelAccess(actor, share.message.channelId))) {
             lost.push(share.messageId);
+            continue;
+        }
+        if (await sealedNow(share.message.channelId)) {
+            lost.push(share.messageId);
+            sealedEnded.push({ messageId: share.messageId, channelId: share.message.channelId });
             continue;
         }
         if (now.getTime() - share.movedAt.getTime() < MIN_MOVE_GAP_MS) continue;
@@ -189,6 +206,15 @@ export async function moveLive(
     }
     if (lost.length) {
         await prisma.chatLocation.updateMany({ where: { messageId: { in: lost } }, data: { endedAt: now } });
+    }
+    // The people in a sealed conversation can still read the card: tell them it stopped.
+    for (const channelId of new Set(sealedEnded.map((one) => one.channelId))) {
+        publishChatChange({
+            channelId,
+            kind: "posted",
+            actorId: actor.id,
+            messageIds: sealedEnded.filter((one) => one.channelId === channelId).map((one) => one.messageId)
+        });
     }
     if (due.length) {
         await prisma.chatLocation.updateMany({

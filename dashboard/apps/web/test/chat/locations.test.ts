@@ -23,6 +23,8 @@ interface Share {
 
 let shares: Share[] = [];
 let reachable = new Set<string>();
+let sealedChannels = new Set<string>();
+const sealedAsked: string[] = [];
 const updates: { where: Record<string, unknown>; data: Record<string, unknown> }[] = [];
 const published: unknown[] = [];
 
@@ -33,6 +35,12 @@ vi.mock("@/lib/chat/access", () => ({
     ChatRuleError: FakeError,
     requireChannel: async () => ({}),
     channelAccess: async (_actor: unknown, channelId: string) => (reachable.has(channelId) ? { channelId } : null)
+}));
+vi.mock("@/lib/chat/e2ee/sealed-conversation", () => ({
+    conversationSealed: async (channelId: string) => {
+        sealedAsked.push(channelId);
+        return sealedChannels.has(channelId);
+    }
 }));
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: (change: unknown) => published.push(change) }));
 vi.mock("@/lib/chat/history-visibility", () => ({ requireReadable: async () => undefined }));
@@ -74,6 +82,8 @@ const point = { latitude: 40.4168, longitude: -3.7038, accuracy: 12 };
 beforeEach(() => {
     shares = [];
     reachable = new Set([CHANNEL, OTHER_CHANNEL]);
+    sealedChannels = new Set();
+    sealedAsked.length = 0;
     updates.length = 0;
     published.length = 0;
 });
@@ -171,6 +181,31 @@ describe("moving a live share", () => {
         const result = await locations.moveLive({ id: "me" }, point, NOW);
         expect(result.running).toBe(0);
         expect(updates[0]?.data).toEqual({ endedAt: NOW });
+    });
+
+    it("ends a share in a conversation sealed since it started instead of moving it in the clear", async () => {
+        sealedChannels = new Set([OTHER_CHANNEL]);
+        shares = [
+            { messageId: MESSAGE, channelId: CHANNEL, authorId: "me", movedAt: new Date(0), liveUntil: new Date(NOW.getTime() + 60_000), endedAt: null },
+            { messageId: MESSAGE_2, channelId: OTHER_CHANNEL, authorId: "me", movedAt: new Date(0), liveUntil: new Date(NOW.getTime() + 60_000), endedAt: null }
+        ];
+        const result = await locations.moveLive({ id: "me" }, point, NOW);
+        expect(result).toEqual({ running: 1, moved: 1 });
+        const ended = updates.find((update) => "endedAt" in update.data);
+        expect(ended).toEqual({ where: { messageId: { in: [MESSAGE_2] } }, data: { endedAt: NOW } });
+        const moved = updates.find((update) => "latitude" in update.data);
+        expect(moved?.where).toMatchObject({ messageId: { in: [MESSAGE] } });
+        // The sealed room's card is told it stopped, so nobody waits on a point that will not come.
+        expect(published).toContainEqual(expect.objectContaining({ channelId: OTHER_CHANNEL, messageIds: [MESSAGE_2] }));
+    });
+
+    it("asks whether a conversation is sealed once per conversation, not once per share", async () => {
+        shares = [
+            { messageId: MESSAGE, channelId: CHANNEL, authorId: "me", movedAt: new Date(0), liveUntil: new Date(NOW.getTime() + 60_000), endedAt: null },
+            { messageId: MESSAGE_2, channelId: CHANNEL, authorId: "me", movedAt: new Date(0), liveUntil: new Date(NOW.getTime() + 60_000), endedAt: null }
+        ];
+        await locations.moveLive({ id: "me" }, point, NOW);
+        expect(sealedAsked).toEqual([CHANNEL]);
     });
 
     it("ignores a move that comes too soon after the last", async () => {
