@@ -42,7 +42,7 @@ import {
     pluginOffer,
     usePlugins,
     useInstallPlugin,
-    statusSentence,
+    statusDetail,
     PERMISSION_KEY,
     type PluginListing,
     type PluginOffer,
@@ -70,11 +70,11 @@ function manifestOf(listing: PluginListing): PluginManifest | null {
 }
 
 /** The badge's short word for how a plugin runs, and the sentence its plugin said about the device, if any. */
-function runLabel(t: Words, installed: InstalledPlugin): { status: string; label: string; detail?: string } {
+function runLabel(t: Words, installed: InstalledPlugin, entry: PluginEntry | null, locale: string): { status: string; label: string; detail?: string } {
     const run = installed.run;
     if ("status" in run && run.status && (run.state === "running" || run.state === "starting")) {
-        const sentence = statusSentence(run.status.code);
-        return { status: run.status.state === "connected" ? "running" : run.status.state === "error" ? "failed" : "idle", label: say(t, `status.${run.status.state}`), detail: sentence ? say(t, sentence) : run.status.detail };
+        const detail = statusDetail(run.status, [installed.manifest, entry], locale, (key, values) => say(t, key, values));
+        return { status: run.status.state === "connected" ? "running" : run.status.state === "error" ? "failed" : "idle", label: say(t, `status.${run.status.state}`), detail };
     }
     return { status: run.state === "running" ? "running" : run.state === "failed" || run.state === "missing" ? "failed" : "idle", label: say(t, `status.${run.state}`) };
 }
@@ -401,7 +401,7 @@ function PluginCard({
     const manifest = manifestOf(listing);
     if (!manifest) return null;
     const offer = pluginOffer(snapshot, listing.id, listing.entry);
-    const run = listing.installed ? runLabel(t, listing.installed) : null;
+    const run = listing.installed ? runLabel(t, listing.installed, listing.entry, locale) : null;
     const href = hrefOf(listing.id);
     const tint = tintFor(listing.id);
     const entries = pluginMenu(t, {
@@ -945,7 +945,7 @@ export function PluginPage({ id }: { id: string }) {
     }
     const { entry, installed } = listing;
     const offer = pluginOffer(state.snapshot, id, entry);
-    const run = installed ? runLabel(t, installed) : null;
+    const run = installed ? runLabel(t, installed, entry, locale) : null;
     const size = entry && state.snapshot.platform ? entry.packages[state.snapshot.platform]?.size : undefined;
 
     const toggle = (enabled: boolean) => {

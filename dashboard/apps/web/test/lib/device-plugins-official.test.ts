@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { controlsByPage } from "@/app/(app)/account/plugins/official-choice-dialog";
-import { lookOfficial, readOfficialChoice, readOfficialRestore, statusSentence, type PluginsBridge, type OfficialControl } from "@/lib/device-plugins-client";
+import type { PluginManifest } from "@polaris/core/device-plugins";
+import { lookOfficial, readOfficialChoice, readOfficialRestore, statusDetail, statusSentence, type PluginsBridge, type OfficialControl } from "@/lib/device-plugins-client";
 
 const LOOK = {
     found: { app: { displayName: "Hercules Stream Control", version: "1.2" }, drivers: null, autostart: [{}], running: true },
@@ -38,10 +39,24 @@ describe("the official software, as the page reads the app's answers", () => {
         expect(readOfficialRestore("nope")).toBe("failed");
     });
 
-    it("translates only the status sentences it knows", () => {
-        expect(statusSentence("herculesDriver")).toBe("statusDetail.herculesDriver");
+    it("translates only the status sentences any plugin may name", () => {
+        expect(statusSentence("otherProgram")).toBe("statusDetail.otherProgram");
+        expect(statusSentence("herculesDriver")).toBeNull();
         expect(statusSentence("fromTheFuture")).toBeNull();
         expect(statusSentence(undefined)).toBeNull();
+    });
+
+    it("says a status in the plugin's own words first, then the page's, then the plugin's English", () => {
+        const say = (key: string, values: { device: string }) => `${key}(${values.device})`;
+        const installed = { name: "Acme Mixer", statusTexts: { mixerApp: { "en-US": "Close Acme Studio.", "es-ES": "Cierra Acme Studio." } } } as unknown as PluginManifest;
+        const newer = { name: "Acme Mixer", statusTexts: { mixerDriver: { "en-US": "Reinstall the Acme driver." } } } as unknown as PluginManifest;
+        expect(statusDetail({ code: "mixerApp", detail: "Close it." }, [installed, newer], "es-ES", say)).toBe("Cierra Acme Studio.");
+        expect(statusDetail({ code: "mixerApp", detail: "Close it." }, [installed, newer], "fr-FR", say)).toBe("Close Acme Studio.");
+        // An installed version older than its words: the catalog's newer one says them.
+        expect(statusDetail({ code: "mixerDriver", detail: "Driver." }, [installed, newer], "es-ES", say)).toBe("Reinstall the Acme driver.");
+        expect(statusDetail({ code: "otherProgram", detail: "Busy." }, [installed, null], "es-ES", say)).toBe("statusDetail.otherProgram(Acme Mixer)");
+        expect(statusDetail({ code: "fromTheFuture", detail: "Its own words." }, [null, installed], "es-ES", say)).toBe("Its own words.");
+        expect(statusDetail({ code: "otherProgram", detail: "Busy." }, [null, null], "es-ES", say)).toBe("Busy.");
     });
 
     it("groups the imported controls by page, knobs before buttons", () => {

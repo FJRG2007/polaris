@@ -116,6 +116,26 @@ nothing around it, and the frame clips its list - so a view holds none:
 control role in a repository plugin's view folder, and on a text missing a
 language.
 
+## Status
+
+A running plugin reports how its device is (`state`), with an English sentence
+(`detail`) and a name for it (`code`). The page says it in the reader's language:
+
+1. the plugin's own `statusTexts[code]` (`en-US`, `es-ES`, ...), from the installed
+   version's manifest, then the catalog's newer one;
+2. Polaris's sentence for a code any plugin may use (`otherProgram`, `noAccess`,
+   `unsupported`, `stopped`, `unplugged`, `noControls`), with the plugin's name in it;
+3. the plugin's `detail`, as it sent it.
+
+**A plugin's words live in its package, never in the dashboard.** A sentence,
+name or code of one plugin written into the dashboard means a release of that
+plugin changes the dashboard too, which publishes a web image and offers every
+deployment a Polaris update for a plugin change.
+`dashboard/apps/web/test/updates/plugin-free-dashboard.test.ts` fails on any
+repository plugin's id, name, device or status code in the dashboard's sources,
+messages or packages. A desktop app older than `statusTexts` drops them, so the
+plugin's English `detail` shows there until it updates.
+
 ## Views
 
 A view is a page in the package (`manifest.view`, e.g. `view/index.html`). The

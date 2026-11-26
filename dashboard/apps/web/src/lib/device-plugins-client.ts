@@ -17,7 +17,9 @@ import {
     pluginInstallResultSchema,
     comparePluginVersions,
     readPluginsSnapshot,
+    pluginStatusText,
     type PluginEntry,
+    type PluginManifest,
     type PluginPermission,
     type PluginsSnapshot,
     type InstalledPlugin
@@ -34,12 +36,36 @@ export const PERMISSION_KEY: Record<PluginPermission, string> = {
     network: "network"
 };
 
-/** The status sentences a plugin names (`code`) that the page says in its own language (`plugins.statusDetail.*`). */
-export const PLUGIN_STATUS_SENTENCES = ["otherProgram", "noAccess", "unsupported", "stopped", "unplugged", "herculesApp", "herculesDriver", "noControls"] as const;
+/**
+ * The status sentences any plugin may name (`code`) that the page says in its own
+ * language (`plugins.statusDetail.*`, with the device's name as `{device}`). What
+ * only one plugin knows about its device it says itself, in its manifest's
+ * `statusTexts`: no plugin's words live here, so a plugin release never makes
+ * the dashboard publish an update.
+ */
+export const PLUGIN_STATUS_SENTENCES = ["otherProgram", "noAccess", "unsupported", "stopped", "unplugged", "noControls"] as const;
 
 /** The key of the page's own sentence for a plugin's status code, or null to show the plugin's words. */
 export function statusSentence(code: string | undefined): string | null {
     return code && (PLUGIN_STATUS_SENTENCES as readonly string[]).includes(code) ? `statusDetail.${code}` : null;
+}
+
+/**
+ * The sentence a running plugin's status shows: the plugin's own words in the
+ * reader's language (the installed version's, then the catalog's newer one), the
+ * page's sentence for a shared code, or the plugin's English `detail`.
+ */
+export function statusDetail(
+    status: { readonly code?: string; readonly detail?: string },
+    manifests: readonly (PluginManifest | null | undefined)[],
+    locale: string,
+    say: (key: string, values: { device: string }) => string
+): string | undefined {
+    const own = pluginStatusText(manifests, status.code, locale);
+    if (own) return own;
+    const sentence = statusSentence(status.code);
+    const device = manifests.find(Boolean)?.name;
+    return sentence && device ? say(sentence, { device }) : status.detail;
 }
 
 /** Where the page stands: no desktop app, an app older than plugins, waiting on it, or its answer. */

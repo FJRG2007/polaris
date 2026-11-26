@@ -2858,7 +2858,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Device plugins", // i18n-ignore
             href: "/account/plugins",
             icon: Puzzle,
-            keywords: ["add-on", "addon", "plugin", "extension", "device", "usb", "hercules", "stream 100", "mixer"],
+            keywords: ["add-on", "addon", "plugin", "extension", "device", "usb", "controller", "mixer"],
             group: THIS_APP_GROUP,
             desktopOnly: true
         }

@@ -68,7 +68,7 @@ const usbIdSchema = z.number().int().min(0).max(0xffff);
 export const pluginClaimSchema = z.object({
     vendorId: usbIdSchema,
     productId: usbIdSchema,
-    /** The device's name as the offer shows it ("Hercules Stream 100"). */
+    /** The device's name as the offer shows it ("Acme Mixer 4"). */
     name: z.string().trim().min(1).max(80)
 });
 
@@ -77,6 +77,13 @@ export type PluginClaim = z.infer<typeof pluginClaimSchema>;
 /** Text a plugin shows, in English and any other language it ships ("es-ES": "..."). */
 const pluginTextSchema = z.object({ "en-US": z.string().trim().min(1).max(120) }).catchall(z.string().trim().min(1).max(120));
 const settingKeySchema = z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/);
+/**
+ * A name for what a plugin says about its device (`deviceBusy`), so a page can
+ * say it in the reader's language; `detail` is the plugin's English words.
+ */
+export const PLUGIN_STATUS_CODE = z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/);
+/** A sentence a plugin says about its device, as long as the status `detail` it stands for. */
+const pluginSentenceSchema = z.object({ "en-US": z.string().trim().min(1).max(200) }).catchall(z.string().trim().min(1).max(200));
 
 /**
  * One setting a plugin declares. Polaris draws it with its own controls on the
@@ -190,7 +197,18 @@ export const pluginManifestSchema = z.object({
      * Settings page in a sandboxed frame. It shows, it does not ask: every
      * control is a declared setting, drawn by Polaris (docs/device-plugins.md, Views).
      */
-    view: entryPathSchema.optional()
+    view: entryPathSchema.optional(),
+    /**
+     * Its own status sentences in each language it ships, by status `code`, for
+     * what only this plugin knows about its device. A plugin's words live in its
+     * package, never in the host, so a plugin release changes nothing in Polaris
+     * (docs/device-plugins.md, Status). A code it leaves out is said by the host
+     * when the host knows it, else as the plugin's `detail`.
+     */
+    statusTexts: z
+        .record(PLUGIN_STATUS_CODE, pluginSentenceSchema)
+        .refine((texts) => Object.keys(texts).length <= 32, "too many status texts")
+        .optional()
 });
 
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;
@@ -391,10 +409,18 @@ export function pluginText(text: { readonly "en-US": string; readonly [locale: s
 }
 
 /**
- * A name for what a plugin says about its device (`herculesDriver`), so a page
- * can say it in the reader's language; `detail` is the plugin's English words.
+ * What a plugin's status `code` reads as in the reader's language, from the
+ * plugin's own `statusTexts`: the first of `manifests` that has it (the
+ * installed version, then the catalog's newer one), or null when none does.
  */
-export const PLUGIN_STATUS_CODE = z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/);
+export function pluginStatusText(manifests: readonly (Pick<PluginManifest, "statusTexts"> | null | undefined)[], code: string | undefined, locale: string): string | null {
+    if (!code) return null;
+    for (const manifest of manifests) {
+        const text = manifest?.statusTexts?.[code];
+        if (text) return pluginText(text, locale);
+    }
+    return null;
+}
 
 const pluginStatusSchema = z.object({ state: z.enum(["connected", "sleeping", "busy", "error"]), detail: z.string().max(200).optional(), code: PLUGIN_STATUS_CODE.optional() });
 

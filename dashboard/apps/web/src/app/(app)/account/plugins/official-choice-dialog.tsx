@@ -2,7 +2,7 @@
 
 /**
  * Installing a plugin whose device's official software is on this computer
- * (only Hercules Stream Control today): what to do with that software first,
+ * (the desktop app finds it and names it): what to do with that software first,
  * what Polaris asks for, and what it carries over from it. Answered by the
  * desktop app (`plugins.official`); an app older than that never gets here.
  */

@@ -78,6 +78,16 @@ describe("Hercules Stream 100 plugin", () => {
         for (const [error, held] of cases) expect(pluginMessageSchema.safeParse({ type: "status", ...entry.describe(error, held) }).success).toBe(true);
         // The service's own name is only in the English words, so that one stays uncoded.
         expect(entry.describe("notFound", { ownership: { state: "unknown", service: "Foo" } }).code).toBeUndefined();
+        // Its own sentences ship in its manifest, in every language; the page has only the shared ones.
+        const manifest = readPluginManifest(JSON.parse(readFileSync(new URL("manifest.json", folder), "utf8")));
+        expect(Object.keys(manifest?.statusTexts ?? {}).sort()).toEqual(["herculesApp", "herculesDriver"]);
+        for (const [error, held] of cases) {
+            const said = entry.describe(error, held);
+            const text = said.code ? manifest?.statusTexts?.[said.code] : undefined;
+            if (!text) continue;
+            expect(Object.keys(text).sort()).toEqual(["en-US", "es-ES"]);
+            expect(text["en-US"]).toBe(said.detail);
+        }
     });
 
     it("reports in, call actions out to the app, under the names the app knows", async () => {

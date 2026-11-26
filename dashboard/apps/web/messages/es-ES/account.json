@@ -2613,14 +2613,12 @@
             "failed": "La versión {version} no arrancó aquí; se volvió a la anterior."
         },
         "statusDetail": {
-            "otherProgram": "Otro programa está usando el Stream 100.",
-            "noAccess": "Este equipo aún no deja a Polaris abrir el Stream 100.",
-            "unsupported": "El Stream 100 aún no se puede leer en este sistema.",
-            "stopped": "El Stream 100 dejó de responder. Reintentando.",
+            "otherProgram": "Otro programa está usando {device}.",
+            "noAccess": "Este equipo aún no deja a Polaris abrir {device}.",
+            "unsupported": "{device} aún no se puede leer en este sistema.",
+            "stopped": "{device} dejó de responder. Reintentando.",
             "unplugged": "No está conectado.",
-            "herculesApp": "Cierra Hercules Stream Control para usar el Stream 100 aquí. Mientras está abierto, tiene el control.",
-            "herculesDriver": "Polaris no pudo leer el Stream 100 con el software de Hercules. Vuelve a conectarlo o reinstala Hercules Stream Control.",
-            "noControls": "El Stream 100 está conectado, pero no se encontraron sus controles."
+            "noControls": "{device} está conectado, pero no se encontraron sus controles."
         },
         "official": {
             "title": "Instalar {name}",
@@ -2658,7 +2656,7 @@
                 "nothingToUninstall": "La app oficial ya no está instalada.",
                 "stopProcess": "No se pudo cerrar la app oficial. Ciérrala y vuelve a intentarlo.",
                 "removeAutostart": "No se pudo quitar del inicio. Vuelve a intentarlo.",
-                "unsigned": "El desinstalador no está firmado por Hercules, así que no se ejecutó.",
+                "unsigned": "El desinstalador no lleva la firma de su fabricante, así que no se ejecutó.",
                 "declined": "Se rechazó el aviso de administrador, así que no se cambió nada.",
                 "uninstaller": "El desinstalador no terminó. Vuelve a intentarlo.",
                 "failed": "No funcionó. Vuelve a intentarlo."
@@ -2669,8 +2667,8 @@
                 "uninstall": "Polaris desinstaló la app oficial. Puedes recuperar sus ajustes.",
                 "keep": "Polaris guardó una copia de los ajustes de la app oficial."
             },
-            "launch": "Abrir Hercules Stream Control",
-            "launchFailed": "No se pudo abrir Hercules Stream Control.",
+            "launch": "Abrir {app}",
+            "launchFailed": "No se pudo abrir {app}.",
             "restoreAction": "Restaurar la app oficial",
             "restore": {
                 "done": "La app oficial vuelve a estar como estaba.",

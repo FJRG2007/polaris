@@ -61,4 +61,22 @@ describe("WEB_IMAGE_PATHS", () => {
         expect(WEB_IMAGE_PATHS.test("dashboard/apps/streamdeck/src/plugin.ts")).toBe(false);
         expect(WEB_IMAGE_PATHS.test("dashboard/apps/sites-of-mine/x.ts")).toBe(true);
     });
+
+    it("counts nothing a device plugin release changes", () => {
+        // A plugin installs and updates from the desktop app; its package, its
+        // native crate and the shared Cargo.lock bump are no dashboard update.
+        for (const file of ["clients/device-plugins/hercules-stream100/manifest.json", "crates/polaris-stream100/Cargo.toml", "crates/polaris-stream100-node/src/lib.rs", "Cargo.lock"])
+            expect(WEB_IMAGE_PATHS.test(file)).toBe(false);
+    });
+
+    it("rebuilds the daemons for a Cargo.lock change only when it reaches them", () => {
+        const text = readFileSync(WORKFLOW, "utf8");
+        const gates = text.split("\n").filter((line) => /&& out (hostd|tunnel) true/.test(line));
+        expect(gates).toHaveLength(2);
+        for (const gate of gates) {
+            expect(gate).not.toContain("Cargo\\.(toml|lock)");
+            expect(gate).not.toContain("Cargo\\.lock");
+            expect(gate).toMatch(/lock_reaches polaris-(hostd|tunnel)/);
+        }
+    });
 });

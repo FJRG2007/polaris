@@ -47,7 +47,7 @@ export function OfficialSoftware({ id, bridge }: { id: string; bridge: PluginsBr
         setBusy("launch");
         const started = (await bridge.official(id, { kind: "launch" }).catch(() => false)) === true;
         setBusy(null);
-        if (!started) toast.show({ title: say("official.launchFailed") });
+        if (!started) toast.show({ title: say("official.launchFailed", { app: app?.displayName ?? say("official.appName") }) });
     };
 
     return (
@@ -56,7 +56,7 @@ export function OfficialSoftware({ id, bridge }: { id: string; bridge: PluginsBr
             <div className="flex shrink-0 flex-wrap items-center gap-2">
                 {app ? (
                     <Button size="sm" variant="secondary" disabled={busy !== null} aria-busy={busy === "launch"} onClick={() => void launch()}>
-                        {say("official.launch")}
+                        {say("official.launch", { app: app.displayName })}
                     </Button>
                 ) : null}
                 {restorable ? (

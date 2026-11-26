@@ -39,8 +39,8 @@ PATHS = [
 def git(*args: str) -> bytes:
     return subprocess.run(["git", *args], check=True, capture_output=True).stdout
 
-def lock_closure(ref: str) -> str:
-    """The Cargo.lock entries the crate depends on, directly or not, one per line."""
+def lock_closure(ref: str, crate: str = CRATE) -> str:
+    """The Cargo.lock entries a crate (this one by default) depends on, directly or not, one per line."""
     lock = tomllib.loads(git("show", f"{ref}:Cargo.lock").decode())
     by_name: dict[str, list[dict]] = {}
     for package in lock.get("package", []):
@@ -57,7 +57,7 @@ def lock_closure(ref: str) -> str:
         return candidates[0]
 
     reached: dict[str, dict] = {}
-    pending = [resolve(CRATE)]
+    pending = [resolve(crate)]
     while pending:
         package = pending.pop()
         key = f"{package['name']} {package['version']}"
