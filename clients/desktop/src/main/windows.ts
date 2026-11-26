@@ -8,7 +8,9 @@
  *   trip the instance starts (see `navigation`); a link anywhere else opens in
  *   the system browser, and a new
  *   window the dashboard opens on its own origin is another Polaris window
- *   under the same rules.
+ *   under the same rules. A page it opens on its own origin that is not one of
+ *   its screens - the live preview of an agent's server, a file - is a **page
+ *   window**: the system's own frame, no bridge, the same navigation rules.
  * - **Local windows** show a page this app ships - the address form, the key
  *   form, a push - with the local bridge. They navigate nowhere. The settings
  *   can also be a **sheet**: the same page laid over a Polaris window.
@@ -25,7 +27,7 @@ import { hideFromSharing } from "./screen-share";
 import { CHANNELS, SEASON_ARGUMENT, TEXT_SIZE_ARGUMENT, VERSION_ARGUMENT } from "@/shared/bridge";
 import { defaultTitleBarColors, foreignPageCss, overlayHeight } from "@/shared/title-bar";
 import { openExternal } from "./open-external";
-import { isServerUrl, mainFrameStep, openVerdict } from "./navigation";
+import { isServerUrl, mainFrameStep, needsForeignTitleBar, openVerdict, popupChrome } from "./navigation";
 import {
     app,
     BrowserWindow,
@@ -36,7 +38,7 @@ import {
     type WebPreferences
 } from "electron";
 
-export type WindowKind = "polaris" | "connect" | "api-key" | "push" | "tv" | "overlay" | "voice-widget";
+export type WindowKind = "polaris" | "page" | "connect" | "api-key" | "push" | "tv" | "overlay" | "voice-widget";
 
 const kinds = new Map<number, WindowKind>();
 
@@ -51,9 +53,9 @@ function ground(): string {
     return nativeTheme.shouldUseDarkColors ? "#0b0c0e" : "#f6f6f9";
 }
 
-function preferences(preload: string, extra: WebPreferences = {}): WebPreferences {
+function preferences(preload: string | null, extra: WebPreferences = {}): WebPreferences {
     return {
-        preload: join(__dirname, "..", "preload", preload),
+        ...(preload ? { preload: join(__dirname, "..", "preload", preload) } : {}),
         contextIsolation: true,
         sandbox: true,
         nodeIntegration: false,
@@ -96,6 +98,11 @@ function polarisPreferences(): WebPreferences {
     return preferences("app.js", { backgroundThrottling: false, additionalArguments: [`${VERSION_ARGUMENT}${app.getVersion()}`] });
 }
 
+/** A page window's: no preload, so no bridge of any kind. */
+function pagePreferences(): WebPreferences {
+    return preferences(null);
+}
+
 function register(contents: WebContents, kind: WindowKind): void {
     const id = contents.id;
     kinds.set(id, kind);
@@ -122,9 +129,10 @@ function windowOptions(options: BrowserWindowConstructorOptions): BrowserWindowC
  * anything else on the web goes to the system browser, and nothing else goes
  * anywhere - except during a provider's round trip the server started (see
  * `navigation`). Frames inside the page are the page's business. Read per
- * event, so a changed server applies at once.
+ * event, so a changed server applies at once. `overlay` is whether the window's
+ * title bar is hidden under the system's buttons (`titleBar`).
  */
-function contain(contents: WebContents, server: () => string | null): void {
+function contain(contents: WebContents, server: () => string | null, overlay: boolean): void {
     let trip = false;
     const guard = (event: { preventDefault: () => void; readonly url: string; readonly isMainFrame: boolean; }) => {
         if (!event.isMainFrame) return;
@@ -137,11 +145,12 @@ function contain(contents: WebContents, server: () => string | null): void {
     };
     contents.on("will-navigate", guard);
     contents.on("will-redirect", guard);
-    // A provider's page has no header to sit the window buttons in or to drag
-    // the window by, and no preload that may report its colours.
+    // A provider's page, or one of the Polaris's that is not a screen of the
+    // dashboard, has no header to sit the window buttons in or to drag the
+    // window by, and no preload that may report its colours.
     contents.on("dom-ready", () => {
         const origin = server();
-        if (process.platform === "darwin" || !origin || isServerUrl(contents.getURL(), origin)) return;
+        if (process.platform === "darwin" || !overlay || !origin || !needsForeignTitleBar(contents.getURL(), origin)) return;
         const colors = defaultTitleBarColors(nativeTheme.shouldUseDarkColors);
         BrowserWindow.fromWebContents(contents)?.setTitleBarOverlay({
             color: colors.background,
@@ -159,6 +168,21 @@ function contain(contents: WebContents, server: () => string | null): void {
     contents.setWindowOpenHandler(({ url }) => {
         const origin = server();
         const verdict = openVerdict(url, origin);
+        if (verdict === "allow" && origin && popupChrome(url, origin) === "native") {
+            // Not a screen of the dashboard, so nothing on it drags a hidden
+            // title bar: the system's frame moves, resizes and snaps it.
+            return {
+                action: "allow",
+                overrideBrowserWindowOptions: windowOptions({
+                    width: 1100,
+                    height: 760,
+                    minWidth: 320,
+                    minHeight: 240,
+                    show: true,
+                    webPreferences: pagePreferences()
+                })
+            };
+        }
         if (verdict === "allow") {
             return {
                 action: "allow",
@@ -174,9 +198,13 @@ function contain(contents: WebContents, server: () => string | null): void {
         if (verdict === "external") openExternal(url);
         return { action: "deny" };
     });
-    contents.on("did-create-window", (child) => {
-        register(child.webContents, "polaris");
-        contain(child.webContents, server);
+    contents.on("did-create-window", (child, { url }) => {
+        const origin = server();
+        // Decided again from the same URL the handler saw; with no server by now
+        // it is the window without the bridge.
+        const chrome = origin ? popupChrome(url, origin) : "native";
+        register(child.webContents, chrome === "overlay" ? "polaris" : "page");
+        contain(child.webContents, server, chrome === "overlay" && process.platform !== "darwin");
     });
 }
 
@@ -208,7 +236,7 @@ export function openPolarisWindow(
         })
     );
     register(window.webContents, "polaris");
-    contain(window.webContents, server);
+    contain(window.webContents, server, process.platform !== "darwin");
     // Whether anybody can see it, for the page's decorative animations: the
     // page cannot read it itself while background throttling is off.
     const tellShown = (shown: boolean) => {
@@ -414,7 +442,7 @@ export function openLocalSheet(parent: BrowserWindow, kind: "connect", onClosed:
 
 /** A window showing one of this app's own pages. */
 export function openLocalWindow(
-    kind: Exclude<WindowKind, "polaris" | "overlay">,
+    kind: Exclude<WindowKind, "polaris" | "page" | "overlay">,
     options: { readonly title: string; readonly width: number; readonly height: number; readonly parent?: BrowserWindow; }
 ): BrowserWindow {
     const window = new BrowserWindow(

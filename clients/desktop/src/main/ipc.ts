@@ -38,7 +38,7 @@ import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys
 import { closeNotice, showNotice } from "./notices";
 import { appBadgeSchema, applyAppBadge } from "./app-badge";
 import { appIconSchema, reportAppIcon } from "./app-icon";
-import { isSafeExternalUrl, isServerUrl, serverPath } from "./navigation";
+import { isPolarisFrame, isSafeExternalUrl, serverPath } from "./navigation";
 import { openExternal } from "./open-external";
 import { clipboardText, dictionaryWord, pagePoint, savableImageUrl } from "./context-menu";
 import { FolderRefusal, zipFolder } from "./folder-zip";
@@ -259,7 +259,9 @@ const REFUSED: Outcome = { ok: false, error: REFUSAL };
 const opened = new Map<string, BrowserWindow>();
 
 export function registerIpc(host: IpcHost): void {
-    /** The dashboard's channels: a Polaris window's main frame, on the Polaris. */
+    /** The dashboard's channels: a Polaris window's main frame, on a screen of
+     *  the Polaris and running on its origin - not a sandboxed page served at
+     *  its address, like an agent's live preview (`isPolarisFrame`). */
     const fromPolaris = (event: IpcMainInvokeEvent | IpcMainEvent): boolean => {
         const origin = host.server();
         const frame = event.senderFrame;
@@ -268,7 +270,7 @@ export function registerIpc(host: IpcHost): void {
                 kindOf(event.sender) === "polaris" &&
                 frame &&
                 frame === event.sender.mainFrame &&
-                isServerUrl(frame.url, origin)
+                isPolarisFrame(frame.url, frame.origin, origin)
         );
     };
     const from = (event: IpcMainInvokeEvent, kind: WindowKind): boolean => kindOf(event.sender) === kind;
@@ -397,7 +399,7 @@ export function registerIpc(host: IpcHost): void {
         if (!rememberTextSize(size)) return true;
         for (const contents of webContents.getAllWebContents()) {
             const kind = kindOf(contents);
-            if (kind && kind !== "polaris" && !contents.isDestroyed()) contents.send(CHANNELS.textSizeChanged, size);
+            if (kind && kind !== "polaris" && kind !== "page" && !contents.isDestroyed()) contents.send(CHANNELS.textSizeChanged, size);
         }
         followWidgetTextSize();
         return true;

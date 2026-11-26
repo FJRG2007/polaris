@@ -34,7 +34,7 @@ vi.mock("@/main/windows", () => ({
 const ORIGIN = "https://polaris.example.test";
 
 function event(kind: string | null, url = `${ORIGIN}/home`) {
-    const frame = { url };
+    const frame = { url, origin: new URL(url).origin };
     const listeners = new Map<string, (details?: unknown) => void>();
     const sender = {
         id: kinds.size + 1,

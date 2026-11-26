@@ -39,7 +39,7 @@ const { copyHosts, importHosts } = await import("@/main/host-transfer");
 const { encodeHostList } = await import("../../../../dashboard/packages/core/src/host-list");
 
 function event(kind: string) {
-    const frame = { url: "file:///connect.html" };
+    const frame = { url: "file:///connect.html", origin: "null" };
     const sender = { id: kinds.size + 1, mainFrame: frame };
     kinds.set(sender.id, kind);
     return { sender, senderFrame: frame };
@@ -124,7 +124,7 @@ describe("at the door: Settings > This app > Hosts", () => {
 
     /** A page: by default the Polaris window's main frame on the host in use. */
     function page(kind = "polaris", url = `${ORIGIN}/account/app/hosts`, mainFrame = true) {
-        const frame = { url };
+        const frame = { url, origin: new URL(url).origin };
         const sender = { id: kinds.size + 1, mainFrame: mainFrame ? frame : { url }, send: vi.fn() };
         kinds.set(sender.id, kind);
         return { sender, senderFrame: frame };

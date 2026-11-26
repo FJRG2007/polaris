@@ -40,8 +40,9 @@ export function defaultTitleBarColors(dark: boolean): TitleBarColors {
 }
 
 /**
- * What a page that is not Polaris - a provider's sign-in during a round trip -
- * is given in the window: it is moved down below the buttons, and the band they
+ * What a page that is not a dashboard screen - a provider's sign-in during a
+ * round trip, a file on the Polaris - is given in a window whose title bar is
+ * hidden: it is moved down below the buttons, and the band they
  * sit in is filled and drags the window, since that page has no header of ours.
  */
 export function foreignPageCss(background: string): string {

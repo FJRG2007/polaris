@@ -47,7 +47,8 @@ vi.mock("@/main/windows", () => ({
 const ORIGIN = "https://polaris.example.test";
 
 function event(kind: string) {
-    const frame = { url: kind === "polaris" ? `${ORIGIN}/chat` : "file:///widget.html" };
+    const url = kind === "polaris" ? `${ORIGIN}/chat` : "file:///widget.html";
+    const frame = { url, origin: new URL(url).origin };
     const sender = { id: kinds.size + 1, mainFrame: frame };
     kinds.set(sender.id, kind);
     return { sender, senderFrame: frame };

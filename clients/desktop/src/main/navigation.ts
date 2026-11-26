@@ -128,3 +128,68 @@ export function serverPath(path: string, serverOrigin: string): string | null {
     const target = parse(`${serverOrigin}${path}`);
     return target && target.origin === serverOrigin ? target.toString() : null;
 }
+
+/**
+ * Paths on the Polaris that answer with something other than a dashboard
+ * screen: its route handlers (a file, an attachment, a raw paste, the live
+ * preview of a server an agent runs - `/api/agents/preview/...`) and the build's
+ * own assets. Every screen draws a strip that drags the window (`app-drag-strip`
+ * in the dashboard's root layout); these carry none of it, and the preview is a
+ * page the agent wrote. The handlers outside `/api` are pinned by a test that
+ * reads the dashboard's routes.
+ */
+const BARE_PATHS: readonly RegExp[] = [
+    /^\/api(\/|$)/,
+    /^\/_next(\/|$)/,
+    /^\/\.well-known(\/|$)/,
+    /^\/c\/[^/]+\/files(\/|$)/,
+    /^\/p\/[^/]+\/raw(\/|$)/,
+    /^\/cli\/[^/]+$/,
+    /^\/season-icon\/[^/]+$/
+];
+
+/**
+ * Whether a URL is a screen of the dashboard on the Polaris: on its origin and
+ * not under one of the bare paths. Only such a page draws its own title bar.
+ */
+export function isDashboardPage(url: string, serverOrigin: string): boolean {
+    const target = parse(url);
+    return Boolean(target && isServerUrl(url, serverOrigin) && !BARE_PATHS.some((path) => path.test(target.pathname)));
+}
+
+/**
+ * How a window the dashboard opens on its own origin is framed.
+ *
+ * - `overlay` - a dashboard screen: the title bar is hidden and the system's
+ *               buttons are drawn over the page's header, which drags it.
+ * - `native`  - anything else on the origin: the operating system's own frame,
+ *               so it moves, resizes and snaps without the page's help, and the
+ *               page gets no bridge, since it is not the dashboard.
+ *
+ * What Electron's custom title bar guide asks of a hidden title bar - the page
+ * has to declare its own `app-region: drag` - is only true of the dashboard.
+ */
+export type PopupChrome = "overlay" | "native";
+
+export function popupChrome(url: string, serverOrigin: string): PopupChrome {
+    return isDashboardPage(url, serverOrigin) ? "overlay" : "native";
+}
+
+/**
+ * Whether a main frame may use the dashboard's bridge: a dashboard screen whose
+ * frame really runs on the Polaris's origin. The URL alone is not enough - the
+ * live preview is served on the Polaris's address in a sandbox (an opaque
+ * origin, `"null"`), and it is a page the agent wrote.
+ */
+export function isPolarisFrame(url: string, frameOrigin: string, serverOrigin: string): boolean {
+    return frameOrigin === serverOrigin && isDashboardPage(url, serverOrigin);
+}
+
+/**
+ * Whether a page in a window whose title bar is hidden has to be given the band
+ * the window buttons sit in (`foreignPageCss`): every page but a dashboard
+ * screen, which draws its own.
+ */
+export function needsForeignTitleBar(url: string, serverOrigin: string): boolean {
+    return !isDashboardPage(url, serverOrigin);
+}
