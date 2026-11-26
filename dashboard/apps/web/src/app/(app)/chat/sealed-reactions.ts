@@ -8,10 +8,15 @@
  * Never reacted in the clear instead.
  */
 
-import * as actions from "./actions";
 import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { countedFor, reactionKey, toggled, type OpenedReactions } from "./sealed-reaction-tally";
+
+/**
+ * The server actions, loaded on first use: the counting here is also drawn by
+ * pure helpers (`opened-sealed.ts`) that must not pull the server action module in.
+ */
+const serverActions = () => import("./actions");
 
 /** Pages of sets read at most for one batch of messages. */
 const MAX_PAGES = 50;
@@ -63,6 +68,7 @@ export async function loadSealedReactions(channelId: string, messageIds: readonl
     if (!messageIds.length) return;
     const found = new Map<string, { sets: OpenedReactions[]; own: string[] }>(messageIds.map((id) => [id, { sets: [], own: [] }]));
     let after: { messageId: string; userId: string } | null = null;
+    const actions = await serverActions();
     for (let page = 0; page < MAX_PAGES; page += 1) {
         const result = await actions.sealedReactionsAction({ channelId, messageIds, after });
         if (!result.page) throw new Error(result.error ?? "the reactions did not load");
@@ -98,7 +104,7 @@ export async function sendSealedReaction(channelId: string, messageId: string, e
     // What they had in the clear before is sealed into the first set; the server drops those rows with it.
     const after = toggled(ownOf(messageId), emoji, on);
     const set = after.length ? await sealedChat.sealReactions(channelId, messageId, after) : null;
-    const result = await actions.putSealedReactionsAction({ messageId, set });
+    const result = await (await serverActions()).putSealedReactionsAction({ messageId, set });
     if (result.error) return { error: result.error };
     const entry = opened.get(messageId);
     const others = (entry?.sets ?? []).filter((one) => !one.mine);
