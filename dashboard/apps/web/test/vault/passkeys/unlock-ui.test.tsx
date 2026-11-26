@@ -44,6 +44,8 @@ const session = vi.hoisted(() => ({
     key: { encKey: new Uint8Array(32), macKey: new Uint8Array(32) }
 }));
 vi.mock("@/app/(app)/vault/vault-session", () => ({ useVaultSession: () => session }));
+const appHandoff = vi.hoisted(() => vi.fn(async () => false));
+vi.mock("@/components/open-in-app", () => ({ appHandoff }));
 
 const { VaultUnlock } = await import("@/app/(app)/vault/vault-unlock");
 const { VaultPasskeys } = await import("@/app/(app)/vault/settings/vault-passkeys");
@@ -170,6 +172,17 @@ describe("asking for the passkey as the lock screen opens", () => {
         await waitFor(() => expect(onUnlocked).toHaveBeenCalledWith(key));
         expect(unlockWithPasskey).toHaveBeenCalledTimes(1);
         expect(unlockWithPasskey.mock.calls[0]![0]).toEqual([ENTRY]);
+    });
+
+    it("asks nothing in a tab whose page was just handed to the desktop app", async () => {
+        const { rememberLocalPasskey } = await import("@/lib/local-passkeys");
+        rememberLocalPasskey(HERE);
+        appHandoff.mockResolvedValueOnce(true);
+        lockScreen([ENTRY]);
+        expect(await screen.findByRole("button", { name: /passkey/i })).toBeTruthy();
+        await waitFor(() => expect(appHandoff).toHaveBeenCalled());
+        await act(async () => undefined);
+        expect(unlockWithPasskey).not.toHaveBeenCalled();
     });
 
     it("waits for the button when the passkey was only ever used on another device", async () => {

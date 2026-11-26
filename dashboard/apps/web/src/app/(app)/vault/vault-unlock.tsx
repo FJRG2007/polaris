@@ -19,6 +19,7 @@ import { KeyRound, Loader2, Lock } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { VaultPasskeyEntry } from "@/lib/vault/passkey-schema";
 import { vaultPasskeyUsedAction } from "./passkey-actions";
+import { appHandoff } from "@/components/open-in-app";
 import type { KdfSettings } from "@polaris/core";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { unlockVaultKey, type SymmetricKey } from "@/lib/vault/crypto";
@@ -77,6 +78,8 @@ export function VaultUnlock({
     // on another device. Waits until somebody is at the screen, so a vault that
     // locked while its owner was away does not time a prompt out on its own. A
     // dismissed prompt leaves the screen as it was and this tab asks no more.
+    // Never in a tab whose page was just handed to the desktop app: the vault
+    // opens there, and a prompt here too would be two ceremonies for one tap.
     const asked = useRef(false);
     useEffect(() => {
         if (!autoPasskey || asked.current || offer?.kind !== "offer") return;
@@ -84,11 +87,14 @@ export function VaultUnlock({
         const candidates = [...offer.automatic];
         if (candidates.length === 0) return;
         const controller = new AbortController();
-        void localPasskeys.whenAttended(controller.signal).then((attended) => {
+        void (async () => {
+            if (await appHandoff()) return;
+            if (controller.signal.aborted) return;
+            const attended = await localPasskeys.whenAttended(controller.signal);
             if (!attended || asked.current) return;
             asked.current = true;
             void onPasskey(candidates, true);
-        });
+        })();
         return () => controller.abort();
     }, [autoPasskey, offer]);
 

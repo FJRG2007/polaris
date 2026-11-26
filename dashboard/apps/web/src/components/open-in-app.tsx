@@ -37,44 +37,75 @@ function triedHere(): boolean {
     }
 }
 
+/** This document's one decision, shared by every caller (`appHandoff`). */
+let handoff: Promise<boolean> | null = null;
+
+async function decideHandoff(): Promise<boolean> {
+    const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const load = documentLoad();
+    const outside = arrivedFromOutside({
+        referrer: document.referrer,
+        origin: window.location.origin,
+        path,
+        landing: load.landing,
+        navigation: load.type,
+        tried: false
+    });
+    if (!outside || triedHere()) return false;
+    try {
+        const response = await fetch("/api/account/app-links", { cache: "no-store" });
+        const answer = (response.ok ? await response.json() : null) as {
+            open?: boolean;
+            phone?: boolean;
+            iphone?: boolean;
+            desktop?: boolean;
+        } | null;
+        if (!answer?.open) return false;
+        const target = appTarget(navigator.userAgent, {
+            phone: answer.phone === true,
+            iphone: answer.iphone === true,
+            desktop: answer.desktop === true
+        });
+        if (!target) return false;
+        window.location.href = appLink(target, window.location.origin, path);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Whether this load handed its page to the app, deciding it - and handing it
+ * over - the first time anything asks. Once per document, whoever asks first:
+ * the note below, or a screen that is about to raise a prompt of its own. A
+ * lock screen waits on it before asking for a passkey, because a page handed to
+ * the app is one the person is about to use there - a Windows Hello prompt from
+ * the tab left behind is a second ceremony for the same tap.
+ */
+export function appHandoff(): Promise<boolean> {
+    handoff ??= decideHandoff();
+    return handoff;
+}
+
 export function OpenInApp() {
     const t = useTranslations("components");
     const toast = useToast();
     const router = useRouter();
 
     useEffect(() => {
-        const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-        const load = documentLoad();
-        const outside = arrivedFromOutside({
-            referrer: document.referrer,
-            origin: window.location.origin,
-            path,
-            landing: load.landing,
-            navigation: load.type,
-            tried: false
+        let live = true;
+        void appHandoff().then((handed) => {
+            if (!handed || !live) return;
+            toast.show({
+                key: "open-in-app",
+                title: t("openInApp.opened"),
+                body: t("openInApp.how"),
+                onPress: () => router.push("/account/preferences#open-in-app")
+            });
         });
-        if (!outside || triedHere()) return;
-        const controller = new AbortController();
-        void fetch("/api/account/app-links", { cache: "no-store", signal: controller.signal })
-            .then((response) => (response.ok ? response.json() : null))
-            .then((answer: { open?: boolean; phone?: boolean; iphone?: boolean; desktop?: boolean } | null) => {
-                if (!answer?.open) return;
-                const target = appTarget(navigator.userAgent, {
-                    phone: answer.phone === true,
-                    iphone: answer.iphone === true,
-                    desktop: answer.desktop === true
-                });
-                if (!target) return;
-                window.location.href = appLink(target, window.location.origin, path);
-                toast.show({
-                    key: "open-in-app",
-                    title: t("openInApp.opened"),
-                    body: t("openInApp.how"),
-                    onPress: () => router.push("/account/preferences#open-in-app")
-                });
-            })
-            .catch(() => undefined);
-        return () => controller.abort();
+        return () => {
+            live = false;
+        };
     }, [router, t, toast]);
 
     return null;
