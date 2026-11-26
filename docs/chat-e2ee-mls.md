@@ -480,7 +480,7 @@ share of the work, not of the code.
 | 4 | **Default-on switch.** Built (2026-11-25): `chatE2eeEnabled()` is `chatE2eeFrom(env, CHAT_E2EE_DEFAULT_ON)` in `flag.ts` - `1` on, `0` off, anything else the default - so turning it on is changing `CHAT_E2EE_DEFAULT_ON` to `true` in a release, on with nothing set and `0` kept as the kill switch, as `passwordLockEnabled()` does, because existing installs never get new `.env` keys (repo CLAUDE.md); tested in `test/chat/e2ee/flag.test.ts`. The kill switch never locks anybody out (built 2026-11-25, see "The kill switch"): `0` holds sealed chat - nothing new becomes sealed, every conversation already sealed keeps opening, sending sealed and refusing plain writes. Left: the flip itself (last); a held page in a browser. | Yes | ~70% |
 | 5 | **Migration of existing chats** (proposal 8): built (2026-11-25, see "Migration of existing chats"): the per-conversation state (`ChatMigration`), the server-side migrator sealing every plain text message and its edit history under a one-time `HK(c, legacy)` sealed to each member's account key, verification of every row before the cut (M3), the cut (sealed only, plain text moved to `ChatMigrationRollback`), resume after a crash, the backup gate, a pass every 10 minutes from the dashboard itself. Verified against a real PostgreSQL. Built 2026-11-25 (round 26, see "Rollback, purge and late members"): the admin line (Management > Security), the per-conversation rollback from `ChatMigrationRollback` and "Seal it again", the purge after 30 days (decision 4), and members whose account key came after the cut getting the legacy key from a member's browser (`legacy-key-gaps`). Left: attachments/polls/system rows (row 3), a "history before [date]" label, members nobody holding the key ever meets again (needs `ORK`, row 6). Not verified: the admin line and rollback in a browser and against a real PostgreSQL. | Yes (owner: every existing chat migrated) | ~65% |
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
-| 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info; scanning the other person's QR in the app; the verified mark; the key-change line in the conversation (per browser, trust on first use). Left: `AccountKeyVerifier` still has no log behind it, so a server could hand out a substitute account key to somebody who never verifies - the append-only key log with a signed root and inclusion and consistency checks in the browser, and each account monitoring its own entries; key changes of group members (no number in a group). | Yes, for "government-grade" | ~30% |
+| 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info; scanning the other person's QR in the app; the verified mark; the key-change line in the conversation (per browser, trust on first use). Built 2026-11-26, not yet run (see "Account key log"): the append-only key log (RFC 6962 tree, signed head), the browser checking the signature, consistency with the last head it saw and inclusion of every key before the QR hand-over, a safety number, a remembered peer key or a sealed history key trusts it; each account's browsers monitoring their own entries; the group form of the key-change line (first 100 members). Left: no test, typecheck or build has run on it, nor a real PostgreSQL or browser; no gossip between browsers and no third-party auditor, so a fork shown to one browser alone is caught only when its own later heads meet it; no non-membership proofs (own-entry monitoring trusts the server to list every entry); the pinned log key and the last head are per browser. | Yes, for "government-grade" | ~65% |
 | 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody; the instance limit on /admin/privacy ("Sealed chat devices", 7 to 90 days, shown while sealed chat is on, audited). Built 2026-11-26 (code and unit tests, not yet run in a browser or against a real Postgres): the organisation's own limit (only tighter, organisation settings, strictest of instance and every organisation applies per account), a "new device" security notice when an account with another device registers one, and a device list with remove on /account/sessions. Left: seeing the three screens rendered, the migration applied on a real database. | Yes, for post-compromise security | ~85% |
 | 9 | **Server features that read chat text**: built (2026-11-25): moderation reports of a sealed message with its files, and the sealed lines of a whole-conversation or person report, see "Sealed reports". Built 2026-11-26 (round 30): moving a whole Polaris (Settings transfer) now re-seals the bare envelopes it used to miss - the MLS store of server-run members (Polar, webhooks), the OPAQUE server setup, automation secrets - and carries each OPAQUE record's password tag as the hash it fingerprints, keyed again on arrival (before, the setup failed to open on the new instance, every OPAQUE record was deleted, and accounts whose password was set over OPAQUE could not sign in nor open their account key or sealed history). Sealed rows, `ChatHistoryKey` and account-key envelopes travel as they are, so a sealed conversation opens after the move. Not carried by the transfer at all (every file, sealed or not): attachment and Drive bytes on disk or a storage connection; a Polar change waiting for Approve is answered as gone; a Polaris database backup is not restorable from the screen and only opens on the instance with the same master key. Confirmed 2026-11-26 (round 31), see "Other places a message is shown": retention (`lib/retention-service.ts`: activity, audit log, notices) and the compliance evidence export (`lib/compliance/*`: accounts, domains, certificates, backups, bans) read no chat table at all; disappearing messages go by `expiresAt` alone, so they expire and are kept the same sealed or not; automations get "New chat message" for a sealed message with an empty body (they are told it was sent, by whom and where, not what), and post into a sealed conversation through a webhook's own MLS device; game chat shows a sealed message as "Sent a message". Left: a sealed-aware game bridge (a server-run member, like webhooks) so a conversation shown in a game shows words again. | Partly (export/import must round-trip) | ~55% |
 | 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. Designed 2026-11-26 (round 31), see "Shared search segments": one segment per history-key epoch, keyed from that epoch's history key, built once under a lease, corrected by small generations, every hit still opened before it is shown. Left: phase-0 measurement, the table, the route ops and the Worker. | No (documented limit) | ~45% |
@@ -654,6 +654,80 @@ placement and wording (`sealed-notice.tsx`):
   sealed chat is off, in a conversation that still sends in the clear while it
   is held, before the answer is known, or when it cannot be had. Tests:
   `test/chat/e2ee/sealed-notice.test.tsx`. Not run in a browser.
+
+## Account key log (built 2026-11-26, not yet run)
+
+Nothing here has run yet: no test, typecheck or build, no PostgreSQL (the
+`unnest` node read and the advisory lock), no browser. The tree code was
+cross-checked against a Python port (every inclusion proof for sizes 1-40 and
+every consistency pair) and the RFC test vectors.
+
+- **The tree** (`@polaris/chat-crypto/key-log`): RFC 6962 leaf and node hashing
+  (`0x00`/`0x01` prefixes), RFC 9162 2.1.3/2.1.4 inclusion and consistency
+  verifiers, a leaf per (account, key version) carrying both public keys. The
+  server keeps only the leaves and the hashes of complete subtrees, which never
+  change once written, so a root or proof is one indexed read.
+- **The server** (`lib/chat/e2ee/key-log.ts`, migration
+  `20281209000000_chat_key_log`, additive): `ChatKeyLogEntry` and
+  `ChatKeyLogNode`. An append takes `pg_advisory_xact_lock` in its transaction,
+  so two appends never take one index; the unique (account, version) makes a
+  repeat a no-op. Nothing updates or deletes a row. A key published before the
+  log existed is appended the first time somebody asks for it (`ensureLogged`):
+  existing installs need no backfill and no setting. The head's Ed25519 key is
+  made on first use and kept sealed in the settings table
+  (`chat.e2ee.keyLog.ed25519`), never in `.env`. Route `POST /api/e2ee/key-log`:
+  `proofs` (at most 100 accounts, scoped to a conversation the caller reaches,
+  as `account-keys` is) and `own` (the caller's newest 64 entries).
+- **The browser** (`key-log-client.ts`): every answer is checked whole or not
+  used - signed by the log key this browser saw first (pinned, as a CT client
+  pins its log), consistent with the last head it saw (never smaller, never a
+  different root at the same size), every entry included under it. The head is
+  then remembered per account in `localStorage`, only ever forward; asks run
+  one at a time per account, so two answers are never checked against the same
+  old head. A failed check is the server contradicting itself: it is reported
+  above every sealed conversation ("keyLogFailed") and the key is not trusted.
+- **Where it is required**: the QR hand-over (`publishedKeyVerifier`) fails
+  without the log's entry for that exact key and version; a safety number is
+  not shown for a key the log contradicts (`unlogged`); a peer key is
+  remembered only when vouched, and while the log cannot be asked only peers
+  already remembered are updated (no first sight on the server's word); a
+  history key is sealed only to vouched keys, and an unreachable log fails the
+  distribution, which is retried (`vouch` in `mls-client.ts`).
+- **Monitoring**: the account's own browsers compare every logged key of the
+  current version or newer with the key they hold (`ownKeyAlarm`); one they did
+  not make is what anybody else would be handed, and is shown ("keyLogForeign").
+- **Group members**: `GroupKeyChangeBar` checks the first 100 members of a
+  conversation (`PEERS_PER_CHECK`, one `account-keys` page) and names those whose
+  key changed. Members past the 100th get no line; sealing to them is still
+  checked page by page.
+
+Limits, stated:
+
+- **No gossip, no auditors.** A signed head is evidence, not honesty. A server
+  that shows one browser a fork and never reconciles it is caught only when
+  that browser's own later heads meet the fork; two browsers are never compared
+  with each other and nobody outside Polaris checks the heads. CT closes this
+  with gossip and monitors, WhatsApp AKD with published epoch roots audited by
+  a third party.
+- **No non-membership proofs.** An RFC 6962 log proves an entry is in it, not
+  that an account has no other one. `own` relies on the server listing every
+  entry of the account; AKD and CONIKS use a prefix tree for this.
+- **Per-browser memory.** The pinned log key and the last head live in
+  `localStorage`. A cleared store (or a new browser) starts over on trust on
+  first use: it accepts whatever head and log key it is shown next, including
+  one rewound or forked from what that browser saw before; no other copy is
+  kept to catch it. A changed master key rotates the log key, and every browser
+  that pinned the old one then reports "log-key" until its storage is cleared:
+  its QR hand-overs fail and it seals history keys to nobody. There is no
+  signed hand-over from the old log key to a new one yet (open; CT handles it
+  by retiring a log and starting a new one under a new key).
+- **Entries are permanent**, even after the account is deleted (the account id
+  and public keys stay). Indexes are 32-bit: 2^31 leaves.
+- Verification memory (safety numbers, the verified mark) stays per browser.
+
+Prior art: RFC 6962 and RFC 9162 (Certificate Transparency), CT clients
+pinning log keys, CONIKS self-monitoring, WhatsApp Key Transparency (AKD),
+IETF KEYTRANS, Signal safety numbers.
 
 ## Device hygiene (built 2026-11-25)
 
