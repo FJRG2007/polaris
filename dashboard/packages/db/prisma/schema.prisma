@@ -19352,6 +19352,22 @@ model ChatKeyLogNode {
     @@id([level, index])
 }
 
+// Every key the key log has signed heads with, oldest first. The first row has
+// no fromKey; each later one names the previous key, the head at the change and
+// the previous key's signature over both, or no signature when that key could
+// no longer be read (a master key change) - which browsers show as a reset.
+model ChatKeyLogHandover {
+    // UUIDv7: time-ordered, so rows read back oldest first by id.
+    id        String   @id @default(uuid(7)) @db.Uuid
+    fromKey   Bytes?
+    toKey     Bytes    @unique
+    treeSize  Int
+    timestamp BigInt
+    rootHash  Bytes
+    signature Bytes?
+    createdAt DateTime @default(now())
+}
+
 // An account's OPAQUE (RFC 9807) registration record. Used to sign in only once
 // verifiedAt is set and passwordTag still matches the account's current password
 // hash, so any password change - reset, admin reset, recovery - retires the

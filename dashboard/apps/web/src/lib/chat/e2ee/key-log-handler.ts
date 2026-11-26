@@ -11,7 +11,8 @@
  *   monitor.
  *
  * Both answer a fresh signed head and, given `since`, the consistency proof
- * from the size the browser last saw.
+ * from the size the browser last saw; given `logKey`, the log key it pinned,
+ * every change of the log's key since, each proven a prefix of the head.
  */
 
 import { z } from "zod";
@@ -28,15 +29,18 @@ const PER_ACCOUNT = 600;
 export const PROOF_PAGE = 100;
 
 const since = z.number().int().min(0).max(2 ** 31).optional();
+/** The log key the browser pinned: raw Ed25519, 32 bytes as 43 base64url characters. */
+const logKey = z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional();
 
 export const keyLogBody = z.discriminatedUnion("op", [
     z.object({
         op: z.literal("proofs"),
         channelId: z.string().uuid().optional(),
         userIds: z.array(z.string().uuid()).min(1).max(PROOF_PAGE),
-        since
+        since,
+        logKey
     }).strict(),
-    z.object({ op: z.literal("own"), since }).strict()
+    z.object({ op: z.literal("own"), since, logKey }).strict()
 ]);
 
 export type KeyLogBody = z.infer<typeof keyLogBody>;
@@ -75,6 +79,13 @@ export function encodeAnswer(answer: keyLog.LogAnswer) {
             signPublicKey: text(e.signPublicKey),
             hpkePublicKey: text(e.hpkePublicKey),
             proof: e.proof.map(text)
+        })),
+        handovers: answer.handovers.map((h) => ({
+            fromKey: text(h.fromKey),
+            toKey: text(h.toKey),
+            head: { treeSize: h.head.treeSize, timestamp: h.head.timestamp, rootHash: text(h.head.rootHash) },
+            signature: h.signature ? text(h.signature) : null,
+            consistency: h.consistency.map(text)
         }))
     };
 }
@@ -97,11 +108,15 @@ export async function handleKeyLog(request: Request): Promise<Response> {
 }
 
 async function answer(userId: string, body: KeyLogBody): Promise<keyLog.LogAnswer> {
-    if (body.op === "own") return keyLog.ownEntries(userId, body.since);
+    const seen: keyLog.Seen = {
+        ...(body.since !== undefined ? { since: body.since } : {}),
+        ...(body.logKey ? { logKey: new Uint8Array(Buffer.from(body.logKey, "base64url")) } : {})
+    };
+    if (body.op === "own") return keyLog.ownEntries(userId, seen);
     const distinct = [...new Set(body.userIds)];
     const { channelId } = body;
-    if (!channelId) return keyLog.keyProofs(distinct.filter((id) => id === userId), body.since);
+    if (!channelId) return keyLog.keyProofs(distinct.filter((id) => id === userId), seen);
     const callerReaches = await channelAccess({ id: userId }, channelId);
     const reach = callerReaches ? await Promise.all(distinct.map((id) => channelAccess({ id }, channelId))) : [];
-    return keyLog.keyProofs(distinct.filter((_, i) => reach[i]), body.since);
+    return keyLog.keyProofs(distinct.filter((_, i) => reach[i]), seen);
 }

@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
     entries: [] as Row[],
     nodes: [] as Row[],
     accountKeys: [] as Row[],
+    handovers: [] as Row[],
     reach: new Map<string, Set<string>>(),
     user: { id: "" } as { id: string } | null,
     busy: 0
@@ -62,6 +63,32 @@ vi.mock("@polaris/db", () => {
             }
         },
         chatAccountKey: { findMany: async ({ where: w }: { where: Row }) => state.accountKeys.filter((r) => where(r, w)) },
+        // Insertion order is id order, as UUIDv7 ids are.
+        chatKeyLogHandover: {
+            findFirst: async () => state.handovers.at(-1) ?? null,
+            findUnique: async ({ where: w }: { where: { toKey: Buffer } }) => state.handovers.find((r) => Buffer.compare(r.toKey as Buffer, w.toKey) === 0) ?? null,
+            findMany: async ({ take }: { take?: number }) => [...state.handovers].reverse().slice(0, take ?? Infinity),
+            create: async ({ data }: { data: Row }) => {
+                if (state.handovers.some((r) => Buffer.compare(r.toKey as Buffer, data.toKey as Buffer) === 0)) throw new Error("unique violation");
+                const row = { id: `h${state.handovers.length}`, ...data };
+                state.handovers.push(row);
+                return row;
+            },
+            createMany: async ({ data }: { data: Row[] }) => {
+                let count = 0;
+                for (const row of data) {
+                    if (state.handovers.some((r) => Buffer.compare(r.toKey as Buffer, row.toKey as Buffer) === 0)) continue;
+                    state.handovers.push({ id: `h${state.handovers.length}`, ...row });
+                    count++;
+                }
+                return { count };
+            },
+            deleteMany: async ({ where: w }: { where: { id: string } }) => {
+                const before = state.handovers.length;
+                state.handovers = state.handovers.filter((r) => r.id !== w.id);
+                return { count: before - state.handovers.length };
+            }
+        },
         $executeRaw: async () => 0,
         $queryRaw: async (strings: TemplateStringsArray, levels: number[], indexes: number[]) => {
             if (strings.join("").includes("pg_try_advisory_xact_lock")) return [{ locked: state.busy-- <= 0 }];
@@ -73,7 +100,25 @@ vi.mock("@polaris/db", () => {
 });
 
 const signing = vi.hoisted(() => ({ key: null as null | { privateKey: unknown; publicKey: string } }));
-vi.mock("@/lib/edge-signing-key", () => ({ storedSigningKey: () => async () => signing.key }));
+vi.mock("@/lib/edge-signing-key", () => ({
+    storedSigningKey: () =>
+        Object.assign(async () => signing.key, {
+            forget: () => undefined,
+            async rotate(handOver: (previous: unknown, next: string) => Promise<() => Promise<void>>) {
+                const next = await freshKey();
+                await handOver(signing.key, next.publicKey);
+                signing.key = next;
+                return next;
+            }
+        })
+}));
+
+/** An Ed25519 pair as the stored signing key holds it. */
+async function freshKey(): Promise<{ privateKey: unknown; publicKey: string }> {
+    const { generateKeyPairSync: generate, createPublicKey: publicOf } = await import("node:crypto");
+    const { privateKey } = generate("ed25519");
+    return { privateKey, publicKey: (publicOf(privateKey).export({ format: "jwk" }) as { x: string }).x };
+}
 vi.mock("@/lib/chat/e2ee/flag", () => ({ chatE2eeEnabled: () => true }));
 vi.mock("@/lib/session", () => ({ backgroundUser: async () => state.user }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
@@ -117,6 +162,7 @@ beforeEach(() => {
     state.entries.length = 0;
     state.nodes.length = 0;
     state.accountKeys.length = 0;
+    state.handovers = [];
     state.reach.clear();
     state.busy = 0;
     state.user = { id: ALICE };
@@ -153,7 +199,7 @@ describe("key log server", () => {
         expect(await verifies(first)).toBe(true);
 
         for (let i = 0; i < 5; i++) await keyLog.appendEntry(entry(`0190a1b2-0000-7000-8000-00000000010${i}`, 10 + i));
-        const later = await keyLog.keyProofs([BOB], first.head.treeSize);
+        const later = await keyLog.keyProofs([BOB], { since: first.head.treeSize });
         expect(later.head.treeSize).toBe(7);
         expect(await verifies(later)).toBe(true);
         expect(await log.verifyConsistency(2, 7, first.head.rootHash, later.head.rootHash, later.consistency!)).toBe(true);
@@ -166,6 +212,64 @@ describe("key log server", () => {
         const own = await keyLog.ownEntries(ALICE);
         expect(own.entries.map((e) => [e.index, e.akVersion])).toEqual([[2, 2], [0, 1]]);
         expect(await verifies(own)).toBe(true);
+    });
+});
+
+describe("key log key changes", () => {
+    /** Whether every hand-over of `answer` holds and its head is a prefix of the answer's head. */
+    async function chainHolds(answer: keyLog.LogAnswer, pinned: Uint8Array): Promise<string> {
+        const followed = await log.followHandovers(pinned, answer.logKey, answer.handovers);
+        for (const link of answer.handovers) {
+            const prefix = await log.verifyConsistency(link.head.treeSize, answer.head.treeSize, link.head.rootHash, answer.head.rootHash, link.consistency);
+            if (!prefix) return "fork";
+        }
+        return followed.kind;
+    }
+
+    it("records the first key once and answers no hand-over to a browser on it", async () => {
+        await keyLog.appendEntry(entry(ALICE, 1));
+        const first = await keyLog.keyProofs([ALICE]);
+        const again = await keyLog.keyProofs([ALICE], { since: 1, logKey: first.logKey });
+        expect(state.handovers).toHaveLength(1);
+        expect(state.handovers[0]!.fromKey).toBeNull();
+        expect(again.handovers).toEqual([]);
+    });
+
+    it("hands over to a new key with the old key's signature, which a pinned browser follows", async () => {
+        await keyLog.appendEntry(entry(ALICE, 1));
+        const before = await keyLog.keyProofs([ALICE]);
+        await keyLog.appendEntry(entry(BOB, 2));
+        await keyLog.rotateLogKey();
+        await keyLog.appendEntry(entry(CAROL, 3));
+        const after = await keyLog.keyProofs([ALICE], { since: before.head.treeSize, logKey: before.logKey });
+        expect(Buffer.from(after.logKey).equals(Buffer.from(before.logKey))).toBe(false);
+        expect(await verifies(after)).toBe(true);
+        expect(after.handovers).toHaveLength(1);
+        expect(after.handovers[0]!.head.treeSize).toBe(2);
+        expect(await chainHolds(after, before.logKey)).toBe("linked");
+        // Without the key it pinned, a browser is handed no chain to follow.
+        expect((await keyLog.keyProofs([ALICE])).handovers).toEqual([]);
+    });
+
+    it("records a key that replaced an unreadable one as an unsigned reset, never as a hand-over", async () => {
+        await keyLog.appendEntry(entry(ALICE, 1));
+        const before = await keyLog.keyProofs([ALICE]);
+        // What `storedSigningKey` does when the master key no longer opens the stored key.
+        signing.key = await freshKey();
+        const after = await keyLog.keyProofs([ALICE], { since: 1, logKey: before.logKey });
+        expect(after.handovers).toHaveLength(1);
+        expect(after.handovers[0]!.signature).toBeNull();
+        expect(await chainHolds(after, before.logKey)).toBe("reset");
+    });
+
+    it("answers no chain from a key it never signed with", async () => {
+        await keyLog.appendEntry(entry(ALICE, 1));
+        await keyLog.keyProofs([ALICE]);
+        await keyLog.rotateLogKey();
+        const stranger = new Uint8Array(32).fill(5);
+        const answer = await keyLog.keyProofs([ALICE], { since: 1, logKey: stranger });
+        expect(answer.handovers).toEqual([]);
+        expect(await chainHolds(answer, stranger)).toBe("broken");
     });
 });
 

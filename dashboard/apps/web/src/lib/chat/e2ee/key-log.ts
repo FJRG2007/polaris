@@ -12,7 +12,11 @@
  * appended the first time a proof of them is asked for (`ensureLogged`), so
  * the log needs no backfill job and no setting. The head's signing key is made
  * on first use and kept sealed in the settings table (`storedSigningKey`),
- * never in `.env` (repo CLAUDE.md).
+ * never in `.env` (repo CLAUDE.md). Every key it has ever signed with is
+ * recorded in `ChatKeyLogHandover` (`currentLogKey`): a deliberate change is
+ * signed by the old key (`rotateLogKey`), one forced by a master key that no
+ * longer opens the old key is recorded unsigned, as a reset; a browser follows
+ * the first on its own and the second only when its user says so.
  *
  * What a head proves, and what it cannot: the server signs whatever it holds,
  * so a signature is evidence, not honesty. Its value is that two heads of the
@@ -23,7 +27,7 @@
 import { sign } from "node:crypto";
 import { prisma } from "@polaris/db";
 import * as log from "@polaris/chat-crypto/key-log";
-import { storedSigningKey } from "@/lib/edge-signing-key";
+import { storedSigningKey, type EdgeSigningKey } from "@/lib/edge-signing-key";
 
 const SIGNING_SETTING = "chat.e2ee.keyLog.ed25519";
 /** A head is re-signed at least this often even when the log has not grown. */
@@ -48,6 +52,19 @@ export interface LogAnswer {
     /** From the size the caller last saw to `head.treeSize`; null when it named none. */
     readonly consistency: Uint8Array[] | null;
     readonly entries: ProvenEntry[];
+    /** From the log key the caller pinned to `logKey`, oldest first; empty when they are the same or it named none. */
+    readonly handovers: ProvenHandover[];
+}
+
+/** A change of the log's key, with the proof that the head at the change is a prefix of the answer's head. */
+export interface ProvenHandover extends log.KeyHandover {
+    readonly consistency: Uint8Array[];
+}
+
+/** What the browser last saw: the tree size and the log key it pinned (raw 32 bytes). */
+export interface Seen {
+    readonly since?: number;
+    readonly logKey?: Uint8Array;
 }
 
 /** Reads the complete subtrees `run` needs, all in one query, then runs it on them. */
@@ -153,12 +170,114 @@ export async function ensureLogged(userIds: ReadonlyArray<string>): Promise<void
     }
 }
 
+const raw = (publicKey: string) => new Uint8Array(Buffer.from(publicKey, "base64url"));
+const sameBytes = (a: Uint8Array, b: Uint8Array) => Buffer.compare(Buffer.from(a), Buffer.from(b)) === 0;
+
+/** The log's size and root right now, unsigned. */
+async function headNow(now = Date.now()): Promise<Pick<log.TreeHead, "treeSize" | "timestamp" | "rootHash">> {
+    const size = await treeSize();
+    return { treeSize: size, timestamp: now, rootHash: await withNodes((read) => log.rootOf(size, read)) };
+}
+
+/**
+ * The key heads are signed with, recorded in `ChatKeyLogHandover` before it
+ * signs anything. A key not recorded yet is the first one (no `fromKey`) or
+ * one that replaced the last recorded key without its signature: the stored
+ * key no longer read under the master key, so `storedSigningKey` made a new
+ * one. That is written down as a reset - honestly unsigned, which browsers
+ * that pinned the old key refuse to follow on their own (`followHandovers`).
+ * A key this process holds that is older than the last recorded one was
+ * rotated by another process: it is dropped and read again.
+ */
+async function currentLogKey(): Promise<EdgeSigningKey> {
+    for (let reread = false; ; reread = true) {
+        const key = await logSigningKey();
+        const latest = await prisma.chatKeyLogHandover.findFirst({ orderBy: { id: "desc" }, select: { toKey: true } });
+        if (latest && sameBytes(latest.toKey, raw(key.publicKey))) return key;
+        const known = latest ? await prisma.chatKeyLogHandover.findUnique({ where: { toKey: Buffer.from(raw(key.publicKey)) }, select: { id: true } }) : null;
+        if (known && !reread) {
+            logSigningKey.forget();
+            continue;
+        }
+        const head = await headNow();
+        await prisma.chatKeyLogHandover.createMany({
+            data: [{
+                fromKey: latest ? Buffer.from(latest.toKey) : null,
+                toKey: Buffer.from(raw(key.publicKey)),
+                treeSize: head.treeSize,
+                timestamp: BigInt(head.timestamp),
+                rootHash: Buffer.from(head.rootHash),
+                signature: null
+            }],
+            skipDuplicates: true
+        });
+        if (latest && !known) console.error("polaris: the chat key log's signing key could not be read and was replaced; browsers will report a reset");
+        return key;
+    }
+}
+
+/**
+ * Replaces the log's signing key while the old one still reads: the old key
+ * signs the new one with the head at the change, and that hand-over is stored
+ * before the new key is, so no head under the new key is ever served without
+ * it. A hand-over to a key that then failed to store is removed again (the
+ * only row this module ever deletes, and one nothing was ever signed by).
+ */
+export async function rotateLogKey(): Promise<void> {
+    await currentLogKey();
+    await logSigningKey.rotate(async (previous, nextPublicKey) => {
+        const head = await headNow();
+        const unsigned = { fromKey: raw(previous.publicKey), toKey: raw(nextPublicKey), head };
+        const signature = sign(null, log.handoverMessage(unsigned), previous.privateKey);
+        const row = await prisma.chatKeyLogHandover.create({
+            data: {
+                fromKey: Buffer.from(unsigned.fromKey),
+                toKey: Buffer.from(unsigned.toKey),
+                treeSize: head.treeSize,
+                timestamp: BigInt(head.timestamp),
+                rootHash: Buffer.from(head.rootHash),
+                signature
+            },
+            select: { id: true }
+        });
+        return async () => {
+            await prisma.chatKeyLogHandover.deleteMany({ where: { id: row.id } });
+        };
+    });
+    lastHead = null;
+}
+
+/** Hand-overs answered at most: one per change of the log's key. */
+export const HANDOVERS = 32;
+
+/** The changes of the log's key from `pinned` on, oldest first; empty when `pinned` is current or unknown. */
+async function handoversFrom(pinned: Uint8Array | undefined, current: Uint8Array): Promise<log.KeyHandover[]> {
+    if (!pinned || sameBytes(pinned, current)) return [];
+    const rows = await prisma.chatKeyLogHandover.findMany({
+        orderBy: { id: "desc" },
+        take: HANDOVERS,
+        select: { fromKey: true, toKey: true, treeSize: true, timestamp: true, rootHash: true, signature: true }
+    });
+    const chain = rows.reverse().flatMap((row) =>
+        row.fromKey
+            ? [{
+                fromKey: new Uint8Array(row.fromKey),
+                toKey: new Uint8Array(row.toKey),
+                head: { treeSize: row.treeSize, timestamp: Number(row.timestamp), rootHash: new Uint8Array(row.rootHash) },
+                signature: row.signature ? new Uint8Array(row.signature) : null
+            }]
+            : []
+    );
+    const start = chain.findIndex((link) => sameBytes(link.fromKey, pinned));
+    return start < 0 ? [] : chain.slice(start);
+}
+
 let lastHead: { head: log.TreeHead; at: number; key: string } | null = null;
 
 /** A signed head of the log as it is now: the cached one while the size is unchanged and it is fresh. */
 export async function signedHead(now = Date.now()): Promise<{ logKey: Uint8Array; head: log.TreeHead }> {
-    const key = await logSigningKey();
-    const logKey = new Uint8Array(Buffer.from(key.publicKey, "base64url"));
+    const key = await currentLogKey();
+    const logKey = raw(key.publicKey);
     const size = await treeSize();
     if (lastHead && lastHead.key === key.publicKey && lastHead.head.treeSize === size && now - lastHead.at < HEAD_TTL_MS) return { logKey, head: lastHead.head };
     const rootHash = await withNodes((read) => log.rootOf(size, read));
@@ -179,24 +298,33 @@ function entryOf(row: { index: number; userId: string; akVersion: number; signPu
     };
 }
 
-/** Proofs of `entries` under `head`, and of `head` extending the size `since`, from one node read. */
-async function prove(head: log.TreeHead, entries: LoggedEntry[], since: number | undefined): Promise<Pick<LogAnswer, "consistency" | "entries">> {
+/**
+ * A fresh signed head with proofs of `entries` under it, of it extending the
+ * size `seen.since`, and of every hand-over from `seen.logKey` - all from one
+ * node read.
+ */
+async function answerFor(entries: LoggedEntry[], seen: Seen): Promise<LogAnswer> {
+    const { logKey, head } = await signedHead();
     const size = head.treeSize;
-    const from = since !== undefined && since <= size ? since : undefined;
-    return withNodes(async (read) => ({
+    const from = seen.since !== undefined && seen.since <= size ? seen.since : undefined;
+    const links = (await handoversFrom(seen.logKey, logKey)).filter((link) => link.head.treeSize <= size);
+    const proven = await withNodes(async (read) => ({
         consistency: from === undefined ? null : await log.consistencyProof(from, size, read),
         entries: await Promise.all(
             entries.filter((e) => e.index < size).map(async (e) => ({ ...e, proof: await log.inclusionProof(e.index, size, read) }))
-        )
+        ),
+        handovers: await Promise.all(links.map(async (link) => ({ ...link, consistency: await log.consistencyProof(link.head.treeSize, size, read) })))
     }));
+    return { logKey, head, ...proven };
 }
 
 /**
  * The latest logged key of each account in `userIds`, each with its inclusion
- * proof, under a fresh signed head - plus the consistency proof from `since`,
- * the size the caller last saw. The caller decides who may be named.
+ * proof, under a fresh signed head - plus the consistency proof from the size
+ * the caller last saw and the hand-overs from the log key it pinned (`seen`).
+ * The caller decides who may be named.
  */
-export async function keyProofs(userIds: ReadonlyArray<string>, since?: number): Promise<LogAnswer> {
+export async function keyProofs(userIds: ReadonlyArray<string>, seen: Seen = {}): Promise<LogAnswer> {
     await ensureLogged(userIds);
     const rows = await prisma.chatKeyLogEntry.findMany({
         where: { userId: { in: [...userIds] } },
@@ -204,15 +332,14 @@ export async function keyProofs(userIds: ReadonlyArray<string>, since?: number):
         distinct: ["userId"],
         select: { index: true, userId: true, akVersion: true, signPublicKey: true, hpkePublicKey: true }
     });
-    const { logKey, head } = await signedHead();
-    return { logKey, head, ...(await prove(head, rows.map(entryOf), since)) };
+    return answerFor(rows.map(entryOf), seen);
 }
 
 /**
  * Every entry of one account, for that account's own browsers to check against
  * the key they hold (monitoring). Answered only to the account itself.
  */
-export async function ownEntries(userId: string, since?: number): Promise<LogAnswer> {
+export async function ownEntries(userId: string, seen: Seen = {}): Promise<LogAnswer> {
     await ensureLogged([userId]);
     const rows = await prisma.chatKeyLogEntry.findMany({
         where: { userId },
@@ -221,6 +348,5 @@ export async function ownEntries(userId: string, since?: number): Promise<LogAns
         take: OWN_ENTRIES,
         select: { index: true, userId: true, akVersion: true, signPublicKey: true, hpkePublicKey: true }
     });
-    const { logKey, head } = await signedHead();
-    return { logKey, head, ...(await prove(head, rows.map(entryOf), since)) };
+    return answerFor(rows.map(entryOf), seen);
 }

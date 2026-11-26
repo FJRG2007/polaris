@@ -34,7 +34,6 @@ export interface EdgeSigningKey {
     readonly publicKey: string;
 }
 
-
 /** Sealed with the master key, as every other stored credential is. The same envelope
  *  the managed certificates use, written here rather than imported so the deploy path
  *  does not load the ACME client to read one setting. */
@@ -110,16 +109,57 @@ async function loadOrCreate(setting: string): Promise<EdgeSigningKey> {
  * and has to keep across restarts with no `.env` key (the chat key log's tree
  * heads). One getter per setting.
  */
-export function storedSigningKey(setting: string): () => Promise<EdgeSigningKey> {
+export function storedSigningKey(setting: string): StoredSigningKey {
     let cached: Promise<EdgeSigningKey> | null = null;
-    return () => {
+    const read = () => {
         cached ??= loadOrCreate(setting).catch((error: unknown) => {
             cached = null;
             throw error;
         });
         return cached;
     };
+    return Object.assign(read, {
+        forget(): void {
+            cached = null;
+            forgetSettingReads();
+        },
+        async rotate(handOver: Rotation): Promise<EdgeSigningKey> {
+            forgetSettingReads();
+            const raw = await getSetting(setting);
+            const previous = readKey(raw);
+            if (!raw || !previous) throw new Error(`The signing key ${setting} cannot be read, so it cannot hand over`);
+            const { privateKey } = generateKeyPairSync("ed25519");
+            const undo = await handOver(previous, publicKeyOf(privateKey));
+            // Only over the value read here: a rotation racing another one stores exactly one of them.
+            const written = await prisma.setting.updateMany({
+                where: { key: setting, value: raw },
+                data: { value: seal(privateKey.export({ format: "pem", type: "pkcs8" }).toString()) }
+            });
+            cached = null;
+            forgetSettingReads();
+            if (!written.count) {
+                await undo();
+                throw new Error(`The signing key ${setting} changed while it was being rotated`);
+            }
+            return read();
+        }
+    });
 }
+
+/**
+ * Called with the key being replaced and the new public key, before the new key
+ * is stored - so whatever announces the change exists before anybody can see
+ * the new key. Answers how to take that back if the new key is not stored.
+ */
+export type Rotation = (previous: EdgeSigningKey, nextPublicKey: string) => Promise<() => Promise<void>>;
+
+/** A stored signing key's getter, and the one way to replace it while the old one still reads. */
+export type StoredSigningKey = (() => Promise<EdgeSigningKey>) & {
+    /** Drops this process's copy: the next call reads the setting again. */
+    forget(): void;
+    /** Replaces the key, `handOver` first; refuses when the key being replaced does not read. */
+    rotate(handOver: Rotation): Promise<EdgeSigningKey>;
+};
 
 /** The signing key, made on first use. */
 export const edgeSigningKey: () => Promise<EdgeSigningKey> = storedSigningKey(KEY_SETTING);
