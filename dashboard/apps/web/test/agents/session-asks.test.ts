@@ -128,6 +128,19 @@ describe("questions and plans", () => {
         ).toBe("deny");
     });
 
+    it("keeps an option's preview, cut to size rather than refused", () => {
+        const long = "x".repeat(9000);
+        const read = asks.readAsk(
+            pre("AskUserQuestion", {
+                questions: [{ question: "Which layout?", options: [{ label: "A", preview: "```\n| a |\n```" }, { label: "B", preview: long }] }]
+            })
+        );
+        expect(read?.ask.kind).toBe("question");
+        const options = read?.ask.kind === "question" ? read.ask.questions[0]!.options : [];
+        expect(options[0]?.preview).toBe("```\n| a |\n```");
+        expect(options[1]?.preview).toHaveLength(8000);
+    });
+
     it("refuses what does not fit the schema", () => {
         expect(asks.readAsk(pre("AskUserQuestion", { questions: [] }))).toBeNull();
         expect(asks.readAsk(pre("ExitPlanMode", {}))).toBeNull();

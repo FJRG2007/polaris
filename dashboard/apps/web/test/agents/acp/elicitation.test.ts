@@ -23,13 +23,13 @@ const SINGLE = {
 };
 
 describe("AskUserQuestion forms", () => {
-    it("reads a single question from the form's message", () => {
+    it("reads a single question from the form's message, an option's preview from its _meta", () => {
         expect(elicitationQuestions(SINGLE)).toEqual([
             {
                 question: "Which framework?",
                 header: "Framework",
                 multiSelect: false,
-                options: [{ label: "React", description: "Components" }, { label: "Vue" }]
+                options: [{ label: "React", description: "Components", preview: "jsx" }, { label: "Vue" }]
             }
         ]);
     });

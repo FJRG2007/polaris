@@ -182,6 +182,16 @@ export function AskCard({
     const mine = picked[index]!;
     const last = index === questions.length - 1;
     const answered = (entry: Picked) => answerText(entry) !== "";
+    // An option's preview (a mockup, a snippet) shows for the option under the
+    // pointer or the keyboard, as in Claude Code, else for the one picked. With
+    // previews a single choice waits for Submit, so a tap can read it first.
+    const [focused, setFocused] = useState<number | null>(null);
+    const hasPreview = question.options.some((option) => !!option.preview);
+    const shown =
+        (focused !== null ? question.options[focused]?.preview : undefined) ??
+        question.options.find((option) => option.preview && mine.labels.includes(option.label))?.preview ??
+        null;
+    useEffect(() => setFocused(null), [index]);
 
     const update = (next: Picked) => setPicked((all) => all.map((entry, at) => (at === index ? next : entry)));
     const submit = (all: readonly Picked[]) =>
@@ -197,6 +207,7 @@ export function AskCard({
         const next = picked.map((entry, at) => (at === index ? { labels: [label], other: null } : entry));
         setPicked(next);
         // A single choice is the answer: on to the next question, or sent.
+        if (hasPreview) return;
         if (last) submit(next);
         else setIndex(index + 1);
     };
@@ -242,6 +253,8 @@ export function AskCard({
                             role={question.multiSelect ? "checkbox" : "radio"}
                             aria-checked={on}
                             onClick={() => pick(at)}
+                            onMouseEnter={() => setFocused(at)}
+                            onFocus={() => setFocused(at)}
                             disabled={busy}
                             className={cn(
                                 "flex min-w-0 items-start gap-2 rounded-md border px-2 py-1.5 text-start text-sm transition-colors hover:bg-card-hover disabled:opacity-60 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:py-2.5",
@@ -284,8 +297,17 @@ export function AskCard({
                     />
                 )}
             </div>
+            {shown ? (
+                <div
+                    aria-label={t("code.ask.preview")}
+                    role="region"
+                    className="max-h-72 min-w-0 overflow-auto rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                >
+                    <MessageResponse>{shown}</MessageResponse>
+                </div>
+            ) : null}
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-                {question.multiSelect || mine.other !== null || questions.length > 1 ? (
+                {question.multiSelect || mine.other !== null || questions.length > 1 || hasPreview ? (
                     <Button
                         type="button"
                         size="sm" className={TOUCH}

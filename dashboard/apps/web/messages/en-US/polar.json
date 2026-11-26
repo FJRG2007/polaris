@@ -1915,6 +1915,7 @@
             "next": "Next question",
             "selected": "{count} selected",
             "other": "Something else",
+            "preview": "Preview",
             "otherPlaceholder": "Type your answer",
             "skip": "Skip",
             "submit": "Send answers",

@@ -35,6 +35,7 @@ export const MAX_QUESTIONS = 4;
 export const MAX_OPTIONS = 9;
 const MAX_PLAN_CHARS = 40_000;
 export const MAX_ANSWER_CHARS = 2_000;
+const MAX_PREVIEW_CHARS = 8_000;
 
 function clip(text: string, max: number): string {
     const flat = text.trim();
@@ -170,7 +171,19 @@ export const questionSchema = z.object({
     header: z.string().trim().max(60).optional(),
     multiSelect: z.boolean().optional(),
     options: z
-        .array(z.object({ label: z.string().trim().min(1).max(200), description: z.string().max(500).optional() }))
+        .array(
+            z.object({
+                label: z.string().trim().min(1).max(200),
+                description: z.string().max(500).optional(),
+                // Claude Code's option preview: a mockup or snippet shown while
+                // the option is focused. Cut rather than refused, so a long one
+                // never costs the whole question.
+                preview: z
+                    .string()
+                    .transform((text) => text.slice(0, MAX_PREVIEW_CHARS))
+                    .optional()
+            })
+        )
         .min(1)
         .max(MAX_OPTIONS)
 });

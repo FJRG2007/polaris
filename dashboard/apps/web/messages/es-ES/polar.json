@@ -1915,6 +1915,7 @@
             "next": "Siguiente",
             "selected": "{count} elegidas",
             "other": "Otra cosa",
+            "preview": "Vista",
             "otherPlaceholder": "Escribe tu respuesta",
             "skip": "Omitir",
             "submit": "Enviar",

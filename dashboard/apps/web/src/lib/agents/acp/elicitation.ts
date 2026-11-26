@@ -35,8 +35,19 @@ export type ElicitationReply =
 const optionSchema = z.object({
     const: z.string(),
     title: z.string().optional(),
-    description: z.string().optional()
+    description: z.string().optional(),
+    _meta: z.record(z.string(), z.unknown()).optional()
 });
+
+/** Where claude-agent-acp puts an option's preview, which ACP's enum option
+ *  has no field for (src/elicitation.ts, OPTION_META_KEY). */
+const OPTION_META_KEY = "_claude/askUserQuestionOption";
+
+function previewOf(meta: Record<string, unknown> | undefined): string | null {
+    const entry = meta?.[OPTION_META_KEY];
+    const preview = entry && typeof entry === "object" ? (entry as Record<string, unknown>).preview : undefined;
+    return typeof preview === "string" && preview.trim() ? preview : null;
+}
 
 const fieldSchema = z.object({
     type: z.string(),
@@ -85,7 +96,8 @@ export function elicitationQuestions(params: unknown): AskQuestion[] | null {
             multiSelect,
             options: options.map((option) => ({
                 label: option.const.slice(0, 200),
-                ...(option.description ? { description: option.description.slice(0, 500) } : {})
+                ...(option.description ? { description: option.description.slice(0, 500) } : {}),
+                ...(previewOf(option._meta) ? { preview: previewOf(option._meta)! } : {})
             }))
         });
         if (!parsed.success) return null;
