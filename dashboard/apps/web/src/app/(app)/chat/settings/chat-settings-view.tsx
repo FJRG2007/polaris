@@ -9,10 +9,9 @@
  */
 
 import Link from "next/link";
-import { ArrowLeft, Settings2 } from "lucide-react";
-import { Card, CardBody, Select } from "@polaris/ui";
+import { ArrowLeft, Images, Settings2 } from "lucide-react";
+import { Card, CardBody, Select, SettingRow, settingType } from "@polaris/ui";
 import { useEffect, useState, type ReactNode } from "react";
-import { SettingRow } from "./setting-row";
 import { setCaptionPositionAction } from "../preference-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { rememberChatPreferences, useChatPreferences } from "../chat-preferences";
@@ -69,13 +68,15 @@ export function ChatSettingsView({
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
-                    <p className="text-sm text-muted-foreground">{t("chatSettings.intro")}</p>
+                    <p className={settingType.hint}>{t("chatSettings.intro")}</p>
                     <Card>
-                        <CardBody className="flex flex-col gap-2">
+                        <CardBody className="p-3">
                             <SettingRow
                                 id="chat-caption-position"
+                                icon={<Images />}
                                 label={t("chatSettings.captionPosition")}
                                 hint={t("chatSettings.captionPositionHint")}
+                                error={error}
                             >
                                 <Select
                                     value={preferences.captionPosition}
@@ -93,11 +94,6 @@ export function ChatSettingsView({
                                     }))}
                                 />
                             </SettingRow>
-                            {error ? (
-                                <p role="alert" className="text-sm text-danger">
-                                    {error}
-                                </p>
-                            ) : null}
                         </CardBody>
                     </Card>
                     {children}

@@ -22,6 +22,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    SettingRow,
     Switch
 } from "@polaris/ui";
 
@@ -48,25 +49,22 @@ export function ViewOnceWatermarkCard({ on }: { on: boolean }) {
 
     return (
         <Card>
-            <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
-                <Stamp className="size-4 shrink-0 text-muted-foreground" />
-                <span className="min-w-[14rem] flex-1">
-                    <span className="block text-[0.8125rem]">{t("viewOnceWatermark.label")}</span>
-                    <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                        {t("viewOnceWatermark.hint")}
-                    </span>
-                    {error && (
-                        <span role="alert" className="block text-xs text-danger">
-                            {error}
-                        </span>
-                    )}
-                </span>
-                <Switch
-                    checked={value}
-                    disabled={saving}
-                    aria-label={t("viewOnceWatermark.label")}
-                    onChange={(next) => (next ? void save(true) : setAsking(true))}
-                />
+            <CardBody className="p-3">
+                <SettingRow
+                    id="chat-view-once-watermark"
+                    icon={<Stamp />}
+                    label={t("viewOnceWatermark.label")}
+                    hint={t("viewOnceWatermark.hint")}
+                    error={error}
+                >
+                    <Switch
+                        checked={value}
+                        disabled={saving}
+                        aria-label={t("viewOnceWatermark.label")}
+                        aria-describedby="chat-view-once-watermark-hint"
+                        onChange={(next) => (next ? void save(true) : setAsking(true))}
+                    />
+                </SettingRow>
             </CardBody>
             <Dialog open={asking} onOpenChange={setAsking}>
                 <DialogContent className="max-w-md">

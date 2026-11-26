@@ -10,13 +10,12 @@
  * ahead of time, or that a video still plays when it is opened.
  */
 
-import { SettingRow } from "./setting-row";
 import { formatBytes } from "@polaris/core";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useCallback, useEffect, useState } from "react";
 import * as rules from "@/lib/chat/offline/media-download";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, CardHeader, CardTitle, Select } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Select, SettingRow, settingType } from "@polaris/ui";
 import { clearMedia, mediaUsage, setMediaPrefs, useMediaPrefs } from "../media-download";
 
 const KINDS: readonly rules.MediaKind[] = ["photos", "videos", "files"];
@@ -58,12 +57,10 @@ export function MediaDownloadCard() {
         <Card>
             <CardHeader>
                 <CardTitle>{t("chatSettings.media.title")}</CardTitle>
+                <p className={settingType.hint}>{t("chatSettings.media.body")}</p>
+                <p className={settingType.hint}>{t("chatSettings.media.whenHint")}</p>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1">
-                    <p className="text-sm text-muted-foreground">{t("chatSettings.media.body")}</p>
-                    <p className="text-sm text-muted-foreground">{t("chatSettings.media.whenHint")}</p>
-                </div>
                 {KINDS.map((kind) => (
                     <SettingRow
                         key={kind}

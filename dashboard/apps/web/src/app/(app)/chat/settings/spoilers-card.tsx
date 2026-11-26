@@ -13,8 +13,8 @@
  * unasked, and ignoring that by default would make marking something pointless.
  */
 
-import { SettingRow } from "./setting-row";
-import { Card, CardBody, Switch } from "@polaris/ui";
+import { EyeOff } from "lucide-react";
+import { Card, CardBody, SettingRow, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setSpoilersShown, useSpoilersShown } from "../spoilers-shown";
 
@@ -23,9 +23,10 @@ export function SpoilersCard() {
     const shown = useSpoilersShown();
     return (
         <Card>
-            <CardBody>
+            <CardBody className="p-3">
                 <SettingRow
                     id="chat-spoilers"
+                    icon={<EyeOff />}
                     label={t("chatSettings.spoilers.title")}
                     hint={t("chatSettings.spoilers.body")}
                 >

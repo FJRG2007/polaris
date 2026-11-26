@@ -68,6 +68,7 @@ export { Card, CardHeader, CardTitle, CardBody } from "./components/card";
 export { Skeleton } from "./components/skeleton";
 export { ProgressBar, type ProgressBarProps, type ProgressTone } from "./components/progress-bar";
 export { EmptyState } from "./components/empty-state";
+export { SettingRow, settingType } from "./components/setting-row";
 export {
     arrangeFindings,
     SEVERITY_ORDER,

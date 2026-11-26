@@ -14,7 +14,7 @@ import { prisma } from "@polaris/db";
 import { Bell, ShieldCheck } from "lucide-react";
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
-import { Button, Card, CardBody } from "@polaris/ui";
+import { Button, Card, CardBody, SettingRow } from "@polaris/ui";
 import { Messages } from "@/components/i18n/messages";
 import { ChatSettingsView } from "./chat-settings-view";
 import { loadChatPreferences } from "@/lib/chat/preferences";
@@ -84,17 +84,17 @@ export default async function ChatSettingsPage() {
                 <SpoilersCard />
                 {elsewhere.map(({ href, icon: Icon, title, hint }) => (
                     <Card key={href}>
-                        <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
-                            <Icon className="size-4 shrink-0 text-muted-foreground" />
-                            <span className="min-w-[14rem] flex-1">
-                                <span className="block text-[0.8125rem]">{title}</span>
-                                <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                                    {hint}
-                                </span>
-                            </span>
-                            <Button size="sm" variant="secondary" asChild>
-                                <Link href={href}>{t("chatSettings.open")}</Link>
-                            </Button>
+                        <CardBody className="p-3">
+                            <SettingRow
+                                id={`chat-elsewhere-${href.split("/").pop()}`}
+                                icon={<Icon />}
+                                label={title}
+                                hint={hint}
+                            >
+                                <Button size="sm" variant="secondary" asChild>
+                                    <Link href={href}>{t("chatSettings.open")}</Link>
+                                </Button>
+                            </SettingRow>
                         </CardBody>
                     </Card>
                 ))}
