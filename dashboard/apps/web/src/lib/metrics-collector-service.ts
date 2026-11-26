@@ -21,6 +21,7 @@ import { rememberSample } from "./container-stats-cache";
 import { containerMetricSubject } from "./container-metric-subject";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { getServerMetrics } from "./server-metrics-service";
+import { advanceTraffic, machineTraffic } from "./metrics-traffic";
 import { summarizeGpus, type GpuReport } from "./gpu/nvidia";
 import { machineGpus, readLocalGpus, recordMachineGpus } from "./gpu/gpu-live";
 import { recordHostDockerId, recordLocalDockerId } from "./local-machine";
@@ -186,8 +187,12 @@ interface MachineReading {
     memTotalBytes: number | null;
     disk: { used: number; total: number } | null;
     cores: number | null;
-    /** Interface counters since boot, where the machine could be asked for them. */
-    net: { rx: number; tx: number } | null;
+    /**
+     * Counters since boot, where the machine could be asked for them: one entry
+     * per counted interface (`if:<name>`), or a single `machine` total from a
+     * probe that did not list them.
+     */
+    net: Map<string, { rx: number; tx: number }> | null;
 }
 
 /**
@@ -277,57 +282,12 @@ async function probedMachine(hostId: string, ownerId: string): Promise<MachineRe
                     : null,
             cores: metrics.cpuCount,
             gpu: metrics.gpu ?? null,
-            net:
-                metrics.netRxBytes != null && metrics.netTxBytes != null
-                    ? { rx: metrics.netRxBytes, tx: metrics.netTxBytes }
-                    : null
+            net: machineTraffic(metrics)
         };
     } catch {
         // Off, unreachable, or without a login Polaris can use.
         return null;
     }
-}
-
-/**
- * How much the containers on one machine have moved, as a counter that only goes
- * up.
- *
- * Summing what each container reports would not do. That sum falls the moment one
- * of them stops or is replaced, and the reader turns a counter into a rate by
- * differencing it - a fall reads as "it restarted and has moved this much since",
- * so every deploy would draw a burst of traffic that never happened. What is kept
- * instead is each container's last reading and a total that only ever has forward
- * movement added to it.
- *
- * A container seen for the first time contributes nothing: it may have been
- * running for a month before this process started, and its counter is a position,
- * not something that moved during this tick.
- *
- * Held in memory, by the one process that collects. After a restart the total
- * begins again at zero, which the reader sees as a single fall followed by
- * ordinary rates rather than as a machine that sent everything at once.
- */
-const traffic = new Map<
-    string,
-    { rx: bigint; tx: bigint; seen: Map<string, { rx: number; tx: number }> }
->();
-
-function advanceTraffic(
-    subjectId: string,
-    readings: Map<string, { rx: number; tx: number }>
-): { rx: bigint; tx: bigint } {
-    const held = traffic.get(subjectId);
-    let rx = held?.rx ?? 0n;
-    let tx = held?.tx ?? 0n;
-    for (const [id, now] of readings) {
-        const before = held?.seen.get(id);
-        if (!before) continue;
-        // A counter below where it was is a container that started again.
-        rx += bigBytes(now.rx >= before.rx ? now.rx - before.rx : now.rx) ?? 0n;
-        tx += bigBytes(now.tx >= before.tx ? now.tx - before.tx : now.tx) ?? 0n;
-    }
-    traffic.set(subjectId, { rx, tx, seen: readings });
-    return { rx, tx };
 }
 
 /**
@@ -508,7 +468,7 @@ async function sampleHost(
     // difference between two unrelated counters.
     const moved = advanceTraffic(
         subjectId,
-        machine?.net ? new Map([["machine", machine.net]]) : (containers?.net ?? new Map())
+        machine?.net ?? containers?.net ?? new Map()
     );
     return {
         dockerId: containers?.dockerId ?? null,

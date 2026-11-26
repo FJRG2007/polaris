@@ -18,6 +18,13 @@ import { GPU_SCRIPT, parseGpuReport, type GpuReport } from "./gpu/nvidia";
  *  a screenful instead of every process on a busy machine. */
 const CONSUMER_LIMIT = 8;
 
+/** One counted network interface's counters since it came up. */
+export interface NetInterfaceReading {
+    readonly name: string;
+    readonly rx: number;
+    readonly tx: number;
+}
+
 /** One thing running on the server, and what it is costing. */
 export interface ServerConsumer {
     readonly name: string;
@@ -51,6 +58,9 @@ export interface ServerMetrics {
      */
     readonly netRxBytes: number | null;
     readonly netTxBytes: number | null;
+    /** The same counters per interface, for a reader that follows each one on its
+     *  own. Absent from a reading taken before interfaces were listed. */
+    readonly netInterfaces?: readonly NetInterfaceReading[];
     /** Heaviest first. Containers and processes ranked together, because the
      *  question is what is eating the machine, not what kind of thing it is. */
     readonly consumers: readonly ServerConsumer[];
@@ -111,14 +121,23 @@ DISK=$(df -k / 2>/dev/null | awk 'NR == 2 { print \$2 " " \$3 }')
 emit disk_total "$(echo "\$DISK" | awk '{ print \$1 * 1024 }')"
 emit disk_used "$(echo "\$DISK" | awk '{ print \$2 * 1024 }')"
 
-# Columns are: <name>: rx_bytes ...7 more... tx_bytes. Printed as an integer
+# Columns are: <name>: rx_bytes ...7 more... tx_bytes. Printed as integers
 # because awk writes a large sum in scientific notation, which parses to a
 # number nobody can difference against the next reading.
+#
+# Only interfaces that carry the machine's own traffic are counted. A container's
+# veth pair and the bridge it hangs off repeat bytes that also cross the uplink,
+# and a tunnel (WireGuard, tun) repeats them once more inside the uplink's
+# packets. Worse, a veth vanishes with its container, so a total that includes
+# them falls on every deploy - and a fall in a counter reads as a restart. Each
+# counted interface is also printed on its own line, so the reader can follow
+# each one and a disappearing interface takes nothing with it.
 if [ -r /proc/net/dev ]; then
-    NET=$(awk 'NR > 2 { sub(":", " "); if (\$1 != "lo") { rx += \$2; tx += \$10 } }
-        END { printf "%.0f %.0f", rx, tx }' /proc/net/dev)
-    emit net_rx "$(echo "\$NET" | awk '{ print \$1 }')"
-    emit net_tx "$(echo "\$NET" | awk '{ print \$2 }')"
+    awk 'NR > 2 { sub(":", " "); name = \$1
+            if (name == "lo" || name ~ /^(veth|docker|br-|virbr|cni|flannel|cali|vxlan|kube-|tunl|weave|podman|lxc|wg|tailscale|tun|tap|zt)/) next
+            rx += \$2; tx += \$10; counted = 1
+            printf "netif=%s\\t%.0f\\t%.0f\\n", name, \$2, \$10 }
+        END { if (counted) printf "net_rx=%.0f\\nnet_tx=%.0f\\n", rx, tx }' /proc/net/dev
 fi
 
 if command -v docker >/dev/null 2>&1; then
@@ -137,6 +156,7 @@ ${GPU_SCRIPT}`;
 export function parseProbe(output: string): ServerMetrics {
     const fields = new Map<string, string>();
     const consumers: ServerConsumer[] = [];
+    const netInterfaces: NetInterfaceReading[] = [];
 
     for (const line of output.split("\n")) {
         const separator = line.indexOf("=");
@@ -145,6 +165,11 @@ export function parseProbe(output: string): ServerMetrics {
         const value = line.slice(separator + 1).trim();
         if (!value) continue;
         if (key === "gpu" || key === "gpuproc") continue;
+        if (key === "netif") {
+            const reading = netInterface(value);
+            if (reading) netInterfaces.push(reading);
+            continue;
+        }
         if (key === "container" || key === "process") {
             const consumer =
                 key === "container" ? containerConsumer(value) : processConsumer(value);
@@ -168,10 +193,20 @@ export function parseProbe(output: string): ServerMetrics {
         diskUsedBytes: numberOf(fields.get("disk_used")),
         netRxBytes: numberOf(fields.get("net_rx")),
         netTxBytes: numberOf(fields.get("net_tx")),
+        netInterfaces,
         consumers: rank(consumers),
         gpu: parseGpuReport(output),
         probedAt: new Date().toISOString()
     };
+}
+
+/** `eth0<TAB>rx<TAB>tx`, as the probe prints each counted interface. */
+function netInterface(value: string): NetInterfaceReading | null {
+    const [name, rx, tx] = value.split("\t");
+    const received = numberOf(rx);
+    const sent = numberOf(tx);
+    if (!name || received === null || sent === null) return null;
+    return { name, rx: received, tx: sent };
 }
 
 /** `name<TAB>12.34%<TAB>128MiB / 1.94GiB`, as `docker stats` formats it. */
