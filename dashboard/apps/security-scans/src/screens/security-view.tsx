@@ -18,9 +18,9 @@ import { SshPanel } from "./ssh-panel";
 import { FocusCard, verdictLine } from "./focus-card";
 import * as schemas from "../model/schemas";
 import * as subjects from "../model/subjects";
-import { NO_LANDING, SECURITY_PATH, type Landing } from "../model/landing";
+import { NO_LANDING, SECURITY_PATH, type HostFocus, type Landing } from "../model/landing";
 import type { SecurityTranslator } from "../lib/i18n";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRef, useMemo, useState, useEffect, useCallback } from "react";
 import { Bug, FileDiff, Package, ServerCog, ShieldCheck } from "lucide-react";
 import {
     Badge,
@@ -130,7 +130,10 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
     const [serversFailed, setServersFailed] = useState(false);
     const [serverId, setServerId] = useState<string | null>(landing.target);
     // A link names a vulnerability scan: those are on the images tab.
-    const [tab, setTab] = useState<Tab>(landing.scan || landing.target ? "images" : "malware");
+    // An alert about a host setting opens the host tab on it.
+    const [tab, setTab] = useState<Tab>(
+        landing.focus ? "host" : landing.scan || landing.target ? "images" : "malware"
+    );
     const [busy, setBusy] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
     const [focusOpen, setFocusOpen] = useState(true);
@@ -330,7 +333,13 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
                     ) : tab === "files" ? (
                         <FilesPanel t={t} overview={overview} targetId={current} submit={submit} />
                     ) : tab === "host" ? (
-                        <HostPanel t={t} targetId={current} server={server} submit={submit} />
+                        <HostPanel
+                            t={t}
+                            targetId={current}
+                            server={server}
+                            submit={submit}
+                            focus={current === landing.target ? landing.focus : null}
+                        />
                     ) : (
                         <ImagesPanel
                             t={t}
@@ -844,17 +853,44 @@ function PackageDialog({
     );
 }
 
+/**
+ * The section an alert pointed at: scrolled to once and ringed, so the page
+ * opens on the thing the alert said rather than on the top of a long panel.
+ */
+function useFocused(focus: HostFocus | null) {
+    const marked = useRef<HTMLElement | null>(null);
+    useEffect(() => {
+        marked.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    }, []);
+    const props = (key: HostFocus) =>
+        key === focus
+            ? {
+                  "data-focused": "true",
+                  ref: (node: HTMLDivElement | null) => {
+                      marked.current = node;
+                  }
+              }
+            : {};
+    props.ring = (key: HostFocus) =>
+        key === focus ? "rounded-md ring-2 ring-primary/60 ring-offset-4 ring-offset-background" : "";
+    return props;
+}
+
 function HostPanel({
     t,
     targetId,
     server,
-    submit
+    submit,
+    focus = null
 }: {
     t: SecurityTranslator;
     targetId: string;
     server: Servers[number] | null;
     submit: Submit;
+    /** The setting the alert that opened this page is about. */
+    focus?: HostFocus | null;
 }) {
+    const focused = useFocused(focus);
     const [updates, setUpdates] = useState(server?.updates ?? "unknown");
     const [every, setEvery] = useState(server?.everyHours ?? 0);
     const [pending, setPending] = useState(false);
@@ -930,7 +966,10 @@ function HostPanel({
                         </Button>
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div
+                    {...focused("updates")}
+                    className={`flex flex-wrap items-center justify-between gap-2 ${focused.ring("updates")}`}
+                >
                     <div className="min-w-0">
                         <p className="text-sm font-medium">{t("host.updates")}</p>
                         <p className="text-sm text-muted-foreground">
@@ -975,7 +1014,10 @@ function HostPanel({
                     </p>
                 ) : null}
                 {updates === "on" || waiting.pending !== null || waiting.reboot !== "none" ? (
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <div
+                        {...focused("restart")}
+                        className={`flex flex-wrap items-center justify-between gap-2 text-sm ${focused.ring("restart")}`}
+                    >
                         <span className="min-w-0 text-muted-foreground">
                             {waiting.pending === null
                                 ? t("host.window")
@@ -1008,13 +1050,29 @@ function HostPanel({
                         ) : null}
                     </div>
                 ) : null}
-                <FirewallPanel
-                    t={t}
-                    targetId={targetId}
-                    summary={firewallSummary}
-                    submit={submit}
-                />
-                <SshPanel t={t} targetId={targetId} summary={sshSummary} submit={submit} />
+                <div {...focused("firewall")} className={focused.ring("firewall")}>
+                    <FirewallPanel
+                        t={t}
+                        targetId={targetId}
+                        summary={firewallSummary}
+                        submit={submit}
+                        review={focus === "firewall" && firewallSummary.firewall === "off"}
+                    />
+                </div>
+                <div {...focused("ssh")} className={focused.ring("ssh")}>
+                    <SshPanel
+                        t={t}
+                        targetId={targetId}
+                        summary={sshSummary}
+                        submit={submit}
+                        review={
+                            focus === "ssh" &&
+                            sshSummary.ssh === "off" &&
+                            !sshSummary.sshHardened &&
+                            !sshSummary.sshBlocked
+                        }
+                    />
+                </div>
                 {updates === "unsupported" ? null : (
                     <HeldPackages
                         t={t}

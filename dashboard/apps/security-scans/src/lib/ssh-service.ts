@@ -17,7 +17,7 @@ import { securityTFor } from "./i18n";
 import * as model from "../model/ssh";
 import { randomUUID } from "node:crypto";
 import { host } from "@polaris/app-host";
-import { SECURITY_PATH } from "../model/landing";
+import { hostHref } from "../model/landing";
 import {
     hostActionNow,
     runHostAction,
@@ -172,7 +172,7 @@ async function announceReview(target: { id: string; ownerId: string; name: strin
             level: "warning",
             title: t("ssh.notify.title", { server: target.name }),
             body: t("ssh.notify.body", { server: target.name }),
-            href: `${SECURITY_PATH}?${new URLSearchParams({ target: target.id })}`,
+            href: hostHref(target.id, "ssh"),
             metadata: { targetId: target.id }
         })
         .catch(() => undefined);

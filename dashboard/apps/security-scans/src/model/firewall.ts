@@ -239,14 +239,16 @@ export function planFirewall(
     };
 }
 
-export type FirewallStep = "sync" | "review" | null;
+export type FirewallStep = "sync" | "enable" | "review" | null;
 
 /**
- * What the periodic pass does for one server. It never turns a firewall on:
- * default-deny closes what Polaris does not know about, so only a person who
- * saw what would close does that. "sync" re-applies a firewall a person turned
- * on, to open what was deployed since; "review" tells the owner, once, that the
- * server has none.
+ * What the periodic pass does for one server. Default-deny closes what Polaris
+ * does not know about, so Polaris turns a firewall on by itself only when that
+ * is nothing: "enable" is a server with none, nobody's choice on record,
+ * nothing listening that would close and no other firewall it would replace.
+ * Anything else that would close waits on a person who saw the list - "review"
+ * tells the owner, once. "sync" re-applies a firewall that is on, to open what
+ * was deployed since.
  */
 export function firewallStep(
     setting: { readonly firewallChoice: string | null; readonly firewallNotifiedAt: Date | null } | null,
@@ -254,9 +256,14 @@ export function firewallStep(
 ): FirewallStep {
     if (view.plan.blocked || view.state === "router") return null;
     if (view.state === "on") {
-        return setting?.firewallChoice === "on" && view.plan.opens ? "sync" : null;
+        const kept = setting?.firewallChoice === "on" || setting?.firewallChoice === "auto";
+        return kept && view.plan.opens ? "sync" : null;
     }
-    if (view.state === "off" && !setting?.firewallChoice && !setting?.firewallNotifiedAt) return "review";
+    if (view.state !== "off" || setting?.firewallChoice) return null;
+    if (view.plan.closing.length === 0 && view.plan.replaces === null && !setting?.firewallNotifiedAt) {
+        return "enable";
+    }
+    if (!setting?.firewallNotifiedAt) return "review";
     return null;
 }
 

@@ -7,10 +7,10 @@
  * comes back - over a connection of its own - and confirms it under the same
  * id, the router app's way (`apps/web/src/lib/router/service.ts`).
  *
- * Polaris never turns it on by itself. Default-deny closes whatever Polaris
- * does not know about, so only a person who has seen what would close turns it
- * on; Polaris tells the owner once that a server has none and offers that
- * review. Once a person has turned it on, Polaris opens what gets deployed
+ * Default-deny closes whatever Polaris does not know about, so Polaris turns
+ * it on by itself only where nothing listening would close (and says so);
+ * anywhere else a person who has seen what would close turns it on, and
+ * Polaris tells the owner once that the review waits on them. Once a person has turned it on, Polaris opens what gets deployed
  * there since - opening a port never locks anybody out.
  *
  * Server-only.
@@ -21,7 +21,7 @@ import { securityTFor } from "./i18n";
 import { randomUUID } from "node:crypto";
 import { host } from "@polaris/app-host";
 import * as model from "../model/firewall";
-import { SECURITY_PATH } from "../model/landing";
+import { hostHref } from "../model/landing";
 import {
     hostActionNow,
     runHostAction,
@@ -191,17 +191,23 @@ export async function firewallOff(targetId: string): Promise<FirewallView> {
     return readFirewall(targetId);
 }
 
-/** Tell the owner, once, that a server has no firewall and the review waits on them. */
-async function announceReview(target: { id: string; ownerId: string; name: string }): Promise<void> {
+/**
+ * Tell the owner, once: that a server has no firewall and the review waits on
+ * them, or that Polaris turned one on where nothing in use would close.
+ */
+async function announceReview(
+    target: { id: string; ownerId: string; name: string },
+    what: "review" | "enabled" = "review"
+): Promise<void> {
     const t = await securityTFor(target.ownerId);
     await host.notificationsDispatch
         .notify({
             userId: target.ownerId,
             event: "security.firewall",
-            level: "warning",
-            title: t("firewall.notify.review.title", { server: target.name }),
-            body: t("firewall.notify.review.body", { server: target.name }),
-            href: `${SECURITY_PATH}?${new URLSearchParams({ target: target.id })}`,
+            level: what === "review" ? "warning" : "info",
+            title: t(`firewall.notify.${what}.title`, { server: target.name }),
+            body: t(`firewall.notify.${what}.body`, { server: target.name }),
+            href: hostHref(target.id, "firewall"),
             metadata: { targetId: target.id }
         })
         .catch(() => undefined);
@@ -240,6 +246,16 @@ export async function planFirewalls(now: Date): Promise<void> {
             const step = model.firewallStep(target.securitySetting, view);
             if (step === "sync") {
                 await applyFirewall(target.id, null, "polaris");
+            } else if (step === "enable") {
+                // Nothing in use closes. Should the change not hold anyway, the
+                // server undoes it by itself and the owner gets the review.
+                const enabled = await applyFirewall(target.id, null, "polaris")
+                    .then((after) => after.state === "on")
+                    .catch(() => false);
+                // Not a person's choice, but kept in step with what is deployed from here on.
+                if (enabled) await record(target.id, { firewallChoice: "auto", firewallChosenAt: now });
+                await announceReview(target, enabled ? "enabled" : "review");
+                await record(target.id, { firewallNotifiedAt: now });
             } else if (step === "review") {
                 await announceReview(target);
                 await record(target.id, { firewallNotifiedAt: now });

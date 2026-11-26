@@ -534,7 +534,8 @@ export const serverHost = {
         networkPublicIp: later(load.networkService, "networkPublicIp")
     },
     notificationService: {
-        createNotification: later(load.notificationService, "createNotification")
+        createNotification: later(load.notificationService, "createNotification"),
+        resolveCondition: later(load.notificationService, "resolveCondition")
     },
     // The invite a player gets in Chat from whoever added them to a server.
     chatGameInvites: {

@@ -67,15 +67,18 @@ export function FirewallPanel({
     t,
     targetId,
     summary,
-    submit
+    submit,
+    review = false
 }: {
     t: SecurityTranslator;
     targetId: string;
     summary: FirewallSummary;
     submit: Submit;
+    /** Opened from an alert about this: the review starts open. */
+    review?: boolean;
 }) {
     const [shown, setShown] = useState(summary);
-    const [reviewing, setReviewing] = useState(false);
+    const [reviewing, setReviewing] = useState(review);
     const [busy, setBusy] = useState(false);
     useEffect(() => setShown(summary), [summary]);
     const turnOff = async () => {

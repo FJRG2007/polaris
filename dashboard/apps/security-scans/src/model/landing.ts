@@ -17,6 +17,10 @@ export const OWN_IMAGES_PATH = "/admin/security/scans";
 /** Advisories carried in a link; an alert never names more. */
 export const MAX_LINK_IDS = 20;
 
+/** The host settings an alert can open on the Host tab. */
+export const HOST_FOCUS = ["firewall", "ssh", "updates", "restart"] as const;
+export type HostFocus = (typeof HOST_FOCUS)[number];
+
 /** An advisory id as scanners write them: CVE-2026-1, GHSA-xxxx-xxxx-xxxx, GO-2026-6612, DSA-1-1. */
 const ADVISORY = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/;
 const uuid = z.string().uuid();
@@ -24,13 +28,20 @@ const uuid = z.string().uuid();
 export interface Landing {
     /** The server the alert is about, when the link names a valid one. */
     readonly target: string | null;
+    /** The host setting to open on that server, when the alert is about one. */
+    readonly focus: HostFocus | null;
     /** The scan whose findings to open. */
     readonly scan: string | null;
     /** The advisories the alert announced, to mark as new. */
     readonly ids: readonly string[];
 }
 
-export const NO_LANDING: Landing = { target: null, scan: null, ids: [] };
+export const NO_LANDING: Landing = { target: null, focus: null, scan: null, ids: [] };
+
+/** A server's host setting, for an alert about it: never the plain page. */
+export function hostHref(targetId: string, focus: HostFocus): string {
+    return `${SECURITY_PATH}?${new URLSearchParams({ target: targetId, focus }).toString()}`;
+}
 
 /** The link a vulnerability alert opens. */
 export function alertHref(to: {
@@ -90,8 +101,10 @@ export function parseLanding(
     const target = first(params.target)?.trim();
     const scan = first(params.scan)?.trim();
     const ids = first(params.ids);
+    const focus = first(params.focus)?.trim();
     return {
         target: target && uuid.safeParse(target).success ? target.toLowerCase() : null,
+        focus: (HOST_FOCUS as readonly string[]).includes(focus ?? "") ? (focus as HostFocus) : null,
         scan: scan && uuid.safeParse(scan).success ? scan.toLowerCase() : null,
         ids: ids ? cleanIds(ids.slice(0, 2000).split(",")) : []
     };

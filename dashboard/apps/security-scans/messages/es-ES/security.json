@@ -251,8 +251,23 @@
         },
         "restart": {
             "title": "{server} necesita reiniciarse",
-            "body": "Hay actualizaciones de seguridad instaladas que necesitan un reinicio. Prográmalo para las 04:30 desde Escaneos de seguridad."
-        }
+            "body": "Hay actualizaciones de seguridad instaladas que necesitan un reinicio."
+        },
+        "scheduled": {
+            "title": "{server} se reinicia a las 04:30",
+            "body": "Las actualizaciones de seguridad necesitan un reinicio. Nada en marcha se interrumpiría, así que Polaris lo programó para la hora tranquila."
+        },
+        "ask": {
+            "title": "{server} necesita reiniciarse",
+            "body": "Las actualizaciones de seguridad necesitan un reinicio y se interrumpirían {reason} en {server}. Elige cuándo."
+        },
+        "back": {
+            "title": "{server} se reinició y ha vuelto",
+            "body": "Las actualizaciones de seguridad terminaron de instalarse."
+        },
+        "reasonPlayers": "jugadores en un servidor de juegos",
+        "reasonDeploy": "un despliegue en curso",
+        "reasonBoth": "jugadores en un servidor de juegos y un despliegue en curso"
     },
     "packages": {
         "run": "Revisar paquetes",
@@ -336,6 +351,10 @@
             "review": {
                 "title": "{server} no tiene cortafuegos",
                 "body": "Cualquier puerto que escuche en {server} es accesible desde fuera. Revisa qué cerraría activar el cortafuegos."
+            },
+            "enabled": {
+                "title": "Polaris activó el cortafuegos de {server}",
+                "body": "No se cerró nada en uso en {server}: solo lo que usan Polaris y tus apps es accesible desde fuera."
             }
         }
     },

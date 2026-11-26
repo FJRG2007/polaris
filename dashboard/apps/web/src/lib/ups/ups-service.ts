@@ -906,7 +906,9 @@ async function announce(
             ...((kind === "TEST" && outcome === "failed") || tone === "danger"
                 ? { level: "danger" as const }
                 : {}),
-            href: `/places/ups/${row.id}?tab=events`,
+            // Not answering: the overview says why and what to check; every
+            // other event is a line in the history.
+            href: event === "ups.commLost" ? `/places/ups/${row.id}` : `/places/ups/${row.id}?tab=events`,
             metadata: { upsId: row.id, kind }
         }).catch((error: unknown) =>
             console.error("polaris: could not report a UPS event:", error)

@@ -17085,9 +17085,8 @@ model SecuritySetting {
     // The host firewall as last read or set: on | armed | off | router | unknown.
     firewall          String    @default("unknown")
     firewallAt        DateTime?
-    // What a person last chose ("on" | "off"); null means nobody did. Polaris
-    // never turns the firewall on by itself: only a person who saw what would
-    // close does.
+    // What a person last chose ("on" | "off"), or "auto" where Polaris turned it
+    // on itself because nothing in use would close; null means nobody did.
     firewallChoice    String?
     firewallChosenAt  DateTime?
     // Ports a person chose to keep open although Polaris does not run them.

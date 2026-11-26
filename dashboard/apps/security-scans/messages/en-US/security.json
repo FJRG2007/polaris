@@ -251,8 +251,23 @@
         },
         "restart": {
             "title": "{server} needs a restart",
-            "body": "Security updates are installed and need a restart to finish. Schedule it for 04:30 from Security scans."
-        }
+            "body": "Security updates are installed and need a restart to finish."
+        },
+        "scheduled": {
+            "title": "{server} restarts at 04:30",
+            "body": "Security updates need a restart to finish. Nothing running there would be interrupted, so Polaris scheduled it for the quiet hour."
+        },
+        "ask": {
+            "title": "{server} needs a restart",
+            "body": "Security updates need a restart to finish, and {reason} on {server} would be interrupted. Choose when."
+        },
+        "back": {
+            "title": "{server} restarted and is back",
+            "body": "The security updates finished installing."
+        },
+        "reasonPlayers": "players on a game server",
+        "reasonDeploy": "a deploy in progress",
+        "reasonBoth": "players on a game server and a deploy in progress"
     },
     "packages": {
         "run": "Check packages",
@@ -336,6 +351,10 @@
             "review": {
                 "title": "{server} has no firewall",
                 "body": "Every port listening on {server} can be reached from outside. Review what turning the firewall on would close."
+            },
+            "enabled": {
+                "title": "Polaris turned on the firewall for {server}",
+                "body": "Nothing in use on {server} closed: only what Polaris and your apps use is reachable from outside."
             }
         }
     },

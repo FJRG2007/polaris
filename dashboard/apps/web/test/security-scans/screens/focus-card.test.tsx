@@ -34,6 +34,7 @@ vi.mock("@polaris-app/security-scans/src/actions/security", () => ({
 import { securityCatalogs } from "@polaris-app/security-scans/messages";
 import { pickServer } from "@polaris-app/security-scans/src/screens/security-view";
 import { FocusCard, verdictLine } from "@polaris-app/security-scans/src/screens/focus-card";
+import type { Landing } from "@polaris-app/security-scans/src/model/landing";
 
 const t = securityCatalogs.translator("en-US", "security");
 const SCAN = "01a1639f-0000-7000-8000-000000000002";
@@ -98,7 +99,7 @@ afterEach(() => {
     rescan.mockReset();
 });
 
-function show(landing: { target: string | null; scan: string | null; ids: string[] }) {
+function show(landing: Landing) {
     const onTarget = vi.fn();
     render(
         <FocusCard
@@ -116,7 +117,7 @@ describe("FocusCard", () => {
     it("opens the alert's scan: its app by today's name, its server, the verdict and the next step", async () => {
         focus.mockResolvedValue({ ok: true, data: SCANNED });
         findings.mockResolvedValue({ ok: true, data: FINDINGS });
-        const onTarget = show({ target: TARGET, scan: SCAN, ids: ["GO-2026-6612", "GO-2026-1"] });
+        const onTarget = show({ target: TARGET, focus: null, scan: SCAN, ids: ["GO-2026-6612", "GO-2026-1"] });
         expect(focus).toHaveBeenCalledWith({ scanId: SCAN });
         expect(await screen.findByText("Network filter DNS server")).toBeTruthy();
         await waitFor(() => expect(onTarget).toHaveBeenCalledWith(TARGET));
@@ -155,7 +156,7 @@ describe("FocusCard", () => {
         }));
         findings.mockResolvedValue({ ok: true, data: FINDINGS });
         rescan.mockResolvedValue({ ok: true, data: QUEUED });
-        show({ target: TARGET, scan: SCAN, ids: [] });
+        show({ target: TARGET, focus: null, scan: SCAN, ids: [] });
         fireEvent.click(await screen.findByRole("button", { name: t("focus.rescan") }));
         expect(await screen.findByText(t("focus.running"))).toBeTruthy();
         expect(focus).toHaveBeenLastCalledWith({ scanId: QUEUED });
@@ -166,27 +167,27 @@ describe("FocusCard", () => {
 
     it("says the scan is gone instead of drawing nothing", async () => {
         focus.mockResolvedValue({ ok: true, data: null });
-        show({ target: TARGET, scan: SCAN, ids: [] });
+        show({ target: TARGET, focus: null, scan: SCAN, ids: [] });
         expect(await screen.findByText(t("focus.gone"))).toBeTruthy();
     });
 
     it("offers a retry when the scan cannot be read", async () => {
         focus.mockResolvedValue({ ok: false, error: "failed" });
-        show({ target: null, scan: SCAN, ids: [] });
+        show({ target: null, focus: null, scan: SCAN, ids: [] });
         expect(await screen.findByText(t("focus.loadFailed"))).toBeTruthy();
         expect(screen.getByRole("button", { name: t("tryAgain") })).toBeTruthy();
     });
 
     it("on the bare page shows the newest serious scan, folded, and nothing when there is none", async () => {
         focus.mockResolvedValue({ ok: true, data: SCANNED });
-        show({ target: null, scan: null, ids: [] });
+        show({ target: null, focus: null, scan: null, ids: [] });
         expect(focus).toHaveBeenCalledWith({ scanId: null });
         expect(await screen.findByText(t("focus.attention"))).toBeTruthy();
         expect(screen.getByRole("button", { name: t("focus.showFindings") })).toBeTruthy();
         expect(findings).not.toHaveBeenCalled();
         cleanup();
         focus.mockResolvedValue({ ok: true, data: null });
-        show({ target: null, scan: null, ids: [] });
+        show({ target: null, focus: null, scan: null, ids: [] });
         await waitFor(() => expect(focus).toHaveBeenCalledTimes(2));
         expect(screen.queryByText(t("focus.gone"))).toBeNull();
     });

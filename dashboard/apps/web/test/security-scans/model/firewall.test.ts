@@ -128,15 +128,29 @@ describe("host firewall pass", () => {
     const off = plan(LOCAL).plan;
     const nothingCloses = plan(LOCAL, ["tcp:5201", "tcp:9090"]).plan;
 
-    it("never turns a firewall on by itself, even when nothing would close", () => {
-        for (const view of [
-            { state: "off" as const, plan: off },
-            { state: "off" as const, plan: nothingCloses },
-            { state: "off" as const, plan: { ...nothingCloses, replaces: null } }
-        ]) {
-            expect(firewall.firewallStep(null, view)).toBe("review");
-            expect(firewall.firewallStep({ firewallChoice: null, firewallNotifiedAt: new Date() }, view)).toBeNull();
+    const closesNothing = { ...nothingCloses, closing: [], replaces: null };
+    const closesOne = { ...nothingCloses, closing: [{ word: "tcp:5201", process: "iperf3" }], replaces: null };
+
+    it("turns a firewall on by itself only where nothing in use would close", () => {
+        expect(firewall.firewallStep(null, { state: "off", plan: closesNothing })).toBe("enable");
+        // Something listening would close, or another firewall would be replaced: a person decides.
+        expect(firewall.firewallStep(null, { state: "off", plan: closesOne })).toBe("review");
+        expect(firewall.firewallStep(null, { state: "off", plan: { ...closesNothing, replaces: "ufw" } })).toBe(
+            "review"
+        );
+        // Told once; a later pass neither repeats it nor switches anything on.
+        for (const plan of [closesNothing, closesOne]) {
+            expect(firewall.firewallStep({ firewallChoice: null, firewallNotifiedAt: new Date() }, { state: "off", plan })).toBeNull();
         }
+    });
+
+    it("keeps a firewall Polaris turned on in step with what is deployed", () => {
+        const opens = { ...closesNothing, opens: true };
+        expect(firewall.firewallStep({ firewallChoice: "auto", firewallNotifiedAt: new Date() }, { state: "on", plan: opens })).toBe(
+            "sync"
+        );
+        // Turned off outside Polaris afterwards: not switched back on.
+        expect(firewall.firewallStep({ firewallChoice: "auto", firewallNotifiedAt: new Date() }, { state: "off", plan: closesNothing })).toBeNull();
     });
 
     it("leaves a firewall a person turned off alone", () => {

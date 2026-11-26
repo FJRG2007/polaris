@@ -15,7 +15,7 @@ import * as images from "../model/images";
 import * as history from "../model/history";
 import * as subjects from "../model/subjects";
 import * as updatesModel from "../model/updates";
-import { findingsHome, OWN_IMAGES_PATH, ownImagesHref, SECURITY_PATH } from "../model/landing";
+import { findingsHome, hostHref, OWN_IMAGES_PATH, ownImagesHref } from "../model/landing";
 import { gunzip, gzip } from "node:zlib";
 import { Readable } from "node:stream";
 import { decodeLockfiles, dependencyContext, shortHash } from "@polaris/deploy";
@@ -474,7 +474,8 @@ export async function sbomOf(scanId: string): Promise<{ name: string; body: Buff
     return { name: `${safe}.cdx.json`, body: await unzip(Buffer.from(scan.payload)) };
 }
 
-function safeJson(text: string): Record<string, unknown> {
+function safeJson(text: string | null): Record<string, unknown> {
+    if (!text) return {};
     try {
         const value: unknown = JSON.parse(text);
         return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -1496,8 +1497,10 @@ const updatesTriedAt = new Map<string, number>();
  * Polaris keeps the servers it manages patched: every server gets automatic
  * security updates turned on once, unless somebody already chose for it, and is
  * read again twice a day for what it is waiting on. A restart the updates need
- * is announced to the owner once, with the button that schedules it; Polaris
- * never restarts a machine nobody asked it to. A few servers per pass, so a
+ * is scheduled for 04:30 by Polaris itself - the machine Polaris runs on too,
+ * always with a notice - unless it would cut off players or a deploy, and then
+ * the owner is asked. A server read again after that restart ends the alert.
+ * A few servers per pass, so a
  * fleet is reached over a few minutes rather than all at once.
  */
 async function planUpdates(now: Date): Promise<void> {
@@ -1507,6 +1510,13 @@ async function planUpdates(now: Date): Promise<void> {
                 { securitySetting: null },
                 { securitySetting: { updatesChoice: null, updatesArmedAt: null } },
                 { securitySetting: { updatesAt: null } },
+                // A restart that should have happened: read it back soon after.
+                {
+                    securitySetting: {
+                        rebootNotifiedAt: { not: null },
+                        rebootAt: { lt: new Date(now.getTime() - RESTART_SETTLE_MS) }
+                    }
+                },
                 {
                     securitySetting: {
                         updatesAt: { lt: new Date(now.getTime() - UPDATES_READ_MS) }
@@ -1543,13 +1553,7 @@ async function planUpdates(now: Date): Promise<void> {
                 where: { targetId: target.id },
                 select: { rebootNotifiedAt: true }
             });
-            if (report.reboot === "required" && !fresh?.rebootNotifiedAt) {
-                await announceUpdates(target, "restart");
-                await prisma.securitySetting.update({
-                    where: { targetId: target.id },
-                    data: { rebootNotifiedAt: now }
-                });
-            }
+            await settleRestart(target, report.reboot, fresh?.rebootNotifiedAt ?? null, now);
         } catch (caught) {
             // Unreachable, the limited edition, an old daemon: tried again later.
             if (!(caught instanceof ScanFailure)) {
@@ -1559,19 +1563,95 @@ async function planUpdates(now: Date): Promise<void> {
     }
 }
 
+/** How long after a scheduled restart's time the server is read back. */
+const RESTART_SETTLE_MS = 15 * 60_000;
+
+/** What a restart on this server would cut off right now. */
+async function restartBlockers(targetId: string, now: Date): Promise<updatesModel.RestartBlockers> {
+    const [deploying, games] = await Promise.all([
+        prisma.deployment.count({
+            where: { targetId, status: { in: ["queued", "building", "deploying"] } }
+        }),
+        prisma.installedApp.findMany({ where: { targetId }, select: { id: true }, take: 200 })
+    ]);
+    const played =
+        games.length === 0
+            ? 0
+            : await prisma.gameSample.count({
+                  where: {
+                      installedAppId: { in: games.map((game) => game.id) },
+                      ts: { gte: new Date(now.getTime() - 24 * 60 * 60_000) },
+                      playersOnline: { gt: 0 }
+                  }
+              });
+    return { players: played > 0, deploying: deploying > 0 };
+}
+
+/** The condition one server's restart alert is, so the read after it can end it. */
+const restartCondition = (targetId: string) => `security:restart:${targetId}`;
+
+/**
+ * Act on a restart the updates need: schedule it, ask, or - once the server
+ * answers again without needing one - end the alert.
+ */
+async function settleRestart(
+    target: { id: string; ownerId: string; name: string },
+    reboot: parse.RebootState | null,
+    notifiedAt: Date | null,
+    now: Date
+): Promise<void> {
+    const needs = reboot === "required" && !notifiedAt;
+    const blockers = needs ? await restartBlockers(target.id, now) : { players: false, deploying: false };
+    const step = updatesModel.restartStep(reboot, notifiedAt, blockers);
+    if (step === null) return;
+    const t = await securityTFor(target.ownerId);
+    if (step === "back") {
+        await host.notificationService.resolveCondition(restartCondition(target.id), {
+            recovery: {
+                title: t("updates.back.title", { server: target.name }),
+                body: t("updates.back.body", { server: target.name }),
+                level: "success"
+            }
+        });
+        await prisma.securitySetting.update({
+            where: { targetId: target.id },
+            data: { rebootNotifiedAt: null }
+        });
+        return;
+    }
+    let what: "scheduled" | "ask" = step === "schedule" ? "scheduled" : "ask";
+    if (step === "schedule") {
+        const scheduled = await scheduleRestart(target.id, true)
+            .then((report) => report.reboot === "scheduled")
+            .catch(() => false);
+        if (!scheduled) what = "ask";
+    }
+    // Asked because the schedule did not take, nothing named is in the way.
+    const reason = blockers.players || blockers.deploying ? t(`updates.${updatesModel.blockerReason(blockers)}`) : "";
+    await announceUpdates(target, what === "ask" && !reason ? "restart" : what, { reason });
+    await prisma.securitySetting.update({
+        where: { targetId: target.id },
+        data: { rebootNotifiedAt: now }
+    });
+}
+
 async function announceUpdates(
     target: { id: string; ownerId: string; name: string },
-    what: "armed" | "restart"
+    what: "armed" | "restart" | "scheduled" | "ask",
+    words: Record<string, string> = {}
 ): Promise<void> {
     const t = await securityTFor(target.ownerId);
+    const restart = what !== "armed";
     await host.notificationsDispatch
         .notify({
             userId: target.ownerId,
             event: "security.updates",
-            level: what === "restart" ? "warning" : "info",
-            title: t(`updates.${what}.title`, { server: target.name }),
-            body: t(`updates.${what}.body`, { server: target.name }),
-            href: `${SECURITY_PATH}?${new URLSearchParams({ target: target.id })}`,
+            level: what === "ask" || what === "restart" ? "warning" : "info",
+            title: t(`updates.${what}.title`, { server: target.name, ...words }),
+            body: t(`updates.${what}.body`, { server: target.name, ...words }),
+            href: hostHref(target.id, restart ? "restart" : "updates"),
+            actionRequired: what === "ask" || what === "restart",
+            ...(restart ? { condition: restartCondition(target.id) } : {}),
             metadata: { targetId: target.id }
         })
         .catch(() => undefined);

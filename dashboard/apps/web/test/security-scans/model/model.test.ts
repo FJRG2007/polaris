@@ -552,3 +552,28 @@ describe("inputs", () => {
         );
     });
 });
+
+describe("the restart security updates need", () => {
+    const clear = { players: false, deploying: false };
+
+    it("is scheduled by Polaris when nothing running there would be cut off", () => {
+        expect(updatesModel.restartStep("required", null, clear)).toBe("schedule");
+    });
+
+    it("asks first when players or a deploy would be cut off", () => {
+        expect(updatesModel.restartStep("required", null, { players: true, deploying: false })).toBe("ask");
+        expect(updatesModel.restartStep("required", null, { players: false, deploying: true })).toBe("ask");
+        expect(updatesModel.blockerReason({ players: true, deploying: true })).toBe("reasonBoth");
+        expect(updatesModel.blockerReason({ players: false, deploying: true })).toBe("reasonDeploy");
+    });
+
+    it("tells once, and ends the alert when the server answers again without needing one", () => {
+        const told = new Date();
+        expect(updatesModel.restartStep("required", told, clear)).toBeNull();
+        expect(updatesModel.restartStep("scheduled", told, clear)).toBeNull();
+        expect(updatesModel.restartStep("none", told, clear)).toBe("back");
+        expect(updatesModel.restartStep("none", null, clear)).toBeNull();
+        // A read that could not say leaves everything as it was.
+        expect(updatesModel.restartStep(null, told, clear)).toBeNull();
+    });
+});

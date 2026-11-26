@@ -48,9 +48,25 @@ describe("alertHref", () => {
         const params = Object.fromEntries(new URL(href, "http://x").searchParams);
         expect(landing.parseLanding(params)).toEqual({
             target: TARGET,
+            focus: null,
             scan: SCAN,
             ids: ["GO-2026-6612"]
         });
+    });
+});
+
+describe("hostHref", () => {
+    it("names the server and the setting, so the alert opens on it", () => {
+        for (const focus of landing.HOST_FOCUS) {
+            const href = landing.hostHref(TARGET, focus);
+            expect(href.startsWith(`${landing.SECURITY_PATH}?`)).toBe(true);
+            const params = Object.fromEntries(new URL(href, "http://x").searchParams);
+            expect(landing.parseLanding(params)).toMatchObject({ target: TARGET, focus });
+        }
+    });
+
+    it("drops a focus it does not know", () => {
+        expect(landing.parseLanding({ target: TARGET, focus: "shell" }).focus).toBeNull();
     });
 });
 
