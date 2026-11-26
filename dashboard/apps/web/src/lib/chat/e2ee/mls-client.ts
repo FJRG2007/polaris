@@ -272,6 +272,15 @@ export interface MlsDeviceOptions {
     historyKeys?: MlsHistoryKeyStore;
     /** Changes per commit (`ADD_BATCH`, `REMOVE_BATCH` unless given): tests use small ones. */
     batch?: { add?: number; remove?: number };
+    /**
+     * The key log's word on account keys the server handed out (design 4.6,
+     * `vouchedAccounts` in `key-log-client.ts`): which of them it vouches for,
+     * or null when it could not be asked. A history key is sealed only to a
+     * vouched key; a log that cannot be asked fails the distribution, which is
+     * retried, as a failed `account-keys` call is. Without it every handed-out
+     * key is taken as is (tests, and members the server runs).
+     */
+    vouch?: (channelId: string, served: ReadonlyArray<{ userId: string; hpkePublicKey: Uint8Array }>) => Promise<Set<string> | null>;
 }
 
 export class MlsDevice {
@@ -932,13 +941,20 @@ export class MlsDevice {
         // Never sealed to this account under a key the server handed out: its own is `account`.
         sealed.add(this.options.userId);
         const recipients = others.filter((id) => !sealed.has(id));
+        // Only to keys the key log vouches for, when this device has the log's word to ask.
+        const sealVouched = async (found: { userId: string; hpkePublicKey: string }[]) => {
+            const served = found.map((f) => ({ userId: f.userId, hpkePublicKey: fromText(f.hpkePublicKey) }));
+            const vouched = this.options.vouch ? await this.options.vouch(channelId, served) : null;
+            if (this.options.vouch && !vouched) throw new Error("the key log could not be asked");
+            for (const key of served) if (!vouched || vouched.has(key.userId)) await seal(key.userId, key.hpkePublicKey);
+        };
         if (recipients.length) {
             const answer = await this.send({ op: "account-keys", channelId, userIds: recipients });
-            for (const found of answer.accountKeys as { userId: string; hpkePublicKey: string }[]) await seal(found.userId, fromText(found.hpkePublicKey));
+            await sealVouched(answer.accountKeys as { userId: string; hpkePublicKey: string }[]);
         }
         for (let after: string | undefined, pages = 0; everyMember && pages < MEMBER_PAGES; pages++) {
             const answer = await this.send({ op: "member-account-keys", channelId, ...(after ? { after } : {}) });
-            for (const found of answer.accountKeys as { userId: string; hpkePublicKey: string }[]) await seal(found.userId, fromText(found.hpkePublicKey));
+            await sealVouched(answer.accountKeys as { userId: string; hpkePublicKey: string }[]);
             if (typeof answer.next !== "string") break;
             after = answer.next;
         }

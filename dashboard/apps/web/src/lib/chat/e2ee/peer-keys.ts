@@ -14,6 +14,9 @@
  * notice and no mark - never a refused message.
  */
 
+import { fromText } from "@/lib/chat/e2ee/base64url";
+import * as keyLog from "@/lib/chat/e2ee/key-log-client";
+
 /** One peer as this browser knows them. */
 export interface PeerKeyRecord {
     /** SHA-256 of the peer's published public keys, hex. */
@@ -138,32 +141,56 @@ export function subscribeBooks(listener: () => void): () => void {
     };
 }
 
-/** The peer's published keys in `channelId`, as `/api/e2ee/mls` answers them; null when none or unreachable. */
-export async function fetchPeerKeys(
-    channelId: string,
-    peerId: string
-): Promise<{ signPublicKey: string; hpkePublicKey: string } | "none" | null> {
+/** A page of `account-keys`: the most people one check covers. */
+export const PEERS_PER_CHECK = 100;
+
+type PublishedPair = { signPublicKey: string; hpkePublicKey: string };
+
+/** The published keys of `peerIds` in `channelId`, as `/api/e2ee/mls` answers them; null when unreachable. */
+export async function fetchPeersKeys(channelId: string, peerIds: ReadonlyArray<string>): Promise<Map<string, PublishedPair> | null> {
     try {
         const response = await fetch("/api/e2ee/mls", {
             method: "POST",
             headers: { "content-type": "application/json" },
             credentials: "same-origin",
-            body: JSON.stringify({ op: "account-keys", channelId, userIds: [peerId] })
+            body: JSON.stringify({ op: "account-keys", channelId, userIds: peerIds.slice(0, PEERS_PER_CHECK) })
         });
         if (!response.ok) return null;
-        const answer = (await response.json()) as { accountKeys?: { userId: string; signPublicKey: string; hpkePublicKey: string }[] };
-        const found = answer.accountKeys?.find((entry) => entry.userId === peerId);
-        return found ? { signPublicKey: found.signPublicKey, hpkePublicKey: found.hpkePublicKey } : "none";
+        const answer = (await response.json()) as { accountKeys?: ({ userId: string } & PublishedPair)[] };
+        return new Map((answer.accountKeys ?? []).map((entry) => [entry.userId, { signPublicKey: entry.signPublicKey, hpkePublicKey: entry.hpkePublicKey }]));
     } catch {
         return null;
     }
 }
 
+/** The peer's published keys in `channelId`; "none" when they have none, null when unreachable. */
+export async function fetchPeerKeys(channelId: string, peerId: string): Promise<PublishedPair | "none" | null> {
+    const found = await fetchPeersKeys(channelId, [peerId]);
+    return found ? (found.get(peerId) ?? "none") : null;
+}
+
+/**
+ * Fetches the keys of `peerIds` and records each one the key log vouches for
+ * (`key-log-client.ts`); a key the log contradicts is never remembered, so it
+ * cannot become the trusted first sight. When the log cannot be asked the key
+ * is recorded as before, on first use. The fingerprints recorded, by account.
+ */
+export async function checkPeers(ownId: string, channelId: string, peerIds: ReadonlyArray<string>): Promise<Map<string, string>> {
+    const recorded = new Map<string, string>();
+    const keys = await fetchPeersKeys(channelId, peerIds);
+    if (!keys?.size) return recorded;
+    const served = [...keys].map(([userId, pair]) => ({ userId, hpkePublicKey: fromText(pair.hpkePublicKey) }));
+    const vouched = await keyLog.vouchedAccounts(ownId, channelId, served);
+    const now = Date.now();
+    for (const [userId, pair] of keys) {
+        if (vouched && !vouched.has(userId)) continue;
+        recorded.set(userId, await keyFingerprint(pair.signPublicKey, pair.hpkePublicKey));
+    }
+    updateBook(ownId, (book) => [...recorded].reduce((next, [userId, fp]) => observePeer(next, userId, fp, now), book));
+    return recorded;
+}
+
 /** Fetches the peer's key and records it; the peer's fingerprint, or null when there is none to record. */
 export async function checkPeer(ownId: string, channelId: string, peerId: string): Promise<string | null> {
-    const keys = await fetchPeerKeys(channelId, peerId);
-    if (!keys || keys === "none") return null;
-    const fp = await keyFingerprint(keys.signPublicKey, keys.hpkePublicKey);
-    updateBook(ownId, (book) => observePeer(book, peerId, fp, Date.now()));
-    return fp;
+    return (await checkPeers(ownId, channelId, [peerId])).get(peerId) ?? null;
 }

@@ -27,6 +27,7 @@ import { LOCK_ENVELOPE_BYTES } from "@polaris/chat-crypto/locks";
 import * as passwordLock from "@polaris/chat-crypto/password-lock";
 import * as safety from "@polaris/chat-crypto/safety-number";
 import * as peerKeys from "@/lib/chat/e2ee/peer-keys";
+import * as keyLog from "@/lib/chat/e2ee/key-log-client";
 import * as passwordWorker from "@/lib/chat/e2ee/password-worker-client";
 import { platformSealedStore } from "@polaris/chat-crypto/platform-store";
 import { platformKeyWrap } from "@/lib/chat/e2ee/platform-key-wrap";
@@ -90,13 +91,13 @@ async function isPublished(state: KeyState, held: HeldKey): Promise<boolean> {
 }
 
 /**
- * The phase 1 `AccountKeyVerifier`: the account's keys as the server publishes
- * them, read with the session the sign-in just issued.
- *
- * enigma: phase 3 swaps this for the key transparency log (design 4.6). Until
- * then a server that lies consistently - publishing the key it forged - is not
- * caught here; every other substitution (a stale or swapped envelope, a relay
- * that changed bytes, another account's key) is.
+ * The `AccountKeyVerifier`: the account's keys as the server publishes them,
+ * read with the session the sign-in just issued, and - since the key log
+ * (design 4.6, `key-log-client.ts`) - the same key at the same version in the
+ * log, under a signed head consistent with the last one this browser saw. A
+ * server that publishes a key it forged has to log it too, where the account's
+ * own browsers find it (`ownKeyAlarm`). A log that cannot be asked fails the
+ * check: the QR hand-over is retried, never completed on the server's word.
  */
 export function publishedKeyVerifier(): account.AccountKeyVerifier {
     return {
@@ -104,9 +105,37 @@ export function publishedKeyVerifier(): account.AccountKeyVerifier {
             const state = await keyState();
             const published = state ? publishedOf(state) : null;
             if (!state || !published || state.userId !== userId) return false;
-            return state.accountKey?.akVersion === akVersion && account.samePublicKeys(published, keys);
+            if (state.accountKey?.akVersion !== akVersion || !account.samePublicKeys(published, keys)) return false;
+            const logged = await keyLog.askLog(userId, { op: "proofs", userIds: [userId] });
+            return logged.kind === "verified" && keyLog.entryMatches(logged.entries.find((e) => e.userId === userId), akVersion, keys);
         }
     };
+}
+
+/**
+ * Own-entry monitoring (design 4.6): the keys the log holds for this account
+ * that this browser's own copy of the account key did not make - what a server
+ * hands out when it substitutes this account's key for somebody else. Empty
+ * when all is well, null when there is nothing to compare with (no copy on
+ * this browser) or the log could not be asked.
+ */
+export async function ownKeyAlarm(): Promise<{ ownId: string; foreign: ReadonlyArray<keyLog.VerifiedEntry> } | null> {
+    const state = await keyState();
+    if (!state?.accountKey) return null;
+    let held: HeldKey | null = null;
+    try {
+        // The device copy as it is, not only when it matches what is published: a published key
+        // that differs from it is exactly what this looks for.
+        held = await deviceLock.openDeviceLock(deviceStore(), state.userId);
+        if (!held) return null;
+        const mine = await account.accountPublicKeys(held.accountKey);
+        const foreign = await keyLog.foreignOwnEntries(state.userId, { akVersion: held.akVersion, ...mine });
+        return foreign ? { ownId: state.userId, foreign } : null;
+    } catch {
+        return null;
+    } finally {
+        held?.accountKey.fill(0);
+    }
 }
 
 /** A conversation's safety number with one other person, or why there is none. */
@@ -115,6 +144,8 @@ export type PairSafety =
     | { readonly kind: "ready"; readonly digits: string; readonly ownId: string; readonly peerFingerprint: string }
     /** The other person has no account key yet: nothing has been sealed to them. */
     | { readonly kind: "no-key" }
+    /** The key the server handed out is not the one its own key log vouches for. */
+    | { readonly kind: "unlogged" }
     | { readonly kind: "unavailable" };
 
 /**
@@ -132,9 +163,14 @@ export async function pairSafetyNumber(channelId: string, peerId: string): Promi
         const theirs = await peerKeys.fetchPeerKeys(channelId, peerId);
         if (!theirs) return { kind: "unavailable" };
         if (theirs === "none") return { kind: "no-key" };
+        const peerKeysBytes = { signPublicKey: fromText(theirs.signPublicKey), hpkePublicKey: fromText(theirs.hpkePublicKey) };
+        const logged = await keyLog.askLog(state.userId, { op: "proofs", channelId, userIds: [peerId] });
+        if (logged.kind === "unavailable") return { kind: "unavailable" };
+        if (logged.kind === "failed" || !keyLog.entryMatches(logged.entries.find((e) => e.userId === peerId), null, peerKeysBytes))
+            return { kind: "unlogged" };
         const digits = await safety.safetyNumber(
             { userId: state.userId, keys: mine },
-            { userId: peerId, keys: { signPublicKey: fromText(theirs.signPublicKey), hpkePublicKey: fromText(theirs.hpkePublicKey) } }
+            { userId: peerId, keys: peerKeysBytes }
         );
         const peerFingerprint = await peerKeys.keyFingerprint(theirs.signPublicKey, theirs.hpkePublicKey);
         peerKeys.updateBook(state.userId, (book) => peerKeys.observePeer(book, peerId, peerFingerprint, Date.now()));

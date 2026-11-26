@@ -55,7 +55,7 @@ import { CallRosterList } from "./call-roster";
 import type { PollDraft } from "./poll-dialog";
 import { draftMessage, stillPending } from "./draft-message";
 import { ScheduledBar } from "./scheduled-bar";
-import { KeyChangeBar } from "./key-change-bar";
+import { GroupKeyChangeBar, KeyChangeBar, KeyLogNotice } from "./key-change-bar";
 import { SealedNotice } from "./sealed-notice";
 import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import { ChannelHeader, PanelSearch } from "./channel-header";
@@ -2850,6 +2850,10 @@ export function ChannelView({
             {channel.kind === "dm" && channel.others[0] && sealedChatActive() && (
                 <KeyChangeBar channelId={channel.id} viewerId={viewerId} peer={channel.others[0]} />
             )}
+            {channel.kind === "group" && channel.others.length > 0 && sealedChatActive() && (
+                <GroupKeyChangeBar channelId={channel.id} viewerId={viewerId} members={channel.others} />
+            )}
+            {sealedChatActive() && <KeyLogNotice viewerId={viewerId} />}
             {error && (
                 <p role="alert" className="px-4 pb-1 text-xs text-danger">
                     {error}

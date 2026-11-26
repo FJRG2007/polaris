@@ -2905,7 +2905,11 @@
         "safetyScanOther": "That is not a safety number code.",
         "safetyChanged": "Your safety number with {name} changed. They may have a new key, or somebody may be in between - compare it again to be sure.",
         "safetyDismiss": "Dismiss",
-        "safetyVerify": "Verify"
+        "safetyVerify": "Verify",
+        "safetyUnlogged": "The key the server gave for {name} is not the one in its own key log, so nothing is sealed to it. Do not trust this conversation until you have compared numbers with {name} in person.",
+        "groupKeysChanged": "{count, plural, one {{name}'s safety number changed.} other {Safety numbers changed for {names}.}} A new key, or somebody in between - compare in your one-to-one conversation to be sure.",
+        "keyLogForeign": "A key you did not create was published for your account, so people writing to you may be sealing to somebody else. Tell your administrator, and compare safety numbers with the people you talk to.",
+        "keyLogFailed": "The server's key log contradicted what it showed this browser before, so keys it vouches for cannot be trusted. Reload the page; if this comes back, tell your administrator."
     },
     "location": {
         "title": "Share location",

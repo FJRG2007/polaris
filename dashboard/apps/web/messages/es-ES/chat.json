@@ -2905,7 +2905,11 @@
         "safetyScanOther": "Eso no es un código seguro.",
         "safetyChanged": "Tu código seguro con {name} ha cambiado. Puede tener una clave nueva o alguien puede estar en medio; compáralo de nuevo para estar seguro.",
         "safetyDismiss": "Descartar",
-        "safetyVerify": "Verificar"
+        "safetyVerify": "Verificar",
+        "safetyUnlogged": "La clave que el servidor dio para {name} no es la de su propio registro de claves, así que no se cifra nada hacia ella. No confíes en esta conversación hasta comparar los números con {name} en persona.",
+        "groupKeysChanged": "{count, plural, one {El código seguro de {name} ha cambiado.} other {Han cambiado los códigos seguros de {names}.}} Una clave nueva o alguien en medio; compáralo en vuestra conversación individual.",
+        "keyLogForeign": "Se ha publicado para tu cuenta una clave que no creaste, así que quien te escribe puede estar cifrando para otra persona. Avisa a tu administrador y compara los códigos seguros con quien hablas.",
+        "keyLogFailed": "El registro de claves del servidor contradice lo que mostró antes a este navegador, así que no se puede confiar en las claves que avala. Recarga la página; si vuelve a salir, avisa a tu administrador."
     },
     "location": {
         "title": "Enviar ubicación",

@@ -71,6 +71,13 @@ export function SafetyNumberView({ channelId, peerId, peerName }: { channelId: s
     if (safety?.kind === "no-key")
         return <p className="px-3 py-3 text-sm text-muted-foreground">{t("info.safetyNoKey", { name: peerName })}</p>;
 
+    if (safety?.kind === "unlogged")
+        return (
+            <p role="alert" className="px-3 py-3 text-sm text-danger">
+                {t("info.safetyUnlogged", { name: peerName })}
+            </p>
+        );
+
     if (safety?.kind === "unavailable")
         return (
             <div className="flex flex-col items-start gap-2 px-3 py-3">
