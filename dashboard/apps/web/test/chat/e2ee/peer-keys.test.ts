@@ -62,6 +62,24 @@ describe("peer key memory", () => {
             return store;
         };
 
+        it("takes nobody's first sight on the server's word when the key log cannot be asked", async () => {
+            stubStorage();
+            const KNOWN = "0190a1b2-0000-7000-8000-000000000001";
+            const NEW = "0190a1b2-0000-7000-8000-000000000002";
+            const pair = (n: number) => ({ signPublicKey: Buffer.alloc(32, n).toString("base64url"), hpkePublicKey: Buffer.alloc(32, n + 1).toString("base64url") });
+            vi.stubGlobal("fetch", async (url: string) =>
+                String(url).includes("/api/e2ee/key-log")
+                    ? new Response("{}", { status: 503 })
+                    : Response.json({ accountKeys: [{ userId: KNOWN, ...pair(1) }, { userId: NEW, ...pair(3) }] })
+            );
+            peerKeys.updateBook("me", (book) => peerKeys.observePeer(book, KNOWN, A, 1));
+            const recorded = await peerKeys.checkPeers("me", "0190a1b2-0000-7000-8000-0000000000cc", [KNOWN, NEW]);
+            expect([...recorded.keys()]).toEqual([KNOWN]);
+            // The known peer's served key differs from the remembered one: the change still shows.
+            expect(peerKeys.readBook("me")[KNOWN]?.changed).toBe(true);
+            expect(peerKeys.readBook("me")[NEW]).toBeUndefined();
+        });
+
         it("stores per account and tells subscribers", () => {
             stubStorage();
             let calls = 0;

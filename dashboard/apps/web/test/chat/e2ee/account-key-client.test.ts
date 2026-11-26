@@ -6,11 +6,15 @@
  * Pinned: an account with no key gets exactly one, even with two sign-ins at
  * once; the passkey PRF lock opens or is sealed; the password lock is re-sealed
  * after a reset; and no key the server swapped, nor a stale device copy, is
- * ever kept or spread under another lock.
+ * ever kept or spread under another lock. `/api/e2ee/key-log` is a real tree
+ * (`support/fake-key-log.ts`): a QR hand-over the log contradicts is refused,
+ * a key logged for this account that it never made raises the own-key alarm,
+ * and a forked, rewound or re-keyed log is refused.
  */
 
 import "fake-indexeddb/auto";
 import * as locks from "@polaris/chat-crypto/locks";
+import { FakeKeyLog } from "./support/fake-key-log";
 import * as qr from "@polaris/chat-crypto/qr-approval";
 import * as account from "@polaris/chat-crypto/account-key";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,6 +40,7 @@ vi.mock("@polaris/chat-crypto/password-lock", async (original) => {
 vi.mock("@/lib/chat/e2ee/password-worker-client", () => import("@polaris/chat-crypto/password-lock"));
 
 const client = await import("../../../src/lib/chat/e2ee/account-key-client");
+const keyLogClient = await import("../../../src/lib/chat/e2ee/key-log-client");
 
 interface Server {
     userId: string;
@@ -117,7 +122,34 @@ async function signKeyOf(accountKey: Uint8Array): Promise<string> {
 const CREDENTIAL = "Y3JlZGVudGlhbC1pZC1vbmUtMTIzNDU2";
 const prf = () => new Uint8Array(32).fill(0x42);
 
-beforeEach(() => {
+let keyLogFake: FakeKeyLog;
+
+/** `/api/e2ee/key-log`: the published key is logged on first ask (as `ensureLogged` does), then the fake log answers. */
+async function keyLogAnswer(body: { op: string; userIds?: string[]; since?: number }): Promise<Response> {
+    const key = server.key;
+    if (key && !keyLogFake.entries.some((e) => e.userId === server.userId && e.akVersion === key.akVersion))
+        await keyLogFake.append({
+            userId: server.userId,
+            akVersion: key.akVersion,
+            signPublicKey: new Uint8Array(Buffer.from(key.signPublicKey, "base64url")),
+            hpkePublicKey: new Uint8Array(Buffer.from(key.hpkePublicKey, "base64url"))
+        });
+    return reply(await keyLogFake.answer(server.userId, body));
+}
+
+/** Every route the client calls: the key log, and the account key endpoint (`route`). */
+async function respond(url: string, init: RequestInit): Promise<Response> {
+    const body = JSON.parse(init.body as string);
+    return String(url).includes("/api/e2ee/key-log") ? keyLogAnswer(body) : route(body);
+}
+
+/** A key this account never made, logged for it at `akVersion`. */
+async function logForged(akVersion: number): Promise<void> {
+    await keyLogFake.append({ userId: server.userId, akVersion, ...(await account.accountPublicKeys(account.generateAccountKey())) });
+}
+
+beforeEach(async () => {
+    keyLogFake = await FakeKeyLog.create();
     counter++;
     passwordSecret = new Uint8Array(32).fill(3);
     server = {
@@ -128,7 +160,7 @@ beforeEach(() => {
         adopted: true,
         ops: []
     };
-    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => route(JSON.parse(init.body as string)));
+    vi.stubGlobal("fetch", respond);
 });
 
 describe("an account with no key", () => {
@@ -325,6 +357,83 @@ describe("the QR approval, both browsers", () => {
     });
 });
 
+describe("the key log", () => {
+    it("refuses the QR hand-over when the log holds another key for the published version", async () => {
+        const ak = account.generateAccountKey();
+        await publish(ak);
+        await logForged(1);
+        await deviceLock.createDeviceLock(deviceLock.indexedDbDeviceLockStore(), server.userId, ak, 1);
+        const { offer, text: offerText } = await client.createKeyOffer();
+        const transfer = await client.sealForScannedCode({
+            approverDeviceId: "33333333-3333-4333-8333-333333333333",
+            flowId: "ABCD2345",
+            keyOffer: offerText,
+            fragment: await qr.offerFragment("ABCD2345", offer)
+        });
+        expect(transfer).not.toBeNull();
+        await deviceLock.forgetDeviceLock(deviceLock.indexedDbDeviceLockStore(), server.userId);
+        expect(await client.acceptKeyDelivery(offer, { userId: server.userId, flowId: "ABCD2345", transfer: transfer! })).toBe(
+            false
+        );
+        expect(await onDevice()).toBeNull();
+    });
+
+    it("raises no own-key alarm while the log holds only this browser's key, and one for a key it did not make", async () => {
+        const ak = account.generateAccountKey();
+        await publish(ak);
+        await deviceLock.createDeviceLock(deviceLock.indexedDbDeviceLockStore(), server.userId, ak, 1);
+        expect((await client.ownKeyAlarm())?.foreign).toEqual([]);
+        await logForged(2);
+        const alarm = await client.ownKeyAlarm();
+        expect(alarm?.ownId).toBe(server.userId);
+        expect(alarm?.foreign.map((e) => e.akVersion)).toEqual([2]);
+    });
+
+    describe("a head against the last one seen", () => {
+        type Answer = Parameters<typeof keyLogClient.checkAnswer>[0];
+        const ask = async (fake: FakeKeyLog, since?: number) =>
+            (await fake.answer(server.userId, { op: "own", ...(since === undefined ? {} : { since }) })) as Answer;
+
+        async function seenOf(fake: FakeKeyLog) {
+            const first = await keyLogClient.checkAnswer(await ask(fake), null);
+            expect(first.kind).toBe("verified");
+            return first.seen!;
+        }
+
+        it("accepts a log that only grew", async () => {
+            await logForged(1);
+            const seen = await seenOf(keyLogFake);
+            await logForged(2);
+            expect((await keyLogClient.checkAnswer(await ask(keyLogFake, seen.treeSize), seen)).kind).toBe("verified");
+        });
+
+        it("refuses a fork: the same size under another root", async () => {
+            await logForged(1);
+            const other = await keyLogFake.fork();
+            await logForged(2);
+            await other.append({ userId: server.userId, akVersion: 2, ...(await account.accountPublicKeys(account.generateAccountKey())) });
+            const seen = await seenOf(keyLogFake);
+            expect(await keyLogClient.checkAnswer(await ask(other, seen.treeSize), seen)).toEqual({ kind: "failed", problem: "consistency" });
+        });
+
+        it("refuses a smaller head than the one seen", async () => {
+            await logForged(1);
+            const older = await ask(keyLogFake);
+            await logForged(2);
+            const seen = await seenOf(keyLogFake);
+            expect(await keyLogClient.checkAnswer(older, seen)).toEqual({ kind: "failed", problem: "rollback" });
+        });
+
+        it("refuses a head signed by a log key other than the one seen first", async () => {
+            await logForged(1);
+            const seen = await seenOf(keyLogFake);
+            const replaced = await FakeKeyLog.create();
+            await replaced.append(keyLogFake.entries[0]!);
+            expect(await keyLogClient.checkAnswer(await ask(replaced, seen.treeSize), seen)).toEqual({ kind: "failed", problem: "log-key" });
+        });
+    });
+});
+
 describe("a sign-in that owed a second factor (no envelope came with it)", () => {
     async function sealedElsewhere(ak: Uint8Array): Promise<void> {
         const envelope = await locks.sealAccountKey(ak, await locks.importLockSecret(passwordSecret), {
@@ -371,10 +480,10 @@ describe("a sign-in that owed a second factor (no envelope came with it)", () =>
         await publish(ak);
         await sealedElsewhere(ak);
         const other = `${server.userId.slice(0, -1)}f`;
-        vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+        vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
             const body = JSON.parse(init.body as string);
             if (body.op === "unlock-start") return reply({ loginId: "l", loginResponse: "x", userId: other });
-            return route(body);
+            return respond(url, init);
         });
         expect(await client.settleAfterPassword("pw", null)).toBe(false);
         expect(await onDevice()).toBeNull();
