@@ -67,9 +67,19 @@ export function isSessionQueued(state: AgentSessionState): boolean {
     return state === "queued";
 }
 
-/** A session that is not computing but is still alive, so a prompt would land. */
+/**
+ * A session that finished its turn and is at its prompt, so a message typed
+ * now lands as the next turn. Not `waiting`: an agent blocked on a permission
+ * prompt or a question is not listening for a new turn - what is typed there
+ * would land in the prompt itself - so that request is answered first.
+ */
 export function isSessionListening(state: AgentSessionState): boolean {
-    return state === "waiting" || state === "idle";
+    return state === "idle";
+}
+
+/** A session blocked on a permission prompt or a question it put to somebody. */
+export function isSessionAsking(state: AgentSessionState): boolean {
+    return state === "waiting";
 }
 
 // ---------------------------------------------------------------------------

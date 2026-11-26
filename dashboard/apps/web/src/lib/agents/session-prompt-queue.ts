@@ -42,7 +42,53 @@ export interface QueuedPrompt {
  * and while anything is already waiting, so nothing jumps the line. Pure.
  */
 export function shouldQueuePrompt(state: core.AgentSessionState, waiting: number): boolean {
-    return state === "working" || (waiting > 0 && !core.isSessionOver(state));
+    return state === "working" || core.isSessionAsking(state) || (waiting > 0 && !core.isSessionOver(state));
+}
+
+/** Where a message typed into a live session goes. */
+export type PromptRoute =
+    /** Its words already reached the agent as the reason of the denial. */
+    | "denied"
+    /** Into the running turn, at its next step; the queue when it is not taken. */
+    | "steer"
+    /** Behind the turn: sent when it ends. */
+    | "queue"
+    /** Typed now: the agent is at its prompt. */
+    | "send";
+
+/**
+ * The route of a message typed now (Claude Code / Codex / OpenCode): a pending
+ * approval is denied first (`denied` says how many were). The message reaches
+ * the agent once: where a denial carried it as its reason (`carried`) the
+ * agent reads it in the turn it is on and nothing more is sent; else it is a
+ * new message, joining the turn the denial resumed. Mid-turn it steers when
+ * nothing is ahead of it, and queues behind whatever is. Pure.
+ */
+export function promptRoute(input: {
+    state: core.AgentSessionState;
+    queued: number;
+    denied: number;
+    carried: number;
+}): PromptRoute {
+    if (input.carried > 0) return "denied";
+    const running = input.denied > 0 || input.state === "working";
+    if (running && input.queued === 0) return "steer";
+    if (running || shouldQueuePrompt(input.state, input.queued)) return "queue";
+    return "send";
+}
+
+/** What "Send now" on a queued row does. */
+export type QueueNowRoute = "deny" | "steer" | "interrupt" | "deliver";
+
+/**
+ * "Send now" on a queued row: a pending approval is denied with the row as its
+ * reason; mid-turn the row steers into the turn (the caller interrupts when the
+ * agent does not take it); at its prompt the agent gets it at once. Pure.
+ */
+export function queueNowRoute(state: core.AgentSessionState, pendingApproval: boolean): QueueNowRoute {
+    if (pendingApproval || core.isSessionAsking(state)) return "deny";
+    if (state === "working") return "steer";
+    return core.isSessionListening(state) ? "deliver" : "interrupt";
 }
 
 /** The session's queue, oldest first. */
@@ -116,10 +162,22 @@ export async function editQueuedPrompt(sessionId: string, id: string, text: stri
 /** Take a message back out of the queue: its text, or null when it already
  *  went (or never was there). */
 export async function takeBackQueuedPrompt(sessionId: string, id: string): Promise<string | null> {
-    const row = await prisma.agentQueuedPrompt.findFirst({ where: { id, sessionId }, select: { text: true } });
+    return (await takeQueuedPrompt(sessionId, id))?.text ?? null;
+}
+
+/** Take a message out of the queue with the files it carries, or null when it
+ *  already went (or never was there). */
+export async function takeQueuedPrompt(
+    sessionId: string,
+    id: string
+): Promise<{ text: string; attachments: string[] } | null> {
+    const row = await prisma.agentQueuedPrompt.findFirst({
+        where: { id, sessionId },
+        select: { text: true, attachments: true }
+    });
     if (!row) return null;
     const removed = await prisma.agentQueuedPrompt.deleteMany({ where: { id, sessionId } });
-    return removed.count === 1 ? row.text : null;
+    return removed.count === 1 ? row : null;
 }
 
 /**
@@ -227,9 +285,10 @@ export async function sendPromptNow(
 /**
  * Send a message typed while the agent works into its running turn, kept on
  * the session only once the agent took it. False when it could not go now
- * (no steering here, no turn of Chat's running, files to place first); the
- * caller queues it. Files wait for the queue because placing them is a step
- * the agent would read mid-turn before they exist.
+ * (no steering here, no turn of Chat's running, files it cannot have); the
+ * caller queues it. Files are placed on the machine before the message goes,
+ * so the agent never reads about one that is not there yet - and only where
+ * the turn takes a message at all, so nothing is copied for a queued one.
  */
 export async function steerPromptNow(
     session: sessions.SessionView,
@@ -237,10 +296,43 @@ export async function steerPromptNow(
     text: string,
     attachmentIds: readonly string[]
 ): Promise<boolean> {
-    if (attachmentIds.length > 0) return false;
-    if (!(await runtime.steerTurn(session.id, text))) return false;
-    await sessions.addSessionMessage(session.id, "user", text, userId);
+    let said = text;
+    if (attachmentIds.length > 0) {
+        if (!(await runtime.canSteerTurn(session.id))) return false;
+        const files = await sessionAttachments.sessionAttachmentsFor(userId, attachmentIds);
+        // A refusal is the queue's to report, when it delivers the row.
+        if ("refusal" in files) return false;
+        said = sessionAttachments.withAttachmentNote(
+            text,
+            files.files.map((file) => file.path)
+        );
+        await runtime.placeAttachments(session, userId, files.files);
+    }
+    if (!(await runtime.steerTurn(session.id, said))) return false;
+    await sessions.addSessionMessage(session.id, "user", said, userId);
     return true;
+}
+
+/**
+ * "Send now" on a queued row mid-turn: the row leaves the queue and goes into
+ * the running turn. False, with the row back where it was, when the agent does
+ * not take a message mid-turn (or the row already went), so the caller stops
+ * the turn instead and the turn end sends it first.
+ */
+export async function steerQueuedPrompt(
+    session: sessions.SessionView,
+    id: string,
+    ports: Pick<QueuePorts, "claim" | "putBack"> = PORTS,
+    steer: typeof steerPromptNow = steerPromptNow
+): Promise<boolean> {
+    const row = await prisma.agentQueuedPrompt.findFirst({
+        where: { id, sessionId: session.id },
+        select: { text: true, authorId: true, attachments: true, createdAt: true, feedbackKey: true }
+    });
+    if (!row || !(await ports.claim(id))) return false;
+    const taken = await steer(session, row.authorId, row.text, row.attachments).catch(() => false);
+    if (!taken) await ports.putBack(session.id, { ...row, feedbackKey: row.feedbackKey ?? null });
+    return taken;
 }
 
 /** One waiting row, as delivery reads it. */

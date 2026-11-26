@@ -171,6 +171,10 @@ export interface PolarCodeThread {
     /** Messages typed mid-turn, waiting for it to end, oldest first. Only for
      *  somebody who may steer it; empty otherwise. */
     readonly waiting: readonly promptQueue.QueuedPrompt[];
+    /** Whether a message sent mid-turn goes into the running turn (Chat);
+     *  else "Send now" stops the turn and it goes next. Absent on a thread
+     *  cached before it was read, which reads as not. */
+    readonly steers?: boolean;
     /** The latest turn failed because the provider refused the account the
      *  agent signs in with: what to call that account (null when the session
      *  picked none). Only for somebody who may steer it; null otherwise. */
@@ -419,6 +423,7 @@ export async function polarCodeThread(
             access === "manage" && !core.isSessionOver(detail.session.state)
                 ? await promptQueue.listQueuedPrompts(sessionId).catch(() => [])
                 : [],
+        steers: acpProviders.usesAcp(detail.session),
         refusedSignIn:
             access === "manage" && lastTurnRefused(detail.events)
                 ? { account: await refusedAccountName(detail.session.accountId) }
@@ -851,7 +856,7 @@ export async function polarCodeWarm(user: SessionUser): Promise<{ warm: boolean 
 export async function polarCodePrompt(
     user: SessionUser,
     input: unknown
-): Promise<{ error?: string; queued?: boolean }> {
+): Promise<{ error?: string; queued?: boolean; steered?: boolean; denied?: boolean }> {
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
     return promptSessionAction(input);
@@ -1167,13 +1172,30 @@ export async function polarCodeQueue(
     if (edit.action === "move")
         return (await promptQueue.reorderQueuedPrompt(edit.sessionId, edit.id, edit.direction)) ? {} : { gone: true };
     if (edit.action === "now") {
-        if (!(await promptQueue.reorderQueuedPrompt(edit.sessionId, edit.id, "front"))) return { gone: true };
-        // At its prompt the agent takes it at once; mid-turn the turn is
-        // stopped and its end sends the front of the queue.
-        if (core.isSessionListening(session.state)) {
-            await promptQueue.deliverNextQueued(edit.sessionId);
-            return {};
+        const pending = (await pendingPermission(edit.sessionId)) !== null;
+        const route = promptQueue.queueNowRoute(session.state, pending);
+        if (route === "deny") {
+            // Pressed while the agent waits on a permission prompt: the
+            // request is denied with this message as its reason, as typing it
+            // would (Claude Code / Codex), instead of typing into the prompt.
+            const row = await promptQueue.takeQueuedPrompt(edit.sessionId, edit.id);
+            if (!row) return { gone: true };
+            const sent = await promptSessionAction({ sessionId: edit.sessionId, ...row });
+            return sent.error ? { error: sent.error, text: row.text } : {};
         }
+        if (route === "steer") {
+            // Mid-turn: into the running turn where the agent takes one.
+            if (await promptQueue.steerQueuedPrompt(session, edit.id)) return {};
+        }
+        if (!(await promptQueue.reorderQueuedPrompt(edit.sessionId, edit.id, "front"))) {
+            const rows = await promptQueue.listQueuedPrompts(edit.sessionId);
+            if (rows[0]?.id !== edit.id) return { gone: true };
+        }
+        if (route === "deliver") {
+            return (await promptQueue.deliverNextQueued(edit.sessionId)) ? {} : { error: t("code.queue.notTaken") };
+        }
+        // Mid-turn and not taken: the turn is stopped and its end sends the
+        // front of the queue.
         const stopped = await interruptSessionAction(edit.sessionId);
         if (stopped.error) return stopped;
         // A stop that reports no turn end (an agent that just sits at its

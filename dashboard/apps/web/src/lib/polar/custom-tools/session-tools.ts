@@ -103,11 +103,17 @@ async function alwaysAllowed(sessionId: string, tool: string): Promise<boolean> 
 /** Asks on the session, the way the agent's own permission prompts are asked. */
 async function ask(sessionId: string, tool: string, detail: string, signal?: AbortSignal): Promise<string | null> {
     if (await alwaysAllowed(sessionId, tool)) return null;
-    const requestId = await permissions.openPermissionRequest(sessionId, { tool, detail, suggestions: null });
+    // Its denial is this tool's result, read in the same turn.
+    const requestId = await permissions.openPermissionRequest(sessionId, {
+        tool,
+        detail,
+        suggestions: null,
+        carriesReason: true
+    });
     void pushPermissionRequest(sessionId, requestId, detail).catch(() => undefined);
     const answer = await permissions.awaitPermission(requestId, sessionId, permissions.PERMISSION_WAIT_MS, signal);
     if (answer.status === "allow" || answer.status === "always") return null;
-    if (answer.status === "deny") return "Denied from Polaris by the session owner.";
+    if (answer.status === "deny") return permissions.denialMessage(answer.answer);
     return "Nobody answered the permission prompt in time, so this did not run. Ask again later or try another approach.";
 }
 

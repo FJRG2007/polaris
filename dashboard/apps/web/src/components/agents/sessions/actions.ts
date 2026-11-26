@@ -654,7 +654,7 @@ async function noteOnTask(session: sessions.SessionView, userId: string): Promis
 
 export async function promptSessionAction(
     input: unknown
-): Promise<{ error?: string; queued?: boolean; steered?: boolean }> {
+): Promise<{ error?: string; queued?: boolean; steered?: boolean; denied?: boolean }> {
     const user = await requirePermission("agents.manage");
     const parsed = core.agentSessionPromptSchema.safeParse(input);
     const t = await getTranslations("agents");
@@ -679,18 +679,35 @@ export async function promptSessionAction(
     // would be typed into a machine that does not exist.
     if (core.isSessionQueued(session.state)) return { error: t("sessions.errors.queued") };
 
+    // A pending approval is answered first: denied (Claude Code's "No, and
+    // tell Claude what to do differently"). The message reaches the agent
+    // once: as the denial's reason where the request carries one back into
+    // its turn (a hook's deny message, a Polaris tool's result), else as the
+    // new message below, joining the turn the denial resumed.
+    const denial = await permissions.denyPendingFor(session.id, user.id, parsed.data.text, {
+        withFiles: parsed.data.attachments.length > 0
+    });
     // Mid-turn, or behind messages already waiting: it joins the queue and is
     // sent when the turn ends (`session-prompt-queue`).
     const waiting = await promptQueue.queuedCount(session.id);
+    const route = promptQueue.promptRoute({
+        state: session.state,
+        queued: waiting,
+        denied: denial.denied,
+        carried: denial.carried
+    });
+    if (route === "denied") {
+        await sessions.addSessionMessage(session.id, "user", parsed.data.text, user.id);
+        return { denied: true };
+    }
     // Mid-turn with nothing waiting: into the running turn where the agent
     // takes one, answered at its next step instead of after the turn.
     if (
-        session.state === "working" &&
-        waiting === 0 &&
+        route === "steer" &&
         (await promptQueue.steerPromptNow(session, user.id, parsed.data.text, parsed.data.attachments))
     )
         return { steered: true };
-    if (promptQueue.shouldQueuePrompt(session.state, waiting)) {
+    if (route !== "send") {
         const files = await sessionAttachments.sessionAttachmentsFor(user.id, parsed.data.attachments);
         if ("refusal" in files) return { error: t(`sessions.errors.files.${files.refusal}`) };
         if (!(await promptQueue.queuePrompt(session.id, user.id, parsed.data.text, parsed.data.attachments)))

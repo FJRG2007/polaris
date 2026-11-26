@@ -151,7 +151,10 @@ export function Confirmation({
         ) : (
             <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
                 <X className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
-                <span className="min-w-0 break-words">{t("approval.rejected")}</span>
+                <span className="min-w-0 break-words">
+                    {/* Denied by a message sent instead (`denyPending` in the panel). */}
+                    {approval.reason === t("queue.deniedReason") ? t("approval.rejectedForMessage") : t("approval.rejected")}
+                </span>
             </p>
         );
     }

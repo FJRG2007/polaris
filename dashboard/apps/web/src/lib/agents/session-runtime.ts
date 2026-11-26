@@ -1595,6 +1595,18 @@ export async function changeSessionEffort(
     );
 }
 
+/** Whether a session's turn takes a message mid-turn at all (`steerTurn`). */
+function steerable(placement: NonNullable<Awaited<ReturnType<typeof sessionPlacement>>>): boolean {
+    return !core.isSessionOver(placement.state) && acpProviders.usesAcp(placement);
+}
+
+/** Whether `steerTurn` can deliver into this session, asked before work that
+ *  only a delivered message needs (placing its files). Never throws. */
+export async function canSteerTurn(sessionId: string): Promise<boolean> {
+    const placement = await sessionPlacement(sessionId).catch(() => null);
+    return !!placement && steerable(placement);
+}
+
 /**
  * Deliver a message into the turn the agent is on, so it reads it at its next
  * step and answers without stopping (Claude Code's own behaviour for a message
@@ -1604,7 +1616,7 @@ export async function changeSessionEffort(
  */
 export async function steerTurn(sessionId: string, text: string): Promise<boolean> {
     const placement = await sessionPlacement(sessionId).catch(() => null);
-    if (!placement || core.isSessionOver(placement.state) || !acpProviders.usesAcp(placement)) return false;
+    if (!placement || !steerable(placement)) return false;
     return acpDrivers
         .acpDriver(sessionId, placement.cli)
         .steer(text)

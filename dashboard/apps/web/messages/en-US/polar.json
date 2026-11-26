@@ -208,7 +208,15 @@
         "edit": "Queued message",
         "up": "Move up",
         "down": "Move down",
-        "remove": "Remove from queue"
+        "remove": "Remove from queue",
+        "menu": "Message options",
+        "sendNow": "Send now",
+        "stopAndSend": "Stop and send now",
+        "save": "Save",
+        "cancel": "Cancel",
+        "files": "+{count} files",
+        "full": "The queue is full ({count}). Send or remove one first.",
+        "deniedReason": "The user sent a new message instead."
     },
     "slash": {
         "title": "Commands",
@@ -343,6 +351,7 @@
         "details": "Details",
         "accepted": "Approved",
         "rejected": "Not run",
+        "rejectedForMessage": "Not run - you sent a new message",
         "always": "Always allow",
         "alwaysTool": "Polar will run {action} without asking again.",
         "alwaysTarget": "Polar will do this to {target} without asking again.",
@@ -1658,6 +1667,7 @@
             }
         },
         "permission": {
+            "deniedByMessage": "Denied - you sent a new message.",
             "title": "Waiting for your OK",
             "asks": "The agent wants to use {tool}",
             "allow": "Allow",
@@ -1705,7 +1715,9 @@
             "cancel": "Cancel",
             "files": "+{count} files",
             "gone": "That message was already sent.",
-            "invalid": "That message can't be changed."
+            "invalid": "That message can't be changed.",
+            "steerNow": "Send now",
+            "notTaken": "The agent didn't take it. Try again or Stop."
         },
         "export": {
             "markdown": "Markdown",

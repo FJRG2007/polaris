@@ -94,6 +94,23 @@ describe("questions and plans", () => {
         expect(back.hookSpecificOutput.permissionDecisionReason).toContain("Add tests");
     });
 
+    it("tells the agent why a question or plan was set aside by a message", () => {
+        const reason = (tool: string, answer: unknown) =>
+            (asks.askDecision(tool, "deny", { questions }, answer) as {
+                hookSpecificOutput: { permissionDecisionReason: string };
+            }).hookSpecificOutput.permissionDecisionReason;
+        expect(reason("AskUserQuestion", { feedback: "Use Svelte" })).toBe(
+            "The user skipped these questions and said instead: Use Svelte"
+        );
+        expect(reason("AskUserQuestion", { byMessage: true })).toBe(
+            "The user skipped these questions and sent a new message instead."
+        );
+        expect(reason("AskUserQuestion", {})).toBe("The user skipped these questions. Carry on with your best judgment.");
+        expect(reason("ExitPlanMode", { byMessage: true })).toBe(
+            "The user wants you to keep planning and sent a new message instead."
+        );
+    });
+
     it("refuses what does not fit the schema", () => {
         expect(asks.readAsk(pre("AskUserQuestion", { questions: [] }))).toBeNull();
         expect(asks.readAsk(pre("ExitPlanMode", {}))).toBeNull();

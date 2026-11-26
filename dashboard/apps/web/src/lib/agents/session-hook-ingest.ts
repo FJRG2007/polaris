@@ -132,7 +132,9 @@ export async function decidePermissionHook(
                 tool,
                 detail: question.ask.kind === "plan" ? "" : question.ask.questions[0]!.question,
                 suggestions: null,
-                input: question.raw as Prisma.InputJsonValue
+                input: question.raw as Prisma.InputJsonValue,
+                // The hook's deny reason is read in the same turn.
+                carriesReason: true
             });
             void pushPermissionRequest(id, requestId, question.ask.kind === "plan" ? tool : question.ask.questions[0]!.question, false);
             const answer = await permissions.awaitPermission(requestId, id, permissions.PERMISSION_WAIT_MS, signal);
@@ -150,11 +152,11 @@ export async function decidePermissionHook(
     if (ruled) return permissions.hookDecision(ruled, asked.tool, null) as Record<string, unknown>;
 
     try {
-        const requestId = await permissions.openPermissionRequest(id, asked);
+        const requestId = await permissions.openPermissionRequest(id, { ...asked, carriesReason: true });
         void dispatchSessionHook(id, "permission.request", { tool: asked.tool, detail: asked.detail }).catch(() => undefined);
         void pushPermissionRequest(id, requestId, asked.detail);
         const answer = await permissions.awaitPermission(requestId, id, permissions.PERMISSION_WAIT_MS, signal);
-        return permissions.hookDecision(answer.status, answer.tool, answer.suggestions) as Record<string, unknown>;
+        return permissions.hookDecision(answer.status, answer.tool, answer.suggestions, answer.answer) as Record<string, unknown>;
     } catch (error) {
         console.error(`[agent-session] ${id}: permission prompt could not be relayed:`, error);
         return {};

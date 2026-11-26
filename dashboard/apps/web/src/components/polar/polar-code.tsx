@@ -1740,7 +1740,7 @@ function CodeThread({
                               sessionId,
                               condition: text
                           })
-                        : postCode<{ error?: string; queued?: boolean }>("/api/polar/code/prompt", {
+                        : postCode<{ error?: string; queued?: boolean; denied?: boolean }>("/api/polar/code/prompt", {
                               sessionId,
                               text: prompt,
                               attachments
@@ -1758,6 +1758,9 @@ function CodeThread({
                 // Mid-turn it waits in the queue, drawn there rather than as
                 // a message the agent already has.
                 if (result.queued) setSent(null);
+                // It answered the agent's open request instead: say so, as
+                // that request's card is gone.
+                if ("denied" in result && result.denied) setInfo(t("code.permission.deniedByMessage"));
                 if (!goal) parts.uploads.clear();
                 read();
             });
@@ -2081,7 +2084,9 @@ function CodeThread({
             ).then((result) => {
                 if (result?.error) setError(result.error);
                 else if (result?.gone) setError(t("code.queue.gone"));
-                else if (result?.text) {
+                // Taken back, or a "Send now" that did not go: the words
+                // return to the reply box rather than being lost.
+                if (result?.text) {
                     const back = result.text;
                     setReply((current) => (current.trim() ? `${back}\n\n${current}` : back));
                 }
@@ -2209,6 +2214,7 @@ function CodeThread({
             {/* A thread cached before the queue existed has none. */}
             <CodeQueuedList
                 waiting={thread.waiting ?? []}
+                steers={thread.steers === true && turning}
                 disabled={busy}
                 onEdit={(id, text) => changeQueued(id, text)}
                 onTakeBack={(id) => changeQueued(id, null)}

@@ -208,7 +208,15 @@
         "edit": "Mensaje en cola",
         "up": "Subir",
         "down": "Bajar",
-        "remove": "Quitar de la cola"
+        "remove": "Quitar de la cola",
+        "menu": "Más opciones",
+        "sendNow": "Enviar ya",
+        "stopAndSend": "Parar y enviar ya",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "files": "+{count} archivos",
+        "full": "La cola está llena ({count}). Envía o quita uno antes.",
+        "deniedReason": "El usuario envió otro mensaje."
     },
     "slash": {
         "title": "Comandos",
@@ -343,6 +351,7 @@
         "details": "Detalles",
         "accepted": "Aprobado",
         "rejected": "Omitido",
+        "rejectedForMessage": "Omitido: enviaste otro mensaje",
         "always": "No preguntar",
         "alwaysTool": "Polar hará {action} sin volver a preguntar.",
         "alwaysTarget": "Polar hará esto en {target} sin volver a preguntar.",
@@ -1658,6 +1667,7 @@
             }
         },
         "permission": {
+            "deniedByMessage": "Denegado: enviaste otro mensaje.",
             "title": "Esperando tu OK",
             "asks": "El agente quiere usar {tool}",
             "allow": "Permitir",
@@ -1705,7 +1715,9 @@
             "cancel": "Cancelar",
             "files": "+{count} archivos",
             "gone": "Ese mensaje ya se envió.",
-            "invalid": "Ese mensaje no se puede cambiar."
+            "invalid": "Ese mensaje no se puede cambiar.",
+            "steerNow": "Enviar ya",
+            "notTaken": "El agente no lo tomó. Reintenta o Para."
         },
         "export": {
             "markdown": "Markdown",

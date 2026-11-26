@@ -205,7 +205,8 @@ import {
     cleanContextText,
     automaticChoice,
     isAutomatic,
-    MAX_QUEUE,
+    chatSendRoute,
+    queuedPrompt,
     polarAttachmentId,
     POLAR_ATTACHMENT_MOST,
     POLAR_ATTACHMENT_TYPES,
@@ -213,6 +214,7 @@ import {
     type ModelChoice,
     type PageContext,
     type SiteContext,
+    type QueuedFile,
     type QueuedMessage
 } from "@/lib/polar/shared";
 import { screenFor } from "@/lib/polar/screen";
@@ -916,6 +918,9 @@ export function PolarChat({
      *  next message only. */
     const pageOnce = useRef(false);
     const [queue, setQueue] = useState<QueuedMessage[]>([]);
+    // Set while a sent message denies the approvals it answers, so the denial
+    // does not start a turn of its own before the message's.
+    const denyingForMessage = useRef(false);
     const [editing, setEditing] = useState<string | null>(null);
     const [confirmRewind, rewindDialog] = useConfirm();
     const [files, setFiles] = useState<AttachmentData[]>([]);
@@ -1148,9 +1153,11 @@ export function PolarChat({
         messages: opening,
         transport,
         // Approvals given, or Polar's question answered (`ask.ts`): the turn goes on.
+        // Not while a sent message is denying them: that message is the turn.
         sendAutomaticallyWhen: (options) =>
-            lastAssistantMessageIsCompleteWithApprovalResponses(options) ||
-            askAnswered(options.messages),
+            !denyingForMessage.current &&
+            (lastAssistantMessageIsCompleteWithApprovalResponses(options) ||
+                askAnswered(options.messages)),
         // An answer keeps running after its chat is left; opening the chat
         // again picks it up where it is (`chat/[id]/stream`).
         resume: true
@@ -1419,8 +1426,7 @@ export function PolarChat({
             return;
         const [next, ...rest] = queue;
         saveQueue(rest);
-        turnChoice.current = null;
-        if (next) void sendWithRoom({ text: next.text });
+        if (next) sendQueued(next);
     }, [busy, compacting, waitingApproval, queue.length, chat.status]);
 
     /** A temporary chat that was written to is deleted as soon as it is left.
@@ -2143,13 +2149,82 @@ export function PolarChat({
                 return void chat.sendMessage(withScreen(message));
             }
         }
-        if (busy || waitingApproval) {
-            if (queue.length < MAX_QUEUE && text) saveQueue([...queue, { id: newId(), text }]);
+        const route = chatSendRoute({ busy, waitingApproval: !!waitingApproval, queued: queue.length });
+        if (route === "full") {
+            // Nothing is dropped without a word: the box keeps what was typed.
+            setInput(raw);
+            toast.show({ title: t("queue.full", { count: queue.length }) });
             return;
         }
+        if (route === "queue") {
+            // The row shows what was typed; what went in front of it (a quote,
+            // picked page context) travels beside it, with its files and model.
+            const context = text === body ? undefined : text.slice(0, text.length - body.length).trimEnd();
+            saveQueue([
+                ...queue,
+                {
+                    id: newId(),
+                    text: raw,
+                    ...(context ? { context } : {}),
+                    ...(ready.length > 0 ? { files: ready.map(queuedFileOf) } : {}),
+                    ...(ownChoice ? { choice: ownChoice } : {})
+                }
+            ]);
+            return;
+        }
+        void (async () => {
+            if (route === "deny-then-send") await denyPending();
+            setLastApproved(false);
+            turnChoice.current = ownChoice;
+            void sendWithRoom(message);
+        })();
+    };
+
+    /**
+     * Send while an approval waits (Claude Code / Codex): every action still
+     * asking is denied, and the message that follows is the next turn - the
+     * denial does not start one of its own. The words reach the model once, as
+     * that message (with its files and context): the denial's reason only says
+     * one is coming, since a reason repeating them would be read twice.
+     */
+    const denyPending = async () => {
+        const reason = t("queue.deniedReason");
+        const asking = (chat.messages.at(-1)?.parts ?? []).flatMap((part) =>
+            "state" in part && part.state === "approval-requested" && "approval" in part && part.approval
+                ? [(part.approval as { id: string }).id]
+                : []
+        );
+        denyingForMessage.current = true;
+        try {
+            for (const id of asking) await chat.addToolApprovalResponse({ id, approved: false, reason });
+        } finally {
+            denyingForMessage.current = false;
+        }
+    };
+
+    /** A queued message, sent as it would have gone when it was typed. */
+    const sendQueued = (entry: QueuedMessage) => {
+        const own = entry.text ? ownCommandIn(entry.text, commands.commands) : null;
+        const body = own ? polarShared.commandText(own.row.prompt, own.rest) : entry.text;
+        turnChoice.current = entry.choice ?? null;
         setLastApproved(false);
-        turnChoice.current = ownChoice;
-        void sendWithRoom(message);
+        void sendWithRoom({ text: queuedPrompt(entry, body), files: (entry.files ?? []).map(filePartOf) });
+    };
+
+    /**
+     * "Send now" on a queued row. Chat has no way into an answer being
+     * written, so mid-answer it stops the answer and the row goes next; at an
+     * approval the approval is denied with the row as its reason.
+     */
+    const sendQueuedNow = async (entry: QueuedMessage) => {
+        const rest = queue.filter((item) => item.id !== entry.id);
+        if (busy) {
+            saveQueue([entry, ...rest]);
+            return stopTurn();
+        }
+        saveQueue(rest);
+        if (waitingApproval) await denyPending();
+        sendQueued(entry);
     };
 
     /**
@@ -2473,28 +2548,33 @@ export function PolarChat({
                     {queue.map((item, index) => (
                         <QueueItem
                             key={item.id}
-                            value={item.text}
+                            value={
+                                item.text ||
+                                (item.files ?? []).map((file) => file.filename ?? file.mediaType).join(", ")
+                            }
                             labels={{
+                                menu: t("queue.menu"),
+                                sendNow: busy ? t("queue.stopAndSend") : t("queue.sendNow"),
                                 edit: t("queue.edit"),
                                 up: t("queue.up"),
                                 down: t("queue.down"),
-                                remove: t("queue.remove")
+                                remove: t("queue.remove"),
+                                save: t("queue.save"),
+                                cancel: t("queue.cancel"),
+                                files: item.files?.length ? t("queue.files", { count: item.files.length }) : null
                             }}
                             first={index === 0}
                             last={index === queue.length - 1}
-                            onChange={(text) =>
-                                setQueue(
-                                    queue.map((entry) =>
-                                        entry.id === item.id ? { ...entry, text } : entry
-                                    )
-                                )
-                            }
-                            onCommit={() => saveQueue(queue.filter((entry) => entry.text.trim()))}
+                            onSave={(text) => {
+                                const next = queue.map((entry) =>
+                                    entry.id === item.id ? { ...entry, text: text.trim() } : entry
+                                );
+                                saveQueue(next.filter((entry) => entry.text || entry.files?.length));
+                            }}
+                            onSendNow={() => void sendQueuedNow(item)}
                             onUp={() => saveQueue(moveItem(queue, index, index - 1))}
                             onDown={() => saveQueue(moveItem(queue, index, index + 1))}
-                            onRemove={() =>
-                                saveQueue(queue.filter((entry) => entry.id !== item.id))
-                            }
+                            onRemove={() => saveQueue(queue.filter((entry) => entry.id !== item.id))}
                         />
                     ))}
                 </QueueSection>
@@ -3849,5 +3929,26 @@ function commandCardOf(
         cwd: run.cwd,
         server: onBound ? bound.name : serverId,
         root: run.root || (onBound && bound.root && !(input as { account?: unknown }).account)
+    };
+}
+
+/** A staged file, as a queued message keeps it. */
+function queuedFileOf(file: { mediaType: string; filename?: string; url: string; size?: number }): QueuedFile {
+    return {
+        mediaType: file.mediaType,
+        url: file.url,
+        ...(file.filename ? { filename: file.filename } : {}),
+        ...(file.size !== undefined ? { size: file.size } : {})
+    };
+}
+
+/** A queued file, as the message part it was when it was attached. */
+function filePartOf(file: QueuedFile) {
+    return {
+        type: "file" as const,
+        mediaType: file.mediaType,
+        filename: file.filename,
+        url: file.url,
+        ...(file.size !== undefined ? { providerMetadata: { polaris: { size: file.size } } } : {})
     };
 }

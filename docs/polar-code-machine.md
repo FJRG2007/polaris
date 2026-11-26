@@ -175,15 +175,24 @@ that sent on turn end, so "messages while working" read as covered. Nobody
 compared what happens in the first seconds after sending, which is where the
 two differ.
 
+Sources for the approval rows: Claude Code's "No, and tell Claude what to do
+differently"; Codex's deny-with-message; OpenCode's `CorrectedError(feedback)`
+applied to every parallel ask (`packages/core/src/permission.ts`) and its
+inbox that steers by default, queues on Mod+Enter (`packages/core/src/session/inbox.ts`).
+
 | Behaviour | Claude Code | Codex | Polaris |
 | --- | --- | --- | --- |
 | Message mid-turn goes into the running turn | yes | yes (`turn/steer`) | yes in Chat, when the agent advertises steering (Claude Code adapter, Codex app-server); a runner turn (`claude -p`) and agents without it queue |
-| Waiting list: send now / edit / delete / reorder | yes | partial | yes (`CodeQueuedList`); send now stops the turn and sends it next |
+| Waiting list: send now / edit / delete / reorder | yes | partial | yes, in one "..." menu per row (`QueueItem`, shared by Chat and Code); the row shows the message as typed, line breaks kept, and saving unchanged words is no change |
 | Stop and send what is waiting, or stop and send nothing | Esc | Esc | composer Stop, Esc for whoever manages the session, "Stop, send nothing" |
 | Stop reaches the turn wherever it runs | - | - | Chat cancel, runner, Ctrl+C; says so when nothing stopped |
 | Slash commands handed to the CLI actually run | yes | TUI only | terminal: yes; Chat: only where the protocol runs them (`runsInChat`), otherwise it says to use the Terminal view |
-| Steered message with files | yes | yes | no: files wait for the queue, since placing them is a step the agent would read before they exist |
-| Send now from the waiting list steers instead of stopping | yes | ? | no: send now still stops the turn first |
+| Steered message with files | yes | yes | yes where the turn takes a message (`canSteerTurn`): the files are placed first, then the message that names them steers; otherwise it queues and nothing is copied |
+| Send now from the waiting list steers instead of stopping | yes | ? | yes (`queueNowRoute`): mid-turn the row steers, and only when the agent does not take it is it put back in place and the turn stopped; the menu says "Send now" or "Stop the turn and send this now" accordingly |
+| A message typed at an open approval | denies it, the words as the reason | denies it, the words as the reason | denies every open request (`denyPendingFor`); the words reach the agent once: as the reason where the request carries one into the turn it is on (`carriesReason`: hook prompts, Polaris tools), else as a new message that steers into the resumed turn, the denial saying only that one follows |
+| Approval or question waiting is not the agent's prompt | - | - | `isSessionListening` is `idle` only; `waiting` is `isSessionAsking`, so a message there is routed through the denial instead of landing in the prompt |
+| A message with files at an approval | - | - | denied without a reason, then the message goes with its files, since a reason holds only words |
+| Chat queue keeps the message whole | yes | yes | yes: context, files and the chosen model wait with the words, and a full queue says so and keeps the box |
 
 Not exercised against a real CLI in a container (no Docker on the development
 machine): the steering calls are checked against the adapter's recorded

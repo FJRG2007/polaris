@@ -181,12 +181,53 @@ export function quoteBlock(quote: string): string {
         .join("\n");
 }
 
-/** A message typed while a turn was still running. */
-export const queuedMessageSchema = z.object({
-    id: z.string().min(1).max(64),
-    text: z.string().trim().min(1).max(20_000)
+/** A file a queued message carries, as it was attached. */
+export const queuedFileSchema = z.object({
+    mediaType: z.string().trim().min(1).max(200),
+    filename: z.string().max(500).optional(),
+    url: z.string().trim().min(1).max(2048),
+    size: z.number().int().nonnegative().optional()
 });
+export type QueuedFile = z.infer<typeof queuedFileSchema>;
+
+/**
+ * A message typed while a turn was still running: the words as typed (shown on
+ * its row and edited there), what was put in front of them (a quote, picked
+ * page context), its files and the model a command of the person's own chose,
+ * so it goes exactly as it would have gone at once. Words or files, never
+ * neither. Rows saved before files and context were kept read as plain text.
+ */
+export const queuedMessageSchema = z
+    .object({
+        id: z.string().min(1).max(64),
+        text: z.string().trim().max(20_000),
+        context: z.string().max(40_000).optional(),
+        files: z.array(queuedFileSchema).max(6).optional(),
+        choice: modelChoiceSchema.nullable().optional()
+    })
+    .refine((entry) => entry.text.length > 0 || (entry.files?.length ?? 0) > 0, { message: "empty" });
 export type QueuedMessage = z.infer<typeof queuedMessageSchema>;
+
+/** The prompt a queued message sends: what was in front of it, then the body
+ *  (the typed words, or the command they named, expanded). Pure. */
+export function queuedPrompt(entry: Pick<QueuedMessage, "context">, body: string): string {
+    if (!entry.context) return body;
+    return body ? `${entry.context}\n\n${body}` : entry.context;
+}
+
+/** What Send does in Chat (Claude Code / Codex): an approval waiting is denied
+ *  with the message as its reason and the message goes after it; a running
+ *  turn queues it (a Chat turn takes nothing mid-answer); a full queue says
+ *  so. Pure. */
+export function chatSendRoute(input: {
+    busy: boolean;
+    waitingApproval: boolean;
+    queued: number;
+}): "deny-then-send" | "queue" | "full" | "send" {
+    if (input.waitingApproval && !input.busy) return "deny-then-send";
+    if (input.busy || input.waitingApproval) return input.queued >= MAX_QUEUE ? "full" : "queue";
+    return "send";
+}
 
 /** What Polar takes as an attachment: pictures a browser may show inline, and
  *  documents models read. SVG is not a picture here - it can carry script. */

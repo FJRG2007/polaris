@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest";
 import {
     isSessionListening,
+    isSessionAsking,
     isSessionOver,
     promptKeystrokes,
     promptSubmitDelayMs,
@@ -69,6 +70,12 @@ describe("replaySessionState", () => {
         expect(isSessionOver(replaySessionState([{ kind: "session.end" }]))).toBe(true);
         expect(isSessionListening("idle")).toBe(true);
         expect(isSessionListening("working")).toBe(false);
+    });
+
+    it("does not count an agent waiting on a permission prompt as listening", () => {
+        expect(isSessionListening("waiting")).toBe(false);
+        expect(isSessionAsking("waiting")).toBe(true);
+        expect(isSessionAsking("idle")).toBe(false);
     });
 });
 

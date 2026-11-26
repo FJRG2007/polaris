@@ -241,6 +241,8 @@ export function askDecision(
     const said = askAnswerSchema.safeParse(answer ?? {});
     const given = said.success ? said.data : {};
     const input = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    // Denied because the person sent a message instead, which follows as one.
+    const byMessage = !!answer && typeof answer === "object" && (answer as { byMessage?: unknown }).byMessage === true;
     const out = (decision: Record<string, unknown>) => ({
         hookSpecificOutput: { hookEventName: "PreToolUse", ...decision }
     });
@@ -251,8 +253,14 @@ export function askDecision(
                 tool === "ExitPlanMode"
                     ? given.feedback
                         ? `The user wants you to keep planning: ${given.feedback}`
-                        : "The user wants you to keep planning before you change anything."
-                    : "The user skipped these questions. Carry on with your best judgment."
+                        : byMessage
+                          ? "The user wants you to keep planning and sent a new message instead."
+                          : "The user wants you to keep planning before you change anything."
+                    : given.feedback
+                      ? `The user skipped these questions and said instead: ${given.feedback}`
+                      : byMessage
+                        ? "The user skipped these questions and sent a new message instead."
+                        : "The user skipped these questions. Carry on with your best judgment."
         });
     if (tool === "AskUserQuestion")
         return out({ permissionDecision: "allow", updatedInput: { ...input, answers: given.answers ?? {} } });

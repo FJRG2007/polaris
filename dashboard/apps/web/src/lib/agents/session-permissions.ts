@@ -18,7 +18,7 @@ import { z } from "zod";
 import { prisma, type Prisma } from "@polaris/db";
 import { normalizeHookEvent } from "./session-hooks";
 import { touchSession, subscribeSession } from "./session-live";
-import { askAnswerSchema, storedAsk, type SessionAsk } from "./session-asks";
+import { askAnswerSchema, storedAsk, MAX_ANSWER_CHARS, type SessionAsk } from "./session-asks";
 
 /** How long the hook waits for an answer. The hook's own curl and Claude's
  *  timeout for it are a little longer (see session-hooks), so the server is
@@ -36,6 +36,23 @@ export const permissionAnswerSchema = z.object({
     /** For a question or a plan: what was chosen or typed (session-asks). */
     answer: askAnswerSchema.optional()
 });
+
+/** The most of a typed message a denial carries back to the agent: what a
+ *  question's or a plan's feedback holds, so the same row reads for both. */
+export const DENIAL_REASON_MAX = MAX_ANSWER_CHARS;
+
+/**
+ * What the agent is told when a request is denied: the person's own words when
+ * the denial came from a message they sent instead (Claude Code's "No, and tell
+ * Claude what to do differently"), else the plain refusal. Pure.
+ */
+export function denialMessage(answer: unknown): string {
+    const given = answer && typeof answer === "object" ? (answer as { feedback?: unknown; byMessage?: unknown }) : {};
+    const reason = typeof given.feedback === "string" ? given.feedback.trim() : "";
+    if (reason) return `The user declined this and said instead: ${reason}`;
+    if (given.byMessage === true) return "The user declined this and sent a new message instead.";
+    return "Denied from Polaris by the session owner.";
+}
 
 /** The kinds of event after which a prompt is no longer the one on screen. */
 const SETTLING_KINDS = new Set(["prompt", "turn.end", "turn.failed", "session.end", "session.clear"]);
@@ -87,14 +104,15 @@ const ALWAYS_TYPES = new Set(["addRules", "addDirectories"]);
 export function hookDecision(
     status: PermissionStatus,
     tool: string,
-    suggestions: unknown
+    suggestions: unknown,
+    answer: unknown = null
 ): Record<string, unknown> {
     if (status === "pending" || status === "expired") return {};
     if (status === "deny") {
         return {
             hookSpecificOutput: {
                 hookEventName: "PermissionRequest",
-                decision: { behavior: "deny", message: "Denied from Polaris by the session owner." }
+                decision: { behavior: "deny", message: denialMessage(answer) }
             }
         };
     }
@@ -134,6 +152,10 @@ export async function openPermissionRequest(
         suggestions: Prisma.InputJsonValue | null;
         /** A question's or a plan's input, echoed back with the answer. */
         input?: Prisma.InputJsonValue | null;
+        /** Whether a denial's reason reaches the agent in the turn it is on:
+         *  a hook's deny message or a Polaris tool's result does, an ACP
+         *  prompt's reject option does not. */
+        carriesReason?: boolean;
     }
 ): Promise<string> {
     await prisma.agentPermissionRequest.updateMany({
@@ -146,7 +168,8 @@ export async function openPermissionRequest(
             tool: request.tool || "tool",
             detail: request.detail,
             ...(request.suggestions !== null ? { suggestions: request.suggestions } : {}),
-            ...(request.input ? { input: request.input } : {})
+            ...(request.input ? { input: request.input } : {}),
+            ...(request.carriesReason ? { carriesReason: true } : {})
         },
         select: { id: true }
     });
@@ -295,4 +318,37 @@ export async function answerPermission(
     });
     if (now?.status === choice) return { ok: true, status: choice };
     return { ok: false, reason: now?.status === "expired" ? "expired" : "answered" };
+}
+
+/**
+ * Deny every request still open on a session because its owner sent a message
+ * instead. The message reaches the agent once: as the reason, where the
+ * request carries one back into the turn the agent is on (`carriesReason`) and
+ * the message has no files a reason cannot hold, else as a new message the
+ * caller sends - the denial then says only that one is coming. `carried` is
+ * how many took the message as their reason; when it is above 0 the caller
+ * sends nothing more. Conditional on `pending`, so an answer that landed first
+ * stands.
+ */
+export async function denyPendingFor(
+    sessionId: string,
+    userId: string,
+    reason: string,
+    options: { withFiles?: boolean } = {}
+): Promise<{ denied: number; carried: number }> {
+    const feedback = options.withFiles ? "" : reason.trim().slice(0, DENIAL_REASON_MAX);
+    const answered = { status: "deny", answeredById: userId, answeredAt: new Date() };
+    const [carried, plain] = await prisma.$transaction([
+        prisma.agentPermissionRequest.updateMany({
+            where: { sessionId, status: "pending", carriesReason: true },
+            data: { ...answered, answer: feedback ? { feedback } : { byMessage: true } }
+        }),
+        prisma.agentPermissionRequest.updateMany({
+            where: { sessionId, status: "pending" },
+            data: { ...answered, answer: { byMessage: true } }
+        })
+    ]);
+    const denied = carried.count + plain.count;
+    if (denied > 0) touchSession(sessionId);
+    return { denied, carried: feedback ? carried.count : 0 };
 }

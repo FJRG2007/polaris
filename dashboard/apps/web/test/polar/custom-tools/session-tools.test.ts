@@ -5,10 +5,11 @@ const perms = vi.hoisted(() => ({ open: vi.fn(), wait: vi.fn() }));
 const offer = vi.hoisted(() => ({ sandboxTools: vi.fn() }));
 
 vi.mock("@polaris/db", () => ({ prisma: { agentPermissionRequest: { findFirst: db.findFirst } } }));
-vi.mock("@/lib/agents/session-permissions", () => ({
+vi.mock("@/lib/agents/session-permissions", async (actual) => ({
     PERMISSION_WAIT_MS: 120_000,
     openPermissionRequest: perms.open,
-    awaitPermission: perms.wait
+    awaitPermission: perms.wait,
+    denialMessage: (await actual<typeof import("@/lib/agents/session-permissions")>()).denialMessage
 }));
 vi.mock("@/lib/agents/agent-notices", () => ({ pushPermissionRequest: vi.fn(async () => undefined) }));
 vi.mock("@/lib/polar/custom-tools/runtime", () => ({ sandboxTools: offer.sandboxTools }));
@@ -77,11 +78,19 @@ describe("prepareSessionCall", () => {
         expect(perms.open).toHaveBeenCalledWith("s1", {
             tool: shared.turnToolName("greet"),
             detail: 'greet {"who":"Ana"}',
-            suggestions: null
+            suggestions: null,
+            carriesReason: true
         });
         perms.wait.mockResolvedValue({ status: "allow" });
         const allowed = await sessionTools.prepareSessionCall(SESSION, "greet", { who: "Ana" });
         expect(allowed).toMatchObject({ ok: true, timeoutSeconds: 60 });
+    });
+
+    it("hands the agent the words of a message that denied it", async () => {
+        offer.sandboxTools.mockResolvedValue({ tools: [{ definition: tool("ask"), fromProject: false, asks: true }], unavailable: [] });
+        perms.wait.mockResolvedValue({ status: "deny", answer: { feedback: "greet Bea instead" } });
+        const denied = await sessionTools.prepareSessionCall(SESSION, "greet", { who: "Ana" });
+        expect(denied).toEqual({ ok: false, refusal: "The user declined this and said instead: greet Bea instead" });
     });
 
     it("does not ask again after an always for that tool", async () => {

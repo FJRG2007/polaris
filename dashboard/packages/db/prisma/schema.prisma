@@ -19033,6 +19033,10 @@ model AgentPermissionRequest {
     // AskUserQuestion input, or the plan), and what they answered with.
     input       Json?
     answer      Json?
+    // Whether a denial's reason reaches the agent in the turn it is on (a
+    // hook's deny message, a Polaris tool's result). False for an ACP prompt,
+    // whose reject option carries no words.
+    carriesReason Boolean @default(false)
     // pending | allow | deny | always | expired
     status      String    @default("pending")
     answeredById String?  @db.Uuid
