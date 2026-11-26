@@ -20,6 +20,7 @@
 
 import { auth } from "@/lib/auth";
 import * as keys from "./account-keys";
+import * as recovery from "./recovery-service";
 import { passwordLockEnabled, sealedChatServed } from "./flag";
 import { NextResponse } from "next/server";
 import * as opaque from "./opaque-service";
@@ -182,8 +183,17 @@ export async function handleSignIn(request: Request): Promise<Response> {
                 // answered, and the password lock is sealed from the unlock.
                 return json({ verified });
             }
+            case "recovery-state":
+            case "put-recovery-shares":
+            case "recovery-own":
+            case "recovery-open":
+            case "recovery-inbox":
+            case "recovery-approve":
+            case "recovery-complete":
+                return await recoveryOp(user.id, body);
         }
     } catch (caught) {
+        if (caught instanceof recovery.RecoveryRefusal) return json({ error: caught.code }, 409);
         if (caught instanceof opaque.OpaqueRefusal) return json(REFUSED, 401);
         console.error("polaris: an end-to-end encryption sign-in step failed:", caught);
         return json(REFUSED, 401);
@@ -357,5 +367,78 @@ export async function handleKeys(request: Request): Promise<Response> {
         if (caught instanceof opaque.OpaqueRefusal) return json(REFUSED, 401);
         console.error("polaris: an end-to-end encryption key step failed:", caught);
         return json(REFUSED, 401);
+    }
+}
+
+type RecoveryBody = Extract<
+    KeysBody,
+    { op: "recovery-state" | "put-recovery-shares" | "recovery-own" | "recovery-open" | "recovery-inbox" | "recovery-approve" | "recovery-complete" }
+>;
+
+/** The quorum recovery ops, each scoped to the signed-in account. */
+async function recoveryOp(userId: string, body: RecoveryBody): Promise<NextResponse> {
+    switch (body.op) {
+        case "recovery-state": {
+            const state = await recovery.recoveryState(userId);
+            return json({
+                ...state,
+                custodians: state.custodians.map((c) => ({ userId: c.userId, akVersion: c.akVersion, hpkePublicKey: text(c.hpkePublicKey) }))
+            });
+        }
+        case "put-recovery-shares":
+            await recovery.putShares(userId, {
+                ...body,
+                shares: body.shares.map((share) => ({ ...share, envelope: bytes(share.envelope) }))
+            });
+            return json({ stored: true });
+        case "recovery-own": {
+            const { request, eligible } = await recovery.ownRequest(userId);
+            return json({
+                eligible,
+                request: request && {
+                    id: request.id,
+                    status: request.status,
+                    akVersion: request.akVersion,
+                    threshold: request.threshold,
+                    requesterKey: text(request.requesterKey),
+                    expiresAt: request.expiresAt.toISOString(),
+                    approvals: request.approvals.length,
+                    // The shares only once the quorum is met; they open for this browser alone.
+                    released:
+                        request.status === "released"
+                            ? request.approvals.map((a) => ({ custodianId: a.custodianId, envelope: text(a.envelope) }))
+                            : []
+                }
+            });
+        }
+        case "recovery-open": {
+            const refusal = await limited([[`e2ee-recovery:${userId}`, PER_ACCOUNT]]);
+            if (refusal) return refusal;
+            return json({ requestId: await recovery.openRequest(userId, bytes(body.requesterKey)) });
+        }
+        case "recovery-inbox": {
+            const inbox = await recovery.custodianInbox(userId);
+            return json({
+                requests: inbox.map((item) => ({
+                    id: item.id,
+                    ownerId: item.userId,
+                    ownerName: item.share.owner.name,
+                    ownerEmail: item.share.owner.email,
+                    akVersion: item.akVersion,
+                    splitId: item.splitId,
+                    threshold: item.threshold,
+                    requesterKey: text(item.requesterKey),
+                    custodianAkVersion: item.share.custodianAkVersion,
+                    envelope: text(item.share.envelope),
+                    createdAt: item.createdAt.toISOString(),
+                    expiresAt: item.expiresAt.toISOString()
+                }))
+            });
+        }
+        case "recovery-approve":
+            return json(await recovery.approveRequest(userId, body.requestId, bytes(body.envelope)));
+        case "recovery-complete":
+            await recovery.completeRequest(userId, body.requestId);
+            return json({ completed: true });
     }
 }

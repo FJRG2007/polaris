@@ -57,6 +57,9 @@ export const signInBody = z.discriminatedUnion("op", [
 ]);
 export type SignInBody = z.infer<typeof signInBody>;
 
+/** A share sealed to an account or to a request key: a hybrid envelope of 33 bytes, about 1.6k as text. */
+const recoveryEnvelope = z.string().min(1500).max(2048).regex(BASE64URL);
+
 export const keysBody = z.discriminatedUnion("op", [
     z.object({ op: z.literal("state") }),
     z.object({
@@ -83,7 +86,26 @@ export const keysBody = z.discriminatedUnion("op", [
         registrationRecord: opaqueMessage,
         ksfVersion: z.union([z.literal(1), z.literal(2)]),
         startLoginRequest: opaqueMessage
-    })
+    }),
+    // Quorum recovery (recovery-service.ts): keep the shares current, raise a
+    // request, approve one as a custodian, close one.
+    z.object({ op: z.literal("recovery-state") }),
+    z.object({
+        op: z.literal("put-recovery-shares"),
+        akVersion,
+        splitId: z.string().uuid(),
+        threshold: z.number().int().min(1).max(3),
+        scope: z.string().regex(/^(instance|org:[0-9a-f-]{36})$/),
+        shares: z
+            .array(z.object({ custodianId: z.string().uuid(), custodianAkVersion: akVersion, envelope: recoveryEnvelope }))
+            .min(1)
+            .max(3)
+    }),
+    z.object({ op: z.literal("recovery-own") }),
+    z.object({ op: z.literal("recovery-open"), requesterKey: z.string().length(1622).regex(BASE64URL) }),
+    z.object({ op: z.literal("recovery-inbox") }),
+    z.object({ op: z.literal("recovery-approve"), requestId: z.string().uuid(), envelope: recoveryEnvelope }),
+    z.object({ op: z.literal("recovery-complete"), requestId: z.string().uuid() })
 ]);
 export type KeysBody = z.infer<typeof keysBody>;
 
