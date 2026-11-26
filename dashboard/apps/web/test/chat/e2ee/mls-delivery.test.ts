@@ -137,11 +137,11 @@ describe("/api/e2ee/mls", () => {
 
     it("tells a Polaris app too old for sealed chat to update, and gives it no device", async () => {
         const oldAndroid = "Mozilla/5.0 (Linux; Android 14; wv) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36 PolarisMobile/0.1.14 (Android)";
-        const refused = await call({ op: "register-device", device: "d-old", signatureKey: blob(7, 32), e2eeVersion: 1 }, ALICE, oldAndroid);
+        const refused = await call({ op: "register-device", device: "old-phone", signatureKey: blob(7, 32), e2eeVersion: 1 }, ALICE, oldAndroid);
         expect(refused).toEqual({ status: 426, body: { error: "updateApp", app: "android", minimum: "0.1.15" } });
         expect(state.tables.mlsDevice ?? []).toHaveLength(0);
         const current = oldAndroid.replace("0.1.14", "0.1.15");
-        expect((await call({ op: "register-device", device: "d-new", signatureKey: blob(7, 32), e2eeVersion: 1 }, ALICE, current)).status).toBe(200);
+        expect((await call({ op: "register-device", device: "new-phone", signatureKey: blob(7, 32), e2eeVersion: 1 }, ALICE, current)).status).toBe(200);
     });
 
     it("orders commits by epoch: the second commit for the same epoch is refused, not forked", async () => {
