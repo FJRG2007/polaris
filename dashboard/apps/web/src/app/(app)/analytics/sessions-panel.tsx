@@ -181,21 +181,6 @@ function Flag({ code }: { code: string | null }) {
     );
 }
 
-/** DB-IP's licence asks for a link wherever a country it placed is shown. */
-function GeoCredit() {
-    const t = useTranslations("analytics");
-    return (
-        <a
-            href="https://db-ip.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-foreground-subtle hover:text-muted-foreground hover:underline"
-        >
-            {t("map.attribution")}
-        </a>
-    );
-}
-
 // --- the screen --------------------------------------------------------------------
 
 export function SessionsPanel(props: PanelProps) {
@@ -461,9 +446,6 @@ function SessionsTable(props: PanelProps & { hrefFor: (id: string | null) => str
             {list.paging && list.items ? <Skeleton className="h-10 w-full" aria-label={t("sessions.loadingMore")} /> : null}
             {list.error ? <Failure message={list.error} /> : null}
             {list.more ? <LoadMore loading={list.paging} label={t("sessions.more")} onMore={list.loadMore} /> : null}
-            <div className="flex justify-end">
-                <GeoCredit />
-            </div>
         </div>
     );
 }
@@ -737,9 +719,6 @@ function ProfileInfo({
                         {t("sessions.ofAddress")}
                     </Button>
                 ) : null}
-                <span className="ms-auto">
-                    <GeoCredit />
-                </span>
             </div>
         </div>
     );

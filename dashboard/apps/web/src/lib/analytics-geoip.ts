@@ -3,10 +3,9 @@
  * server - so the map fills in for every site, including the ones counted only from
  * the edge log, and no visitor's address is ever sent anywhere to be looked up.
  *
- * The database is DB-IP's "IP to Country Lite" (CC BY 4.0, monthly; the screens
- * that show its answers credit it). Polaris fetches it on its own the first time a
- * visit needs it and again when it is a month old, into the data folder, so there
- * is nothing to install and nothing to configure. Until the first copy has arrived
+ * The database is DB-IP's "IP to Country Lite" (CC BY 4.0, monthly). Polaris fetches
+ * it on its own the first time a visit needs it and again when it is a month old,
+ * into the data folder, so there is nothing to install and nothing to configure. Until the first copy has arrived
  * - or on a server that cannot reach the internet - a visit falls back to the time
  * zone the tracker reports, exactly as before.
  *

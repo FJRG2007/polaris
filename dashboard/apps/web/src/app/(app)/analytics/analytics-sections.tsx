@@ -461,16 +461,10 @@ export function WorldMap({ rows, unavailable = false }: { rows: readonly core.Vi
             />
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span className="min-w-0 truncate">{rows.length === 0 ? t("breakdowns.noCountries") : t("map.hint")}</span>
-                <span className="flex shrink-0 items-center gap-3">
-                    <span className="flex items-center gap-1.5">
-                        {t("map.fewer")}
-                        <span aria-hidden className="h-2 w-16 rounded-full bg-gradient-to-r from-primary/25 to-primary" />
-                        {t("map.more")}
-                    </span>
-                    {/* DB-IP's licence asks for this link wherever its answers are shown. */}
-                    <a href="https://db-ip.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline">
-                        {t("map.attribution")}
-                    </a>
+                <span className="flex shrink-0 items-center gap-1.5">
+                    {t("map.fewer")}
+                    <span aria-hidden className="h-2 w-16 rounded-full bg-gradient-to-r from-primary/25 to-primary" />
+                    {t("map.more")}
                 </span>
             </div>
         </div>

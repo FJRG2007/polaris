@@ -351,7 +351,6 @@
         "title": "Visitas por país",
         "visitors": "{count} visitas",
         "hint": "Ubicado por la IP de cada visita. Elige un país.",
-        "attribution": "Ubicación IP: DB-IP",
         "fewer": "Menos",
         "more": "Más"
     },
