@@ -632,5 +632,29 @@
         "waiting": "Esperando a que pulses Iniciar en Telegram...",
         "expired": "Ese enlace ha caducado. Empieza de nuevo.",
         "failed": "No se pudo empezar a vincular. Reinténtalo."
+    },
+    "chatRecovery": {
+        "title": "Recuperación del chat cifrado",
+        "loading": "Comprobando quién puede recuperar tu cuenta.",
+        "org": "Tu organización puede recuperar tu cuenta ({threshold} de {count} administradores) si olvidas la contraseña y pierdes todos tus dispositivos.",
+        "instance": "Los administradores de la instancia pueden recuperar tu cuenta ({threshold} de {count}) si olvidas la contraseña y pierdes todos tus dispositivos.",
+        "pending": "La recuperación se configura la próxima vez que abras tus chats cifrados en este dispositivo.",
+        "nobody": "Nadie puede recuperar tu cuenta todavía: ningún administrador tiene el chat cifrado configurado.",
+        "on": "Activada",
+        "start": "Recuperar chats cifrados",
+        "refused": "No se pudo iniciar la recuperación. Necesita una recuperación de cuenta aprobada por un administrador en los últimos 7 días.",
+        "waiting": "Código {code}. Díselo a tus administradores cuando te lo pidan. Aprobaciones: {approvals} de {threshold}.",
+        "recovered": "Tus chats cifrados vuelven a estar en este dispositivo.",
+        "failed": "La clave recuperada no coincide con tu cuenta. Pide a tus administradores una solicitud nueva.",
+        "soleCustodian": "Eres el único administrador que puede recuperar {count, plural, one {# cuenta} other {# cuentas}}. Añade un segundo administrador para que la recuperación no dependa de una sola persona.",
+        "inboxTitle": "{name} pide recuperar sus chats cifrados",
+        "inboxBody": "{email}. Deben aprobarlo {threshold} administradores.",
+        "review": "Revisar",
+        "confirmTitle": "Aprobar la recuperación",
+        "confirmBody": "Pide a {name} el código de su pantalla, por teléfono o en persona. Aprueba solo si coincide con este.",
+        "cancel": "Cancelar",
+        "confirm": "Coinciden, aprobar",
+        "approved": "Aprobado. La cuenta recupera sus chats cuando aprueben suficientes administradores.",
+        "approveFailed": "No se pudo aprobar. Abre antes tus chats cifrados en este dispositivo y vuelve a intentarlo."
     }
 }

@@ -34,6 +34,7 @@ import { SuccessorCard, type SuccessorPerson } from "./successor-card";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
 import { Feedback, SettingCard, type SettingLock } from "./setting-card";
 import { LockdownCard } from "./lockdown-card";
+import { ChatRecoveryCard } from "./chat-recovery-card";
 import { SessionBindingCard } from "./session-binding-card";
 import type { AccountStanding } from "@/lib/account-lifecycle";
 import { setNewDeviceGraceAction, updateSessionLimitsAction } from "./actions";
@@ -454,6 +455,8 @@ export function SecurityView({
             {part === "recovery" ? <SuccessorCard successor={successor} lock={lock} /> : null}
             {/* Last, because it is the end of the page: the emergency switch and
                 the two ways out, with nothing under them. */}
+            {signIn ? <ChatRecoveryCard /> : null}
+
             {signIn ? <LockdownCard standing={standing} lock={lock} /> : null}
 
             <ChangePasswordDialog open={dialog === "password"} onOpenChange={(open) => !open && close()} />

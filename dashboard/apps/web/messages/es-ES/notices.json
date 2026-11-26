@@ -84,7 +84,15 @@
         "account_oauth_ip_rule_changed": "Se ha cambiado desde dónde puede conectarse un asistente de IA",
         "account_oauth_network_exception_changed": "Se ha cambiado la excepción a las reglas de red de tu cuenta en un asistente de IA conectado",
         "account_oauth_replay_detected": "Se ha desconectado un asistente porque su token se usó dos veces",
-        "advice": "Si no has sido tú, cambia tu contraseña y cierra la sesión en todos los demás dispositivos."
+        "advice": "Si no has sido tú, cambia tu contraseña y cierra la sesión en todos los demás dispositivos.",
+        "chat_recovery_requested": "Alguien ha pedido recuperar tus chats cifrados",
+        "chat_recovery_requested_body": "Tus administradores deben aprobarlo. Si no has sido tú, avísales y cambia la contraseña.",
+        "chat_recovery_waiting": "Una recuperación de cuenta espera tu aprobación",
+        "chat_recovery_waiting_body": "Compara el código con la persona antes de aprobarla en la página de seguridad.",
+        "chat_recovery_approved": "Un administrador ha aprobado recuperar tus chats cifrados",
+        "chat_recovery_approved_body": "Si no lo has pedido tú, avisa ahora a tus administradores.",
+        "chat_recovery_completed": "Tus chats cifrados se han recuperado en un dispositivo nuevo",
+        "chat_recovery_completed_body": "Lo aprobaron tus administradores. Si no has sido tú, cierra todas las sesiones en la página de sesiones."
     },
     "friends": {
         "somebody": "Alguien",

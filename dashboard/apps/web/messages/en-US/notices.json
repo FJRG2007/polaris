@@ -84,7 +84,15 @@
         "account_oauth_ip_rule_changed": "Where a connected AI assistant may connect from was changed",
         "account_oauth_network_exception_changed": "An exception to your account's network rules was changed on a connected AI assistant",
         "account_oauth_replay_detected": "A connected assistant was disconnected because its token was used twice",
-        "advice": "If this was not you, change your password and sign out every other device."
+        "advice": "If this was not you, change your password and sign out every other device.",
+        "chat_recovery_requested": "Someone asked to recover your encrypted chats",
+        "chat_recovery_requested_body": "Your administrators must approve it. If it was not you, tell them and change your password.",
+        "chat_recovery_waiting": "An account recovery waits for your approval",
+        "chat_recovery_waiting_body": "Compare the code with the person before you approve it on the security page.",
+        "chat_recovery_approved": "An administrator approved recovering your encrypted chats",
+        "chat_recovery_approved_body": "If you did not ask for this, tell your administrators now.",
+        "chat_recovery_completed": "Your encrypted chats were recovered on a new device",
+        "chat_recovery_completed_body": "Your administrators approved it. If it was not you, end every session on the sessions page."
     },
     "friends": {
         "somebody": "Somebody",

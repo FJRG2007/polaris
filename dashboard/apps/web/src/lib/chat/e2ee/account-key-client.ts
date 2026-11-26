@@ -31,6 +31,7 @@ import * as keyLog from "@/lib/chat/e2ee/key-log-client";
 import * as passwordWorker from "@/lib/chat/e2ee/password-worker-client";
 import { platformSealedStore } from "@polaris/chat-crypto/platform-store";
 import { platformKeyWrap } from "@/lib/chat/e2ee/platform-key-wrap";
+import * as recoveryClient from "@/lib/chat/e2ee/recovery-client";
 
 const ROUTE = "/api/e2ee/keys";
 /** The first key version of an account. Rotation is a later phase. */
@@ -214,6 +215,7 @@ export async function deviceAccountHpke(): Promise<{ hpkePublicKey: Uint8Array; 
     if (!held) return null;
     try {
         const [published, pair] = await Promise.all([account.accountPublicKeys(held.accountKey), account.accountHpkeKeyPair(held.accountKey)]);
+        void recoveryClient.refreshShares(state!.userId, Uint8Array.from(held.accountKey), held.akVersion);
         return { hpkePublicKey: published.hpkePublicKey, hpkePrivateKey: pair.privateKey };
     } finally {
         held.accountKey.fill(0);
@@ -222,6 +224,20 @@ export async function deviceAccountHpke(): Promise<{ hpkePublicKey: Uint8Array; 
 
 async function keepOnDevice(userId: string, held: HeldKey): Promise<void> {
     await deviceLock.createDeviceLock(deviceStore(), userId, held.accountKey, held.akVersion);
+    // Its own copy: the caller zeroes held.accountKey as soon as this returns.
+    void recoveryClient.refreshShares(userId, Uint8Array.from(held.accountKey), held.akVersion);
+}
+
+/**
+ * A key rebuilt by quorum recovery (recovery-client.ts): kept on this device
+ * only when it is the key the account published and logged, exactly the check
+ * the QR hand-over makes. The caller zeroes `accountKey`.
+ */
+export async function adoptRecoveredKey(userId: string, accountKey: Uint8Array, akVersion: number): Promise<boolean> {
+    const keys = await account.accountPublicKeys(accountKey);
+    if (!(await publishedKeyVerifier().verify(userId, akVersion, keys))) return false;
+    await keepOnDevice(userId, { accountKey, akVersion });
+    return true;
 }
 
 /** This browser's copy, only when it is still the account's published key. */
