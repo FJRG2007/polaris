@@ -9,31 +9,45 @@
  * The preview follows the widget's rules in `clients/desktop/src/shared/voice-widget.ts`:
  * who is listed, when a name shows, how many rows before "and N more", the
  * opacity it has while locked, and the quick actions while they are clickable.
+ * Faces are the same `Avatar` a call draws - initials underneath, the picture
+ * over them - with the viewer first, as their own face in a real call.
  */
 
 import { useState } from "react";
 import * as core from "@polaris/core/app-settings";
 import type { PolarisDesktop } from "@/lib/desktop-bridge";
+import { Avatar } from "@/components/avatar";
+import { useSessionViewer } from "@/components/session-scope";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { HeadphoneOff, Headphones, Mic, MicOff, PhoneOff } from "lucide-react";
 import { Button, Card, CardBody, ControlSlider, Switch, cn, useToast } from "@polaris/ui";
 
-/** The sample call drawn in the preview: fixture people, one talking, one muted, one deafened. */
-const SAMPLE = [
-    { id: "a", speaking: true, muted: false, deafened: false, hue: 210 },
-    { id: "b", speaking: false, muted: true, deafened: false, hue: 262 },
-    { id: "c", speaking: false, muted: false, deafened: false, hue: 330 },
-    { id: "d", speaking: false, muted: true, deafened: true, hue: 20 },
-    { id: "e", speaking: true, muted: false, deafened: false, hue: 150 },
-    { id: "f", speaking: false, muted: false, deafened: false, hue: 45 }
+/**
+ * The sample call drawn in the preview: fixture people, one talking, one muted,
+ * one deafened. Most have a bundled illustration for a picture, as most people
+ * in a real call do; two keep their initials so the face with none shows too.
+ */
+export const SAMPLE = [
+    { id: "a", speaking: true, muted: false, deafened: false, picture: "/voice-widget/sample-a.svg" },
+    { id: "b", speaking: false, muted: true, deafened: false, picture: null },
+    { id: "c", speaking: false, muted: false, deafened: false, picture: "/voice-widget/sample-c.svg" },
+    { id: "d", speaking: false, muted: true, deafened: true, picture: "/voice-widget/sample-d.svg" },
+    { id: "e", speaking: true, muted: false, deafened: false, picture: "/voice-widget/sample-e.svg" },
+    { id: "f", speaking: false, muted: false, deafened: false, picture: null }
 ] as const;
 
-/** Up to two letters for a face, as the widget draws one with no picture. */
-function initials(name: string): string {
-    const words = name.trim().split(/\s+/).filter(Boolean);
-    if (words.length === 0) return "?";
-    const letters = words.length === 1 ? [...words[0]!].slice(0, 2) : [[...words[0]!][0], [...words[words.length - 1]!][0]];
-    return letters.join("").toUpperCase();
+/** The widget's face sizes (`ROW_METRICS` in the desktop app's voice widget). */
+const FACE = { large: 32, small: 22 } as const;
+
+interface PreviewPerson {
+    readonly key: string;
+    /** The account behind the face, null for a sample (no picture is asked for). */
+    readonly id: string | null;
+    readonly name: string;
+    readonly picture: string | null;
+    readonly speaking: boolean;
+    readonly muted: boolean;
+    readonly deafened: boolean;
 }
 
 /** How many rows are drawn: the chosen number, or everybody when Off. */
@@ -44,8 +58,17 @@ export function previewRows(people: number, maxUsers: number): { shown: number; 
 
 export function VoiceWidgetPreview({ snapshot }: { snapshot: core.AppSettingsSnapshot }) {
     const t = useTranslations("appSettings");
+    const viewer = useSessionViewer();
     const large = snapshot.voiceWidgetAvatars === "large";
-    const listed = SAMPLE.filter((person) => snapshot.voiceWidgetPeople === "always" || person.speaking);
+    const people: PreviewPerson[] = [
+        // The viewer's own face, from the session the page already has: the
+        // picture is the same address every other face of theirs loads.
+        ...(viewer
+            ? [{ key: "viewer", id: viewer.id, name: viewer.name, picture: null, speaking: false, muted: false, deafened: false }]
+            : []),
+        ...SAMPLE.map((person) => ({ ...person, key: person.id, id: null, name: t(`overlay.people.${person.id}`) }))
+    ];
+    const listed = people.filter((person) => snapshot.voiceWidgetPeople === "always" || person.speaking);
     const { shown, more } = previewRows(listed.length, snapshot.voiceWidgetMaxUsers);
     const actions = snapshot.overlayQuickActions && snapshot.overlayClickable;
     const right = snapshot.voiceWidgetCorner.endsWith("right");
@@ -71,23 +94,22 @@ export function VoiceWidgetPreview({ snapshot }: { snapshot: core.AppSettingsSna
                         style={{ opacity: Number(snapshot.voiceWidgetOpacity) / 100 }}
                     >
                         {listed.slice(0, shown).map((person) => {
-                            const name = t(`overlay.people.${person.id}`);
+                            const name = person.name;
                             const named =
                                 snapshot.voiceWidgetNames === "always" ||
                                 (snapshot.voiceWidgetNames === "speaking" && person.speaking);
                             return (
-                                <div key={person.id} className="flex min-w-0 items-center gap-2">
-                                    <span
-                                        title={named ? undefined : name}
+                                <div key={person.key} className="flex min-w-0 items-center gap-2">
+                                    <Avatar
+                                        person={{ id: person.id, name, image: person.picture }}
+                                        size={large ? FACE.large : FACE.small}
+                                        // As the widget does: the mute mark on the face when no plate shows.
+                                        callBadge={named ? null : person.deafened ? "deafened" : person.muted ? "muted" : null}
                                         className={cn(
-                                            "flex shrink-0 items-center justify-center rounded-full font-medium text-white",
-                                            large ? "size-8 text-xs" : "size-5 text-[0.625rem]",
-                                            person.speaking && "ring-2 ring-success ring-offset-1 ring-offset-background"
+                                            "transition-shadow duration-fast",
+                                            person.speaking && "ring-2 ring-success"
                                         )}
-                                        style={{ background: `hsl(${person.hue} 55% 45%)` }}
-                                    >
-                                        {initials(name)}
-                                    </span>
+                                    />
                                     {named && (
                                         <span className="flex min-w-0 items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-xs">
                                             <span className="truncate" title={name}>{name}</span>

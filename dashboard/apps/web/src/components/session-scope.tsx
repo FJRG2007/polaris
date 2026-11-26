@@ -13,13 +13,36 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 const SessionScopeContext = createContext("");
+const SessionNameContext = createContext("");
 
-export function SessionScopeProvider({ userId, children }: { userId: string; children: ReactNode }) {
-    return <SessionScopeContext.Provider value={userId}>{children}</SessionScopeContext.Provider>;
+export function SessionScopeProvider({
+    userId,
+    name = "",
+    children
+}: {
+    userId: string;
+    /** The signed-in account's display name, for a screen that draws the
+     *  viewer's own face (the voice widget preview) without asking for it. */
+    name?: string;
+    children: ReactNode;
+}) {
+    return (
+        <SessionScopeContext.Provider value={userId}>
+            <SessionNameContext.Provider value={name}>{children}</SessionNameContext.Provider>
+        </SessionScopeContext.Provider>
+    );
 }
 
 /** The signed-in account's id. Empty outside a provider, which keeps a component
  *  rendered on its own working - it simply shares nothing with other tabs. */
 export function useSessionScope(): string {
     return useContext(SessionScopeContext);
+}
+
+/** The signed-in account as a face draws it, from what the page already holds;
+ *  null outside a provider. */
+export function useSessionViewer(): { id: string; name: string } | null {
+    const id = useContext(SessionScopeContext);
+    const name = useContext(SessionNameContext);
+    return id ? { id, name } : null;
 }

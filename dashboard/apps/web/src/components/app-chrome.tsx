@@ -266,7 +266,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                     the server rendered and nothing else - see `shelf-scope`. */}
                 <ShelfScopeProvider shelf={shelfKey(scope.org?.id ?? null)}>
                     <DisplayFormatProvider preferences={display}>
-                        <SessionScopeProvider userId={user.id}>
+                        <SessionScopeProvider userId={user.id} name={user.name}>
                             <ChatUnreadProvider
                                 initial={chatUnread}
                                 enabled={apps.ids.includes("chat")}
