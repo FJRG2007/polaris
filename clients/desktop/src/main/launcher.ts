@@ -44,7 +44,9 @@ import { runningPrograms } from "./game-detect";
 import { quickAnswer } from "@/shared/quick-answer";
 import type { LauncherStatus } from "@/shared/bridge";
 import { takeFocus } from "./window-front";
-import { installedApps, installedAppsRead, listedApps, openListedApp } from "./launcher-apps";
+import { installedApps, installedAppsRead, listedApps, openListedApp, type InstalledApp } from "./launcher-apps";
+import { gameExe, iconCandidates, PICTURE_FILE } from "./launcher-icons";
+import { readdir, stat } from "node:fs/promises";
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipEntry } from "@/shared/clipboard-history";
 import { DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator } from "@/shared/launcher-hotkey";
 import { conflictSentence, findLaunchers, likelyHolders, type FoundLauncher } from "@/shared/launcher-conflicts";
@@ -99,8 +101,8 @@ let actions = new Map<string, () => void>();
 /** The usage key of each row listed last that is ranked by use (see `launcher-usage`), by its id. */
 let useKeys = new Map<string, string>();
 /** The program behind each app row listed last, for its icon. */
-let appPaths = new Map<string, string>();
-/** Program icons already asked of the system, by path. Bounded by the list of installed programs. */
+let appPaths = new Map<string, InstalledApp>();
+/** Program icons already worked out, by the program's `path`. Bounded by the list of installed programs. */
 const appIcons = new Map<string, string | null>();
 /** The instance whose `/launcher` page the window shows, or null for the window's own panel. */
 let remote: string | null = null;
@@ -235,7 +237,7 @@ export function followClipboardKeep(): void {
 function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     const query = text.trim();
     const next = new Map<string, () => void>();
-    const paths = new Map<string, string>();
+    const paths = new Map<string, InstalledApp>();
     const keys = new Map<string, string>();
     const rows: LauncherRow[] = [];
     const add = (row: Omit<LauncherRow, "id">, action: () => void, useKey?: string) => {
@@ -250,7 +252,7 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     const appKey = (app: { path: string; }) => `app:${app.path}`;
     const addApp = (app: ReturnType<typeof listedApps>[number]) => {
         add({ kind: "app", title: app.label, subtitle: appSubtitle(app) }, () => void openListedApp(app.path), appKey(app));
-        paths.set(String(rows.length - 1), app.icon ?? app.path);
+        paths.set(String(rows.length - 1), app);
     };
     const addPage = (page: { label: string; path: string; }) => add({ kind: "page", title: page.label, subtitle: "Open in Polaris" }, () => host?.showPolaris(page.path), pageKey(page));
 
@@ -396,30 +398,49 @@ function appSource(path: string): string {
     return { packaged: "Application", epic: "Epic Games", steam: "Steam", gog: "GOG", ubisoft: "Ubisoft Connect" }[store] ?? "Application";
 }
 
-/**
- * The program's own icon as a PNG data URL, asked of the system once per
- * program - or, for a picture a store keeps of its game, that picture.
- */
-async function iconOf(path: string): Promise<string | null> {
-    if (appIcons.has(path)) return appIcons.get(path) ?? null;
-    const picture = /\.(jpe?g|png)$/i.test(path);
-    const image = picture
+/** One file's picture as a PNG data URL: an image read as it is, a program's icon asked of the system. Null when it gives none. */
+async function pictureOf(path: string): Promise<string | null> {
+    const found = await stat(path).then((info) => info.isFile() || path.endsWith(".app"), () => false);
+    if (!found) return null;
+    const image = PICTURE_FILE.test(path)
         ? (() => {
-              const found = nativeImage.createFromPath(path);
-              return found.isEmpty() ? null : found.resize({ width: 32, height: 32, quality: "good" });
+              const read = nativeImage.createFromPath(path);
+              return read.isEmpty() ? null : read.resize({ width: 32, height: 32, quality: "good" });
           })()
         : await app.getFileIcon(path, { size: "normal" }).catch(() => null);
     const url = image && !image.isEmpty() ? image.toDataURL() : null;
-    appIcons.set(path, url && url.startsWith("data:image/png;base64,") && url.length < 200_000 ? url : null);
-    return appIcons.get(path) ?? null;
+    return url && url.startsWith("data:image/png;base64,") && url.length < 200_000 ? url : null;
+}
+
+/**
+ * A listed program's picture, worked out once per program: the first of its
+ * own pictures that exists (`iconCandidates`), else, for a store game, its
+ * executable's icon. Null leaves the row its kind's generic glyph.
+ */
+async function iconOf(listed: InstalledApp): Promise<string | null> {
+    if (appIcons.has(listed.path)) return appIcons.get(listed.path) ?? null;
+    let url: string | null = null;
+    for (const file of iconCandidates(listed, process.platform)) {
+        url = await pictureOf(file);
+        if (url) break;
+    }
+    const folder = listed.folder;
+    if (!url && folder) {
+        const entries = await readdir(folder, { withFileTypes: true }).catch(() => []);
+        const exes = entries.filter((entry) => entry.isFile() && /\.exe$/i.test(entry.name)).slice(0, 200).map((entry) => join(folder, entry.name));
+        const exe = gameExe(listed.label, exes);
+        if (exe) url = await pictureOf(exe);
+    }
+    appIcons.set(listed.path, url);
+    return url;
 }
 
 /** The rows with each program's icon added. */
 async function withIcons(answer: LauncherAnswer): Promise<LauncherAnswer> {
     const rows = await Promise.all(
         answer.rows.map(async (row) => {
-            const path = row.kind === "app" ? appPaths.get(row.id) : undefined;
-            return path ? { ...row, icon: await iconOf(path) } : row;
+            const listed = row.kind === "app" ? appPaths.get(row.id) : undefined;
+            return listed ? { ...row, icon: await iconOf(listed) } : row;
         })
     );
     return { ...answer, rows };

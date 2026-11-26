@@ -172,7 +172,13 @@ function Launcher() {
                                     onHover={() => setActive(position)}
                                 >
                                     <SearchItem
-                                        icon={<Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+                                        icon={
+                                            row.icon ? (
+                                                <img src={row.icon} alt="" width={18} height={18} className="size-[18px] shrink-0 object-contain" />
+                                            ) : (
+                                                <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                            )
+                                        }
                                         label={row.title}
                                         context={row.subtitle}
                                         terms={terms}

@@ -270,7 +270,8 @@ function startsWhat(program: FoundProgram): string | undefined {
 
 /**
  * Every source as one list, best source first: a program two of them list is
- * kept once, as the first one listed it, with the other names of every copy.
+ * kept once, as the first one listed it, with the other names of every copy
+ * and the first picture any of them has.
  * Two copies are one program when they start the same thing - executable,
  * launch link, packaged app - or carry the same name.
  */
@@ -285,6 +286,10 @@ export function mergePrograms<T extends FoundProgram>(sources: readonly (readonl
             const at = (target === undefined ? undefined : byTarget.get(target)) ?? byLabel.get(label);
             if (at !== undefined) {
                 const entry = kept[at]!;
+                // The copy kept is the best source to open it by, not always
+                // the one with a picture: a Steam game's Start menu `.url`
+                // has none, its store row has the game's icon.
+                if (!entry.program.icon && program.icon) entry.program = { ...entry.program, icon: program.icon };
                 for (const alias of [program.label, ...(program.aliases ?? [])]) entry.aliases.add(alias);
                 if (target && !byTarget.has(target)) byTarget.set(target, at);
                 continue;

@@ -30,6 +30,7 @@ import { app, shell } from "electron";
 import { spawn } from "node:child_process";
 import type { StoreGame } from "./game-detect";
 import { exeDescription } from "./launcher-exe-info";
+import { shortcutIcon, urlShortcutIcon } from "./launcher-icons";
 import { readFileSync, watch, type FSWatcher } from "node:fs";
 import { readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { isPackagedAppId, isVettedLaunchUri, regQuery, storeApps, type AppLaunch } from "./launcher-stores";
@@ -64,7 +65,7 @@ export const WATCH_MAX_MS = 20_000;
 const MAX_APPS = 4000;
 const MAX_DEPTH = 3;
 /** Bumped whenever what a listing holds changes, so an older one on disk is read again rather than trusted. */
-export const INDEX_VERSION = 2;
+export const INDEX_VERSION = 3;
 const MAX_INDEX_BYTES = 8 * 1024 * 1024;
 
 interface Listing {
@@ -184,20 +185,23 @@ export function isProgramShortcut(label: string): boolean {
  * own reader, which reads what the shortcut stores and does not resolve it
  * (resolving can wait on a network share); only real on Windows.
  */
-function shortcutTarget(path: string): string | null {
+function readShortcut(path: string): { target: string | null; icon: string | null; } {
     try {
-        const target = shell.readShortcutLink(path).target;
-        return target && /\.exe$/i.test(target) ? target : null;
+        const link = shell.readShortcutLink(path);
+        return { target: link.target && /\.exe$/i.test(link.target) ? link.target : null, icon: shortcutIcon(link, process.env) };
     } catch {
-        return null;
+        return { target: null, icon: null };
     }
 }
 
-/** What an Internet shortcut opens (`steam://rungameid/570`), so the store's own row and it are one program. */
-async function internetShortcutTarget(path: string): Promise<string | null> {
+/**
+ * What an Internet shortcut opens (`steam://rungameid/570`), so the store's own
+ * row and it are one program, and the `IconFile` it is drawn with.
+ */
+async function readInternetShortcut(path: string): Promise<{ target: string | null; icon: string | null; }> {
     const info = await stat(path).catch(() => null);
-    if (!info || info.size > 64 * 1024) return null;
-    return readFile(path, "utf8").then(programs.urlShortcutTarget, () => null);
+    const text = info && info.size <= 64 * 1024 ? await readFile(path, "utf8").catch(() => null) : null;
+    return text === null ? { target: null, icon: null } : { target: programs.urlShortcutTarget(text), icon: urlShortcutIcon(text, process.env) };
 }
 
 async function walk(platform: NodeJS.Platform, dir: string, depth: number, out: InstalledApp[], maxDepth = MAX_DEPTH): Promise<void> {
@@ -217,11 +221,11 @@ async function walk(platform: NodeJS.Platform, dir: string, depth: number, out: 
         const label = entry.name.replace(/\.(lnk|url|appref-ms)$/i, "");
         if (!isProgramShortcut(label)) continue;
         if (/\.lnk$/i.test(entry.name)) {
-            const target = shortcutTarget(path);
-            out.push(target ? { label, path, target, aliases: programs.exeAliases(target) } : { label, path });
+            const { target, icon } = readShortcut(path);
+            out.push({ label, path, ...(target ? { target, aliases: programs.exeAliases(target) } : {}), ...(icon ? { icon } : {}) });
         } else if (/\.url$/i.test(entry.name)) {
-            const target = await internetShortcutTarget(path);
-            out.push(target ? { label, path, target } : { label, path });
+            const { target, icon } = await readInternetShortcut(path);
+            out.push({ label, path, ...(target ? { target } : {}), ...(icon ? { icon } : {}) });
         } else {
             out.push({ label, path });
         }

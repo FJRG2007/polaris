@@ -21,6 +21,7 @@ import { z } from "zod";
 import { execFile } from "node:child_process";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { win32 } from "node:path";
+import * as icons from "./launcher-icons";
 
 /** Every path here is a Windows path from a store or the registry, whatever machine runs the code. */
 const { basename, isAbsolute, join, normalize, sep } = win32;
@@ -233,8 +234,33 @@ function vdfGet(node: Vdf | undefined, key: string): string | Vdf | undefined {
 
 // --- Store and Xbox apps -----------------------------------------------------
 
-const startAppSchema = z.object({ Name: label, AppID: z.string().regex(AUMID) });
+const startAppSchema = z.object({ Name: label, AppID: z.string().regex(AUMID), Location: z.string().max(1000).nullish() });
 const startAppsSchema = z.union([z.array(z.unknown()).max(5000), z.unknown()]);
+
+/**
+ * `Get-StartApps` with each app's package folder beside it (from
+ * `Get-AppxPackage`, joined on the family name before the `!`), so its logo can
+ * be read from the package's manifest. Fixed text, never built from input.
+ */
+export const PACKAGED_SCRIPT =
+    "$at = @{}; Get-AppxPackage | ForEach-Object { $at[$_.PackageFamilyName] = $_.InstallLocation }; " +
+    "Get-StartApps | Where-Object { $_.AppID -like '*!*' } | ForEach-Object { [pscustomobject]@{ Name = $_.Name; AppID = $_.AppID; Location = $at[($_.AppID -split '!')[0]] } } | ConvertTo-Json -Compress";
+
+/**
+ * The file a packaged app's logo is drawn from: the manifest's logo for that
+ * app, in the variant `pickAsset` takes. Null when the package folder, its
+ * manifest or the asset cannot be read.
+ */
+export async function packagedLogo(location: string | null | undefined, aumid: string): Promise<string | null> {
+    if (!location || !folder.safeParse(location).success) return null;
+    const manifest = await readBounded(join(location, "AppxManifest.xml"));
+    const logo = manifest ? icons.manifestLogo(manifest, aumid.slice(aumid.indexOf("!") + 1)) : null;
+    if (!logo) return null;
+    const assets = icons.assetFolder(location, logo);
+    if (!inside(location, logo)) return null;
+    const name = icons.pickAsset(logo, await readdir(assets).catch(() => [] as string[]));
+    return name ? join(assets, name) : null;
+}
 
 /**
  * The packaged apps the Start menu lists (Store, Xbox and Game Pass games),
@@ -243,7 +269,7 @@ const startAppsSchema = z.union([z.array(z.unknown()).max(5000), z.unknown()]);
  * already read from the Start menu's folders.
  */
 export async function packagedApps(): Promise<StoreApp[]> {
-    const script = "Get-StartApps | Where-Object { $_.AppID -like '*!*' } | Select-Object Name,AppID | ConvertTo-Json -Compress";
+    const script = PACKAGED_SCRIPT;
     const output = await run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script]);
     if (!output?.trim()) return [];
     let parsed: unknown;
@@ -257,7 +283,8 @@ export async function packagedApps(): Promise<StoreApp[]> {
     for (const item of Array.isArray(list) ? list : [list]) {
         const app = startAppSchema.safeParse(item);
         if (!app.success || out.length >= MAX_PER_STORE) continue;
-        out.push({ label: app.data.Name, path: `packaged:${app.data.AppID}`, launch: { kind: "packaged", id: app.data.AppID } });
+        const icon = await packagedLogo(app.data.Location, app.data.AppID);
+        out.push({ label: app.data.Name, path: `packaged:${app.data.AppID}`, launch: { kind: "packaged", id: app.data.AppID }, ...(icon ? { icon } : {}) });
     }
     return out;
 }
@@ -345,6 +372,45 @@ async function steamRoots(programFilesX86: string | undefined): Promise<string[]
     return roots.filter((root, at) => roots.findIndex((other) => other.toLowerCase() === root.toLowerCase()) === at);
 }
 
+/** The uninstall hives, 32-bit view first since Steam is a 32-bit program. */
+const UNINSTALL_HIVES = [
+    "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+];
+
+/**
+ * The `DisplayIcon` of every `Steam App <id>` uninstall entry, by id: Steam
+ * points it at the game's own icon in `steam\games\<hash>.ico`, the one its
+ * desktop shortcuts use. One `reg` call per hive, only once a game is found.
+ */
+async function steamUninstallIcons(): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    for (const hive of UNINSTALL_HIVES) {
+        for (const found of await registry([hive, "/s", "/v", "DisplayIcon"])) {
+            const id = icons.steamUninstallId(found.key);
+            const icon = icons.iconFile(found.values.get("displayicon"), process.env);
+            if (id && icon && !out.has(id)) out.set(id, icon);
+        }
+    }
+    return out;
+}
+
+/**
+ * A Steam game's icon: its uninstall entry's `.ico`, else the library cache's
+ * icon in either layout - `librarycache\<id>_icon.jpg` (older clients) or the
+ * hashed file in `librarycache\<id>\` (newer ones). Null when none is on disk;
+ * the row then takes the game's executable's icon (see `launcher-icons.ts`).
+ */
+async function steamIcon(root: string, id: string, uninstall: () => Promise<Map<string, string>>): Promise<string | null> {
+    const registered = (await uninstall()).get(id);
+    if (registered && (await exists(registered))) return registered;
+    const cache = join(root, "appcache", "librarycache");
+    const flat = join(cache, `${id}_icon.jpg`);
+    if (await exists(flat)) return flat;
+    const name = icons.steamFolderIcon(await readdir(join(cache, id)).catch(() => [] as string[]));
+    return name ? join(cache, id, name) : null;
+}
+
 /**
  * Steam's installed games: every library folder `steamapps\libraryfolders.vdf`
  * lists, and an `appmanifest_<id>.acf` per game in each, launched with
@@ -358,6 +424,8 @@ async function steamRoots(programFilesX86: string | undefined): Promise<string[]
 export async function steamGames(programFilesX86: string | undefined): Promise<StoreApp[]> {
     const out: StoreApp[] = [];
     const seen = new Set<string>();
+    let uninstallIcons: Promise<Map<string, string>> | null = null;
+    const uninstallIconsOnce = () => (uninstallIcons ??= steamUninstallIcons());
     for (const root of await steamRoots(programFilesX86)) {
         const libraries = [root];
         const listed = parseVdf((await readBounded(join(root, "steamapps", "libraryfolders.vdf"))) ?? "");
@@ -388,14 +456,14 @@ export async function steamGames(programFilesX86: string | undefined): Promise<S
                 if (!installed && !(Number(vdfGet(state, "buildid")) > 0 && home && (await hasFiles(home)))) continue;
                 const updating = !installed || (flags & STEAM_UPDATING) !== 0;
                 seen.add(id);
-                const icon = join(root, "appcache", "librarycache", `${id}_icon.jpg`);
+                const icon = await steamIcon(root, id, uninstallIconsOnce);
                 if (music && !(home && (await exists(home))) && (await exists(music))) continue;
                 out.push({
                     label: title.data,
                     path: `steam:${id}`,
                     launch: { kind: "uri", uri: `steam://rungameid/${id}` },
                     store: `steam:${id}`,
-                    ...((await exists(icon)) ? { icon } : {}),
+                    ...(icon ? { icon } : {}),
                     ...(home ? { folder: home } : {}),
                     ...(updating ? { updating: true as const } : {})
                 });

@@ -54,7 +54,7 @@ beforeEach(() => {
 
 describe("Store and Xbox apps", () => {
     it("lists packaged apps by their AppUserModelID and leaves desktop programs to the Start menu", async () => {
-        const script = "Get-StartApps | Where-Object { $_.AppID -like '*!*' } | Select-Object Name,AppID | ConvertTo-Json -Compress";
+        const script = stores.PACKAGED_SCRIPT;
         commands.set(
             `powershell.exe -NoProfile -NonInteractive -Command ${script}`,
             JSON.stringify([
@@ -73,8 +73,42 @@ describe("Store and Xbox apps", () => {
         ]);
     });
 
+    it("draws a packaged app with the logo its manifest names, in the variant Windows draws small", async () => {
+        const location = join(base, "WindowsApps", "Microsoft.WindowsCalculator_11.2_x64__8wekyb3d8bbwe");
+        commands.set(
+            `powershell.exe -NoProfile -NonInteractive -Command ${stores.PACKAGED_SCRIPT}`,
+            JSON.stringify({ Name: "Calculator", AppID: "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", Location: location })
+        );
+        file(
+            join(location, "AppxManifest.xml"),
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<Package><Properties><Logo>Assets\\StoreLogo.png</Logo></Properties><Applications>" +
+                "<Application Id=\"App\" Executable=\"CalculatorApp.exe\"><uap:VisualElements DisplayName=\"ms-resource:AppName\" Square150x150Logo=\"Assets\\CalculatorMedTile.png\" Square44x44Logo=\"Assets\\CalculatorAppList.png\" /></Application>" +
+                "</Applications></Package>"
+        );
+        dir(join(location, "Assets"), [
+            "CalculatorAppList.scale-200.png",
+            "CalculatorAppList.targetsize-16.png",
+            "CalculatorAppList.targetsize-32.png",
+            "CalculatorAppList.targetsize-32_altform-unplated.png",
+            "CalculatorAppList.targetsize-32_altform-lightunplated.png",
+            "CalculatorAppList.contrast-black_targetsize-32.png",
+            "StoreLogo.scale-100.png"
+        ]);
+        const [calculator] = await stores.packagedApps();
+        expect(calculator?.icon).toBe(join(location, "Assets", "CalculatorAppList.targetsize-32_altform-unplated.png"));
+    });
+
+    it("lists a packaged app without a logo when its package folder cannot be read", async () => {
+        commands.set(
+            `powershell.exe -NoProfile -NonInteractive -Command ${stores.PACKAGED_SCRIPT}`,
+            JSON.stringify({ Name: "Calculator", AppID: "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", Location: join(base, "Gone") })
+        );
+        const [calculator] = await stores.packagedApps();
+        expect(calculator).toEqual({ label: "Calculator", path: "packaged:Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", launch: { kind: "packaged", id: "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App" } });
+    });
+
     it("reads a single app, which PowerShell prints as an object rather than a list", async () => {
-        const script = "Get-StartApps | Where-Object { $_.AppID -like '*!*' } | Select-Object Name,AppID | ConvertTo-Json -Compress";
+        const script = stores.PACKAGED_SCRIPT;
         commands.set(`powershell.exe -NoProfile -NonInteractive -Command ${script}`, JSON.stringify({ Name: "Calculator", AppID: "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App" }));
         expect((await stores.packagedApps()).map((app) => app.label)).toEqual(["Calculator"]);
     });
@@ -231,6 +265,49 @@ describe("Steam", () => {
                 store: "steam:730"
             }
         ]);
+    });
+
+    /** One installed game in Steam's own library, for the icon tests below. */
+    const oneGame = () => {
+        commands.set("reg.exe query HKCU\\Software\\Valve\\Steam /v SteamPath", `\r\nHKEY_CURRENT_USER\\Software\\Valve\\Steam\r\n    SteamPath    REG_SZ    ${steam}\r\n\r\n`);
+        dir(join(steam, "steamapps"), ["appmanifest_1145360.acf"]);
+        file(join(steam, "steamapps", "appmanifest_1145360.acf"), `"AppState"\n{\n\t"appid"\t\t"1145360"\n\t"name"\t\t"Hades"\n\t"StateFlags"\t\t"4"\n\t"installdir"\t\t"Hades"\n}\n`);
+    };
+    const uninstall = "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+    const displayIcon = (icon: string) =>
+        commands.set(`reg.exe query ${uninstall} /s /v DisplayIcon`, `\r\n${long(uninstall)}\\Steam App 1145360\r\n    DisplayIcon    REG_SZ    ${icon}\r\n\r\nEnd of search: 1 match(es) found.\r\n`);
+
+    it("takes a game's icon from the library cache's per-game folder, the layout newer clients write", async () => {
+        oneGame();
+        dir(join(steam, "appcache", "librarycache", "1145360"), ["header.jpg", "library_600x900.jpg", "logo.png", "0123456789abcdef0123456789abcdef01234567.jpg"]);
+        const [game] = await stores.steamGames(undefined);
+        expect(game?.icon).toBe(join(steam, "appcache", "librarycache", "1145360", "0123456789abcdef0123456789abcdef01234567.jpg"));
+    });
+
+    it("never takes a banner from the per-game folder for the icon", async () => {
+        oneGame();
+        dir(join(steam, "appcache", "librarycache", "1145360"), ["header.jpg", "library_600x900.jpg", "logo.png"]);
+        const [game] = await stores.steamGames(undefined);
+        expect(game?.label).toBe("Hades");
+        expect(game?.icon).toBeUndefined();
+    });
+
+    it("prefers the .ico the game's uninstall entry names, which its desktop shortcuts use", async () => {
+        oneGame();
+        const ico = join(steam, "steam", "games", "abcdefabcdefabcdefabcdefabcdefabcdefabcd.ico");
+        file(ico, "ico");
+        file(join(steam, "appcache", "librarycache", "1145360_icon.jpg"), "jpg");
+        displayIcon(ico);
+        const [game] = await stores.steamGames(undefined);
+        expect(game?.icon).toBe(ico);
+    });
+
+    it("falls back to the flat cache icon when the uninstall entry's .ico is gone", async () => {
+        oneGame();
+        file(join(steam, "appcache", "librarycache", "1145360_icon.jpg"), "jpg");
+        displayIcon(join(steam, "steam", "games", "gone.ico"));
+        const [game] = await stores.steamGames(undefined);
+        expect(game?.icon).toBe(join(steam, "appcache", "librarycache", "1145360_icon.jpg"));
     });
 
     it("gives no folder to a game whose install folder climbs out of the library", async () => {
