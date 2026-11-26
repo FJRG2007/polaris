@@ -16,7 +16,7 @@ export const LAUNCHER_CHANNELS = {
     hidden: "launcher:hidden",
     clearClipboard: "launcher:clear-clipboard",
     open: "launcher:open",
-    addons: "launcher:addons"
+    plugins: "launcher:plugins"
 } as const;
 
 export type LauncherRowKind = "url" | "answer" | "polaris" | "page" | "system" | "app" | "polar" | "web" | "clip";
@@ -56,7 +56,9 @@ export interface PolarisLauncher {
     onOpened(listener: (query: string) => void): void;
     /** The window was put away by main (it lost focus), not by the page. */
     onHidden(listener: () => void): void;
-    /** The device add-ons on this computer, as the main window's bridge answers them (the dashboard's palette only). */
+    /** The device plugins on this computer, as the main window's bridge answers them (the dashboard's palette only). */
+    plugins(): Promise<unknown>;
+    /** @deprecated `plugins` by its name before the rename, for hosts that predate it. */
     addons(): Promise<unknown>;
 }
 

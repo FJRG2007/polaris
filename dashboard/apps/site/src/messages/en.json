@@ -56,10 +56,10 @@
     },
     "market": {
         "title": "Marketplace",
-        "intro": "Every app in the catalogue, as the dashboard lists it. Built-in apps come with every install; the rest install with one press. Device add-ons, which the desktop app installs on your own computer, are listed apart.",
+        "intro": "Every app in the catalogue, as the dashboard lists it. Built-in apps come with every install; the rest install with one press. Device plugins, which the desktop app installs on your own computer, are listed apart.",
         "installPolaris": "Install Polaris",
         "installHint": "Apps are installed from your own Polaris, in one click.",
-        "addon": {
+        "plugin": {
             "platforms": "Works on",
             "devices": "Devices it supports",
             "version": "Version",
@@ -69,10 +69,10 @@
             "installTitle": "How to install",
             "installSteps": [
                 "Get the Polaris desktop app on the computer the device is plugged into.",
-                "In the app, open Settings, then This app, then Device add-ons.",
+                "In the app, open Settings, then This app, then Device plugins.",
                 "Find {name} and press Install."
             ],
-            "installHint": "Add-ons belong to the computer, not to a server: installed once, they work with any Polaris, signed out and offline.",
+            "installHint": "Plugins belong to the computer, not to a server: installed once, they work with any Polaris, signed out and offline.",
             "getDesktop": "Get the desktop app",
             "platform": {
                 "win32-x64": "Windows (x64)",

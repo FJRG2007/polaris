@@ -14,7 +14,7 @@ pub mod mls;
 #[cfg(feature = "opaque")]
 pub mod opaque;
 
-/// USB presence for the desktop's device add-ons. Platform I/O, so it is its
+/// USB presence for the desktop's device plugins. Platform I/O, so it is its
 /// own crate (`polaris-core-usb`) and nothing here: re-exported so the Node
 /// binding, which may depend on polaris-core alone, can reach it.
 #[cfg(feature = "usb")]

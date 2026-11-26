@@ -32,7 +32,7 @@ mls = [
 # OPAQUE (RFC 9807) for password sign-in (docs/chat-e2ee-phase1.md). Off by
 # default; the Node binding and the dedicated OPAQUE WebAssembly module turn it on.
 opaque = ["dep:opaque-ke", "dep:argon2", "dep:sha2", "dep:base64", "dep:generic-array", "dep:rand_core", "dep:rand_chacha"]
-# USB presence for the desktop's device add-ons: platform I/O, so it is its own
+# USB presence for the desktop's device plugins: platform I/O, so it is its own
 # crate and only re-exported here. Off by default; only the Node binding turns
 # it on, never a WebAssembly build.
 usb = ["dep:polaris-core-usb"]

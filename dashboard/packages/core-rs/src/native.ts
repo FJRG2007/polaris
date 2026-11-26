@@ -88,7 +88,7 @@ export interface NativeUsb {
 }
 
 /**
- * The binding's USB presence, for the desktop's device add-ons, or null when
+ * The binding's USB presence, for the desktop's device plugins, or null when
  * there is no binding here or it was built before USB presence (an older
  * install's binding): the caller then treats devices as not known.
  */

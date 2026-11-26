@@ -1,0 +1,114 @@
+# Device plugins (docs/device-plugins.md): build every plugin under
+# clients/device-plugins/, write the catalog, sign it, and publish all of it on the
+# `device-plugins` release, which the desktop app reads from any host.
+name: Device plugins
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "clients/device-plugins/**"
+      # The native modules packaged into plugins (version-guard.mjs NATIVE_SOURCES).
+      - "crates/polaris-stream100/**"
+      - "crates/polaris-stream100-node/**"
+      - "clients/device-plugins/scripts/**"
+      - ".github/workflows/device-plugins.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: device-plugins
+  cancel-in-progress: false
+
+jobs:
+  # The native modules plugins load, one per platform they ship on. Not
+  # committed: built here from the crate, so the package holds exactly what
+  # the repository's source compiles to.
+  native:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: win32-x64
+            os: windows-latest
+            file: polaris_stream100_node.dll
+          - platform: linux-x64
+            os: ubuntu-latest
+            file: libpolaris_stream100_node.so
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: device-plugins-${{ matrix.platform }}
+      - run: cargo build -p polaris-stream100-node --profile release-node --locked
+      - name: Stage the module
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/native/hercules-stream100/${{ matrix.platform }}"
+          cp "target/release-node/${{ matrix.file }}" "$RUNNER_TEMP/native/hercules-stream100/${{ matrix.platform }}/stream100.node"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.platform }}
+          path: ${{ runner.temp }}/native
+          if-no-files-found: error
+
+  publish:
+    needs: native
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - run: node --test clients/device-plugins/scripts/device-plugins.test.mjs
+      # A package that changed under a version already published never reaches
+      # an app holding that version: refuse it before anything is uploaded.
+      - name: Every changed plugin has a new version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The release from before the rename, until the new one is first published.
+          gh release download device-plugins -p catalog.json -D "$RUNNER_TEMP/published" || gh release download device-addons -p catalog.json -D "$RUNNER_TEMP/published" || true
+          node clients/device-plugins/scripts/version-guard.mjs clients/device-plugins "$RUNNER_TEMP/published/catalog.json" "${{ github.event.before }}"
+      # Each platform's module into its plugin's `<platform>/` folder.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: clients/device-plugins
+          merge-multiple: true
+      - name: Install fflate
+        working-directory: clients/desktop
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build and sign the catalog
+        env:
+          DEVICE_ADDONS_SIGNING_KEY: ${{ secrets.DEVICE_ADDONS_SIGNING_KEY }}
+        run: node clients/device-plugins/scripts/publish.mjs clients/device-plugins "$RUNNER_TEMP/device-plugins"
+      # And again on `device-addons`, the release desktop apps from before the
+      # rename read: the same signed catalog, which names both fields. Removable
+      # once no supported desktop app predates it.
+      - name: Publish on the device-plugins and device-addons releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # The uploads run from the output folder, outside the checkout, where
+          # gh cannot read the repository from git.
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cd "$RUNNER_TEMP/device-plugins"
+          for tag in device-plugins device-addons; do
+            if ! gh release view "$tag" >/dev/null 2>&1; then
+              gh release create "$tag" --title "Device plugins" --notes "The catalog and packages of device plugins. Updated by CI." --latest=false
+            fi
+            # Packages first, the catalog that names them last, its signature after it.
+            ls | grep -v '^catalog\.json' | xargs -r gh release upload "$tag" --clobber
+            gh release upload "$tag" --clobber catalog.json
+            gh release upload "$tag" --clobber catalog.json.sig
+          done

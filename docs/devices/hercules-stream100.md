@@ -185,11 +185,11 @@ What each route really takes:
 
 ### Polaris' WinUSB driver
 
-The add-on declares a toggle, "Polaris driver on this PC" (`polarisDriver`,
+The plugin declares a toggle, "Polaris driver on this PC" (`polarisDriver`,
 off by default). Turning it on runs the setup below and turning it off the
-removal; the desktop app (`createDriverSetting` in `addons/official.ts`) keeps
+removal; the desktop app (`createDriverSetting` in `plugins/official.ts`) keeps
 the new value only when that went through and otherwise writes the old one back.
-The add-on's own view (`any/view/`, above the screen preview) is text only: it
+The plugin's own view (`any/view/`, above the screen preview) is text only: it
 asks `driver.look` and says when the toggle is needed (another driver holds the
 controller), and why the last change did not go through. A look also brings the
 toggle in line with the machine (off once a Hercules reinstall or Windows Update
@@ -198,7 +198,7 @@ administrator prompt later the device is on WinUSB and Polaris reads it with
 no Hercules software at all: no Stream Control, no `hsm_api_core` DLL, no
 `HercStreamMixDevice` driver. The approach is libwdi's (studied as a reference
 only, it is LGPL), reimplemented with Windows' own tools in
-`clients/desktop/src/main/addons/hercules-driver.ts`:
+`clients/desktop/src/main/plugins/hercules-driver.ts`:
 
 | Step | How |
 | --- | --- |
@@ -208,7 +208,7 @@ only, it is LGPL), reimplemented with Windows' own tools in
 | Catalog | `New-FileCatalog -CatalogVersion 2.0`, signed with `Set-AuthenticodeSignature` (SHA-256), then the private key is deleted (`-DeleteKey`, in a `finally`), so nothing else can ever be signed with it |
 | Binding | `UpdateDriverForPlugAndPlayDevicesW` with `INSTALLFLAG_FORCE` (Hercules' package is Microsoft-signed and would outrank ours otherwise) |
 | Record | `state.json` beside it: our published `oemNN.inf`, the INF the device had before, the certificate's thumbprint |
-| Uninstall | removing the add-on runs the elevated script's `remove` first: `pnputil /delete-driver <ours> /uninstall /force`, our certificates out of `My`/`Root`/`TrustedPublisher`, the previous INF put back on the device (Hercules' package stays in the driver store, so it simply returns), `pnputil /scan-devices`. A declined prompt keeps the add-on installed |
+| Uninstall | removing the plugin runs the elevated script's `remove` first: `pnputil /delete-driver <ours> /uninstall /force`, our certificates out of `My`/`Root`/`TrustedPublisher`, the previous INF put back on the device (Hercules' package stays in the driver store, so it simply returns), `pnputil /scan-devices`. A declined prompt keeps the plugin installed |
 
 The elevated side takes nothing from the unelevated one but the action: the
 INF is inside the script, every path comes from `%ProgramData%` and
@@ -219,7 +219,7 @@ into its own command, and runs those same bytes. Exit codes: 0 done, 1223
 declined, 10 certificate, 11 signing, 13 binding, 14 unplugged, 20 removing,
 87 integrity; each has its own sentence on the page.
 
-The add-on then reads the controller through `native::winusb`
+The plugin then reads the controller through `native::winusb`
 (`crate::session`): interface 1 to alternate setting 1, the vendor reads `0x52`
 and `0x02`, reports from `0x81`, and an `SM` keep-alive on the isochronous
 endpoint `0x01` every 250 ms (`WinUsb_WriteIsochPipeAsap`; `nusb` 0.2 has no
@@ -237,13 +237,13 @@ first run.
 | --- | --- |
 | Input report decoding, knob engine, display message framing and checksum, image conversion, audio categories, ownership, manifest, settings (read field by field: one bad value resets only itself) | done, unit-tested (`cargo test -p polaris-stream100`) |
 | Input on Windows (feature `native`) | the HID API: the largest input collection of `06f8:e053`, opened read-only and shared, one overlapped read at a time with a timeout. Windows puts the report id first (`0` when the device numbers none) and `report::from_hid_read` brings it back to the USB transfer's bytes. Exercised against another HID device (opens, times out, cancels cleanly); never against the Stream 100, which the Hercules driver holds |
-| Input on Linux | the USB transport (`nusb`); needs the `uaccess` rule for the device, and without it the add-on says the system does not let Polaris open it |
+| Input on Linux | the USB transport (`nusb`); needs the `uaccess` rule for the device, and without it the plugin says the system does not let Polaris open it |
 | Input on macOS | not written (HID manager), so no package is built for macOS |
 | Display transport | not written: `nusb` 0.2 has no isochronous transfers, and initialization is not understood (above) |
 | Per-app audio backends | Windows Core Audio and PulseAudio/PipeWire done; macOS answers unsupported |
 | Desktop binding (`crates/polaris-stream100-node`) | `Controller` (reports in, volume out, actions back) and `Reader` (reads on a worker thread, `await reader.next(500)`) |
-| Device add-on (`clients/device-addons/hercules-stream100`) | manifest generated from the crate (`cargo run -p polaris-stream100 --example manifest`, a test keeps them equal), entry `any/main.cjs`, native module built per platform by `.github/workflows/device-addons.yml` (Windows x64, Linux x64). Settings live only on the add-on's page, never in the app's own settings |
-| Game category | the engine takes running games (`Controller.setGames`), but the add-on protocol has no method that hands them over yet, so Games follows only the apps the classifier knows |
+| Device plugin (`clients/device-plugins/hercules-stream100`) | manifest generated from the crate (`cargo run -p polaris-stream100 --example manifest`, a test keeps them equal), entry `any/main.cjs`, native module built per platform by `.github/workflows/device-plugins.yml` (Windows x64, Linux x64). Settings live only on the plugin's page, never in the app's own settings |
+| Game category | the engine takes running games (`Controller.setGames`), but the plugin protocol has no method that hands them over yet, so Games follows only the apps the classifier knows |
 
 ### Needed from a real device
 
@@ -289,20 +289,20 @@ Multi-app volume`, `Discord > Mute`, `Actions > Next page`); a knob's
 customization holds its preset `name` and the app `sources` it follows. The
 same file holds the person's Discord, Spotify and OBS tokens: Polaris reads only
 the `pages\...` keys and never parses or keeps the rest.
-`clients/desktop/src/main/addons/hercules-official.ts` holds the detection, the
+`clients/desktop/src/main/plugins/hercules-official.ts` holds the detection, the
 uninstaller check and the importer; each is pure and tested on fixtures.
 
 ### Carrying out the choice
 
-`clients/desktop/src/main/addons/hercules-official-run.ts` (tested with a fake machine)
+`clients/desktop/src/main/plugins/hercules-official-run.ts` (tested with a fake machine)
 does what the person picked, and `official.ts` answers the page through
-`window.polarisDesktop.addons.official(id, request)` (`look`, `choose`,
+`window.polarisDesktop.plugins.official(id, request)` (`look`, `choose`,
 `restore`, `launch`; Windows and `hercules-stream100` only, null otherwise):
 
-- Before any step it keeps a copy in `<userData>/addons/official/<id>/official-software.json`:
+- Before any step it keeps a copy in `<userData>/plugins/official/<id>/official-software.json`:
   the Run values it may remove and `Stream Control.ini` with every
   `token`/`secret`/`password` line taken out. The first copy is kept across
-  later choices; uninstalling the add-on does not delete it.
+  later choices; uninstalling the plugin does not delete it.
 - Stream Control is asked to close (`taskkill /im`), and forced (`/f`) only if
   it is still running 5 seconds later.
 - A Run value is removed with `reg.exe delete`; the HKLM one goes through
@@ -315,14 +315,14 @@ does what the person picked, and `official.ts` answers the page through
   back with today's sign-in lines put back in their sections, and starts
   Stream Control. An uninstall cannot be undone from here: only the settings
   go back.
-- `system.launchOfficial` (add-on protocol) starts only the `Stream-control.exe`
+- `system.launchOfficial` (plugin protocol) starts only the `Stream-control.exe`
   a Run value or the copy names. It has no permission of its own on purpose:
   a new permission in the manifest would make every older app refuse the
   whole signed catalog.
 
 ### Feature parity with Stream Control 2.05
 
-| Stream Control | Polaris add-on today |
+| Stream Control | Polaris plugin today |
 | --- | --- |
 | Pages of 4 knobs + 4 buttons, Next/Previous page buttons | imported and stored (`Settings.pages`, up to 8, `layout.json`); the engine still drives one page |
 | Profiles (`profiles`, `LastProfileKey`) | in the settings model (`Settings.profiles`); not imported: the only real file read has `profiles=@Invalid()` |
@@ -395,5 +395,5 @@ standalone probe that makes the same calls; the callbacks are kept verbatim in
 - The log has no detent marker, so it does not measure counts per detent; the
   HID route's 48 is kept.
 
-The Polaris add-on itself has not been run against the device; only the probe
+The Polaris plugin itself has not been run against the device; only the probe
 has.

@@ -83,7 +83,7 @@ export function useCallRemote(
         });
     }, [meetingId]);
 
-    // A device add-on's camera or screen button, from the desktop app: the
+    // A device plugin's camera or screen button, from the desktop app: the
     // same command a deck key sends, turned the other way from where it is.
     useEffect(() => {
         const listen = desktopBridge()?.onCallAction;

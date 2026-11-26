@@ -296,14 +296,14 @@ export interface PolarisDesktop {
     readonly voiceWidgetPictures?: boolean;
     /** Hear a press on the voice widget's buttons. Answers the way to stop. */
     onVoiceAction?(listener: (action: "mic" | "deafen" | "leave") => void): () => void;
-    /** Hear a device add-on's camera or screen button. Absent from an app older than add-ons. */
+    /** Hear a device plugin's camera or screen button. Absent from an app older than plugins. */
     onCallAction?(listener: (action: "camera" | "share") => void): () => void;
     /**
-     * The device add-ons on this computer, for Settings > Device add-ons.
-     * Every answer is read through `@polaris/core/device-addons`; absent from
+     * The device plugins on this computer, for Settings > Device plugins.
+     * Every answer is read through `@polaris/core/device-plugins`; absent from
      * an app older than them.
      */
-    addons?: {
+    plugins?: {
         get(): Promise<unknown>;
         refresh(): Promise<void>;
         install(id: string, accepted: readonly string[]): Promise<unknown>;
@@ -311,15 +311,17 @@ export interface PolarisDesktop {
         setEnabled(id: string, enabled: boolean): Promise<boolean>;
         settings(id: string): Promise<unknown>;
         setSetting(id: string, key: string, value: unknown): Promise<unknown>;
-        /** Automatic updates for one add-on, or all (`id` null). Absent from an app older than them. */
+        /** Automatic updates for one plugin, or all (`id` null). Absent from an app older than them. */
         setAutoUpdate?(id: string | null, value: boolean | null): Promise<boolean>;
-        /** A call from the add-on's own view, judged by the app. Absent from an app older than views. */
+        /** A call from the plugin's own view, judged by the app. Absent from an app older than views. */
         viewCall?(id: string, method: string, params: unknown): Promise<unknown>;
         /** The device's official software on this computer (look, choose, restore, launch). Absent from an app older than it. */
         official?(id: string, request: unknown): Promise<unknown>;
         onChange(listener: () => void): () => void;
         onOpen(listener: (id: string) => void): () => void;
     };
+    /** @deprecated `plugins` by its name in desktop apps from before the rename. Removable once no supported desktop app or host predates the rename (desktop 0.1.124). */
+    addons?: PolarisDesktop["plugins"];
     /** The window that adds and switches servers. Absent from an older app. */
     openServers?(): Promise<void>;
     /** Windows' Default apps at Polaris, to pick it for mailto links; false

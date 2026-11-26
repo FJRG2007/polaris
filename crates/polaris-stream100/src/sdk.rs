@@ -114,7 +114,7 @@ pub fn info_is_stream100(info: &[u8]) -> bool {
 
 /// The company a Hercules SDK file must be signed by, the same signer the
 /// desktop app requires of the vendor uninstaller (`HERCULES_SIGNER` in
-/// `clients/desktop/src/main/addons/hercules-official.ts`). Its R&D arm signs
+/// `clients/desktop/src/main/plugins/hercules-official.ts`). Its R&D arm signs
 /// the SDK ("Guillemot Recherche & Developpement, Inc").
 pub const SIGNER: &str = "Guillemot";
 

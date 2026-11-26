@@ -100,7 +100,7 @@ import {
 } from "@/app/(app)/search-actions";
 import * as polls from "./shared-polls";
 import { readHostRows, type HostRow, type SearchHost } from "@/lib/search/search-host";
-import { useAddonEntries } from "@/lib/search/use-addon-entries";
+import { usePluginEntries } from "@/lib/search/use-plugin-entries";
 import { keepUnlockProofs } from "@/app/(app)/chat/lock-session";
 import { openLockedChatsAction, searchLockAction } from "@/app/(app)/chat/lock-actions";
 import { maybeLockCode, revealLockedChats } from "@/app/(app)/chat/lock-reveal";
@@ -688,21 +688,21 @@ export function CommandPalette({
         [tourRows, tTours]
     );
 
-    // Device add-ons on this computer, from the desktop app; the catalog alone in a browser.
-    const addonRows = useAddonEntries(open, host);
-    const addons = useMemo(
-        () => addonRows.filter((entry) => !reachable.has(entry.href)),
-        [addonRows, reachable]
+    // Device plugins on this computer, from the desktop app; the catalog alone in a browser.
+    const pluginRows = usePluginEntries(open, host);
+    const plugins = useMemo(
+        () => pluginRows.filter((entry) => !reachable.has(entry.href)),
+        [pluginRows, reachable]
     );
 
     /** What fuse matches against: everything, or one scope's slice of the index. */
     const pool = useMemo(() => {
-        if (!scope) return [...navigation, ...tours, ...addons, ...resourceEntries(resources)];
+        if (!scope) return [...navigation, ...tours, ...plugins, ...resourceEntries(resources)];
         if (!scope.resourceKind) return [];
         return resourceEntries(
             resources.filter((resource) => resource.kind === scope.resourceKind)
         );
-    }, [scope, navigation, tours, addons, resources]);
+    }, [scope, navigation, tours, plugins, resources]);
 
     const suggestions = useMemo(
         () =>

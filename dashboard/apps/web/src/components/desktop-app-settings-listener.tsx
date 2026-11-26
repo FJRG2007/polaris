@@ -9,7 +9,7 @@
  * and this mounts again on the page that follows.
  *
  * It also asks the service worker to keep every category's page (and the
- * device add-ons' and Downloads', where the app's updates are), so each one
+ * device plugins' and Downloads', where the app's updates are), so each one
  * opens with the host out of reach even if it was never opened here before (a
  * page the worker kept is what a navigation gets offline). The phone app's
  * categories are kept the same way inside the phone app.
@@ -36,7 +36,7 @@ export function DesktopAppSettingsListener() {
         });
         // Hosts are drawn here only by an app that manages them through the page.
         void settings.announce(settings.hosts ? ["hosts"] : []).catch(() => undefined);
-        keepCategoryPages(APP_SETTING_CATEGORIES, [DEVICE_ADDONS_PATH, DOWNLOADS_PATH]);
+        keepCategoryPages(APP_SETTING_CATEGORIES, [DEVICE_PLUGINS_PATH, DOWNLOADS_PATH]);
         return stop;
     }, [settings, router]);
 
@@ -47,8 +47,8 @@ export function DesktopAppSettingsListener() {
     return null;
 }
 
-/** The desktop's device add-ons, listed in its settings after the categories. */
-const DEVICE_ADDONS_PATH = "/account/addons";
+/** The desktop's device plugins, listed in its settings after the categories. */
+const DEVICE_PLUGINS_PATH = "/account/plugins";
 
 /** Where the app's version, its check for updates and its restart into one are. */
 const DOWNLOADS_PATH = "/account/downloads";

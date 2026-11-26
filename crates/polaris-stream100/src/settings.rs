@@ -1,5 +1,5 @@
 //! The module's settings: the stored values with their defaults, and the
-//! declarative schema the add-on settings page draws them from.
+//! declarative schema the plugin settings page draws them from.
 //!
 //! The schema is data only (switches, choices, sliders, per-knob lists and
 //! action pickers), so the page renders it without any code from this module.
@@ -128,7 +128,7 @@ pub struct Settings {
     pub display: DisplayMode,
     pub brightness: u8,
     /// Every page beyond the live knobs and buttons, as imported from Stream
-    /// Control (`clients/desktop/src/main/addons/hercules-official.ts`, `Layout`).
+    /// Control (`clients/desktop/src/main/plugins/hercules-official.ts`, `Layout`).
     pub pages: Vec<Page>,
     pub profiles: Vec<Profile>,
 }

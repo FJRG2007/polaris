@@ -20,12 +20,19 @@
 
 import type { AppSettingCategory } from "@polaris/core/app-settings";
 
-/** A category of This app, or the device add-ons listed after them. */
-export type SettingsPlace = AppSettingCategory | "addons";
+/** A category of This app, or the device plugins listed after them. */
+export type SettingsPlace = AppSettingCategory | "plugins";
+
+/**
+ * The plugins' page on the host. Hosts from before the rename serve it only at
+ * `/account/addons`, and every host after it keeps that address too, so this one
+ * works on all of them. Removable once no supported desktop app or host predates the rename (desktop 0.1.124).
+ */
+export const HOST_PLUGINS_PATH = "/account/addons";
 
 /** The address of a place on the host. */
 export function settingsPath(place: SettingsPlace): string {
-    return place === "addons" ? "/account/addons" : `/account/app/${place}`;
+    return place === "plugins" ? HOST_PLUGINS_PATH : `/account/app/${place}`;
 }
 
 /**

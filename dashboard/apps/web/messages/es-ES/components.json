@@ -200,8 +200,8 @@
     },
     "search": {
         "commands": "Comandos",
-        "addons": {
-            "installed": "Complementos",
+        "plugins": {
+            "installed": "Plugins de equipos",
             "catalog": "Para instalar",
             "setting": "Ajuste de {name}",
             "section": "Ajustes de {name}",

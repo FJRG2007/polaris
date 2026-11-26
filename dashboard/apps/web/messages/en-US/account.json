@@ -2467,14 +2467,14 @@
             "noScopes": "Your account cannot use Polar, which is all Polaris Terminal asks for. Ask an administrator for access."
         }
     },
-    "addons": {
+    "plugins": {
         "page": {
-            "title": "Device add-ons",
+            "title": "Device plugins",
             "intro": "Support for hardware you plug into this computer. Installed here only, and works on any server.",
-            "browser": "Add-ons run in the Polaris desktop app. Open this page there to install them.",
+            "browser": "Plugins run in the Polaris desktop app. Open this page there to install them.",
             "download": "Get the desktop app",
-            "oldApp": "This version of the desktop app has no add-ons. Update it to get them.",
-            "back": "Device add-ons"
+            "oldApp": "This version of the desktop app has no plugins. Update it to get them.",
+            "back": "Device plugins"
         },
         "tabs": {
             "browse": "Browse",
@@ -2482,7 +2482,7 @@
             "updates": "Updates"
         },
         "filters": {
-            "search": "Search for add-ons",
+            "search": "Search for plugins",
             "categories": "Categories"
         },
         "category": {
@@ -2494,11 +2494,11 @@
             "other": "Other"
         },
         "empty": {
-            "catalog": "No add-ons are published yet.",
-            "offline": "The add-on list could not be reached. Installed add-ons keep working.",
+            "catalog": "No plugins are published yet.",
+            "offline": "The plugin list could not be reached. Installed plugins keep working.",
             "installed": "Nothing installed on this computer.",
             "updates": "Everything is up to date.",
-            "noMatch": "No add-on matches \"{query}\"."
+            "noMatch": "No plugin matches \"{query}\"."
         },
         "card": {
             "install": "Install",
@@ -2557,11 +2557,11 @@
             "screenshot": "{name} screenshot {number}",
             "settings": "Settings",
             "noSettings": "Nothing to set up.",
-            "enabled": "Use this add-on",
+            "enabled": "Use this plugin",
             "uninstall": "Uninstall",
             "uninstallTitle": "Uninstall {name}?",
             "uninstallBody": "Its files and settings are removed from this computer.",
-            "notFound": "This add-on is not on this computer or in the list.",
+            "notFound": "This plugin is not on this computer or in the list.",
             "installFirst": "Install it to set it up.",
             "saveFailed": "That change was not saved.",
             "toggleFailed": "It could not be switched.",
@@ -2584,7 +2584,7 @@
             "confirm": "Update"
         },
         "auto": {
-            "all": "Update add-ons automatically",
+            "all": "Update plugins automatically",
             "one": "Update automatically",
             "hint": "Updates that ask for new permissions wait for you.",
             "failed": "That change was not saved."

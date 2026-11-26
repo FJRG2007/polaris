@@ -15,7 +15,7 @@
 //!   is loaded only while the controller is plugged in.
 //! - [`ownership`]: who holds the device on this machine, and what to offer.
 //! - [`settings`]: stored values, defaults, and the declarative settings schema.
-//! - [`addon`]: the same settings as the add-on page's flat fields.
+//! - [`plugin`]: the same settings as the plugin page's flat fields.
 //! - [`sdk`]: the Hercules SDK's input state, as the same reports.
 //! - [`engine`]: reports in, volume changes and Polaris actions out.
 //! - [`session`]: the start-up reads and keep-alive of a plain-USB session,
@@ -25,7 +25,7 @@
 //! the operating system's per-app volume and the Windows ownership probe are
 //! behind `native` ([`native`]).
 
-pub mod addon;
+pub mod plugin;
 pub mod audio;
 pub mod display;
 pub mod encoder;

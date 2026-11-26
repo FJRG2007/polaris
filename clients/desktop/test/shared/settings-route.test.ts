@@ -50,7 +50,7 @@ describe("settingsRoute", () => {
     });
 
     it("opens the hosts window only for a host without the screen, or before any host", () => {
-        const places: SettingsPlace[] = [...APP_SETTING_CATEGORIES, "addons"];
+        const places: SettingsPlace[] = [...APP_SETTING_CATEGORIES, "plugins"];
         const probes = [null, "present", "signed-out", "unreachable", "missing"] as const;
         for (const place of places) {
             for (const probe of probes) {
@@ -66,8 +66,8 @@ describe("settingsRoute", () => {
         }
     });
 
-    it("sends the device add-ons to their own page", () => {
-        expect(settingsRoute("addons", { ...loaded, probe: "present" })).toEqual({ kind: "navigate", path: "/account/addons" });
+    it("sends the device plugins to their own page", () => {
+        expect(settingsRoute("plugins", { ...loaded, probe: "present" })).toEqual({ kind: "navigate", path: "/account/addons" });
     });
 });
 
@@ -92,7 +92,7 @@ describe("host pages the hosts window may open", () => {
     });
 
     it("refuses anything else, settings places included", () => {
-        for (const raw of [settingsPath("general"), settingsPath("addons"), "/account/security", "https://evil.example/admin/updates", "/admin/updates?x=1", "", null, 3]) {
+        for (const raw of [settingsPath("general"), settingsPath("plugins"), "/account/security", "https://evil.example/admin/updates", "/admin/updates?x=1", "", null, 3]) {
             expect(readHostPath(raw)).toBeNull();
         }
     });

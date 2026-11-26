@@ -1,0 +1,158 @@
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createPluginManager } from "@/main/plugins/manager";
+import type { PluginChild } from "@/main/plugins/supervisor";
+import type { UsbDevice } from "@polaris/core/device-plugins";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { listLinuxUsb, readUsbId } from "@/main/plugins/presence";
+import { catalogOf, entryFor, fakeFetch, fixturePackage, PACKAGE_URL, sign, TEST_KEYS } from "./fixtures";
+
+// installed.json refused after `refuse.after` renames over it, as Windows answers a rename over an open file.
+const refuse = vi.hoisted(() => ({ after: Number.POSITIVE_INFINITY, seen: 0 }));
+vi.mock("node:fs/promises", async (original) => {
+    const real = await original<typeof import("node:fs/promises")>();
+    return {
+        ...real,
+        rename: (from: string, to: string) => {
+            if (String(to).endsWith("installed.json") && ++refuse.seen > refuse.after) {
+                return Promise.reject(Object.assign(new Error("EPERM: operation not permitted, rename"), { code: "EPERM" }));
+            }
+            return real.rename(from, to);
+        }
+    };
+});
+
+const CATALOG = "https://github.com/FJRG2007/polaris/releases/download/device-plugins/catalog.json";
+const DEVICE: UsbDevice = { vendorId: 0x06f8, productId: 0xe053 };
+const dirs: string[] = [];
+async function tempDir(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "plugins-manager-"));
+    dirs.push(dir);
+    return dir;
+}
+afterEach(async () => {
+    refuse.after = Number.POSITIVE_INFINITY;
+    refuse.seen = 0;
+    for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
+});
+
+async function setup() {
+    const dir = await tempDir();
+    const bytes = fixturePackage();
+    const catalogBytes = new TextEncoder().encode(JSON.stringify(catalogOf([entryFor(bytes)])));
+    const fetched: string[] = [];
+    const fetcher = fakeFetch({ [CATALOG]: catalogBytes, [`${CATALOG}.sig`]: sign(catalogBytes), [PACKAGE_URL]: bytes }, fetched);
+    let devices: UsbDevice[] | null = [];
+    let deviceListBroken = false;
+    const forks: string[] = [];
+    const offers: string[] = [];
+    const manager = createPluginManager({
+        dir,
+        platform: "linux-x64",
+        appVersion: "0.1.73",
+        fetcher,
+        keys: TEST_KEYS,
+        fork: (wanted): PluginChild => {
+            forks.push(wanted.entryPath);
+            return { postMessage: () => undefined, kill: () => undefined, onMessage: () => undefined, onExit: () => undefined };
+        },
+        call: async () => null,
+        devices: () => {
+            if (deviceListBroken) throw new Error("device list unavailable");
+            return devices;
+        },
+        offer: (entry, name) => offers.push(`${entry.id}:${name}`)
+    });
+    return {
+        manager,
+        dir,
+        fetched,
+        forks,
+        offers,
+        plug: (next: UsbDevice[] | null) => {
+            devices = next;
+        },
+        breakDeviceList: () => {
+            deviceListBroken = true;
+        }
+    };
+}
+
+describe("plugin manager", () => {
+    it("with nothing installed starts nothing and fetches nothing", async () => {
+        const { manager, fetched, forks } = await setup();
+        await manager.start();
+        expect(fetched).toEqual([]);
+        expect(forks).toEqual([]);
+    });
+
+    it("offers support once for a claimed device that is plugged in", async () => {
+        const { manager, offers, fetched } = await setup();
+        await manager.devicesChanged([DEVICE]);
+        await manager.devicesChanged([DEVICE]);
+        expect(offers).toEqual(["fixture-mixer:Fixture device"]);
+        expect(fetched.filter((url) => url === PACKAGE_URL)).toEqual([]);
+    });
+
+    it("sleeps an installed plugin while its device is unplugged and wakes it on the plug", async () => {
+        const { manager, forks, plug } = await setup();
+        await manager.snapshot();
+        await manager.refresh();
+        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true, started: true });
+        expect(forks).toEqual([]);
+        expect((await manager.snapshot()).installed[0]?.run).toEqual({ state: "sleeping" });
+        plug([DEVICE]);
+        await manager.devicesChanged([DEVICE]);
+        expect(forks).toHaveLength(1);
+        expect((await manager.snapshot()).installed[0]?.run).toMatchObject({ state: "starting" });
+        plug([]);
+        await manager.devicesChanged([]);
+        expect((await manager.snapshot()).installed[0]?.run).toEqual({ state: "sleeping" });
+    });
+
+    it("reports an install that went in as installed when starting it fails", async () => {
+        const { manager, dir, breakDeviceList } = await setup();
+        await manager.refresh();
+        breakDeviceList();
+        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true, started: false });
+        expect(JSON.parse(await readFile(join(dir, "installed.json"), "utf8")).plugins["fixture-mixer"].version).toBe("1.0.0");
+    });
+
+    it("reports an install that went in as installed when writing it down afterwards keeps failing", async () => {
+        const { manager, dir } = await setup();
+        await manager.refresh();
+        refuse.seen = 0;
+        refuse.after = 1;
+        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true, started: true });
+        expect(JSON.parse(await readFile(join(dir, "installed.json"), "utf8")).plugins["fixture-mixer"].version).toBe("1.0.0");
+    });
+
+    it("runs an installed plugin where devices cannot be listed, and stops it when disabled", async () => {
+        const { manager, forks, plug } = await setup();
+        plug(null);
+        await manager.refresh();
+        await manager.install("fixture-mixer", ["usb", "polaris-actions"]);
+        expect(forks).toHaveLength(1);
+        await manager.setEnabled("fixture-mixer", false);
+        expect((await manager.snapshot()).installed[0]?.run).toEqual({ state: "disabled" });
+        expect(await manager.setSetting("fixture-mixer", "lights", false)).toEqual({ lights: false });
+        expect(await manager.setSetting("fixture-mixer", "lights", "off")).toBeNull();
+        await manager.uninstall("fixture-mixer");
+        expect((await manager.snapshot()).installed).toEqual([]);
+    });
+});
+
+describe("USB presence on Linux", () => {
+    it("reads sysfs ids and skips interfaces", async () => {
+        const root = await tempDir();
+        await mkdir(join(root, "1-2"));
+        await writeFile(join(root, "1-2", "idVendor"), "06f8\n");
+        await writeFile(join(root, "1-2", "idProduct"), "e053\n");
+        // An interface folder ("1-2:1.0" on Linux) holds no ids.
+        await mkdir(join(root, "usb1-interface"));
+        expect(listLinuxUsb(root)).toEqual([DEVICE]);
+        expect(readUsbId("zzzz")).toBeNull();
+        expect(listLinuxUsb(join(root, "missing"))).toEqual([]);
+    });
+});

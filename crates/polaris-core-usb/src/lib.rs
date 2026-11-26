@@ -1,5 +1,5 @@
 //! Which USB devices are plugged in, and word when that changes, for the
-//! desktop's device add-ons (docs/device-addons.md): an add-on whose device is
+//! desktop's device plugins (docs/device-plugins.md): a plugin whose device is
 //! unplugged has no process, and the plug event starts it.
 //!
 //! Vendor and product ids only - nothing is opened, so this never takes a

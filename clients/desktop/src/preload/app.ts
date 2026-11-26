@@ -35,6 +35,35 @@ const version = process.argv.find((arg) => arg.startsWith(VERSION_ARGUMENT))?.sl
 /** How many of the page's `onUpdateReady` listeners are attached. */
 let updateListeners = 0;
 
+const pluginsBridge: NonNullable<PolarisDesktop["plugins"]> = {
+    get: () => ipcRenderer.invoke(CHANNELS.pluginsGet),
+    refresh: () => ipcRenderer.invoke(CHANNELS.pluginsRefresh),
+    install: (id, accepted) => ipcRenderer.invoke(CHANNELS.pluginsInstall, id, accepted),
+    uninstall: (id) => ipcRenderer.invoke(CHANNELS.pluginsUninstall, id),
+    setEnabled: (id, enabled) => ipcRenderer.invoke(CHANNELS.pluginsEnable, id, enabled),
+    settings: (id) => ipcRenderer.invoke(CHANNELS.pluginsSettings, id),
+    setSetting: (id, key, value) => ipcRenderer.invoke(CHANNELS.pluginsSetSetting, id, key, value),
+    setAutoUpdate: (id, value) => ipcRenderer.invoke(CHANNELS.pluginsSetAutoUpdate, id, value),
+    viewCall: (id, method, params) => ipcRenderer.invoke(CHANNELS.pluginsViewCall, id, method, params),
+    official: (id, request) => ipcRenderer.invoke(CHANNELS.pluginsOfficial, id, request),
+    onChange: (listener) => {
+        const heard = () => listener();
+        ipcRenderer.on(CHANNELS.pluginsChanged, heard);
+        return () => {
+            ipcRenderer.removeListener(CHANNELS.pluginsChanged, heard);
+        };
+    },
+    onOpen: (listener) => {
+        const heard = (_event: unknown, id: unknown) => {
+            if (typeof id === "string") listener(id);
+        };
+        ipcRenderer.on(CHANNELS.pluginsOpen, heard);
+        return () => {
+            ipcRenderer.removeListener(CHANNELS.pluginsOpen, heard);
+        };
+    }
+};
+
 const bridge: PolarisDesktop = {
     version,
     platform: process.platform,
@@ -173,34 +202,9 @@ const bridge: PolarisDesktop = {
             };
         }
     },
-    addons: {
-        get: () => ipcRenderer.invoke(CHANNELS.addonsGet),
-        refresh: () => ipcRenderer.invoke(CHANNELS.addonsRefresh),
-        install: (id, accepted) => ipcRenderer.invoke(CHANNELS.addonsInstall, id, accepted),
-        uninstall: (id) => ipcRenderer.invoke(CHANNELS.addonsUninstall, id),
-        setEnabled: (id, enabled) => ipcRenderer.invoke(CHANNELS.addonsEnable, id, enabled),
-        settings: (id) => ipcRenderer.invoke(CHANNELS.addonsSettings, id),
-        setSetting: (id, key, value) => ipcRenderer.invoke(CHANNELS.addonsSetSetting, id, key, value),
-        setAutoUpdate: (id, value) => ipcRenderer.invoke(CHANNELS.addonsSetAutoUpdate, id, value),
-        viewCall: (id, method, params) => ipcRenderer.invoke(CHANNELS.addonsViewCall, id, method, params),
-        official: (id, request) => ipcRenderer.invoke(CHANNELS.addonsOfficial, id, request),
-        onChange: (listener) => {
-            const heard = () => listener();
-            ipcRenderer.on(CHANNELS.addonsChanged, heard);
-            return () => {
-                ipcRenderer.removeListener(CHANNELS.addonsChanged, heard);
-            };
-        },
-        onOpen: (listener) => {
-            const heard = (_event: unknown, id: unknown) => {
-                if (typeof id === "string") listener(id);
-            };
-            ipcRenderer.on(CHANNELS.addonsOpen, heard);
-            return () => {
-                ipcRenderer.removeListener(CHANNELS.addonsOpen, heard);
-            };
-        }
-    },
+    plugins: pluginsBridge,
+    // The name before the rename, for pages from hosts that predate it. Removable once no supported desktop app or host predates the rename (desktop 0.1.124).
+    addons: pluginsBridge,
     openMailDefaults: () => ipcRenderer.invoke(CHANNELS.openMailDefaults),
     setAppBadge: (input) => ipcRenderer.invoke(CHANNELS.appBadge, input),
     setAppIcon: (input) => ipcRenderer.invoke(CHANNELS.appIcon, input),

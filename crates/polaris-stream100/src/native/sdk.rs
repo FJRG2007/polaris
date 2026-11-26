@@ -117,7 +117,7 @@ fn wide(path: &Path) -> Vec<u16> {
 /// The Hercules SDK folder, when Program Files is known and absolute.
 ///
 /// Asked of the shell rather than read from `ProgramFiles`: the desktop app
-/// starts add-ons with a short list of environment variables that does not
+/// starts plugins with a short list of environment variables that does not
 /// include it, so the variable is missing in exactly the process that needs it
 /// (BUG-0056), and a variable is whatever the parent set, where the known
 /// folder is what the system says.
@@ -472,7 +472,7 @@ impl Drop for SdkInput {
 mod tests {
     use super::*;
 
-    // The add-on process has no `ProgramFiles` variable (BUG-0056): the folder
+    // The plugin process has no `ProgramFiles` variable (BUG-0056): the folder
     // has to come from the shell, and be the real one.
     #[test]
     fn program_files_comes_from_the_shell() {

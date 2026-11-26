@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 path = "src/lib.rs"
 
 [dependencies]
-# `usb`: the desktop's device add-ons (crates/polaris-core-usb).
+# `usb`: the desktop's device plugins (crates/polaris-core-usb).
 polaris-core = { path = "../polaris-core", features = ["opaque", "usb"] }
 napi = { version = "=3.16.2", default-features = false, features = ["napi6"] }
 napi-derive = { version = "=3.7.0", default-features = false }

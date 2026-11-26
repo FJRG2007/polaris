@@ -21,7 +21,7 @@
 // First: its first line is when the bundle began to run.
 import { markStartup, startupMarked, writeStartupLog } from "./startup-log";
 import { join } from "node:path";
-import { addonShortcutsNow, addonsSnapshotNow, registerAddonViewScheme, startDeviceAddons, stopDeviceAddons } from "./addons/electron";
+import { pluginShortcutsNow, pluginsSnapshotNow, registerPluginViewScheme, startDevicePlugins, stopDevicePlugins } from "./plugins/electron";
 import { HOST_UPDATE_ACCESS_PATH, hostsRoute, readSettingsProbe, readUpdateAccess, settingsRoute, type HostPageOutcome, type LocalSettingsState, type SettingsPlace, type SettingsProbe } from "@/shared/settings-route";
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
@@ -982,7 +982,7 @@ function start(): void {
     startedByLogin = startedAtLogin(process.argv);
     startHidden = startedByLogin && settings.toggle("startMinimized");
 
-    registerAddonViewScheme();
+    registerPluginViewScheme();
     app.on("browser-window-created", (_event, window) => hideMenuBar(window));
 
     app.on("web-contents-created", (_event, contents) => {
@@ -1074,10 +1074,10 @@ function start(): void {
         // sessions list groups it with this app (native-host/service.ts).
         startNativeHost({ primary: () => current, server });
 
-        launcher.startLauncher({ server, showPolaris, addons: () => addonShortcutsNow().installed, addonsSnapshot: addonsSnapshotNow });
-        // Device add-ons start after the window, never before it: with none
+        launcher.startLauncher({ server, showPolaris, plugins: () => pluginShortcutsNow().installed, pluginsSnapshot: pluginsSnapshotNow });
+        // Device plugins start after the window, never before it: with none
         // installed this reads one small file and starts nothing.
-        setTimeout(() => startDeviceAddons((path) => showPolaris(path)), 3_000).unref();
+        setTimeout(() => startDevicePlugins((path) => showPolaris(path)), 3_000).unref();
         registerIpc({
             server,
             showPolaris,
@@ -1254,7 +1254,7 @@ function start(): void {
 
     // Keys held system-wide are the operating system's until let go.
     app.on("will-quit", () => {
-        stopDeviceAddons();
+        stopDevicePlugins();
         void runner().use(null);
         releaseCallHotkeys();
         closeVoiceWidget();

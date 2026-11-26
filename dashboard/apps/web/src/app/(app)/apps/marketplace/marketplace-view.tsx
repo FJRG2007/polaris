@@ -88,8 +88,8 @@ import {
 } from "./store-card";
 import * as store from "@polaris/ui/store-card";
 import { StoreFilters, StoreNoMatch, StoreSection } from "@polaris/ui/store-layout";
-import { ADDON_CATEGORIES, type AddonCategory } from "@polaris/core/device-addons";
-import { AddonsShelf } from "@/app/(app)/account/addons/addons-view";
+import { PLUGIN_CATEGORIES, type PluginCategory } from "@polaris/core/device-plugins";
+import { PluginsShelf } from "@/app/(app)/account/plugins/plugins-view";
 import {
     Badge,
     Button,
@@ -124,16 +124,16 @@ export function statusLabel(t: Words, status: string): string {
  *  (`uninstallAccess`, the check the uninstall action makes). */
 export type StoreInstallRow = InstalledAppReaderView & { readonly canUninstall?: boolean };
 
-/** What the Marketplace lists: everything, only apps, or only device add-ons. */
-type StoreKind = "all" | "apps" | "addons";
+/** What the Marketplace lists: everything, only apps, or only device plugins. */
+type StoreKind = "all" | "apps" | "plugins";
 
-const STORE_KINDS: readonly StoreKind[] = ["all", "apps", "addons"];
+const STORE_KINDS: readonly StoreKind[] = ["all", "apps", "plugins"];
 
-/** An add-on category in the shared category bar, kept apart from the apps' own. */
-type AddonCategoryFilter = `addon:${AddonCategory}`;
+/** A plugin category in the shared category bar, kept apart from the apps' own. */
+type PluginCategoryFilter = `plugin:${PluginCategory}`;
 
-const addonCategoryOf = (value: string): AddonCategory | null =>
-    value.startsWith("addon:") ? (value.slice(6) as AddonCategory) : null;
+const pluginCategoryOf = (value: string): PluginCategory | null =>
+    value.startsWith("plugin:") ? (value.slice(6) as PluginCategory) : null;
 
 export function MarketplaceView({
     installed,
@@ -174,21 +174,21 @@ export function MarketplaceView({
     const [deploying, setDeploying] = useState<AppManifest | null>(null);
     const [removing, setRemoving] = useState<StoreInstallRow | null>(null);
     const [query, setQuery] = useState(initialQuery);
-    const [picked, setPicked] = useState<StoreCategory | AddonCategoryFilter>("all");
+    const [picked, setPicked] = useState<StoreCategory | PluginCategoryFilter>("all");
     const [sort, setSort] = useState<StoreSort>("featured");
-    // Device add-ons belong to the reader's own computer, not to a server, so they
+    // Device plugins belong to the reader's own computer, not to a server, so they
     // are offered on the reader's Marketplace and never on the Polaris apps screen.
-    const withAddons = scope === "deployable";
+    const withPlugins = scope === "deployable";
     const [kind, setKind] = useState<StoreKind>("all");
-    const addonCategory = addonCategoryOf(picked);
-    const showsApps = !withAddons || (kind !== "addons" && addonCategory === null);
-    const showsAddons = withAddons && kind !== "apps" && (picked === "all" || addonCategory !== null);
-    // An add-on category lists no apps; for the app filters it reads as all of them.
-    const category: StoreCategory = addonCategory === null ? (picked as StoreCategory) : "all";
+    const pluginCategory = pluginCategoryOf(picked);
+    const showsApps = !withPlugins || (kind !== "plugins" && pluginCategory === null);
+    const showsPlugins = withPlugins && kind !== "apps" && (picked === "all" || pluginCategory !== null);
+    // A plugin category lists no apps; for the app filters it reads as all of them.
+    const category: StoreCategory = pluginCategory === null ? (picked as StoreCategory) : "all";
     const pickKind = (next: StoreKind) => {
         setKind(next);
-        if (next === "apps" && addonCategory !== null) setPicked("all");
-        if (next === "addons" && addonCategory === null) setPicked("all");
+        if (next === "apps" && pluginCategory !== null) setPicked("all");
+        if (next === "plugins" && pluginCategory === null) setPicked("all");
     };
 
     // In the reader's words, so the cards and the search say what they read. An
@@ -291,21 +291,21 @@ export function MarketplaceView({
             onInstall={() => (app.deployTemplate ? setDeploying(app) : install(app))}
             onConfigure={() => setWizardApp(app)}
             onUninstall={setRemoving}
-            kindLabel={withAddons ? t("card.kindApp") : undefined}
+            kindLabel={withPlugins ? t("card.kindApp") : undefined}
         />
     );
 
-    const addonsShelf = showsAddons ? (
-        <AddonsShelf
+    const pluginsShelf = showsPlugins ? (
+        <PluginsShelf
             query={query}
-            category={addonCategory ?? ""}
+            category={pluginCategory ?? ""}
             byName={sort === "name"}
-            label={t("view.shelves.addons")}
-            kind={t("card.kindAddon")}
+            label={t("view.shelves.plugins")}
+            kind={t("card.kindPlugin")}
         />
     ) : null;
 
-    const kindSwitch = withAddons ? (
+    const kindSwitch = withPlugins ? (
         <SegmentedControl
             value={kind}
             onValueChange={pickKind}
@@ -340,7 +340,7 @@ export function MarketplaceView({
                         ) : null
                     }
                 />
-                {addonsShelf}
+                {pluginsShelf}
             </div>
         );
 
@@ -359,24 +359,24 @@ export function MarketplaceView({
                 category={picked}
                 onCategoryChange={setPicked}
                 categories={[
-                    ...(["all", ...(kind === "addons" ? [] : categories)] as StoreCategory[]).map(
+                    ...(["all", ...(kind === "plugins" ? [] : categories)] as StoreCategory[]).map(
                         (value) => ({
-                            value: value as StoreCategory | AddonCategoryFilter,
+                            value: value as StoreCategory | PluginCategoryFilter,
                             label:
                                 value === "all"
                                     ? t("view.allCategories")
                                     : categoryLabel(words, value, navLabel)
                         })
                     ),
-                    ...(withAddons && kind !== "apps"
-                        ? ADDON_CATEGORIES.map((value) => ({
-                              value: `addon:${value}` as AddonCategoryFilter,
-                              label: ta(`addons.category.${value}`)
+                    ...(withPlugins && kind !== "apps"
+                        ? PLUGIN_CATEGORIES.map((value) => ({
+                              value: `plugin:${value}` as PluginCategoryFilter,
+                              label: ta(`plugins.category.${value}`)
                           }))
                         : [])
                 ]}
                 words={{
-                    search: kind === "addons" ? ta("addons.filters.search") : t("view.search"),
+                    search: kind === "plugins" ? ta("plugins.filters.search") : t("view.search"),
                     sortLabel: t("view.sortLabel"),
                     categories: t("view.categories")
                 }}
@@ -443,7 +443,7 @@ export function MarketplaceView({
                 ))
             )}
 
-            {addonsShelf}
+            {pluginsShelf}
 
             {wizardApp && <InstallWizard app={wizardApp} onClose={() => setWizardApp(null)} />}
             {deploying?.deployTemplate && (
@@ -777,7 +777,7 @@ function StoreCard({
     onInstall: () => void;
     onConfigure: () => void;
     onUninstall: (item: StoreInstallRow) => void;
-    /** The "App" badge, where device add-ons share the grid. */
+    /** The "App" badge, where device plugins share the grid. */
     kindLabel?: string;
 }) {
     const t = useTranslations("marketplace");

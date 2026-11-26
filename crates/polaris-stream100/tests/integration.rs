@@ -169,11 +169,11 @@ fn the_manifest_claims_only_the_stream_100() {
 
 #[test]
 fn the_published_manifest_is_the_crates_own() {
-    // clients/device-addons/hercules-stream100/manifest.json is what CI packages; it
+    // clients/device-plugins/hercules-stream100/manifest.json is what CI packages; it
     // must be exactly what the code declares (regenerate it from `manifest()`).
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../clients/device-addons/hercules-stream100/manifest.json"
+        "/../../clients/device-plugins/hercules-stream100/manifest.json"
     );
     let published: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();

@@ -111,10 +111,10 @@ function keptPage(url, answer) {
 }
 
 /* The pages a page may ask to have kept before they were ever opened here: the
- * desktop app's own settings (Settings > This app) and its device add-ons, which
+ * desktop app's own settings (Settings > This app) and its device plugins, which
  * read from the app rather than the network once drawn, so every one opens
  * offline - one opened offline is a full navigation, answered from here. */
-const WARMABLE = /^\/account\/(?:app\/[a-z]{1,20}|addons)$/;
+const WARMABLE = /^\/account\/(?:app\/[a-z]{1,20}|plugins|addons)$/;
 const WARM_MOST = 16;
 
 /** Loads and keeps each path not kept yet, one at a time. */

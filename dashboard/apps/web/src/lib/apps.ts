@@ -2855,8 +2855,8 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         // Hardware support the desktop app installs on this computer only.
         {
-            label: "Device add-ons", // i18n-ignore
-            href: "/account/addons",
+            label: "Device plugins", // i18n-ignore
+            href: "/account/plugins",
             icon: Puzzle,
             keywords: ["add-on", "addon", "plugin", "extension", "device", "usb", "hercules", "stream 100", "mixer"],
             group: THIS_APP_GROUP,

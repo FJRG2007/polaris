@@ -19,8 +19,8 @@ let wantedFile: string | null = null;
 let held: { items: readonly MenuItemConstructorOptions[]; show: () => void } | null = null;
 /** The last link handed to the browser, for "Copy last link opened". */
 let lastLink: string | null = null;
-/** The add-ons whose device is plugged in now, each a way to its page. */
-let addons: { items: readonly { id: string; name: string; }[]; open: (id: string) => void } = { items: [], open: () => undefined };
+/** The plugins whose device is plugged in now, each a way to its page. */
+let plugins: { items: readonly { id: string; name: string; }[]; open: (id: string) => void } = { items: [], open: () => undefined };
 
 /**
  * Remember the last link sent to the browser. A link that the system took but
@@ -33,11 +33,11 @@ export function rememberLink(url: string): void {
 }
 
 /**
- * The add-ons to offer "Configure <name>" for: those whose device is plugged in
- * now (`addons/ways-in.ts`). Nothing is listed while none is.
+ * The plugins to offer "Configure <name>" for: those whose device is plugged in
+ * now (`plugins/ways-in.ts`). Nothing is listed while none is.
  */
-export function setTrayAddons(items: readonly { id: string; name: string; }[], open: (id: string) => void): void {
-    addons = { items, open };
+export function setTrayPlugins(items: readonly { id: string; name: string; }[], open: (id: string) => void): void {
+    plugins = { items, open };
     if (held) installTray(held.items, held.show);
 }
 
@@ -85,8 +85,8 @@ export function installTray(items: readonly MenuItemConstructorOptions[], show: 
             { type: "separator" },
             ...items,
             { type: "separator" },
-            ...(addons.items.length > 0
-                ? [...addons.items.map((addon): MenuItemConstructorOptions => ({ label: `Configure ${addon.name}`, click: () => addons.open(addon.id) })), { type: "separator" as const }]
+            ...(plugins.items.length > 0
+                ? [...plugins.items.map((plugin): MenuItemConstructorOptions => ({ label: `Configure ${plugin.name}`, click: () => plugins.open(plugin.id) })), { type: "separator" as const }]
                 : []),
             {
                 label: "Copy last link opened",

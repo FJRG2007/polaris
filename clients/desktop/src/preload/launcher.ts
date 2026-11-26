@@ -14,7 +14,9 @@ const bridge: PolarisLauncher = {
     run: (id) => ipcRenderer.invoke(LAUNCHER_CHANNELS.run, id),
     hide: () => ipcRenderer.invoke(LAUNCHER_CHANNELS.hide),
     clearClipboard: () => ipcRenderer.invoke(LAUNCHER_CHANNELS.clearClipboard),
-    addons: () => ipcRenderer.invoke(LAUNCHER_CHANNELS.addons),
+    plugins: () => ipcRenderer.invoke(LAUNCHER_CHANNELS.plugins),
+    // The name before the rename, for launcher pages from hosts that predate it.
+    addons: () => ipcRenderer.invoke(LAUNCHER_CHANNELS.plugins),
     onOpened: (listener) => {
         ipcRenderer.on(LAUNCHER_CHANNELS.opened, (_event, query: unknown) => listener(typeof query === "string" ? query : ""));
     },

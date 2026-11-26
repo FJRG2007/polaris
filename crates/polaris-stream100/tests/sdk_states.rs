@@ -70,7 +70,7 @@ fn replay(name: &str) -> Vec<Vec<Event>> {
     let mut events = vec![decoder.feed(first)];
     for frame in &frames[1..] {
         let report = sdk::decode_state(&frame.state).unwrap();
-        // The add-on carries each report across as bytes; replay that hop.
+        // The plugin carries each report across as bytes; replay that hop.
         events.push(decoder.feed(Report::parse(&report.to_bytes()).unwrap()));
     }
     events

@@ -1,6 +1,6 @@
 [package]
 name = "polaris-stream100"
-version = "0.1.8"
+version = "0.1.9"
 description = "Polaris' driver for the Hercules Stream 100: its USB protocol, knob handling, display frames and per-app audio categories (docs/devices/hercules-stream100.md)."
 edition.workspace = true
 rust-version.workspace = true
@@ -19,7 +19,7 @@ default = []
 usb = ["dep:nusb"]
 # The operating system's per-app volume, the controller's input reports (the
 # HID API on Windows, `usb` elsewhere) and, on Windows, who holds the device.
-# Built only into the add-on's own binding, never into anything a machine
+# Built only into the plugin's own binding, never into anything a machine
 # without the controller loads.
 native = ["usb", "dep:windows", "dep:pulseaudio"]
 

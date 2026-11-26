@@ -4,7 +4,7 @@
 //! each knob and button is set to, and answers each input report with what to
 //! do: change a session's volume or mute, change the output's, or run a
 //! Polaris action. It never touches audio or the network itself, so the host
-//! (the add-on process) applies the commands and the engine stays pure and
+//! (the plugin process) applies the commands and the engine stays pure and
 //! tested without a device.
 
 use crate::audio::{resolve, Session, Target};

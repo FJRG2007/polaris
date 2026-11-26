@@ -175,7 +175,7 @@ export interface PolarisDesktop {
     readonly voiceWidgetPictures: true;
     /** Hear a press on the voice widget's buttons. Answers the way to stop. */
     onVoiceAction(listener: (action: VoiceAction) => void): () => void;
-    /** Hear a device add-on's camera or screen button, for the page holding the call. Answers the way to stop. */
+    /** Hear a device plugin's camera or screen button, for the page holding the call. Answers the way to stop. */
     onCallAction(listener: (action: CallPageAction) => void): () => void;
     /** Open the app's window for adding and switching servers. */
     openServers(): Promise<void>;
@@ -246,17 +246,17 @@ export interface PolarisDesktop {
         onOpen(listener: (category: string) => void): () => void;
     };
     /**
-     * Device add-ons on this computer (`main/addons`), for the host's Settings
-     * to draw its store and each add-on's page. Answers are read through
-     * `@polaris/core/device-addons` on the page's side; absent in apps that
+     * Device plugins on this computer (`main/plugins`), for the host's Settings
+     * to draw its store and each plugin's page. Answers are read through
+     * `@polaris/core/device-plugins` on the page's side; absent in apps that
      * predate them.
      */
-    addons?: {
-        /** The catalog, what is installed and how each one runs (`AddonsSnapshot`). */
+    plugins?: {
+        /** The catalog, what is installed and how each one runs (`PluginsSnapshot`). */
         get(): Promise<unknown>;
         /** Fetch the catalog now. */
         refresh(): Promise<void>;
-        /** Install or update; `accepted` must hold every permission the add-on asks for. */
+        /** Install or update; `accepted` must hold every permission the plugin asks for. */
         install(id: string, accepted: readonly string[]): Promise<unknown>;
         uninstall(id: string): Promise<boolean>;
         setEnabled(id: string, enabled: boolean): Promise<boolean>;
@@ -264,23 +264,25 @@ export interface PolarisDesktop {
         settings(id: string): Promise<unknown>;
         /** Change one; answers every value after it, or null when refused. */
         setSetting(id: string, key: string, value: unknown): Promise<unknown>;
-        /** Whether updates go in by themselves: for one add-on (`id`), or for all (`id` null); null on one follows all. */
+        /** Whether updates go in by themselves: for one plugin (`id`), or for all (`id` null); null on one follows all. */
         setAutoUpdate(id: string | null, value: boolean | null): Promise<boolean>;
-        /** A call from the add-on's view, relayed by the page holding its frame: `{ ok, value }` or `{ ok: false, error }`. */
+        /** A call from the plugin's view, relayed by the page holding its frame: `{ ok, value }` or `{ ok: false, error }`. */
         viewCall(id: string, method: string, params: unknown): Promise<unknown>;
         /** Hear that anything changed (progress, a crash, an install). Answers the way to stop. */
         onChange(listener: () => void): () => void;
-        /** Hear the app asking to show an add-on (its "found" notice was clicked). Answers the way to stop. */
+        /** Hear the app asking to show a plugin (its "found" notice was clicked). Answers the way to stop. */
         onOpen(listener: (id: string) => void): () => void;
         /**
          * The device's official software on this computer, for the install
-         * dialog and the add-on's page: `{ kind: "look" }`, `{ kind: "choose",
+         * dialog and the plugin's page: `{ kind: "look" }`, `{ kind: "choose",
          * choice, accepted }` (carries the choice out, then installs),
          * `{ kind: "restore" }` and `{ kind: "launch" }`. Answers null for an
-         * add-on with no official software the app knows of.
+         * plugin with no official software the app knows of.
          */
         official(id: string, request: unknown): Promise<unknown>;
     };
+    /** @deprecated `plugins` by its name before the rename, the same object, for hosts that predate it. Removable once no supported desktop app or host predates the rename (desktop 0.1.124). */
+    addons?: PolarisDesktop["plugins"];
     /** Open Windows' Default apps at Polaris, where it can be picked for mailto
      *  links. False where there is no such screen to open (macOS, Linux). */
     openMailDefaults(): Promise<boolean>;
@@ -855,18 +857,18 @@ export const CHANNELS = {
     hostsImport: "desktop:hosts-import",
     appSettingsChanged: "desktop:app-settings-changed",
     appSettingsOpen: "desktop:app-settings-open",
-    addonsGet: "desktop:addons-get",
-    addonsRefresh: "desktop:addons-refresh",
-    addonsInstall: "desktop:addons-install",
-    addonsUninstall: "desktop:addons-uninstall",
-    addonsEnable: "desktop:addons-enable",
-    addonsSettings: "desktop:addons-settings",
-    addonsSetSetting: "desktop:addons-set-setting",
-    addonsSetAutoUpdate: "desktop:addons-set-auto-update",
-    addonsViewCall: "desktop:addons-view-call",
-    addonsChanged: "desktop:addons-changed",
-    addonsOpen: "desktop:addons-open",
-    addonsOfficial: "desktop:addons-official",
+    pluginsGet: "desktop:plugins-get",
+    pluginsRefresh: "desktop:plugins-refresh",
+    pluginsInstall: "desktop:plugins-install",
+    pluginsUninstall: "desktop:plugins-uninstall",
+    pluginsEnable: "desktop:plugins-enable",
+    pluginsSettings: "desktop:plugins-settings",
+    pluginsSetSetting: "desktop:plugins-set-setting",
+    pluginsSetAutoUpdate: "desktop:plugins-set-auto-update",
+    pluginsViewCall: "desktop:plugins-view-call",
+    pluginsChanged: "desktop:plugins-changed",
+    pluginsOpen: "desktop:plugins-open",
+    pluginsOfficial: "desktop:plugins-official",
     openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",
     appIcon: "desktop:app-icon",

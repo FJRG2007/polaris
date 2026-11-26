@@ -32,7 +32,7 @@ pub const DISPLAY_ENDPOINT: u8 = 0x01;
 /// The device interface Polaris' WinUSB package (`polaris-stream100.inf`)
 /// registers, so Polaris finds the controller it installed for and nothing
 /// else. Generated at random for Polaris; the desktop app's INF renderer uses the same
-/// value (`clients/desktop/src/main/addons/hercules-driver.ts`, a test there
+/// value (`clients/desktop/src/main/plugins/hercules-driver.ts`, a test there
 /// keeps the two equal).
 pub const DEVICE_INTERFACE_GUID: &str = "{24a30efc-7c61-4f1a-baaa-f87f84a38ce1}";
 /// [`DEVICE_INTERFACE_GUID`] as the number Windows' `GUID` holds.

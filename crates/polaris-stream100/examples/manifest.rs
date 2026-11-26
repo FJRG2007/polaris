@@ -1,6 +1,6 @@
-//! Prints the device add-on manifest as `clients/device-addons/hercules-stream100/manifest.json` holds it:
+//! Prints the device plugin manifest as `clients/device-plugins/hercules-stream100/manifest.json` holds it:
 //!
-//!   cargo run -q -p polaris-stream100 --example manifest > clients/device-addons/hercules-stream100/manifest.json
+//!   cargo run -q -p polaris-stream100 --example manifest > clients/device-plugins/hercules-stream100/manifest.json
 
 use serde::Serialize;
 

@@ -31,7 +31,7 @@ polaris/
 │   └── scripts/               # install / update / dev
 └── clients/
     ├── desktop/               # native desktop app (Electron, own npm workspace)
-    ├── device-addons/         # device add-ons the desktop app installs
+    ├── device-plugins/         # device plugins the desktop app installs
     └── terminal/              # Polaris Terminal, its own Cargo workspace
 ```
 

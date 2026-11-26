@@ -670,7 +670,7 @@ pub fn phone_country_from_regions(regions: Vec<Option<String>>) -> Option<&'stat
     polaris_core::phone::phone_country_from_regions(regions.iter().map(Option::as_deref))
 }
 
-// USB presence for the desktop's device add-ons, polaris_core::usb: vendor
+// USB presence for the desktop's device plugins, polaris_core::usb: vendor
 // and product ids only, nothing opened.
 
 fn usb_error(error: polaris_core::usb::Error) -> napi::Error {

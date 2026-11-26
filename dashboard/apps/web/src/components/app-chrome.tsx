@@ -88,7 +88,7 @@ import { ServiceWorkerRegistration } from "@/components/installed-app";
 import { getReportedTimeZone, resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
 import { DesktopGameReporter } from "@/components/desktop-game-reporter";
-import { DesktopAddonsOpener } from "@/components/desktop-addons-opener";
+import { DesktopPluginsOpener } from "@/components/desktop-plugins-opener";
 import { DesktopAppSettingsListener } from "@/components/desktop-app-settings-listener";
 import { ChatUnreadProvider } from "@/components/chat-unread";
 import { MailUnreadProvider } from "@/components/mail-unread";
@@ -335,7 +335,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                 <LocaleWatcher />
                                                                                 <PresenceReporter />
                                                                                 <DesktopGameReporter />
-                                                                                <DesktopAddonsOpener />
+                                                                                <DesktopPluginsOpener />
                                                                                 <DesktopAppSettingsListener />
                                                                                 <TimeZoneReporter
                                                                                     reported={

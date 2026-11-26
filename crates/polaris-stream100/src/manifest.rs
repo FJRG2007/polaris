@@ -1,9 +1,9 @@
-//! How this module describes itself to the desktop app: the device add-on
-//! manifest (`docs/device-addons.md`, schema in `@polaris/core/device-addons`).
+//! How this module describes itself to the desktop app: the device plugin
+//! manifest (`docs/device-plugins.md`, schema in `@polaris/core/device-plugins`).
 //!
-//! `clients/device-addons/hercules-stream100/manifest.json` is this function's output,
+//! `clients/device-plugins/hercules-stream100/manifest.json` is this function's output,
 //! checked by a test, so the published package and the code cannot drift. The
-//! desktop watches for the USB id it claims and runs the add-on only while
+//! desktop watches for the USB id it claims and runs the plugin only while
 //! such a device can be there; with no controller nothing runs.
 
 use serde_json::{json, Value};
@@ -15,10 +15,10 @@ pub const PLATFORMS: [&str; 2] = ["win32-x64", "linux-x64"];
 /// The script each platform's package starts.
 pub const ENTRY: &str = "main.cjs";
 
-/// The page in the package that draws the controller (`docs/device-addons.md`).
+/// The page in the package that draws the controller (`docs/device-plugins.md`).
 pub const VIEW: &str = "view/index.html";
 
-/// The first desktop release with the add-on host.
+/// The first desktop release with the plugin host.
 pub const MIN_APP_VERSION: &str = "0.1.75";
 
 pub fn manifest() -> Value {
@@ -45,8 +45,8 @@ pub fn manifest() -> Value {
         // playing audio; run Polaris' call actions from the buttons. The
         // display is asked for once something is drawn on it.
         "permissions": ["usb", "audio-sessions", "polaris-actions"],
-        "settings": crate::addon::addon_settings(),
-        "groups": crate::addon::addon_groups(),
+        "settings": crate::plugin::plugin_settings(),
+        "groups": crate::plugin::plugin_groups(),
         // The editor that shows the controller: its screen, knobs and buttons.
         "view": VIEW,
     })

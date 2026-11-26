@@ -76,16 +76,16 @@ export interface LauncherHost {
     readonly server: () => string | null;
     /** Show the Polaris window at a path of the Polaris in use. */
     readonly showPolaris: (path?: string) => void;
-    /** The device add-ons installed here, each with its page in Settings, for "Configure <name>". */
-    readonly addons?: () => readonly {
+    /** The device plugins installed here, each with its page in Settings, for "Configure <name>". */
+    readonly plugins?: () => readonly {
         readonly id: string;
         readonly name: string;
         readonly path: string;
         /** Its groups of settings and settings, each leading to that place on its page. */
         readonly places?: readonly { readonly label: string; readonly path: string; readonly words: readonly string[]; }[];
     }[];
-    /** The add-on bridge's snapshot, so the instance's palette lists them with their settings in the reader's language. */
-    readonly addonsSnapshot?: () => Promise<unknown>;
+    /** The plugin bridge's snapshot, so the instance's palette lists them with their settings in the reader's language. */
+    readonly pluginsSnapshot?: () => Promise<unknown>;
 }
 
 let host: LauncherHost | null = null;
@@ -284,11 +284,11 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
                 add({ kind: "polaris", title: entry.label, subtitle: entry.context }, () => host?.showPolaris(entry.href), entryKey(entry));
             }
             for (const page of rankedMatches(query, PAGES.map((page) => ({ ...page, context: "Polaris" })), 3, pageKey, uses)) addPage(page);
-            const addonPages = (host?.addons?.() ?? []).flatMap((addon) => [
-                { label: `Configure ${addon.name}`, path: addon.path, context: addon.name, subtitle: "Device add-on - opens its settings" },
-                ...(addon.places ?? []).map((place) => ({ label: `${addon.name} - ${place.label}`, path: place.path, context: place.words.join(" "), subtitle: `Setting of ${addon.name}` }))
+            const pluginPages = (host?.plugins?.() ?? []).flatMap((plugin) => [
+                { label: `Configure ${plugin.name}`, path: plugin.path, context: plugin.name, subtitle: "Device plugin - opens its settings" },
+                ...(plugin.places ?? []).map((place) => ({ label: `${plugin.name} - ${place.label}`, path: place.path, context: place.words.join(" "), subtitle: `Setting of ${plugin.name}` }))
             ]);
-            for (const page of rankedMatches(query, addonPages, PER_KIND, pageKey, uses)) {
+            for (const page of rankedMatches(query, pluginPages, PER_KIND, pageKey, uses)) {
                 add({ kind: "page", title: page.label, subtitle: page.subtitle }, () => host?.showPolaris(page.path), pageKey(page));
             }
         }
@@ -882,10 +882,11 @@ export function startLauncher(given: LauncherHost): void {
         action();
         return true;
     });
-    ipcMain.handle(LAUNCHER_CHANNELS.addons, async (event) => {
-        // The instance's own palette only: the window's own panel lists them from `addons` above.
+    // Also under its name from before the rename. Removable once no supported desktop app or host predates the rename (desktop 0.1.124).
+    for (const channel of [LAUNCHER_CHANNELS.plugins, "launcher:addons"]) ipcMain.handle(channel, async (event) => {
+        // The instance's own palette only: the window's own panel lists them from `plugins` above.
         if (!fromLauncher(event) || !remote) return null;
-        return (await host?.addonsSnapshot?.().catch(() => null)) ?? null;
+        return (await host?.pluginsSnapshot?.().catch(() => null)) ?? null;
     });
     ipcMain.handle(LAUNCHER_CHANNELS.hide, (event) => {
         if (fromLauncher(event)) hide();

@@ -11,7 +11,7 @@
 //!
 //! Isochronous writes go through `WinUsb_WriteIsochPipeAsap` (Windows 8.1+);
 //! `nusb` 0.2 has no isochronous transfers, which is why this route talks to
-//! WinUSB directly through the `windows` crate the add-on already pins.
+//! WinUSB directly through the `windows` crate the plugin already pins.
 
 use crate::display::PACKET_SIZE;
 use crate::report::{Report, REPORT_LEN};

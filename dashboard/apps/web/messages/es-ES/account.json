@@ -2467,14 +2467,14 @@
             "noScopes": "Tu cuenta no puede usar Polar, que es lo único que pide Polaris Terminal. Pide acceso a un administrador."
         }
     },
-    "addons": {
+    "plugins": {
         "page": {
-            "title": "Complementos",
+            "title": "Plugins de equipos",
             "intro": "Soporte para el hardware que conectas a este equipo. Solo se instala aquí y va con cualquier servidor.",
-            "browser": "Los complementos van en la app de escritorio de Polaris. Abre esta página allí para instalarlos.",
+            "browser": "Los plugins van en la app de escritorio de Polaris. Abre esta página allí para instalarlos.",
             "download": "Descargar la app",
-            "oldApp": "Esta versión de la app no tiene complementos. Actualízala para tenerlos.",
-            "back": "Complementos"
+            "oldApp": "Esta versión de la app no tiene plugins. Actualízala para tenerlos.",
+            "back": "Plugins de equipos"
         },
         "tabs": {
             "browse": "Explorar",
@@ -2482,7 +2482,7 @@
             "updates": "Novedades"
         },
         "filters": {
-            "search": "Buscar complementos",
+            "search": "Buscar plugins",
             "categories": "Categorías"
         },
         "category": {
@@ -2494,11 +2494,11 @@
             "other": "Otros"
         },
         "empty": {
-            "catalog": "Aún no hay complementos publicados.",
+            "catalog": "Aún no hay plugins publicados.",
             "offline": "No se pudo cargar la lista. Los instalados siguen funcionando.",
             "installed": "Nada instalado en este equipo.",
             "updates": "Todo está al día.",
-            "noMatch": "Ningún complemento coincide con \"{query}\"."
+            "noMatch": "Ningún plugin coincide con \"{query}\"."
         },
         "card": {
             "install": "Instalar",
@@ -2557,11 +2557,11 @@
             "screenshot": "Captura {number} de {name}",
             "settings": "Ajustes",
             "noSettings": "Nada que configurar.",
-            "enabled": "Activar complemento",
+            "enabled": "Activar plugin",
             "uninstall": "Desinstalar",
             "uninstallTitle": "¿Desinstalar {name}?",
             "uninstallBody": "Se borran sus archivos y ajustes de este equipo.",
-            "notFound": "Este complemento no está en el equipo ni en la lista.",
+            "notFound": "Este plugin no está en el equipo ni en la lista.",
             "installFirst": "Instálalo para configurarlo.",
             "saveFailed": "No se guardó el cambio.",
             "toggleFailed": "No se pudo cambiar.",
@@ -2584,7 +2584,7 @@
             "confirm": "Actualizar"
         },
         "auto": {
-            "all": "Actualizar complementos solos",
+            "all": "Actualizar plugins solos",
             "one": "Actualizar solo",
             "hint": "Las que piden permisos nuevos te esperan.",
             "failed": "Ese cambio no se guardó."

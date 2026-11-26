@@ -1,0 +1,2 @@
+# Native modules are built by .github/workflows/device-plugins.yml, never committed.
+*.node

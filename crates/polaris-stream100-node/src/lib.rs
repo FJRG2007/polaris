@@ -1,11 +1,11 @@
 //! Node binding of `polaris-stream100`. Conversion only: the protocol, the knob
 //! engine, the categories and the backends are the crate's.
 //!
-//! Values cross as JSON text in the crate's own serde shapes, so the add-on's
+//! Values cross as JSON text in the crate's own serde shapes, so the plugin's
 //! TypeScript validates one documented shape instead of a second copy of every
 //! type. Every export catches panics (built with the `release-node` profile,
 //! which unwinds), so a defect surfaces as an `Error` and never aborts the
-//! add-on's process.
+//! plugin's process.
 
 use napi::bindgen_prelude::{AsyncTask, Uint8Array};
 use napi::{Env, Task};
@@ -16,7 +16,7 @@ use polaris_stream100::native::input::Input;
 use polaris_stream100::report::KnobMap;
 use polaris_stream100::settings::{schema, Settings};
 use polaris_stream100::transport::TransportError;
-use polaris_stream100::{addon, manifest, native, ownership};
+use polaris_stream100::{plugin, manifest, native, ownership};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -29,31 +29,31 @@ fn audio_error(error: AudioError) -> napi::Error {
     napi::Error::from_reason(error.to_string())
 }
 
-/// The device add-on manifest (`clients/device-addons/hercules-stream100/manifest.json`).
+/// The device plugin manifest (`clients/device-plugins/hercules-stream100/manifest.json`).
 #[napi(catch_unwind)]
 pub fn manifest_json() -> napi::Result<String> {
     json(&manifest::manifest())
 }
 
-/// The declarative settings schema the add-on's settings page draws.
+/// The declarative settings schema the plugin's settings page draws.
 #[napi(catch_unwind)]
 pub fn schema_json() -> napi::Result<String> {
     json(&schema())
 }
 
-/// The add-on manifest's `settings` list (flat switches, choices, ranges, actions).
+/// The plugin manifest's `settings` list (flat switches, choices, ranges, actions).
 #[napi(catch_unwind)]
-pub fn addon_settings_json() -> napi::Result<String> {
-    json(&addon::addon_settings())
+pub fn plugin_settings_json() -> napi::Result<String> {
+    json(&plugin::plugin_settings())
 }
 
-/// The add-on page's stored flat values (a JSON object) as the full settings
+/// The plugin page's stored flat values (a JSON object) as the full settings
 /// [`Controller`] takes; anything missing or not fitting keeps its default.
 #[napi(catch_unwind)]
-pub fn settings_from_addon(values: String) -> napi::Result<String> {
+pub fn settings_from_plugin(values: String) -> napi::Result<String> {
     let values = serde_json::from_str::<serde_json::Value>(&values).unwrap_or_default();
     let empty = serde_json::Map::new();
-    json(&addon::settings_from_addon(
+    json(&plugin::settings_from_plugin(
         values.as_object().unwrap_or(&empty),
     ))
 }
@@ -91,7 +91,7 @@ pub fn audio_status() -> String {
 /// The controller: input reports in; volume and mute applied through this
 /// system's per-app volume; Polaris actions handed back to the caller.
 ///
-/// Create and use it on one thread (the add-on's main thread): the Windows
+/// Create and use it on one thread (the plugin's main thread): the Windows
 /// backend's COM objects belong to the thread that made them.
 #[napi]
 pub struct Controller {
@@ -203,7 +203,7 @@ struct ReaderState {
     closed: AtomicBool,
 }
 
-/// One wait for a report, run on a worker thread so the add-on's main
+/// One wait for a report, run on a worker thread so the plugin's main
 /// thread (and the Controller's audio objects on it) never block on the device.
 pub struct NextRead {
     state: Arc<ReaderState>,

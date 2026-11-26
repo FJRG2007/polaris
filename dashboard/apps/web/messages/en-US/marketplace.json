@@ -46,7 +46,7 @@
         "shelves": {
             "polaris": "Polaris apps",
             "community": "From other developers",
-            "addons": "Device add-ons"
+            "plugins": "Device plugins"
         },
         "empty": {
             "title": "Nothing to deploy yet",
@@ -57,7 +57,7 @@
             "label": "Show",
             "all": "All",
             "apps": "Apps",
-            "addons": "Add-ons"
+            "plugins": "Plugins"
         }
     },
     "uninstall": {
@@ -93,7 +93,7 @@
         "lockedHint": "Installing apps needs permission to manage apps. Ask an admin.",
         "preview": "{name} preview",
         "kindApp": "App",
-        "kindAddon": "Add-on"
+        "kindPlugin": "Plugin"
     },
     "wizard": {
         "title": "Install {name}",

@@ -12,6 +12,8 @@ interface DesktopLauncherBridge {
     open(href: string): Promise<void>;
     onOpened(listener: (query?: unknown) => void): void;
     onHidden(listener: () => void): void;
+    plugins(): Promise<unknown>;
+    /** `plugins` in a desktop app from before the rename (0.1.122). */
     addons(): Promise<unknown>;
 }
 
@@ -39,7 +41,8 @@ export function LauncherSearch({
 }) {
     const host = useMemo<SearchHost>(() => {
         const bridge = typeof window === "undefined" ? undefined : window.polarisLauncher;
-        const addons = bridge?.addons;
+        // A launcher from before the rename answers under `addons`.
+        const plugins = bridge?.plugins ?? bridge?.addons;
         const onHidden = bridge?.onHidden;
         // Feature-detected call by call: a desktop build that predates one of
         // them still gets everything else.
@@ -57,7 +60,7 @@ export function LauncherSearch({
             close: () => void bridge?.hide?.(),
             onOpened: (listener) => bridge?.onOpened?.((query) => listener(typeof query === "string" ? query : undefined)),
             onHidden: typeof onHidden === "function" ? (listener) => onHidden(listener) : undefined,
-            addons: typeof addons === "function" ? () => addons() : undefined
+            plugins: typeof plugins === "function" ? () => plugins() : undefined
         };
     }, []);
     return <CommandPalette host={host} isAdmin={isAdmin} appIds={appIds} held={held} installed={installed} />;

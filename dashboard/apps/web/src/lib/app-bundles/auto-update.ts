@@ -2,7 +2,7 @@
  * Installed apps keeping up with their own releases, with nobody pressing
  * Update: the background half of `releases.ts`.
  *
- * The model is the device add-ons' (`clients/desktop/src/main/addons/updates.ts`): a
+ * The model is the device plugins' (`clients/desktop/src/main/plugins/updates.ts`): a
  * pass a minute after start and every six hours after, retried from five
  * minutes, doubling, while the registry cannot be reached. A newer release goes
  * in by itself through the same verified update the screen runs, unless
@@ -58,7 +58,7 @@ const AppId = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/);
 
 /**
  * Whether apps update by themselves: one switch for all, and an override per
- * app. On by default, as device add-ons are.
+ * app. On by default, as device plugins are.
  */
 const PolicySchema = z.object({
     auto: z.boolean().catch(true),

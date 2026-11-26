@@ -147,30 +147,30 @@ export function siteShelves(apps: readonly SiteApp[]): { shelf: StoreShelf; apps
 }
 
 /* -------------------------------------------------------------------------- */
-/* Device add-ons                                                              */
+/* Device plugins                                                              */
 /* -------------------------------------------------------------------------- */
 
-/** What the marketplace lists: everything, only Polaris apps, or only device add-ons. */
-export type MarketKind = "all" | "apps" | "addons";
+/** What the marketplace lists: everything, only Polaris apps, or only device plugins. */
+export type MarketKind = "all" | "apps" | "plugins";
 
-export const MARKET_KINDS: readonly MarketKind[] = ["all", "apps", "addons"];
+export const MARKET_KINDS: readonly MarketKind[] = ["all", "apps", "plugins"];
 
-/** An add-on category's id in the shared category bar, kept apart from the apps' own. */
-export const ADDON_CATEGORY_PREFIX = "addon:";
+/** A plugin category's id in the shared category bar, kept apart from the apps' own. */
+export const PLUGIN_CATEGORY_PREFIX = "plugin:";
 
 /**
- * One device add-on of the published catalog (docs/device-addons.md), read at
- * build time from the same `clients/device-addons/<id>/manifest.json` CI signs, in one
+ * One device plugin of the published catalog (docs/device-plugins.md), read at
+ * build time from the same `clients/device-plugins/<id>/manifest.json` CI signs, in one
  * locale. Its summary and changelog are the publisher's own words.
  */
-export interface SiteAddon {
+export interface SitePlugin {
     readonly id: string;
     readonly name: string;
     readonly publisher: string;
     /** "By {publisher}", in the dashboard's words. */
     readonly byline: string;
     readonly summary: string;
-    /** `addon:<category>`, as the category bar names it. */
+    /** `plugin:<category>`, as the category bar names it. */
     readonly category: string;
     readonly categoryLabel: string;
     readonly version: string;
@@ -182,17 +182,17 @@ export interface SiteAddon {
     /** What installing it allows, in the dashboard's words. */
     readonly permissions: readonly string[];
     readonly changelog: string;
-    /** Its icon under `addon-icons/`, or null for the package mark. */
+    /** Its icon under `plugin-icons/`, or null for the package mark. */
     readonly icon: string | null;
 }
 
-/** The dashboard's own words for add-ons in the marketplace. */
-export interface AddonWords {
+/** The dashboard's own words for plugins in the marketplace. */
+export interface PluginWords {
     readonly kinds: Readonly<Record<MarketKind | "label", string>>;
     readonly shelf: string;
     readonly kindApp: string;
-    readonly kindAddon: string;
-    /** The search box's placeholder while only add-ons are listed. */
+    readonly kindPlugin: string;
+    /** The search box's placeholder while only plugins are listed. */
     readonly search: string;
     readonly publisher: string;
     readonly permissions: string;
@@ -200,38 +200,38 @@ export interface AddonWords {
     readonly noPermissions: string;
 }
 
-const ADDON_FIELDS: readonly SearchField<SiteAddon>[] = [
-    { text: (addon) => addon.name, weight: 3 },
-    { text: (addon) => addon.summary, weight: 2 },
-    { text: (addon) => [addon.publisher, ...addon.devices], weight: 1 },
-    { text: (addon) => addon.categoryLabel, weight: 1 }
+const PLUGIN_FIELDS: readonly SearchField<SitePlugin>[] = [
+    { text: (plugin) => plugin.name, weight: 3 },
+    { text: (plugin) => plugin.summary, weight: 2 },
+    { text: (plugin) => [plugin.publisher, ...plugin.devices], weight: 1 },
+    { text: (plugin) => plugin.categoryLabel, weight: 1 }
 ];
 
-/** The add-on categories present, in the order they first appear. */
-export function addonCategories(addons: readonly SiteAddon[]): { id: string; label: string }[] {
+/** The plugin categories present, in the order they first appear. */
+export function pluginCategories(plugins: readonly SitePlugin[]): { id: string; label: string }[] {
     const seen = new Map<string, string>();
-    for (const addon of addons)
-        if (!seen.has(addon.category)) seen.set(addon.category, addon.categoryLabel);
+    for (const plugin of plugins)
+        if (!seen.has(plugin.category)) seen.set(plugin.category, plugin.categoryLabel);
     return [...seen].map(([id, label]) => ({ id, label }));
 }
 
-/** Whether a picked category leaves the apps or the add-ons in the list. */
-export function kindShows(kind: MarketKind, category: string, of: "apps" | "addons"): boolean {
+/** Whether a picked category leaves the apps or the plugins in the list. */
+export function kindShows(kind: MarketKind, category: string, of: "apps" | "plugins"): boolean {
     if (kind !== "all" && kind !== of) return false;
     if (!category) return true;
-    return category.startsWith(ADDON_CATEGORY_PREFIX) === (of === "addons");
+    return category.startsWith(PLUGIN_CATEGORY_PREFIX) === (of === "plugins");
 }
 
-/** The add-ons a search, category and order leave, as `filterSiteApps` does for apps. */
-export function filterSiteAddons(
-    addons: readonly SiteAddon[],
+/** The plugins a search, category and order leave, as `filterSiteApps` does for apps. */
+export function filterSitePlugins(
+    plugins: readonly SitePlugin[],
     filter: { query: string; category: string; sort: StoreSort; locale: SiteLocale }
-): SiteAddon[] {
+): SitePlugin[] {
     const inCategory = filter.category
-        ? addons.filter((addon) => addon.category === filter.category)
-        : [...addons];
+        ? plugins.filter((plugin) => plugin.category === filter.category)
+        : [...plugins];
     const term = filter.query.trim();
-    const matched = term ? searchItems(inCategory, term, ADDON_FIELDS) : inCategory;
+    const matched = term ? searchItems(inCategory, term, PLUGIN_FIELDS) : inCategory;
     if (filter.sort !== "name") return matched;
     const collator = new Intl.Collator(filter.locale, { sensitivity: "base" });
     return [...matched].sort((left, right) => collator.compare(left.name, right.name));
@@ -651,9 +651,9 @@ export interface LocaleData {
     /** The apps every Polaris comes with, in the dashboard's order. */
     readonly builtIn: readonly BuiltInSiteApp[];
     readonly builtInWords: BuiltInWords;
-    /** The device add-ons of the published catalog, in its order. */
-    readonly addons: readonly SiteAddon[];
-    readonly addonWords: AddonWords;
+    /** The device plugins of the published catalog, in its order. */
+    readonly plugins: readonly SitePlugin[];
+    readonly pluginWords: PluginWords;
     readonly replaces: readonly ReplacesRow[];
     readonly showcase: readonly ShowcaseSection[];
 }

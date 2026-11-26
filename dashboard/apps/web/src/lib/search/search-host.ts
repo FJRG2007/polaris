@@ -64,9 +64,9 @@ export interface SearchHost {
     /** Called when the host puts the search away by itself (its window lost
      *  focus); absent from a host too old to say. */
     readonly onHidden?: (listener: () => void) => void;
-    /** The device add-ons the host's computer has, as the desktop app's
-     *  snapshot (`@polaris/core/device-addons`); absent from a host too old to say. */
-    readonly addons?: () => Promise<unknown>;
+    /** The device plugins the host's computer has, as the desktop app's
+     *  snapshot (`@polaris/core/device-plugins`); absent from a host too old to say. */
+    readonly plugins?: () => Promise<unknown>;
 }
 
 /** A path of this instance, and nothing that leaves it. */

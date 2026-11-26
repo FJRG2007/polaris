@@ -1,2 +1,0 @@
-# Native modules are built by .github/workflows/device-addons.yml, never committed.
-*.node

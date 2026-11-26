@@ -15,7 +15,7 @@
  *
  * A change shows at once - with what follows from it, such as the restart a
  * setting needs - and is put back, with a toast, when the app refuses it.
- * Used by every category; screens of their own under This app (hosts, add-ons)
+ * Used by every category; screens of their own under This app (hosts, plugins)
  * read through the same hook rather than asking the bridge themselves.
  */
 
