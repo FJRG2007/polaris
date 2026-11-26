@@ -27,7 +27,7 @@ export function startPerfWatch(accelerated: boolean): void {
     if (log) return;
     const current = new PerfLog(join(app.getPath("userData"), "logs", "perf.log"));
     log = current;
-    const gpu = (() => {
+    const gpu = ((): Record<string, PerfValue> => {
         try {
             const status = app.getGPUFeatureStatus();
             return { compositing: status.gpu_compositing, raster: status.rasterization };

@@ -12,7 +12,7 @@ const listeners = vi.hoisted(() => new Map<string, Set<(event: unknown, value: u
 const exposed = vi.hoisted(() => ({ bridge: null as unknown }));
 
 vi.mock("electron", () => ({
-    contextBridge: { exposeInMainWorld: (_name: string, value: unknown) => (exposed.bridge = value) },
+    contextBridge: { exposeInMainWorld: (name: string, value: unknown) => void (name === "polarisDesktop" && (exposed.bridge = value)) },
     ipcRenderer: {
         invoke,
         on: (channel: string, listener: (event: unknown, value: unknown) => void) => {

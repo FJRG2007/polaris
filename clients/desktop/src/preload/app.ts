@@ -266,7 +266,10 @@ contextBridge.exposeInMainWorld("polarisDesktop", bridge);
 
 followTitleBarColors((colors) => void ipcRenderer.invoke(CHANNELS.titleBarColors, colors));
 reportTextSize((raw) => void ipcRenderer.invoke(CHANNELS.textSizeSeen, raw));
-watchPagePerformance((report) => ipcRenderer.send(CHANNELS.perfReport, report));
+watchPagePerformance((report) => ipcRenderer.send(CHANNELS.perfReport, report), {
+    expose: (name, api) => contextBridge.exposeInMainWorld(name, api),
+    run: (source) => webFrame.executeJavaScript(source)
+});
 holdOutsideLinks((url) => ipcRenderer.invoke(CHANNELS.openOutside, url));
 ipcRenderer.on(CHANNELS.linkNotice, (_event, raw: unknown) => {
     const words = readLinkNotice(raw);
