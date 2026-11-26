@@ -273,6 +273,24 @@ on the device, through `openSealed`, with the same page cache.
   no unlock proof, as its server lookup does, so a locked or hidden
   conversation stays out; a row shows the words this device opened, and a hit
   whose kept words are an older version than the server's is left out.
+- **Automations.** "New chat message" (`chat.message`, `lib/automations/app-events.ts`)
+  fires for a sealed message as for any other, with its id, conversation,
+  author and thread, and an empty `body`: the server holds no words to give
+  it. An automation that matches on the text never matches in a sealed
+  conversation; one that reacts to "somebody wrote here" still works. Posting
+  into a sealed conversation goes through the webhook's own MLS device (see
+  "Server-run members").
+- **Game chat** (`game-relay.ts`). A sealed message reaches a player in the
+  game with no words, which the game draws as "Sent a message" with the
+  author and the conversation, like the corner notice. A conversation an
+  operator shows in a game's chat for everybody playing shows the same line:
+  the words would need a game bridge that is a member of the group, which is
+  not built.
+- **Retention and compliance.** Neither reads chat: the retention sweep
+  (`lib/retention-service.ts`) trims activity, the audit log and notices, and
+  the compliance evidence export (`lib/compliance/*`) lists accounts, domains,
+  certificates, backups and bans. Disappearing messages and "Keep in chat"
+  (`keep.ts`) go by `expiresAt` alone and work the same on a sealed message.
 - **Link cards.** Not made for a sealed message: the server makes a card by
   fetching the link, which would tell it what was sent. The link is still a
   link. A card the sender makes and seals beside the message is the way to
@@ -377,6 +395,63 @@ What is built on top of it:
   webhook's device seals the post; the name and picture the call gave stay
   metadata beside it, and no link card is made.
 
+## Shared search segments: the design (row 10, not built)
+
+The device index (`sealed-search-index.ts`) finds only what this browser
+opened. Proposal 6.1 closes that with index segments every member can read;
+this is how it fits what is built. Decided here, nothing of it is code yet.
+
+- **One segment, one history key.** A segment indexes up to 5,000 sealed
+  messages of one conversation sealed in one epoch `e`, and is sealed with an
+  index key derived from that epoch's history key: `IK(c, e) =
+  HKDF-SHA256(HK(c, e), salt = channel id, info = "polaris chat index v1" ||
+  epoch)`. Whoever can read the messages (holds `HK(c, e)`, the same rule as
+  history visibility and `ChatHistoryKey`) can read their segment, and nobody
+  else: a member removed at `e` never holds `IK(c, e+1)`. A long epoch takes
+  several segments (`seq` 0, 1, ...).
+- **What is inside.** Deflated, then AES-256-GCM under `IK` with the
+  conversation, epoch, seq and generation in the additional data: the message
+  ids with the time of each one's last edit, and an inverted index from term
+  (the device index's `NFKC` + lowercase tokens) to positions in that id list.
+  No words beyond the terms, no names. Padded to the next power of two from
+  4 KiB, at most 512 KiB, so its size tells the server little more than the
+  message count it already sees.
+- **Table** `ChatSearchSegment` (additive): channel, epoch, seq, generation,
+  ciphertext, nonce, the builder's device and its signature over the
+  ciphertext, created at; unique on (channel, epoch, seq, generation). The
+  server never reads it; deleting the conversation deletes its segments.
+- **Who builds it.** The first member device that has the whole stretch open
+  (it read or sent those messages), in the background after the epoch ends or
+  the stretch fills, through a lease the route hands out with a
+  compare-and-set (`claim-index-build`, ten minutes), so one device builds
+  each segment instead of every member. Migrated history is indexed by the
+  migration itself, which already holds the words.
+- **Edits and deletions.** A sealed edit adds the message to a small
+  correction segment of the same epoch (`generation` + 1, same key); a reader
+  keeps, per message id, the entry with the newest edit time. Deletions need
+  nothing: `searchSealedAction` already drops deleted and out-of-reach ids.
+  When corrections pass a quarter of the base, the next builder writes a new
+  base and the older generations are removed.
+- **A new browser.** Lists the segments of the conversations it may read
+  (`index-segments`: only epochs the account holds a history key for, newest
+  first, 50 per page), fetches them in parallel, opens them in a Worker and
+  searches in memory, adding the hits to what the device index finds. Recent
+  results show at once, older ones as they arrive. A private window keeps
+  them in memory only.
+- **A lying segment.** A member could upload a segment that is wrong. Every
+  hit is still opened before it is shown (a hit whose words do not match is
+  left out, as today), so a bad segment can hide matches but never show one;
+  a device that finds a message of a segment missing from it while opening
+  the conversation rebuilds that segment. The signature names the device that
+  built it.
+- **What the server learns.** How many segments a conversation has, their
+  padded sizes and when they were written; never a term. Deterministic search
+  tokens stay rejected (proposal v1 4.4): they leak frequencies and access
+  patterns.
+- **Measure before building (phase 0):** segment size and build time for
+  5,000 messages of 150 bytes, and open-plus-search time in a Worker for 90
+  days of a busy account.
+
 ## Not built yet
 
 - Sealed link cards (see "Other places a message is shown").
@@ -407,8 +482,8 @@ share of the work, not of the code.
 | 6 | **Recovery.** Password lock, passkey PRF lock, device lock and the QR hand-over exist. Missing: the organisation recovery key (proposal below), which is also what the migration seals legacy history to for members with no account key yet (proposal 8.4), and admin account recovery handing an account back with its history. Without `ORK`, an account with no factor of its own on a new browser (magic link, SSO, admin reset) loses its history. | Yes, for "nobody loses history" | ~45% |
 | 7 | **Key transparency** (proposal 4.6): built (2026-11-25, see "Safety numbers"): the 60-digit safety number and its QR in a one-to-one conversation's info; scanning the other person's QR in the app; the verified mark; the key-change line in the conversation (per browser, trust on first use). Left: `AccountKeyVerifier` still has no log behind it, so a server could hand out a substitute account key to somebody who never verifies - the append-only key log with a signed root and inclusion and consistency checks in the browser, and each account monitoring its own entries; key changes of group members (no number in a group). | Yes, for "government-grade" | ~30% |
 | 8 | **Device hygiene**: built (2026-11-25, see "Device hygiene"): a signed-out browser's device is retired and its leaf leaves every group at the next member's send; a device unseen for 30 days (decision 7) likewise, and it rejoins on its own when back; retired devices are handed out to nobody. Left: the screen for the instance limit (the `Setting` key is read, 7-90) and the organisation's own limit, the "new device added" notice on the account's other devices, a device list with revoke. | Yes, for post-compromise security | ~50% |
-| 9 | **Server features that read chat text**: built (2026-11-25): moderation reports of a sealed message with its files, and the sealed lines of a whole-conversation or person report, see "Sealed reports". Built 2026-11-26 (round 30): moving a whole Polaris (Settings transfer) now re-seals the bare envelopes it used to miss - the MLS store of server-run members (Polar, webhooks), the OPAQUE server setup, automation secrets - and carries each OPAQUE record's password tag as the hash it fingerprints, keyed again on arrival (before, the setup failed to open on the new instance, every OPAQUE record was deleted, and accounts whose password was set over OPAQUE could not sign in nor open their account key or sealed history). Sealed rows, `ChatHistoryKey` and account-key envelopes travel as they are, so a sealed conversation opens after the move. Not carried by the transfer at all (every file, sealed or not): attachment and Drive bytes on disk or a storage connection; a Polar change waiting for Approve is answered as gone; a Polaris database backup is not restorable from the screen and only opens on the instance with the same master key. Left: retention and compliance export (proposal 9), automations that read messages. Each needs its sealed answer or an explicit "not in sealed conversations". | Partly (export/import must round-trip) | ~48% |
-| 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. | No (documented limit) | ~40% |
+| 9 | **Server features that read chat text**: built (2026-11-25): moderation reports of a sealed message with its files, and the sealed lines of a whole-conversation or person report, see "Sealed reports". Built 2026-11-26 (round 30): moving a whole Polaris (Settings transfer) now re-seals the bare envelopes it used to miss - the MLS store of server-run members (Polar, webhooks), the OPAQUE server setup, automation secrets - and carries each OPAQUE record's password tag as the hash it fingerprints, keyed again on arrival (before, the setup failed to open on the new instance, every OPAQUE record was deleted, and accounts whose password was set over OPAQUE could not sign in nor open their account key or sealed history). Sealed rows, `ChatHistoryKey` and account-key envelopes travel as they are, so a sealed conversation opens after the move. Not carried by the transfer at all (every file, sealed or not): attachment and Drive bytes on disk or a storage connection; a Polar change waiting for Approve is answered as gone; a Polaris database backup is not restorable from the screen and only opens on the instance with the same master key. Confirmed 2026-11-26 (round 31), see "Other places a message is shown": retention (`lib/retention-service.ts`: activity, audit log, notices) and the compliance evidence export (`lib/compliance/*`: accounts, domains, certificates, backups, bans) read no chat table at all; disappearing messages go by `expiresAt` alone, so they expire and are kept the same sealed or not; automations get "New chat message" for a sealed message with an empty body (they are told it was sent, by whom and where, not what), and post into a sealed conversation through a webhook's own MLS device; game chat shows a sealed message as "Sent a message". Left: a sealed-aware game bridge (a server-run member, like webhooks) so a conversation shown in a game shows words again. | Partly (export/import must round-trip) | ~55% |
+| 10 | **Search on a new browser** (proposal 6.1, encrypted shared index segments): the device index finds only what this browser opened. Designed 2026-11-26 (round 31), see "Shared search segments": one segment per history-key epoch, keyed from that epoch's history key, built once under a lease, corrected by small generations, every hit still opened before it is shown. Left: phase-0 measurement, the table, the route ops and the Worker. | No (documented limit) | ~45% |
 | 11 | **Web code trust** (proposal 4.7): published hash of the crypto bundle, extension and desktop checking it, strict CSP and Trusted Types on message rendering. | No for default-on; yes for intelligence deployments | ~10% |
 | 12 | **Large channels**: built (2026-11-25): `reconcile` adds at most 100 newcomers per send (`ADD_BATCH`, one `claim-key-packages` call's worth); the roster's pages together could name more, which the claim refused, so every add in a channel past 1,000 leaves failed and was retried forever. The rest are added by later sends or join by their own external commit on open (decision 9). Removals go at most 100 per commit (`REMOVE_BATCH`), as many commits as it takes, all before anything is sealed: every removed leaf blanks its path and the committer then encrypts to each node left under a blank, so one commit taking out thousands could pass the 1 MiB commit limit and never land (tested: five leaving with a batch of two take three commits, and none of them opens what is sealed after). Left: steady-state commit size with a filled tree is unmeasured (phase 0). | For big spaces | ~38% |
 
