@@ -335,6 +335,12 @@ impl MlsMember {
         polaris_core::mls::Member::own_leaf(&self.inner, group_id).map_err(mls_error)
     }
 
+    /// Blank nodes on this member's path: above zero, a `selfUpdate` fills them.
+    #[wasm_bindgen(js_name = blankPath)]
+    pub fn blank_path(&self, group_id: &[u8]) -> Result<u32, JsValue> {
+        polaris_core::mls::Member::blank_path(&self.inner, group_id).map_err(mls_error)
+    }
+
     pub fn members(&self, group_id: &[u8]) -> Result<Vec<MlsGroupMember>, JsValue> {
         polaris_core::mls::Member::members(&self.inner, group_id)
             .map(|members| {

@@ -67,7 +67,7 @@ mod provider;
 pub use journal::{Journal, StoreChange};
 pub use member::{
     CommitOutput, GroupMember, Member, Processed, ProcessedKind, CONTENT_SIGNATURE_LABEL,
-    INLINE_TREE_BYTES,
+    INLINE_TREE_BYTES, MAX_COMMIT_BYTES,
 };
 pub use openmls_memory_storage::MemoryStorage;
 pub use provider::{Provider, SeededRand};
@@ -112,6 +112,11 @@ pub enum ErrorKind {
     /// caller fetches that epoch's tree from the delivery service and joins
     /// again with it.
     MissingTree,
+    /// The commit came out larger than the delivery service takes
+    /// ([`Member::commit_limit`]); nothing was staged. The caller splits the
+    /// change (fewer removals per commit) or waits for the group's members to
+    /// fill the tree (`Member::blank_path`), which makes the same commit smaller.
+    CommitTooLarge,
 }
 
 impl ErrorKind {
@@ -126,6 +131,7 @@ impl ErrorKind {
             ErrorKind::Storage => "MlsStorage",
             ErrorKind::Internal => "MlsInternal",
             ErrorKind::MissingTree => "MlsMissingTree",
+            ErrorKind::CommitTooLarge => "MlsCommitTooLarge",
         }
     }
 }

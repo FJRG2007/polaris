@@ -573,6 +573,12 @@ impl MlsMember {
         polaris_core::mls::Member::own_leaf(&self.inner, &group_id).map_err(mls_error)
     }
 
+    /// Blank nodes on this member's path: above zero, a `selfUpdate` fills them.
+    #[napi(catch_unwind)]
+    pub fn blank_path(&self, group_id: Uint8Array) -> napi::Result<u32, ErrorClass> {
+        polaris_core::mls::Member::blank_path(&self.inner, &group_id).map_err(mls_error)
+    }
+
     #[napi(catch_unwind)]
     pub fn members(&self, group_id: Uint8Array) -> napi::Result<Vec<MlsGroupMember>, ErrorClass> {
         polaris_core::mls::Member::members(&self.inner, &group_id)

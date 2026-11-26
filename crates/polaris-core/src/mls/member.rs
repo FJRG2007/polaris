@@ -57,6 +57,62 @@ fn wrong_type(expected: &str) -> MlsError {
 /// device that predates this expects.
 pub const INLINE_TREE_BYTES: usize = 64 * 1024;
 
+/// The largest commit the delivery service takes, as decoded bytes
+/// (`mlsBytes` in `apps/web/src/lib/chat/e2ee/schemas.ts`). A commit past it
+/// is refused here, before anything is staged ([`ErrorKind::CommitTooLarge`]),
+/// rather than built, sent and refused by the route.
+pub const MAX_COMMIT_BYTES: usize = 1024 * 1024;
+
+/// RFC 9420 appendix C tree math over node indices (leaves even, parents odd).
+mod treemath {
+    pub fn level(x: u64) -> u32 {
+        (!x).trailing_zeros()
+    }
+
+    fn parent_step(x: u64) -> u64 {
+        let k = level(x);
+        let b = (x >> (k + 1)) & 1;
+        (x | (1 << k)) ^ (b << (k + 1))
+    }
+
+    /// The parent of `x` in a tree of `nodes` nodes.
+    pub fn parent(x: u64, nodes: u64) -> u64 {
+        let mut p = parent_step(x);
+        while p >= nodes {
+            p = parent_step(p);
+        }
+        p
+    }
+
+    /// The child of `parent` that is not `child`.
+    pub fn sibling(child: u64, parent: u64, nodes: u64) -> u64 {
+        let k = level(parent);
+        let left = |x: u64, k: u32| x ^ (1 << (k - 1));
+        if child < parent {
+            let mut right = parent ^ (3 << (k - 1));
+            let mut depth = k - 1;
+            while right >= nodes && depth > 0 {
+                right = left(right, depth);
+                depth -= 1;
+            }
+            right
+        } else {
+            left(parent, k)
+        }
+    }
+
+    /// The root of a tree of `nodes` nodes.
+    pub fn root(nodes: u64) -> u64 {
+        (1u64 << (63 - nodes.leading_zeros())) - 1
+    }
+
+    /// The first and last leaf index under node `x`.
+    pub fn leaf_span(x: u64) -> (u64, u64) {
+        let k = level(x);
+        ((x + 1 - (1 << k)) / 2, (x + (1 << k) - 1) / 2)
+    }
+}
+
 fn parse_tree(bytes: &[u8]) -> Result<RatchetTreeIn> {
     RatchetTreeIn::tls_deserialize_exact(bytes).map_err(malformed)
 }
@@ -131,6 +187,8 @@ pub struct Member<S: StorageProvider<CURRENT_VERSION> = MemoryStorage> {
     signer: SignatureKeyPair,
     credential: CredentialWithKey,
     ciphersuite: Ciphersuite,
+    /// [`MAX_COMMIT_BYTES`] unless a test sets a smaller one.
+    commit_limit: std::sync::atomic::AtomicUsize,
 }
 
 fn ciphersuite(value: u16) -> Result<Ciphersuite> {
@@ -264,7 +322,84 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
             signer,
             credential,
             ciphersuite,
+            commit_limit: std::sync::atomic::AtomicUsize::new(MAX_COMMIT_BYTES),
         }
+    }
+
+    /// The largest commit this member builds ([`MAX_COMMIT_BYTES`] by default).
+    pub fn commit_limit(&self) -> usize {
+        self.commit_limit.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Build commits against another limit: tests use a small one to reach
+    /// the refusal without a group of a thousand members.
+    pub fn set_commit_limit(&self, bytes: usize) {
+        self.commit_limit
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Refuse a staged commit past [`Member::commit_limit`], unstaging it.
+    fn within_limit(&self, group: &mut MlsGroup, out: CommitOutput) -> Result<CommitOutput> {
+        let limit = self.commit_limit();
+        if out.commit.len() <= limit {
+            return Ok(out);
+        }
+        group
+            .clear_pending_commit(self.provider.storage())
+            .map_err(storage_error)?;
+        Err(MlsError::new(
+            ErrorKind::CommitTooLarge,
+            format!(
+                "the commit is {} bytes, past the {limit} the delivery service takes",
+                out.commit.len()
+            ),
+        ))
+    }
+
+    /// How many nodes of this member's filtered direct path (RFC 9420, 4.1.2:
+    /// the ancestors whose other side holds somebody) are blank. A member
+    /// added by somebody else's commit has the ancestors it does not share
+    /// with the adder blank, and every commit in the group then encrypts
+    /// through each leaf under a blank node (RFC 9420, 4.2); one commit of
+    /// its own with a path (`self_update`) fills them. Zero once filled, and
+    /// for the member whose commits built the group. Ancestors that hold this
+    /// member as an unmerged leaf (RFC 9420, 12.1.1) are not counted: OpenMLS
+    /// does not expose them, and each costs a commit one ciphertext, where a
+    /// blank costs one per leaf under it.
+    pub fn blank_path(&self, group_id: &[u8]) -> Result<u32> {
+        let group = self.load(group_id)?;
+        let tree = group.treesync();
+        let slots = tree.leaves();
+        let width = slots.len() as u64;
+        if width < 2 {
+            return Ok(0);
+        }
+        // full[i]: occupied leaves before leaf i, so a span's count is a subtraction.
+        let mut full = Vec::with_capacity(slots.len() + 1);
+        full.push(0u32);
+        for slot in &slots {
+            full.push(full[full.len() - 1] + u32::from(slot.is_some()));
+        }
+        let occupied = |node: u64| {
+            let (first, last) = treemath::leaf_span(node);
+            let last = last.min(width - 1);
+            first <= last && full[last as usize + 1] > full[first as usize]
+        };
+        let blank: std::collections::HashSet<u32> =
+            tree.blank_parents().map(|index| index.u32()).collect();
+        let nodes = 2 * width - 1;
+        let root = treemath::root(nodes);
+        let mut child = 2 * u64::from(group.own_leaf_index().u32());
+        let mut count = 0;
+        while child != root {
+            let parent = treemath::parent(child, nodes);
+            let other = treemath::sibling(child, parent, nodes);
+            if occupied(other) && blank.contains(&(((parent - 1) / 2) as u32)) {
+                count += 1;
+            }
+            child = parent;
+        }
+        Ok(count)
     }
 
     pub fn storage(&self) -> &S {
@@ -430,7 +565,11 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
     }
 
     /// Commit adding the members whose KeyPackages are given. As
-    /// `MlsGroup::add_members` does, the commit carries a path.
+    /// `MlsGroup::add_members` does, the commit carries a path - unless that
+    /// path is what takes it past [`Member::commit_limit`] (a sparse tree
+    /// costs one ciphertext per leaf under a blank node): an Add does not
+    /// require a path (RFC 9420, 12.4), so it is built again without one, and
+    /// refused with `CommitTooLarge` only if it is still too large.
     pub fn add_members(&self, group_id: &[u8], key_packages: &[Vec<u8>]) -> Result<CommitOutput> {
         if key_packages.is_empty() {
             return Err(rejected("no key packages to add"));
@@ -441,10 +580,34 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
             .collect::<Result<Vec<_>>>()?;
         let mut group = self.load(group_id)?;
         let inline = Self::tree_inline(&group);
+        let out = self.stage_adds(&mut group, parsed.clone(), inline, true)?;
+        let out = if out.commit.len() <= self.commit_limit() {
+            out
+        } else {
+            group
+                .clear_pending_commit(self.provider.storage())
+                .map_err(storage_error)?;
+            let out = self.stage_adds(&mut group, parsed, inline, false)?;
+            self.within_limit(&mut group, out)?
+        };
+        if out.welcome.is_none() {
+            return Err(internal("an add commit came back without its Welcome"));
+        }
+        Ok(out)
+    }
+
+    /// Stage a commit of these adds, with this member's path or without.
+    fn stage_adds(
+        &self,
+        group: &mut MlsGroup,
+        parsed: Vec<KeyPackage>,
+        inline: bool,
+        path: bool,
+    ) -> Result<CommitOutput> {
         let bundle = group
             .commit_builder()
             .propose_adds(parsed)
-            .force_self_update(true)
+            .force_self_update(path)
             .load_psks(self.provider.storage())
             .map_err(rejected)?
             .use_ratchet_tree_extension(inline)
@@ -458,14 +621,12 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
             .map_err(rejected)?
             .stage_commit(&self.provider)
             .map_err(rejected)?;
-        let out = self.commit_output(&group, bundle, inline)?;
-        if out.welcome.is_none() {
-            return Err(internal("an add commit came back without its Welcome"));
-        }
-        Ok(out)
+        self.commit_output(group, bundle, inline)
     }
 
-    /// Commit removing the members at these leaves.
+    /// Commit removing the members at these leaves. Refused with
+    /// `CommitTooLarge` past [`Member::commit_limit`]: a removal requires a
+    /// path, so the caller removes fewer at once.
     pub fn remove_members(&self, group_id: &[u8], leaves: &[u32]) -> Result<CommitOutput> {
         if leaves.is_empty() {
             return Err(rejected("no members to remove"));
@@ -492,11 +653,15 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
             .map_err(rejected)?
             .stage_commit(&self.provider)
             .map_err(rejected)?;
-        self.commit_output(&group, bundle, inline)
+        let out = self.commit_output(&group, bundle, inline)?;
+        self.within_limit(&mut group, out)
     }
 
     /// Commit a fresh leaf key and path: post-compromise security for this
-    /// member (RFC 9420, 16.6).
+    /// member (RFC 9420, 16.6), and the commit that fills a joiner's blank
+    /// ancestors ([`Member::blank_path`]). Refused with `CommitTooLarge` past
+    /// [`Member::commit_limit`], which in a sparse tree shrinks as other
+    /// members fill theirs.
     pub fn self_update(&self, group_id: &[u8]) -> Result<CommitOutput> {
         let mut group = self.load(group_id)?;
         let inline = Self::tree_inline(&group);
@@ -517,7 +682,8 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
             .map_err(rejected)?
             .stage_commit(&self.provider)
             .map_err(rejected)?;
-        self.commit_output(&group, bundle, inline)
+        let out = self.commit_output(&group, bundle, inline)?;
+        self.within_limit(&mut group, out)
     }
 
     /// Apply this member's pending commit, once the delivery service accepted it.
