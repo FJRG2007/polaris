@@ -31,7 +31,10 @@ export const hostRowSchema = z.object({
         .regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/)
         .nullish(),
     /** A system command's id, drawn by its name here in the reader's language. */
-    command: z.enum(SYSTEM_COMMAND_IDS).nullish()
+    command: z.enum(SYSTEM_COMMAND_IDS).nullish(),
+    /** A program that is a game, with the store it comes from (a brand name). */
+    game: z.boolean().nullish(),
+    store: z.string().max(60).nullish()
 });
 
 export type HostRow = z.infer<typeof hostRowSchema>;

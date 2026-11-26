@@ -30,6 +30,10 @@ export interface LauncherRow {
     readonly icon?: string | null;
     /** A system command's id (`@polaris/core` `launcher-commands`), so a page draws its name in the reader's language. */
     readonly command?: SystemCommandId;
+    /** A program that is a game (Raycast's Game kind): listed with the apps, drawn as a game, found by "games". */
+    readonly game?: boolean;
+    /** The store a game comes from ("Steam", "Epic Games"): a brand name, never translated. */
+    readonly store?: string;
 }
 
 export interface LauncherAnswer {
@@ -70,6 +74,27 @@ export function launcherQuery(raw: string): string {
 }
 
 /** Something listed: its name, its context line and the words it is found by. */
+/**
+ * What lists every game and game launcher instead of searching (Raycast's
+ * "Game Launcher" command, also found by "games"), in either language.
+ */
+const GAMES_QUERY = /^(games?|game launchers?|juegos?|lanzador de juegos)$/;
+
+export function isGamesQuery(text: string): boolean {
+    return GAMES_QUERY.test(normalizeSearchText(text).trim());
+}
+
+/**
+ * A program that starts games rather than being one: the stores' own
+ * clients, listed with the games by the games command (the stores Raycast's
+ * Game Launcher covers).
+ */
+const GAME_LAUNCHER = /^(steam|epic games( launcher)?|gog galaxy|ubisoft connect|battle\.net|ea( app)?|itch|riot client|rockstar games launcher|xbox|battlestate games launcher|geforce now|roblox( player)?|amazon games|heroic games launcher|playnite)$/;
+
+export function isGameLauncher(label: string): boolean {
+    return GAME_LAUNCHER.test(normalizeSearchText(label).trim());
+}
+
 export interface Searchable {
     readonly label: string;
     readonly context: string;

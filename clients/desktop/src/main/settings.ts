@@ -74,9 +74,9 @@ const settingsSchema = z.object({
     voiceWidget: z.boolean().catch(true),
     // Off unless somebody turned it on: the widget only while a game runs.
     voiceWidgetGameOnly: z.boolean().catch(false),
-    // On unless somebody turned it off: the launcher's key goes to the game
-    // while one, or anything full screen, is in front.
-    launcherGameMode: z.boolean().catch(true),
+    // Off unless somebody turned it on (Raycast's Game Mode is opt-in): the
+    // launcher's key goes to the game while one, or anything full screen, is in front.
+    launcherGameMode: z.boolean().catch(false),
     // Where the widget was dragged to, or null for its corner.
     voiceWidgetPlace: z.object({ x: z.number().int(), y: z.number().int() }).nullable().catch(null),
     // Where each of the overlay layer's panels was left (`overlay-layout`),
@@ -150,7 +150,7 @@ const EMPTY: Settings = {
     startMinimized: true,
     voiceWidget: true,
     voiceWidgetGameOnly: false,
-    launcherGameMode: true,
+    launcherGameMode: false,
     voiceWidgetPlace: null,
     overlayLayout: [],
     voiceWidgetAvatars: DEFAULT_LOOK.avatars,

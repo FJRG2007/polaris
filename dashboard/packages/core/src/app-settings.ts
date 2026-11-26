@@ -87,7 +87,7 @@ export const APP_SETTINGS = [
     { key: "minimizeToTray", kind: "toggle", category: "window", default: true },
     { key: "launcher", kind: "toggle", category: "search", default: true },
     { key: "launcherBinding", kind: "shortcut", category: "search", default: "Alt+Space", dependsOn: "launcher" },
-    { key: "launcherGameMode", kind: "toggle", category: "search", default: true, dependsOn: "launcher" },
+    { key: "launcherGameMode", kind: "toggle", category: "search", default: false, dependsOn: "launcher" },
     { key: "launcherEngine", kind: "choice", category: "search", default: "google", options: APP_SEARCH_ENGINES },
     { key: "launcherClipboard", kind: "toggle", category: "clipboard", default: true },
     {
@@ -241,7 +241,7 @@ const snapshotSchema = z.object({
     minimizeToTray: z.boolean().catch(true),
     launcher: z.boolean().catch(true),
     launcherBinding: z.string().max(40).catch("Alt+Space"),
-    launcherGameMode: z.boolean().catch(true),
+    launcherGameMode: z.boolean().catch(false),
     launcherEngine: z.enum(APP_SEARCH_ENGINES).catch("google"),
     launcherClipboard: z.boolean().catch(true),
     launcherClipboardKeep: z.enum(APP_CLIPBOARD_KEEPS).catch("week"),

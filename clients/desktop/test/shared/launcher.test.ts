@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { convert, evaluate, quickAnswer } from "@/shared/quick-answer";
-import { DEFAULT_SEARCH_ENGINE, LAUNCHER_QUERY_MAX, launcherEngineOf, launcherQuery, matchScore, rankedMatches, SEARCH_ENGINE_IDS, topMatches, useBoost, USE_BOOST_MAX, webSearchUrl } from "@/shared/launcher";
+import { DEFAULT_SEARCH_ENGINE, isGameLauncher, isGamesQuery, LAUNCHER_QUERY_MAX, launcherEngineOf, launcherQuery, matchScore, rankedMatches, SEARCH_ENGINE_IDS, topMatches, useBoost, USE_BOOST_MAX, webSearchUrl } from "@/shared/launcher";
 import { conflictSentence, findLaunchers, likelyHolders } from "@/shared/launcher-conflicts";
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipboardProbe } from "@/shared/clipboard-history";
 import { bindingFromPress, DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator, type KeyPress } from "@/shared/launcher-hotkey";
@@ -280,5 +280,17 @@ describe("the text the main window opens the launcher with", () => {
         expect(launcherQuery("  quarterly\n\treport  ")).toBe("quarterly report");
         expect(launcherQuery("")).toBe("");
         expect(launcherQuery("a".repeat(500))).toHaveLength(LAUNCHER_QUERY_MAX);
+    });
+});
+
+describe("the games command", () => {
+    it("answers to the command's names in either language, and to nothing longer", () => {
+        for (const text of ["games", "Game", " GAME LAUNCHER ", "juegos", "lanzador de juegos"]) expect(isGamesQuery(text)).toBe(true);
+        for (const text of ["gamestop", "game of thrones", "steam", ""]) expect(isGamesQuery(text)).toBe(false);
+    });
+
+    it("knows the stores' own clients from the games they start", () => {
+        for (const label of ["Steam", "Epic Games Launcher", "Battle.net", "EA app", "Riot Client", "GOG GALAXY"]) expect(isGameLauncher(label)).toBe(true);
+        for (const label of ["Steam Deck Tools", "Fortnite", "EAsy Notes"]) expect(isGameLauncher(label)).toBe(false);
     });
 });

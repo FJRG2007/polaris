@@ -56,7 +56,7 @@ import { recordLauncherUse, usageScores } from "./launcher-usage";
 import { searchableCommand, systemCommands, type SystemCommand } from "@/shared/system-commands";
 import { byFrecency } from "../../../../dashboard/packages/core/src/frecency";
 import { typedUrl } from "../../../../dashboard/packages/core/src/typed-url";
-import { LAUNCHER_CHANNELS, rankedMatches, webSearchUrl, type LauncherAnswer, type LauncherRow } from "@/shared/launcher";
+import { isGameLauncher, isGamesQuery, LAUNCHER_CHANNELS, rankedMatches, webSearchUrl, type LauncherAnswer, type LauncherRow } from "@/shared/launcher";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, powerMonitor, safeStorage, screen, session, type IpcMainInvokeEvent } from "electron";
 
 /** How long after start the hidden window is made, so it does not compete with the main window's first load. */
@@ -68,6 +68,8 @@ export const REFRESH_AFTER_HIDE_MS = 2_000;
 const INDEX_FRESH_MS = 60_000;
 /** The most rows of each kind, so the list stays one screen. */
 const PER_KIND = 6;
+/** The most games the games command lists. */
+const MAX_GAMES = 60;
 
 export interface LauncherHost {
     /** The Polaris in use, or null before one is set. */
@@ -251,7 +253,8 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     const pageKey = (page: { path: string; }) => `page:${page.path}`;
     const appKey = (app: { path: string; }) => `app:${app.path}`;
     const addApp = (app: ReturnType<typeof listedApps>[number]) => {
-        add({ kind: "app", title: app.label, subtitle: appSubtitle(app) }, () => void openListedApp(app.path), appKey(app));
+        const store = gameStore(app);
+        add({ kind: "app", title: app.label, subtitle: appSubtitle(app), ...(store ? { game: true, store } : {}) }, () => void openListedApp(app.path), appKey(app));
         paths.set(String(rows.length - 1), app);
     };
     const addPage = (page: { label: string; path: string; }) => add({ kind: "page", title: page.label, subtitle: "Open in Polaris" }, () => host?.showPolaris(page.path), pageKey(page));
@@ -298,7 +301,11 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
                 commandKey(command)
             );
         }
-        for (const app of rankedMatches(query, listedApps().map((app) => ({ ...app, context: "" })), PER_KIND, appKey, uses)) addApp(app);
+        // "games": every game and game launcher, most used first (Raycast's Game Launcher).
+        const games = isGamesQuery(query) ? byFrecency(listedApps().filter((app) => gameStore(app) || isGameLauncher(app.label)), appKey, uses).slice(0, MAX_GAMES) : [];
+        for (const app of games) addApp(app);
+        const listedGames = new Set(games.map((app) => app.path));
+        for (const app of rankedMatches(query, listedApps().map((app) => ({ ...app, context: "" })), PER_KIND, appKey, uses)) if (!listedGames.has(app.path)) addApp(app);
         if (origin) {
             add({ kind: "polar", title: `Ask Polar "${query.slice(0, 120)}"`, subtitle: "Opens Polar with the question ready to send" }, () =>
                 host?.showPolaris(`/polar?new=1&prompt=${encodeURIComponent(query.slice(0, 4000))}`)
@@ -391,6 +398,13 @@ async function upgradeOwnPanel(kept: BrowserWindow): Promise<void> {
 function appSubtitle(app: { path: string; launch?: { kind: string; }; updating?: boolean; }): string {
     const source = app.launch && app.launch.kind !== "open" ? appSource(app.path) : "Application";
     return app.updating ? `${source} - updating` : source;
+}
+
+/** The store a listed program is a game of, or null for an application (a shortcut, a packaged app, a store's own client). */
+function gameStore(app: { path: string; launch?: { kind: string; }; }): string | null {
+    if (!app.launch || app.launch.kind === "open" || app.launch.kind === "packaged") return null;
+    const source = appSource(app.path);
+    return source === "Application" ? null : source;
 }
 
 function appSource(path: string): string {

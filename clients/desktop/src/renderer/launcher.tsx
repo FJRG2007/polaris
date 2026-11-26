@@ -13,7 +13,7 @@ import { createRoot } from "react-dom/client";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { LauncherRow, LauncherRowKind, PolarisLauncher } from "@/shared/launcher";
 import { groupRows, searchTerms, stepActive } from "../../../../dashboard/packages/ui/src/search/search-match";
-import { AppWindow, Calculator, ClipboardList, Compass, Globe, Link, Power, Search, Sparkles, type LucideIcon } from "lucide-react";
+import { AppWindow, Calculator, ClipboardList, Compass, Gamepad2, Globe, Link, Power, Search, Sparkles, type LucideIcon } from "lucide-react";
 import { SearchGroup, SearchItem, SearchMessage, SearchOption, SearchSheet } from "../../../../dashboard/packages/ui/src/search/search-panel";
 import { KEY_GLYPHS, KeyHint, type HintKey } from "../../../../dashboard/packages/ui/src/shortcuts/key-cap";
 
@@ -161,7 +161,7 @@ function Launcher() {
                 groups.map((group) => (
                     <SearchGroup key={`${group.label}-${group.rows[0]?.position}`} label={group.label}>
                         {group.rows.map(({ row, position }) => {
-                            const Icon = KINDS[row.kind].icon;
+                            const Icon = row.game ? Gamepad2 : KINDS[row.kind].icon;
                             return (
                                 <SearchOption
                                     key={row.id}

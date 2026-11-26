@@ -19,7 +19,7 @@ import { Avatar } from "@/components/avatar";
 import type { LucideIcon } from "lucide-react";
 import type { ClockCommand, RecentSearch } from "@polaris/core";
 import { LAUNCHER_COMMANDS, typedUrl } from "@polaris/core";
-import { AlarmClock, AppWindow, Calculator, Clipboard, Clock, Copy, CornerDownLeft, Globe, Link, Power, Timer, Watch, X } from "lucide-react";
+import { AlarmClock, AppWindow, Calculator, Clipboard, Clock, Copy, CornerDownLeft, Gamepad2, Globe, Link, Power, Timer, Watch, X } from "lucide-react";
 import type { HostRow, HostRowKind } from "@/lib/search/search-host";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
@@ -378,15 +378,17 @@ export function HostResultRow({ row, query, ...props }: RowProps & { row: HostRo
             ? t("search.host.webHint")
             : row.kind === "polar"
               ? t("search.host.polarHint")
-              : row.kind === "app"
-                ? t("search.host.app")
-                : row.kind === "clip"
-                  ? t("search.host.clipHint")
-                  : row.kind === "system"
-                    ? t(row.command && CONFIRMED.has(row.command) ? "search.host.systemConfirmHint" : "search.host.systemHint")
-                    : row.subtitle;
+              : row.kind === "app" && row.game && row.store
+                ? t("search.host.gameFrom", { store: row.store })
+                : row.kind === "app"
+                  ? t("search.host.app")
+                  : row.kind === "clip"
+                    ? t("search.host.clipHint")
+                    : row.kind === "system"
+                      ? t(row.command && CONFIRMED.has(row.command) ? "search.host.systemConfirmHint" : "search.host.systemHint")
+                      : row.subtitle;
     const fallback =
-        row.kind === "url" ? Link : row.kind === "answer" ? Calculator : row.kind === "system" ? Power : row.kind === "web" ? Globe : row.kind === "clip" ? Clipboard : AppWindow;
+        row.kind === "url" ? Link : row.kind === "answer" ? Calculator : row.kind === "system" ? Power : row.kind === "web" ? Globe : row.kind === "clip" ? Clipboard : row.game ? Gamepad2 : AppWindow;
     const Icon = fallback;
     const icon =
         row.kind === "polar" ? (

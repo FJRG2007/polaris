@@ -323,6 +323,7 @@
             "polar": "Polar",
             "clip": "Portapapeles",
             "app": "Aplicación",
+            "gameFrom": "Juego - {store}",
             "webTitle": "Buscar en la web \"{query}\"",
             "webHint": "Se abre en tu navegador",
             "polarTitle": "Preguntar a Polar \"{query}\"",

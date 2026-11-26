@@ -307,7 +307,7 @@ describe("an app older than hosts managed here", () => {
             minimizeToTray: true,
             launcher: true,
             launcherBinding: "Alt+Space",
-            launcherGameMode: true,
+            launcherGameMode: false,
             launcherEngine: "google",
             launcherClipboard: true,
             launcherClipboardKeep: "week",

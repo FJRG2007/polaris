@@ -323,6 +323,7 @@
             "polar": "Polar",
             "clip": "Clipboard",
             "app": "Application",
+            "gameFrom": "Game - {store}",
             "webTitle": "Search the web for \"{query}\"",
             "webHint": "Opens in your browser",
             "polarTitle": "Ask Polar \"{query}\"",
