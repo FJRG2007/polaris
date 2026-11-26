@@ -41,6 +41,7 @@ import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PolarMemberRow } from "./polar-member-row";
 import { SafetyNumberView, usePeerVerified } from "./safety-number";
+import { useConversationSealed } from "./sealed-notice";
 import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import { useTypingIn } from "./typing-everywhere";
 import { useState, type ReactNode } from "react";
@@ -69,6 +70,7 @@ import {
     Settings2,
     ShieldCheck,
     KeyRound,
+    LockKeyhole,
     ShieldOff,
     Star,
     Timer,
@@ -120,7 +122,7 @@ export interface ConversationInfoEntries {
 export type InfoLayout = "page" | "panel";
 
 /** The chooser standing in for the page, or the page itself. */
-type View = "main" | "mute" | "notify" | "vanish" | "privacy" | "media" | "safety";
+type View = "main" | "mute" | "notify" | "vanish" | "privacy" | "media" | "safety" | "sealed";
 
 export function ConversationInfo({
     channel,
@@ -224,6 +226,8 @@ function InfoBody({
     // A one-to-one conversation only: in a group each pair compares its own number (design 4.6).
     const safetyPeer = direct && sealedChatActive() ? (channel.others[0] ?? null) : null;
     const safetyVerified = usePeerVerified(viewerId, safetyPeer?.id ?? "", null);
+    // Any other sealed conversation says so in its own row; a one-to-one says it on the number's.
+    const sealedGroup = useConversationSealed(channel.id) && !safetyPeer;
     // A group with one other person in it is still drawn as the group here.
     const face = direct ? person : channel.self ? conversationFace(channel, { id: viewerId, name: viewerName }) : null;
     // Somebody else on the other end: the one person a block can be about.
@@ -384,6 +388,16 @@ function InfoBody({
         return shell(
             t("info.safetyNumber"),
             <SafetyNumberView channelId={channel.id} peerId={safetyPeer.id} peerName={safetyPeer.name} />
+        );
+    }
+
+    if (view === "sealed" && sealedGroup) {
+        return shell(
+            t("sealedNotice.title"),
+            <div className="flex flex-col gap-3 text-sm">
+                <p>{t("sealedNotice.body")}</p>
+                <p className="text-muted-foreground">{t("sealedNotice.groupVerify")}</p>
+            </div>
         );
     }
 
@@ -588,6 +602,14 @@ function InfoBody({
                         label={t("chatPrivacy.linkPreviews")}
                         checked={vanishRules.linkPreviews}
                         onChange={entries.vanish.onLinkPreviews}
+                    />
+                ) : null}
+                {sealedGroup ? (
+                    <SettingRow
+                        icon={<LockKeyhole />}
+                        label={t("sealedNotice.infoRow")}
+                        value={t("sealedNotice.mark")}
+                        onClick={() => setView("sealed")}
                     />
                 ) : null}
                 {safetyPeer ? (

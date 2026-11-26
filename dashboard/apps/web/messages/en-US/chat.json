@@ -3136,5 +3136,15 @@
             "clearTitle": "Clear saved media?",
             "clearBody": "Photos, videos and documents saved on this device are deleted. Messages stay, and each one loads again when you open it."
         }
+    },
+    "sealedNotice": {
+        "line": "Messages are end-to-end encrypted. No one outside this chat, not even Polaris, can read them.",
+        "learnMore": "Click to learn more.",
+        "mark": "End-to-end encrypted",
+        "title": "End-to-end encrypted",
+        "body": "Messages, files and polls you send here are locked on your device and open only on the devices of the people in this chat. Polaris carries them but cannot read them.",
+        "verify": "Verify {name}",
+        "groupVerify": "To check someone's key, open your one-to-one chat with them and compare the safety number.",
+        "infoRow": "Encryption"
     }
 }

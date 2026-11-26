@@ -48,6 +48,7 @@ import * as conversationList from "@/lib/chat/conversation-list";
 import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { VanishDuration } from "@/lib/chat/vanish-rules";
 import { VanishBadge } from "./vanish-controls";
+import { SealedMark } from "./sealed-notice";
 import {
     ArrowLeft,
     Hash,
@@ -334,6 +335,7 @@ export function ChannelHeader({
                     </span>
                 </HeaderTitle>
                 {vanish && <VanishBadge seconds={vanish.rules.vanishAfter} />}
+                <SealedMark channelId={channel.id} peer={channel.kind === "dm" ? (channel.others[0] ?? null) : null} />
                 {/* A call running in a one-to-one or a group, said beside who
                     it is with. Only to somebody who may take calls - the same
                     rule as the call button. */}

@@ -56,6 +56,7 @@ import type { PollDraft } from "./poll-dialog";
 import { draftMessage, stillPending } from "./draft-message";
 import { ScheduledBar } from "./scheduled-bar";
 import { KeyChangeBar } from "./key-change-bar";
+import { SealedNotice } from "./sealed-notice";
 import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import { ChannelHeader, PanelSearch } from "./channel-header";
 import { useWideScreen } from "./use-wide-screen";
@@ -2691,10 +2692,18 @@ export function ChannelView({
                     </p>
                 )}
 
+                {/* The start of the conversation says it is sealed, as WhatsApp's
+                    first line does - only once there is nothing older to load. */}
+                {channel && messages !== null && !olderThan && rows.length > 0 ? (
+                    <SealedNotice channelId={channel.id} peer={channel.kind === "dm" ? (channel.others[0] ?? null) : null} />
+                ) : null}
                 {messages === null ? (
                     <MessagesSkeleton className="h-full" />
                 ) : rows.length === 0 ? (
-                    <div className="flex h-full items-center justify-center p-6">
+                    <div className="flex h-full flex-col items-center justify-center gap-4 p-6">
+                        {channel ? (
+                            <SealedNotice channelId={channel.id} peer={channel.kind === "dm" ? (channel.others[0] ?? null) : null} />
+                        ) : null}
                         <EmptyState
                             title={t("channelView.nothingHereYet")}
                             description={t("channelView.saySomethingEverybodyInThis")}

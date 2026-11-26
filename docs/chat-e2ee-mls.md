@@ -630,6 +630,31 @@ consistency with the last head it saw, and each account's own devices
 monitoring its entries - which is what turns a substituted key from invisible
 into a failed check.
 
+### The encrypted notice (built 2026-11-26)
+
+WhatsApp opens every chat with a centred line, "Messages and calls are
+end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read
+or listen to them. Tap to learn more.", and its contact info carries an
+"Encryption" row ("Tap to verify") that leads to the security code; Signal puts
+"View safety number" in the conversation settings. Polaris follows WhatsApp's
+placement and wording (`sealed-notice.tsx`):
+
+- **The line** sits above the first message once there is nothing older to load
+  (and above "Nothing here yet" in an empty conversation): "Messages are
+  end-to-end encrypted. No one outside this chat, not even Polaris, can read
+  them." with a lock. Calls are not named, because they are not sealed by MLS.
+- **The lock** sits beside the conversation's name in its header.
+- **Both open the explainer** (a dialog): what is sealed, and in a one-to-one
+  conversation the safety number with its QR, scan and verified mark (the same
+  `SafetyNumberView` as the info page); in a group, where each pair compares in
+  their own one-to-one, a sentence saying so. A sealed group's info page has an
+  "Encryption" row with the same text; a one-to-one keeps its "Safety number" row.
+- **Only where it is true.** All three ask `sealsSendsIn` - the same answer the
+  composer, polls, files and forum posts send by - so nothing is shown while
+  sealed chat is off, in a conversation that still sends in the clear while it
+  is held, before the answer is known, or when it cannot be had. Tests:
+  `test/chat/e2ee/sealed-notice.test.tsx`. Not run in a browser.
+
 ## Device hygiene (built 2026-11-25)
 
 A leaf that nobody uses any more is a key that still receives everything said
