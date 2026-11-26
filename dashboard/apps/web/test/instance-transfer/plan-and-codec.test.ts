@@ -75,6 +75,26 @@ describe("a row on its way between instances", () => {
         expect(envelopeTriples(mail).map((triple) => triple.ciphertext)).toContain("adminSecret");
     });
 
+    it("finds a table's one envelope in bare columns", () => {
+        const bare = (name: string) => envelopeTriples(real.find((model) => model.name === name)!);
+        expect(bare("MlsStoreEntry")).toEqual([{ ciphertext: "ciphertext", nonce: "nonce", keyId: "keyId" }]);
+        expect(bare("OpaqueServerSetup")).toEqual([{ ciphertext: "ciphertext", nonce: "nonce", keyId: "keyId" }]);
+        expect(bare("AutomationSecret")).toEqual([{ ciphertext: "encrypted", nonce: "nonce", keyId: "keyId" }]);
+    });
+
+    it("re-seals the state of a member the server runs, so Polar and webhooks keep their groups", async () => {
+        const store = real.find((model) => model.name === "MlsStoreEntry")!;
+        const row = { device: "service/polar", key: Buffer.from("leaf"), ciphertext: Buffer.from("source:epoch-secret"), nonce: Buffer.from("n"), keyId: "source" };
+        const tally = { carried: 0, unreadable: 0 };
+        const wire = JSON.parse(JSON.stringify(await encodeRow(store, row, codecFor("source"), tally))) as Record<string, unknown>;
+        expect(wire).not.toHaveProperty("nonce");
+        const decoded = await decodeRow(store, wire, codecFor("target"));
+        expect(Buffer.from(decoded.ciphertext as Buffer).toString()).toBe("target:epoch-secret");
+        expect(decoded.keyId).toBe("target");
+        expect(Buffer.from(decoded.key as Buffer).toString()).toBe("leaf");
+        expect(tally).toEqual({ carried: 1, unreadable: 0 });
+    });
+
     it("arrives re-sealed under the other instance's key", async () => {
         const row = {
             id: "019f8506-683f-7dd0-9c13-1e9ee9237fe3",

@@ -55,15 +55,21 @@ export interface Triple {
     readonly keyId: string;
 }
 
-/** Every envelope a model keeps in three columns. */
+/**
+ * Every envelope a model keeps in three columns: `xNonce` beside `encryptedX`
+ * or `x` and `xKeyId`, or a table that holds one secret and names its columns
+ * bare - `nonce` and `keyId` beside `encrypted` or `ciphertext` (the MLS store
+ * of the members the server runs, the OPAQUE server setup, automation secrets).
+ */
 export function envelopeTriples(model: Pick<SchemaModel, "fields">): Triple[] {
     const byName = new Map(model.fields.map((field) => [field.name, field]));
     const triples: Triple[] = [];
     for (const field of model.fields) {
-        if (!field.name.endsWith("Nonce") || field.type !== "Bytes") continue;
-        const base = field.name.slice(0, -"Nonce".length);
-        const keyId = `${base}KeyId`;
-        const prefixed = `encrypted${base.charAt(0).toUpperCase()}${base.slice(1)}`;
+        const bare = field.name === "nonce";
+        if ((!bare && !field.name.endsWith("Nonce")) || field.type !== "Bytes") continue;
+        const base = bare ? "ciphertext" : field.name.slice(0, -"Nonce".length);
+        const keyId = bare ? "keyId" : `${base}KeyId`;
+        const prefixed = bare ? "encrypted" : `encrypted${base.charAt(0).toUpperCase()}${base.slice(1)}`;
         const ciphertext = byName.get(prefixed)?.type === "Bytes" ? prefixed : byName.get(base)?.type === "Bytes" ? base : null;
         if (ciphertext && byName.get(keyId)?.type === "String") triples.push({ ciphertext, nonce: field.name, keyId });
     }

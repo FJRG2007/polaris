@@ -179,6 +179,41 @@ describe("moving an instance", () => {
         expect(opened).toBe("sealed-value-never-in-clear");
     });
 
+    it("keeps an OPAQUE record usable, and a retired one retired, under the new key", async () => {
+        const { passwordTag } = await import("@/lib/chat/e2ee/password-tag");
+        const RETIRED = "019f8506-683f-7dd0-9c13-1e9ee9237fe4";
+        const setup = encryptSecret("opaque-server-setup", SOURCE_KEY);
+        tables.set("User", [
+            { id: USER, email: "a@example.com", name: "A" },
+            { id: RETIRED, email: "b@example.com", name: "B" }
+        ]);
+        tables.set("Account", [
+            { id: "c1", userId: USER, accountId: USER, providerId: "credential", password: "hash-a" },
+            { id: "c2", userId: RETIRED, accountId: RETIRED, providerId: "credential", password: "hash-b-new" }
+        ]);
+        tables.set("OpaqueRecord", [
+            { userId: USER, record: "rec-a", passwordTag: passwordTag("hash-a", SOURCE_KEY), ksfVersion: 2 },
+            // Made against a password changed since: retired here.
+            { userId: RETIRED, record: "rec-b", passwordTag: passwordTag("hash-b-old", SOURCE_KEY), ksfVersion: 2 }
+        ]);
+        tables.set("OpaqueServerSetup", [{ id: "default", ciphertext: setup.ciphertext, nonce: setup.nonce, keyId: setup.keyId }]);
+        const { path } = await exported();
+        expect((await readFile(path)).includes(Buffer.from("hash-a"))).toBe(false);
+        tables.clear();
+        tables.set("User", [{ id: "fresh-admin" }]);
+        useKey(TARGET_KEY);
+        await transfer.applyTransfer(path, "correct horse battery staple");
+        const records = new Map(tables.get("OpaqueRecord")!.map((row) => [row.userId, row]));
+        expect(records.get(USER)!.passwordTag).toBe(passwordTag("hash-a", TARGET_KEY));
+        expect(records.get(RETIRED)!.passwordTag).not.toBe(passwordTag("hash-b-new", TARGET_KEY));
+        const arrived = tables.get("OpaqueServerSetup")![0]!;
+        const opened = decryptSecret(
+            { ciphertext: arrived.ciphertext as Buffer, nonce: arrived.nonce as Buffer, keyId: arrived.keyId as string },
+            TARGET_KEY
+        );
+        expect(opened).toBe("opaque-server-setup");
+    });
+
     it("refuses an instance that is already in use, before writing anything", async () => {
         const { path } = await exported();
         tables.set("User", [{ id: "one" }, { id: "two" }]);

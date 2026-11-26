@@ -28,6 +28,7 @@ import { createGunzip, createGzip } from "node:zlib";
 import { createReadStream, createWriteStream } from "node:fs";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { keyFields, writePlan, type SchemaModel } from "./plan";
+import { passwordTag } from "@/lib/chat/e2ee/password-tag";
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
 import { decodeRow, encodeRow, type SecretCodec, type Tally } from "./codec";
 import { newHeader, openStream, passphraseFileKey, SealError, sealStream } from "@/lib/backups/sealing";
@@ -118,6 +119,41 @@ export function instanceCodec(): SecretCodec {
     };
 }
 
+/**
+ * An OPAQUE record signs in only while its tag matches a fingerprint of the
+ * account's password hash keyed under the master key (`chat/e2ee/password-tag`),
+ * and the instance it moves to has another key. Without this every record
+ * would arrive retired: an account whose password was set over OPAQUE has a
+ * hash that opens for nothing, so its owner could not sign in, and nobody could
+ * open the password envelope of an account key - nor the sealed conversations
+ * behind it. So a tag that matches here travels as the hash it fingerprints
+ * (already in the file, in `Account`) and is keyed again on arrival; one that
+ * does not match travels as it is and stays retired there too.
+ */
+async function carryPasswordTags(rows: readonly Record<string, unknown>[], encoded: Record<string, unknown>[]): Promise<void> {
+    const ids = [...new Set(rows.map((row) => String(row.userId)))];
+    if (ids.length === 0) return;
+    const accounts = await prisma.account.findMany({
+        where: { userId: { in: ids }, providerId: "credential", password: { not: null } },
+        select: { userId: true, password: true }
+    });
+    const hashes = new Map<string, string[]>();
+    for (const account of accounts) {
+        if (!account.password) continue;
+        hashes.set(account.userId, [...(hashes.get(account.userId) ?? []), account.password]);
+    }
+    rows.forEach((row, index) => {
+        const hash = (hashes.get(String(row.userId)) ?? []).find((candidate) => passwordTag(candidate) === row.passwordTag);
+        if (hash) encoded[index]!.passwordTag = { $passwordTagOf: hash };
+    });
+}
+
+/** The tag `carryPasswordTags` sent as its hash, keyed under this instance's key. */
+export function retagPassword(row: Record<string, unknown>): void {
+    const tagged = row.passwordTag as { $passwordTagOf?: unknown } | null | undefined;
+    if (tagged && typeof tagged === "object" && typeof tagged.$passwordTagOf === "string") row.passwordTag = passwordTag(tagged.$passwordTagOf);
+}
+
 /** Write one line, waiting when the stream asks to. */
 async function writeLine(stream: NodeJS.WritableStream, value: unknown): Promise<void> {
     if (!stream.write(`${JSON.stringify(value)}\n`)) await once(stream, "drain");
@@ -144,7 +180,10 @@ export async function exportInstance(passphrase: string, target: string): Promis
             let rows = 0;
             for (let skip = 0; ; skip += PAGE) {
                 const page = await delegateOf(prisma, name).findMany({ orderBy, skip, take: PAGE });
-                for (const row of page) await writeLine(gzip, { m: name, r: await encodeRow(model, row, codec, tally) });
+                const encoded: Record<string, unknown>[] = [];
+                for (const row of page) encoded.push(await encodeRow(model, row, codec, tally));
+                if (name === "OpaqueRecord") await carryPasswordTags(page, encoded);
+                for (const row of encoded) await writeLine(gzip, { m: name, r: row });
                 rows += page.length;
                 if (page.length < PAGE) break;
             }
@@ -285,6 +324,7 @@ export async function applyTransfer(path: string, passphrase: string): Promise<T
                 const model = byName.get(line.m);
                 if (!model || LEFT_BEHIND.has(model.name)) continue;
                 const row = await decodeRow(model, line.r as Record<string, unknown>, codec);
+                if (model.name === "OpaqueRecord") retagPassword(row);
                 // A JSON column's empty value has to be said the database's way.
                 for (const field of model.fields) {
                     if (field.type === "Json" && field.kind === "scalar" && row[field.name] === null) {

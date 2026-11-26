@@ -28,13 +28,13 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import * as opaque from "@polaris/chat-crypto/opaque-server";
 import { clientIp } from "@/lib/request-context";
 import { passwordOpensRecordOffThread } from "./clear-password-pool";
+import { passwordTag as tagOfHash } from "./password-tag";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { PASSWORD_KSF_CURRENT, passwordKsf, type PasswordKsfVersion } from "@polaris/chat-crypto/password-lock";
 import { CredentialDecryptError, decryptSecret, encryptSecret, secretFingerprint } from "@polaris/storage";
 
 const SETUP_ID = "default";
 const LOGIN_TTL_MS = 2 * 60 * 1000;
-const PASSWORD_TAG_SCOPE = "chat-e2ee/opaque-password";
 const UNKNOWN_ID_SCOPE = "chat-e2ee/opaque-unknown-account";
 
 /** `proof` proves the signed-in account's current password to a server action
@@ -97,7 +97,7 @@ export async function serverSetup(): Promise<string> {
     return setupLoad;
 }
 
-/** Forget the cached setup. Tests only. */
+/** Forget the cached setup: after a whole Polaris is imported, and in tests. */
 export function resetServerSetupCache(): void {
     setupLoad = null;
 }
@@ -112,7 +112,7 @@ export async function credentialHash(userId: string): Promise<string | null> {
 }
 
 export function passwordTag(hash: string): string {
-    return secretFingerprint(hash, PASSWORD_TAG_SCOPE, loadEnv().POLARIS_MASTER_KEY);
+    return tagOfHash(hash);
 }
 
 function sameTag(a: string, b: string): boolean {

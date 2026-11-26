@@ -14,6 +14,7 @@ import { passwordIsBreached } from "@/lib/pwned-passwords";
 import { passwordMatchesIdentity } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import * as transfer from "@/lib/instance-transfer/transfer";
+import { resetServerSetupCache } from "@/lib/chat/e2ee/opaque-service";
 import { dropTransferFile, newTransferFile, transferPath } from "@/lib/instance-transfer/files";
 
 const MIN_PASSPHRASE = 12;
@@ -104,6 +105,9 @@ export async function applyImportAction(
     try {
         const path = await uploaded(id);
         const summary = await transfer.applyTransfer(path, parsed.data);
+        // The OPAQUE server setup this process read before is the fresh
+        // install's; the records that arrived were made under the file's.
+        resetServerSetupCache();
         await dropTransferFile(id);
         // Nobody signed in here any more: the import replaced every account.
         await recordAudit({
