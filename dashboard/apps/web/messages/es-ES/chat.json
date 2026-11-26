@@ -2909,11 +2909,11 @@
         "safetyUnlogged": "La clave que el servidor dio para {name} no es la de su propio registro de claves, así que no se cifra nada hacia ella. No confíes en esta conversación hasta comparar los números con {name} en persona.",
         "groupKeysChanged": "{count, plural, one {El código seguro de {name} ha cambiado.} other {Han cambiado los códigos seguros de {names}.}} Una clave nueva o alguien en medio; compáralo en vuestra conversación individual.",
         "keyLogForeign": "Se ha publicado para tu cuenta una clave que no creaste, así que quien te escribe puede estar cifrando para otra persona. Avisa a tu administrador y compara los códigos seguros con quien hablas.",
-        "keyLogFailed": "El registro de claves del servidor contradice lo que mostró antes a este navegador, así que no se puede confiar en las claves que avala. Recarga la página; si vuelve a salir, avisa a tu administrador.",
+        "keyLogFailed": "{surface, select, app {El registro de claves del servidor contradice lo que mostró antes a esta app, así que no se puede confiar en las claves que avala. Recarga la página; si vuelve a salir, avisa a tu administrador.} other {El registro de claves del servidor contradice lo que mostró antes a este navegador, así que no se puede confiar en las claves que avala. Recarga la página; si vuelve a salir, avisa a tu administrador.}}",
         "keyLogReset": "El registro de claves firma ahora con una clave nueva que la anterior nunca avaló. Pasa al cambiar la clave maestra del servidor; hasta que confíes en ella, no se usan las claves que avala.",
-        "keyLogTrust": "Confiar en esta clave",
+        "keyLogTrust": "Aceptar la clave",
         "keyLogTrustTitle": "¿Confiar en la nueva clave del registro?",
-        "keyLogTrustBody": "Hazlo solo si tu administrador cambió la clave maestra del servidor. Solo se confía en esta clave, y el registro debe seguir conteniendo todo lo que este navegador vio antes.",
+        "keyLogTrustBody": "{surface, select, app {Hazlo solo si tu administrador cambió la clave maestra del servidor. Solo se confía en esta clave, y el registro debe seguir conteniendo todo lo que esta app vio antes.} other {Hazlo solo si tu administrador cambió la clave maestra del servidor. Solo se confía en esta clave, y el registro debe seguir conteniendo todo lo que este navegador vio antes.}}",
         "keyLogTrustCancel": "Ahora no"
     },
     "location": {

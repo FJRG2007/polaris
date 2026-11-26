@@ -2909,11 +2909,11 @@
         "safetyUnlogged": "The key the server gave for {name} is not the one in its own key log, so nothing is sealed to it. Do not trust this conversation until you have compared numbers with {name} in person.",
         "groupKeysChanged": "{count, plural, one {{name}'s safety number changed.} other {Safety numbers changed for {names}.}} A new key, or somebody in between - compare in your one-to-one conversation to be sure.",
         "keyLogForeign": "A key you did not create was published for your account, so people writing to you may be sealing to somebody else. Tell your administrator, and compare safety numbers with the people you talk to.",
-        "keyLogFailed": "The server's key log contradicted what it showed this browser before, so keys it vouches for cannot be trusted. Reload the page; if this comes back, tell your administrator.",
+        "keyLogFailed": "{surface, select, app {The server's key log contradicted what it showed this app before, so keys it vouches for cannot be trusted. Reload the page; if this comes back, tell your administrator.} other {The server's key log contradicted what it showed this browser before, so keys it vouches for cannot be trusted. Reload the page; if this comes back, tell your administrator.}}",
         "keyLogReset": "The server's key log now signs with a new key its old one never vouched for. This happens when the server's master key is changed; until you trust it, keys it vouches for are not used.",
         "keyLogTrust": "Trust this key",
         "keyLogTrustTitle": "Trust the key log's new key?",
-        "keyLogTrustBody": "Do this only if your administrator changed the server's master key. Only this exact key is trusted, and the log must still contain everything this browser saw before.",
+        "keyLogTrustBody": "{surface, select, app {Do this only if your administrator changed the server's master key. Only this exact key is trusted, and the log must still contain everything this app saw before.} other {Do this only if your administrator changed the server's master key. Only this exact key is trusted, and the log must still contain everything this browser saw before.}}",
         "keyLogTrustCancel": "Not now"
     },
     "location": {

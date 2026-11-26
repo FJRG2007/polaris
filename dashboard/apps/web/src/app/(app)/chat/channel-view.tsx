@@ -2850,7 +2850,7 @@ export function ChannelView({
             {channel.kind === "dm" && channel.others[0] && sealedChatActive() && (
                 <KeyChangeBar channelId={channel.id} viewerId={viewerId} peer={channel.others[0]} />
             )}
-            {channel.kind === "group" && channel.others.length > 0 && sealedChatActive() && (
+            {sealedChatActive() && channel.kind === "group" && channel.others.length > 0 && (
                 <GroupKeyChangeBar channelId={channel.id} viewerId={viewerId} members={channel.others} />
             )}
             {sealedChatActive() && <KeyLogNotice viewerId={viewerId} />}
