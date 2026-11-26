@@ -45,14 +45,33 @@ export class MlsDeliveryRefusal extends Error {
     }
 }
 
-/** Record (or refresh) a device and the protocol version it declares. */
+/**
+ * Record (or refresh) a device and the protocol version it declares.
+ *
+ * A device the account did not have, joining one it already had, tells the
+ * account (docs/chat-e2ee-mls.md, "Device hygiene"): a new device reads every
+ * sealed conversation from then on, so it is the one change worth hearing about
+ * at once - the same alert WhatsApp and Signal raise for a linked device. The
+ * account's first device says nothing (that is just turning sealed chat on), and
+ * neither do the members the server runs, whose device registers on every act.
+ * A browser signed out or removed that comes back is new again, and says so.
+ */
 export async function registerDevice(userId: string, device: string, signatureKey: Uint8Array, e2eeVersion: number): Promise<void> {
     const now = new Date();
+    const known = await prisma.mlsDevice.findUnique({ where: { userId_device: { userId, device } }, select: { userId: true } });
     await prisma.mlsDevice.upsert({
         where: { userId_device: { userId, device } },
         create: { userId, device, signatureKey: Buffer.from(signatureKey), e2eeVersion, lastSeenAt: now },
         update: { signatureKey: Buffer.from(signatureKey), e2eeVersion, lastSeenAt: now }
     });
+    if (known || userId === POLAR_SERVICE_ID || userId === WEBHOOK_SERVICE_ID) return;
+    try {
+        const others = await prisma.mlsDevice.count({ where: { userId, device: { not: device } } });
+        if (others > 0) await (await import("@/lib/notifications/security-events")).notifySealedDeviceAdded(userId);
+    } catch (caught) {
+        // Telling the account is never worth failing the device it is about.
+        console.error("polaris: could not raise the new sealed-chat device alert:", caught);
+    }
 }
 
 /**
@@ -79,9 +98,42 @@ export function inactiveDaysFrom(stored: string | null | undefined): number {
     return Math.min(INACTIVE_DEVICE_DAYS.max, Math.max(INACTIVE_DEVICE_DAYS.min, days));
 }
 
-/** The moment before which a device last seen counts as retired. */
-export async function inactiveCutoff(now = Date.now()): Promise<Date> {
-    return new Date(now - (await inactiveDeviceDays()) * 86_400_000);
+/**
+ * An account's limit: the instance's, or a tighter one any organization it
+ * belongs to set (as owner or member). An organization may only shorten it - a
+ * value at or above the instance's changes nothing - so the strictest applies.
+ */
+export function strictestDays(instance: number, orgDays: readonly (number | null | undefined)[]): number {
+    const tighter = orgDays.filter((days): days is number => typeof days === "number" && Number.isFinite(days)).map((days) => inactiveDaysFrom(String(days)));
+    return Math.min(instance, ...tighter);
+}
+
+/**
+ * Each account's cutoff: the moment before which a device of it last seen
+ * counts as retired. Two indexed reads whatever the number of accounts: their
+ * memberships, then the organizations among those (or owned by them) that set a
+ * limit.
+ */
+export async function inactiveCutoffs(userIds: readonly string[], now = Date.now()): Promise<Map<string, Date>> {
+    const users = [...new Set(userIds)];
+    const instance = await inactiveDeviceDays();
+    const cutoffs = new Map(users.map((userId) => [userId, new Date(now - instance * 86_400_000)]));
+    if (!users.length) return cutoffs;
+    const memberships = await prisma.organizationMember.findMany({ where: { userId: { in: users } }, select: { userId: true, orgId: true } });
+    const limited = await prisma.organization.findMany({
+        where: { sealedDeviceDays: { not: null }, OR: [{ id: { in: [...new Set(memberships.map((m) => m.orgId))] } }, { ownerId: { in: users } }] },
+        select: { id: true, ownerId: true, sealedDeviceDays: true }
+    });
+    if (!limited.length) return cutoffs;
+    const days = new Map(limited.map((org) => [org.id, org.sealedDeviceDays]));
+    for (const userId of users) {
+        const own = [
+            ...memberships.filter((m) => m.userId === userId).map((m) => days.get(m.orgId)),
+            ...limited.filter((org) => org.ownerId === userId).map((org) => org.sealedDeviceDays)
+        ];
+        cutoffs.set(userId, new Date(now - strictestDays(instance, own) * 86_400_000));
+    }
+    return cutoffs;
 }
 
 /** A device's `lastSeenAt` moves at most this often from its ordinary traffic. */
@@ -114,11 +166,12 @@ export async function retireDevice(userId: string, device: string): Promise<void
 
 /**
  * Of these device addresses (leaves of a group), the ones no longer in use:
- * retired, never known, or unseen since `cutoff`. A member the server runs
- * (Polar, a webhook) is never one: its device lives on the server and registers
- * each time it acts, so a quiet month says nothing about a lost device.
+ * retired, never known, or unseen since its account's cutoff (`inactiveCutoffs`).
+ * A member the server runs (Polar, a webhook) is never one: its device lives on
+ * the server and registers each time it acts, so a quiet month says nothing
+ * about a lost device.
  */
-export async function retiredDevices(addresses: readonly string[], cutoff: Date): Promise<string[]> {
+export async function retiredDevices(addresses: readonly string[], now = Date.now()): Promise<string[]> {
     const services = new Set([POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID]);
     const wanted = [...new Set(addresses)].filter((address) => !services.has(address.slice(0, address.indexOf("/"))));
     if (!wanted.length) return [];
@@ -127,7 +180,8 @@ export async function retiredDevices(addresses: readonly string[], cutoff: Date)
         where: { userId: { in: [...new Set(parsed.map((p) => p.userId))] }, device: { in: parsed.map((p) => p.device) } },
         select: { userId: true, device: true, lastSeenAt: true }
     });
-    const live = new Set(rows.filter((r) => r.lastSeenAt >= cutoff).map((r) => deviceAddress(r.userId, r.device)));
+    const cutoffs = await inactiveCutoffs(parsed.map((p) => p.userId), now);
+    const live = new Set(rows.filter((r) => r.lastSeenAt >= cutoffs.get(r.userId)!).map((r) => deviceAddress(r.userId, r.device)));
     return parsed.filter((p) => !live.has(p.address)).map((p) => p.address);
 }
 
@@ -169,12 +223,13 @@ export async function claimKeyPackages(
     ciphersuite: number
 ): Promise<{ address: string; keyPackage: Uint8Array }[]> {
     const users = [...new Set(userIds)].slice(0, MAX_CLAIM_USERS);
-    const cutoff = await inactiveCutoff();
+    const cutoffs = await inactiveCutoffs(users);
     const known = await prisma.mlsDevice.findMany({ where: { userId: { in: users } }, select: { userId: true, device: true, lastSeenAt: true } });
-    // A device unseen past the limit is added to nothing new, and its packages go (it publishes fresh ones when it is back).
-    const stale = known.filter((d) => d.lastSeenAt < cutoff);
+    // A device unseen past its account's limit is added to nothing new, and its packages go (it publishes fresh ones when it is back).
+    const fresh = (d: { userId: string; lastSeenAt: Date }) => d.lastSeenAt >= cutoffs.get(d.userId)!;
+    const stale = known.filter((d) => !fresh(d));
     for (const { userId, device } of stale) await prisma.mlsKeyPackage.deleteMany({ where: { userId, device } });
-    const devices = known.filter((d) => d.lastSeenAt >= cutoff);
+    const devices = known.filter(fresh);
     const out: { address: string; keyPackage: Uint8Array }[] = [];
     for (const { userId, device } of devices) {
         for (let attempt = 0; attempt < 3; attempt++) {

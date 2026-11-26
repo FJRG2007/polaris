@@ -553,6 +553,11 @@ export async function setOrgChat(orgId: string, isolated: boolean): Promise<void
     await prisma.organization.update({ where: { id: orgId }, data: { chatIsolated: isolated } });
 }
 
+/** The organization's own sealed-chat device limit in days; null is the instance's. */
+export async function setOrgSealedDeviceDays(orgId: string, days: number | null): Promise<void> {
+    await prisma.organization.update({ where: { id: orgId }, data: { sealedDeviceDays: days } });
+}
+
 export interface OrgDetail {
     readonly id: string;
     readonly slug: string;

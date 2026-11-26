@@ -261,6 +261,13 @@
             "label": "A chat of its own",
             "hint": "Conversations between the people here stay here, apart from the ones they have with everybody else. They switch between the two the way they switch shelves, in the header. Turning this off later puts the conversations back rather than hiding them."
         },
+        "sealedDevices": {
+            "title": "Encrypted chat devices",
+            "label": "Unused devices leave after",
+            "hint": "A device nobody here has opened for this long stops receiving encrypted chats until it is opened again. It can only be shorter than this Polaris allows.",
+            "instance": "Same as this Polaris ({count, plural, one {# day} other {# days}})",
+            "days": "{count, plural, one {# day} other {# days}}"
+        },
         "profile": {
             "title": "Profile",
             "descriptionPlaceholder": "What this organization does"
@@ -381,7 +388,9 @@
         "nameSuccessor": "Could not name that successor.",
         "chooseHolder": "Choose who this mailbox is for.",
         "handOut": "That mailbox could not be handed out.",
-        "takeBack": "That mailbox could not be taken back."
+        "takeBack": "That mailbox could not be taken back.",
+        "sealedChatOff": "Encrypted chat is not on in this Polaris.",
+        "sealedDevicesNotShorter": "Pick fewer days than this Polaris already allows."
     },
     "quotas": {
         "title": "Limits",

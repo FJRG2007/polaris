@@ -71,6 +71,8 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
         key: "security.account_2fa_trusted_devices_revoked",
         href: SESSIONS
     },
+    // A sealed-chat device taken off the account by hand on the sessions page.
+    "account.chat-device.removed": { key: "security.chat_device_removed", href: SESSIONS },
     "account.passkey.removed": { key: "security.account_passkey_removed", href: PASSKEYS },
     "account.passkey.added": { key: "security.account_passkey_added", href: PASSKEYS },
     "vault.passkey.added": { key: "security.vault_passkey_added", href: VAULT_SETTINGS },
@@ -211,5 +213,21 @@ export async function notifyPhoneClaimed(userId: string, phone: string, outcome:
                 : t("security.account_phone_contested", { phone }),
         body: outcome === "taken" ? t("security.account_phone_taken_body") : t("security.account_phone_contested_body"),
         href: "/account/details"
+    });
+}
+
+/**
+ * Tell an account a new device joined its sealed chats (`registerDevice`): from
+ * now on it reads every end-to-end encrypted conversation the account is in. The
+ * alert lands on the sessions page, where the device can be removed.
+ */
+export async function notifySealedDeviceAdded(userId: string): Promise<void> {
+    const t = await wordsFor(userId, "notices");
+    await notify({
+        userId,
+        event: "account.security",
+        title: t("security.chat_device_added"),
+        body: t("security.chat_device_added_body"),
+        href: SESSIONS
     });
 }

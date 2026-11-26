@@ -16,7 +16,7 @@
  */
 
 import { useState } from "react";
-import { useOptimisticToggle } from "@polaris/ui";
+import { useOptimisticToggle, useOptimisticValue } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -36,6 +36,7 @@ import {
     deleteOrgAction,
     setOrgChatAction,
     setOrgNameTagAction,
+    setOrgSealedDeviceDaysAction,
     transferOrgAction,
     updateOrgAction
 } from "@/app/(app)/account/organizations/actions";
@@ -65,7 +66,8 @@ export function SettingsView({
     chatOffered,
     nameTag,
     nameTagStaff,
-    orgImage
+    orgImage,
+    sealedDevices
 }: {
     org: OrgDetail;
     isOwner: boolean;
@@ -91,6 +93,10 @@ export function SettingsView({
     /** An instance administrator, who may use the reserved words here too. */
     nameTagStaff: boolean;
     orgImage: string | null;
+    /** The organization's sealed-chat device limit (null days: the instance's)
+     *  and the instance's own; null while sealed chat is off or for somebody who
+     *  cannot manage it. */
+    sealedDevices: { days: number | null; instance: number } | null;
 }) {
     const tt = useTranslations("badges");
     const router = useRouter();
@@ -133,6 +139,7 @@ export function SettingsView({
                         changes what people see rather than what the
                         organization is called. */}
                     {chatOffered && <ChatCard orgId={org.id} isolated={chatIsolated} onRun={run} />}
+                    {sealedDevices && <SealedDevicesCard orgId={org.id} {...sealedDevices} />}
                     {nameTag && (
                         <NameTagEditor
                             title={tt("nameTags.org.title")}
@@ -200,6 +207,68 @@ function ChatCard({ orgId, isolated, onRun }: { orgId: string; isolated: boolean
                         aria-label={t("settings.chat.label")}
                     />
                 </div>
+            </CardBody>
+        </Card>
+    );
+}
+
+/** The choices an organization may pick, before the instance's own cuts them. */
+const DEVICE_DAY_CHOICES = [7, 14, 30, 45, 60] as const;
+
+/**
+ * How long a sealed-chat device of anybody here may go unused before it leaves
+ * their conversations. Only shorter than the instance's limit: an account in
+ * several organizations gets the strictest, so a longer value would do nothing.
+ */
+function SealedDevicesCard({ orgId, days, instance }: { orgId: string; days: number | null; instance: number }) {
+    const t = useTranslations("accountOrgs");
+    const [error, setError] = useState<string | null>(null);
+    const [value, save, pending] = useOptimisticValue<number | null>(
+        days,
+        async (next) => {
+            setError(null);
+            return setOrgSealedDeviceDaysAction(orgId, next);
+        },
+        { onRefused: setError }
+    );
+    const shorter: number[] = DEVICE_DAY_CHOICES.filter((choice) => choice < instance);
+    // A value set before the instance's limit moved under it still shows as itself.
+    const choices = value === null || shorter.includes(value) ? shorter : [...shorter, value].sort((a, b) => a - b);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>{t("settings.sealedDevices.title")}</CardTitle>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{t("settings.sealedDevices.label")}</p>
+                        <p id="org-sealed-devices" className="text-muted-foreground text-xs">
+                            {t("settings.sealedDevices.hint")}
+                        </p>
+                    </div>
+                    <Select
+                        className="h-8 w-full shrink-0 text-xs sm:w-56"
+                        aria-label={t("settings.sealedDevices.label")}
+                        aria-describedby="org-sealed-devices"
+                        value={value === null ? "instance" : String(value)}
+                        disabled={pending}
+                        options={[
+                            { value: "instance", label: t("settings.sealedDevices.instance", { count: instance }) },
+                            ...choices.map((choice) => ({
+                                value: String(choice),
+                                label: t("settings.sealedDevices.days", { count: choice })
+                            }))
+                        ]}
+                        onValueChange={(next) => {
+                            const chosen = next === "instance" ? null : Number.parseInt(next, 10);
+                            if (chosen !== null && !Number.isFinite(chosen)) return;
+                            if (chosen !== value) save(chosen);
+                        }}
+                    />
+                </div>
+                {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
             </CardBody>
         </Card>
     );

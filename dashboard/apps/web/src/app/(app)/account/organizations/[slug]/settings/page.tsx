@@ -25,6 +25,8 @@ import { orgChatOffered } from "@/lib/chat/isolation";
 import { prisma } from "@polaris/db";
 import { orgAvatarUrl } from "@/lib/avatar-url";
 import { tagOfOrg } from "@/lib/name-tags/name-tag-service";
+import { sealedChatServed } from "@/lib/chat/e2ee/flag";
+import { inactiveDeviceDays } from "@/lib/chat/e2ee/mls-delivery";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +47,7 @@ export default async function OrganizationSettingsPage({
     if (!canManage && !canDelete) notFound();
 
     // Each half's inputs are only fetched for somebody who will be shown it.
-    const [members, impact, successor, chatOffered, chat, nameTag] = await Promise.all([
+    const [members, impact, successor, chatOffered, chat, nameTag, instanceDeviceDays] = await Promise.all([
         access.isOwner
             ? listOrgMembers(org.id, { id: user.id, isAdmin: user.isAdmin })
             : Promise.resolve([]),
@@ -59,9 +61,11 @@ export default async function OrganizationSettingsPage({
         orgChatOffered(),
         prisma.organization.findUnique({
             where: { id: org.id },
-            select: { chatIsolated: true, image: true }
+            select: { chatIsolated: true, image: true, sealedDeviceDays: true }
         }),
-        canManage ? tagOfOrg(org.id) : Promise.resolve(null)
+        canManage ? tagOfOrg(org.id) : Promise.resolve(null),
+        // Only while sealed chat is served: the limit means nothing otherwise.
+        canManage && sealedChatServed() ? inactiveDeviceDays() : Promise.resolve(null)
     ]);
 
     // The photo card is the account screens' own, and reads their namespace.
@@ -82,6 +86,11 @@ export default async function OrganizationSettingsPage({
                 nameTag={nameTag}
                 nameTagStaff={user.isAdmin}
                 orgImage={chat?.image ? orgAvatarUrl(org.id) : null}
+                sealedDevices={
+                    instanceDeviceDays === null
+                        ? null
+                        : { days: chat?.sealedDeviceDays ?? null, instance: instanceDeviceDays }
+                }
             />
         </Messages>
     );

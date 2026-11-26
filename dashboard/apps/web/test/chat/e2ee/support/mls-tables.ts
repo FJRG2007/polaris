@@ -22,8 +22,9 @@ export function memoryPrisma(state: MemoryTablesState) {
             if (key === "AND") return (want as Row[]).every((w) => matches(row, w));
             if (key === "userId_device" || key === "channelId_service") return matches(row, want as Row);
             if (want && typeof want === "object" && !(want instanceof Uint8Array)) {
-                const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint };
+                const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint; not?: unknown };
                 if (cond.in) return cond.in.some((value) => same(row[key], value));
+                if ("not" in cond) return !same(row[key] ?? null, cond.not);
                 if (cond.gt !== undefined) return (row[key] as bigint) > cond.gt;
                 if (cond.gte !== undefined) return (row[key] as bigint) >= cond.gte;
                 if (cond.lt !== undefined) return (row[key] as bigint) < cond.lt;
@@ -108,6 +109,9 @@ export function memoryPrisma(state: MemoryTablesState) {
         chatServiceMember: table("chatServiceMember", ["channelId", "service"]),
         user: table("user", ["id"]),
         setting: table("setting", ["key"]),
+        // Read by `inactiveCutoffs` (an organization's tighter device limit).
+        organizationMember: table("organizationMember", ["orgId", "userId"]),
+        organization: table("organization", ["id"]),
         // All or nothing, one at a time (Postgres's row lock on the group does
         // the same for two commits): run on the live tables, put the copy back
         // on a throw.

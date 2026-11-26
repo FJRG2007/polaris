@@ -7014,6 +7014,12 @@ model Organization {
     // write belongs to the organization (its mailboxes, its task spaces).
     // Written by whoever holds settings.manage; empty is none.
     writingGuide String @default("")
+    // How long a sealed-chat device of anybody here may go unused before it
+    // leaves their conversations (docs/chat-e2ee-mls.md, "Device hygiene"), in
+    // days, 7-90. Only ever tightens the instance's own limit - an account in
+    // several organizations gets the strictest. Null, the default and every
+    // existing organization's value, is the instance's limit.
+    sealedDeviceDays Int?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 

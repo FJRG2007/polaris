@@ -14,6 +14,7 @@
  * replace the whole screen over one refused write.
  */
 
+import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
@@ -22,6 +23,8 @@ import * as orgs from "@/lib/orgs/org-service";
 import * as roles from "@/lib/orgs/role-service";
 import { recordAudit } from "@/lib/audit-service";
 import { orgChatOffered } from "@/lib/chat/isolation";
+import { sealedChatServed } from "@/lib/chat/e2ee/flag";
+import { INACTIVE_DEVICE_DAYS, inactiveDeviceDays } from "@/lib/chat/e2ee/mls-delivery";
 import { canCreateOrganization } from "@/lib/orgs/policy";
 import * as invitations from "@/lib/orgs/invitation-service";
 import { getTranslations } from "@/lib/i18n/request";
@@ -148,6 +151,35 @@ export async function setOrgChatAction(
             return { error: (await getTranslations("accountOrgs"))("errors.noSeparateChats") };
         await orgs.setOrgChat(orgId, wanted);
         await record(caller.id, orgId, "org.chat", { isolated: wanted });
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "errors.saveThat");
+    }
+}
+
+/**
+ * How long a sealed-chat device of anybody here may go unused before it leaves
+ * their conversations (docs/chat-e2ee-mls.md, "Device hygiene"). Null hands it
+ * back to the instance's limit. A setting like the chat one, so `settings.manage`
+ * changes it; refused while sealed chat is not served (the screen hides the card
+ * then) and for a value that is not shorter than the instance's, which an
+ * organization may only tighten.
+ */
+export async function setOrgSealedDeviceDaysAction(
+    orgId: string,
+    days: unknown
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = z.number().int().min(INACTIVE_DEVICE_DAYS.min).max(INACTIVE_DEVICE_DAYS.max).nullable().safeParse(days);
+    if (!parsed.success) return { error: (await getTranslations("accountOrgs"))("errors.saveThat") };
+    try {
+        await orgs.requireOrgPermission(caller, orgId, "settings.manage");
+        if (!sealedChatServed()) return { error: (await getTranslations("accountOrgs"))("errors.sealedChatOff") };
+        if (parsed.data !== null && parsed.data >= (await inactiveDeviceDays()))
+            return { error: (await getTranslations("accountOrgs"))("errors.sealedDevicesNotShorter") };
+        await orgs.setOrgSealedDeviceDays(orgId, parsed.data);
+        await record(caller.id, orgId, "org.sealed-device-days", { days: parsed.data });
         refresh();
         return {};
     } catch (caught) {

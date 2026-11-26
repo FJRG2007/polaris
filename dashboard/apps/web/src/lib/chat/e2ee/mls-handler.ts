@@ -181,7 +181,7 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
             return json({
                 departed: others.filter((_, i) => !reach[i]),
                 joinable: await delivery.accountsWithKeyPackages(candidates, body.ciphersuite, JOINABLE_PAGE),
-                retired: await delivery.retiredDevices(devices, await delivery.inactiveCutoff())
+                retired: await delivery.retiredDevices(devices)
             });
         }
         case "group": {

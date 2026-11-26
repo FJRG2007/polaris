@@ -24,11 +24,15 @@ const state = vi.hoisted(() => ({
     members: new Set<string>(),
     seq: 0n,
     keepEditHistory: true,
-    editWindowMinutes: null as number | null
+    editWindowMinutes: null as number | null,
+    deviceNotices: [] as string[]
 }));
 
 vi.mock("@/lib/session", () => ({ backgroundUser: async () => state.user }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
+vi.mock("@/lib/notifications/security-events", () => ({
+    notifySealedDeviceAdded: async (userId: string) => void state.deviceNotices.push(userId)
+}));
 // The ordinary send, reduced to the row it writes: what a sealed message adds to it is under test here.
 vi.mock("@/lib/chat/messages", () => ({
     send: async (actor: { id: string }, input: { channelId: string; body: string; clientKey?: string }, ...rest: unknown[]) => {
@@ -93,6 +97,7 @@ beforeEach(() => {
     state.members = new Set([`${ALICE}:${CHANNEL}`, `${BOB}:${CHANNEL}`]);
     state.keepEditHistory = true;
     state.editWindowMinutes = null;
+    state.deviceNotices = [];
 });
 
 describe("/api/e2ee/mls", () => {
@@ -897,6 +902,67 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         expect((await call({ op: "retire-device", device: "alice-laptop" }, null)).status).toBe(401);
         await call({ op: "retire-device", device: "alice-laptop" }, BOB);
         expect(state.tables.mlsDevice!.some((d) => d.device === "alice-laptop")).toBe(true);
+    });
+
+    it("tells the account when a device joins one it already had, never for its first, a refresh or a service member", async () => {
+        await device(ALICE, "alice-laptop");
+        await device(ALICE, "alice-laptop");
+        expect(state.deviceNotices).toEqual([]);
+        await device(ALICE, "alice-phone-1");
+        expect(state.deviceNotices).toEqual([ALICE]);
+        await device(ALICE, "alice-phone-1");
+        expect(state.deviceNotices).toEqual([ALICE]);
+        // Removed (signed out, or taken off on the sessions page) and back: new again.
+        await call({ op: "retire-device", device: "alice-phone-1" });
+        await device(ALICE, "alice-phone-1");
+        expect(state.deviceNotices).toEqual([ALICE, ALICE]);
+        const delivery = await import("@/lib/chat/e2ee/mls-delivery");
+        const polar = "00000000-0000-0000-0000-000000000001";
+        await delivery.registerDevice(polar, "polar-service-a", new Uint8Array(32), 1);
+        await delivery.registerDevice(polar, "polar-service-b", new Uint8Array(32), 1);
+        expect(state.deviceNotices).toEqual([ALICE, ALICE]);
+    });
+
+    it("an organization only shortens the device limit, and an account gets the strictest of its organizations", async () => {
+        const delivery = await import("@/lib/chat/e2ee/mls-delivery");
+        expect(delivery.strictestDays(30, [])).toBe(30);
+        expect(delivery.strictestDays(30, [null, 14, 60])).toBe(14);
+        expect(delivery.strictestDays(30, [90])).toBe(30);
+        expect(delivery.strictestDays(30, [1])).toBe(7);
+
+        await device(BOB, "bob-phone-1");
+        await device(BOB, "bob-tablet");
+        const tablet = state.tables.mlsDevice!.find((d) => d.device === "bob-tablet")!;
+        tablet.lastSeenAt = new Date(Date.now() - 10 * 86_400_000);
+        const devices = [`${BOB}/bob-phone-1`, `${BOB}/bob-tablet`];
+        const retired = async () => (await call({ op: "roster", channelId: CHANNEL, accounts: [ALICE, BOB], devices, ciphersuite: 0x004f })).body.retired;
+        await device(ALICE, "alice-laptop");
+        expect(await retired()).toEqual([]);
+
+        // Bob is on a roster with a 7-day limit: ten days unused is past it.
+        state.tables.organization = [{ id: "org-a", ownerId: EVE, sealedDeviceDays: 7 }];
+        state.tables.organizationMember = [{ orgId: "org-a", userId: BOB }];
+        expect(await retired()).toEqual([`${BOB}/bob-tablet`]);
+        // Owning one counts the same; a longer one never loosens the instance's 30.
+        state.tables.organization = [{ id: "org-b", ownerId: BOB, sealedDeviceDays: 7 }, { id: "org-c", ownerId: EVE, sealedDeviceDays: 90 }];
+        state.tables.organizationMember = [{ orgId: "org-c", userId: BOB }];
+        expect(await retired()).toEqual([`${BOB}/bob-tablet`]);
+        state.tables.organization = [{ id: "org-c", ownerId: EVE, sealedDeviceDays: 90 }, { id: "org-d", ownerId: EVE, sealedDeviceDays: null }];
+        state.tables.organizationMember = [{ orgId: "org-c", userId: BOB }, { orgId: "org-d", userId: BOB }];
+        expect(await retired()).toEqual([]);
+        tablet.lastSeenAt = new Date(Date.now() - 31 * 86_400_000);
+        expect(await retired()).toEqual([`${BOB}/bob-tablet`]);
+
+        // The claim reads the same per-account cutoff: Alice's limit does not reach Bob.
+        tablet.lastSeenAt = new Date(Date.now() - 10 * 86_400_000);
+        state.tables.organization = [{ id: "org-a", ownerId: EVE, sealedDeviceDays: 7 }];
+        state.tables.organizationMember = [{ orgId: "org-a", userId: ALICE }];
+        await call({ op: "publish-key-packages", device: "bob-tablet", ciphersuite: 0x004f, keyPackages: [blob(5)] }, BOB);
+        const claimed = await call({ op: "claim-key-packages", channelId: CHANNEL, userIds: [BOB], ciphersuite: 0x004f });
+        expect((claimed.body.keyPackages as { address: string }[]).map((k) => k.address)).toEqual([`${BOB}/bob-tablet`]);
+        state.tables.organizationMember = [{ orgId: "org-a", userId: BOB }];
+        await call({ op: "publish-key-packages", device: "bob-tablet", ciphersuite: 0x004f, keyPackages: [blob(6)] }, BOB);
+        expect((await call({ op: "claim-key-packages", channelId: CHANNEL, userIds: [BOB], ciphersuite: 0x004f })).body.keyPackages).toEqual([]);
     });
 
     it("notes a device's use at most once an hour, so an open tab never counts as inactive", async () => {
