@@ -216,7 +216,7 @@
             "title": "Encrypted chat devices",
             "description": "Each of these can read your encrypted chats. Remove one you no longer use or do not recognize.",
             "device": "Device {code}",
-            "thisBrowser": "This browser",
+            "thisBrowser": "{surface, select, app {This app} other {This browser}}",
             "added": "Added",
             "lastUsed": "last used",
             "empty": "No device reads your encrypted chats now.",

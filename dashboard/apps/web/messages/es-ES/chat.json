@@ -3140,8 +3140,8 @@
     "sealedNotice": {
         "line": "Los mensajes están cifrados de extremo a extremo. Nadie fuera de este chat, ni siquiera Polaris, puede leerlos.",
         "learnMore": "Haz clic para saber más.",
-        "mark": "Cifrado de extremo a extremo",
-        "title": "Cifrado de extremo a extremo",
+        "mark": "Cifrado extremo a extremo",
+        "title": "Cifrado extremo a extremo",
         "body": "Los mensajes, archivos y encuestas que envías aquí se cierran en tu dispositivo y solo se abren en los de las personas de este chat. Polaris los lleva, pero no puede leerlos.",
         "verify": "Verificar a {name}",
         "groupVerify": "Para comprobar la clave de alguien, abre tu chat individual con esa persona y compara el código seguro.",

@@ -262,8 +262,8 @@
             "hint": "Las conversaciones entre las personas de aquí se quedan aquí, separadas de las que tienen con todos los demás. Cambian entre las dos igual que cambian de estante, en la cabecera. Si más adelante lo desactivas, las conversaciones vuelven en lugar de ocultarse."
         },
         "sealedDevices": {
-            "title": "Dispositivos del chat cifrado",
-            "label": "Los dispositivos sin uso salen tras",
+            "title": "Dispositivos de chat cifrado",
+            "label": "Dispositivos sin uso salen tras",
             "hint": "Un dispositivo que nadie de aquí abre en ese tiempo deja de recibir chats cifrados hasta que se abre de nuevo. Solo puede ser menos de lo que permite este Polaris.",
             "instance": "Igual que este Polaris ({count, plural, one {# día} other {# días}})",
             "days": "{count, plural, one {# día} other {# días}}"

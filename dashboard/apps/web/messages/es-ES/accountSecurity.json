@@ -213,10 +213,10 @@
             "stopThis": "Dejar de recordar este dispositivo"
         },
         "sealed": {
-            "title": "Dispositivos del chat cifrado",
+            "title": "Dispositivos de chat cifrado",
             "description": "Cada uno puede leer tus chats cifrados. Quita el que ya no uses o no reconozcas.",
             "device": "Dispositivo {code}",
-            "thisBrowser": "Este navegador",
+            "thisBrowser": "{surface, select, app {Esta app} other {Este navegador}}",
             "added": "Añadido",
             "lastUsed": "último uso",
             "empty": "Ningún dispositivo lee ahora tus chats cifrados.",

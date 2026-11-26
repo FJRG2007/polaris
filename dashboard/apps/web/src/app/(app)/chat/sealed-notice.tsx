@@ -96,7 +96,7 @@ export function SealedNotice({ channelId, peer }: { channelId: string; peer: Sea
             <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="flex max-w-md min-w-0 items-start gap-2 rounded-md bg-muted px-3 py-2 text-left text-xs text-muted-foreground hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex max-w-md min-w-0 items-start gap-2 rounded-md bg-muted px-3 py-2 text-start text-xs text-muted-foreground hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 <LockKeyhole className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                 <span className="min-w-0 break-words">
