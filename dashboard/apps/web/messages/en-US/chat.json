@@ -840,7 +840,7 @@
         "opening": "Opening your conversation with {name}",
         "youBlocked": "You blocked {name}. They cannot reach you, and you cannot write to them.",
         "updateAppToChat": "This version of the Polaris app can no longer send or read encrypted messages. Update it to keep chatting.",
-        "updateApp": "Update",
+        "updateApp": "Update app",
         "messagePlaceholder": "Message {name}",
         "leaveAndJoin": "Leave your call and join {name}?",
         "roomCount": "{count, plural, =0 { - nobody is in here} one { - one person is in here} other { - {count} people are in here}}",
