@@ -526,7 +526,7 @@
             "retry": "Try again",
             "useTranscribed": "Use voice by transcription",
             "failed": "Live voice didn't connect. Try again, or use voice by transcription.",
-            "noKey": "Live voice needs a key of your own that can talk live, such as OpenAI.",
+            "noKey": "Live voice needs a key of your own that can talk live, such as OpenAI or Google.",
             "notSaved": "Part of this call couldn't be saved to the chat."
         },
         "transcribed": {

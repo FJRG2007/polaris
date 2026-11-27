@@ -21,26 +21,38 @@ import { z } from "zod";
  * Providers with a speech-to-speech model a browser can be connected to on a
  * short-lived secret minted here. Checked against each provider's own docs:
  *
- * - OpenAI: Realtime API, `POST /v1/realtime/client_secrets` mints a secret,
- *   the browser opens WebRTC at `/v1/realtime/calls`; the server cuts its own
- *   unplayed audio when you talk over it, and function calling is supported.
+ * - OpenAI (`openai`): Realtime API, `POST /v1/realtime/client_secrets` mints
+ *   a secret, the browser opens WebRTC at `/v1/realtime/calls`; the server cuts
+ *   its own unplayed audio when you talk over it, and function calling is
+ *   supported.
+ * - Google Gemini Live (`google-ai`): `POST v1beta/auth_tokens` mints an
+ *   ephemeral token locked to the model and the whole session setup, the
+ *   browser opens `BidiGenerateContentConstrained` over a WebSocket with it and
+ *   carries 16 kHz PCM in and 24 kHz PCM out itself; the server says
+ *   `interrupted` when you talk over it, and function calling is supported.
  *
- * Researched, not wired yet (each needs a client of its own):
- * - Google Gemini Live: ephemeral token from `v1beta/auth_tokens`, then a
- *   WebSocket carrying raw 16 kHz PCM in and 24 kHz PCM out, played by the page.
- * - ElevenLabs Agents: a signed URL per agent (`/v1/convai/conversation/
- *   get-signed-url?agent_id=`), so an agent has to exist on the account first.
+ * Researched, not wired yet: ElevenLabs Agents. A call opens on a signed URL
+ * for an agent stored on the account; the key can make one
+ * (`POST /v1/convai/agents/create`, `ask_polar` as a client tool) and find it
+ * again (`GET /v1/convai/agents?search=`), so it needs no setup by the person,
+ * but its socket protocol needs a client of its own.
  */
-export const LIVE_VOICE_PROVIDERS = ["openai"] as const;
+export const LIVE_VOICE_PROVIDERS = ["openai", "google-ai"] as const;
 export type LiveVoiceProvider = (typeof LIVE_VOICE_PROVIDERS)[number];
 
 /**
  * The provider a live call runs on, or null. Only a key of the person's own
  * counts: the deployment's key is never handed to a browser, not even as a
- * secret that lasts a minute.
+ * secret that lasts a minute. With more than one, `prefer` (the provider of
+ * the model the chat is on) wins when it is one of them; Polar stores no
+ * default provider of its own.
  */
-export function liveVoiceProvider(sources: ReadonlyMap<string, string>): LiveVoiceProvider | null {
-    return LIVE_VOICE_PROVIDERS.find((slug) => sources.get(slug) === "own") ?? null;
+export function liveVoiceProvider(
+    sources: ReadonlyMap<string, string>,
+    prefer: string | null = null
+): LiveVoiceProvider | null {
+    const held = LIVE_VOICE_PROVIDERS.filter((slug) => sources.get(slug) === "own");
+    return held.find((slug) => slug === prefer) ?? held[0] ?? null;
 }
 
 /** How voice mode runs for this person: `live` speech to speech, `transcribed`
@@ -56,9 +68,20 @@ export function voiceModeOf(voice: { dictation: boolean; realtime?: boolean }): 
 export const liveBodySchema = z
     .object({
         threadId: z.string().uuid(),
-        lang: z.string().trim().max(35).nullable().default(null)
+        lang: z.string().trim().max(35).nullable().default(null),
+        /** The provider of the model the chat is on, preferred when it can talk live. */
+        provider: z.string().trim().max(64).nullable().default(null)
     })
     .strict();
+
+/** The Gemini Live session setup, as the token locks it and the socket's first
+ *  message repeats it. Built on the server (`gemini-live.ts`). */
+export type GeminiLiveSetup = Record<string, unknown> & { model: string };
+
+/** What opening a live call answers: which provider, and how to connect. */
+export type LiveGrant =
+    | { provider: "openai"; value: string; expiresAt: number }
+    | { provider: "google-ai"; token: string; setup: GeminiLiveSetup; expiresAt: number };
 
 /** Longest line of a live call saved into the thread. */
 export const LIVE_LINE_MAX = 8_000;

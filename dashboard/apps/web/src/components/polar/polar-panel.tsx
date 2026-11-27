@@ -2630,6 +2630,7 @@ export function PolarChat({
                     threadId={threadId}
                     temporary={temporary}
                     projectId={newProject}
+                    provider={choice?.provider ?? null}
                     messages={chat.messages}
                     status={chat.status}
                     onSend={(text) => void sendSpoken(text)}
