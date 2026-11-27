@@ -1,0 +1,12 @@
+[package]
+name = "polaris_relay"
+edition = "2024"
+description = "Polaris Terminal's side of the Polaris remote-control relay: frames and live pane output"
+authors.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+base64.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true

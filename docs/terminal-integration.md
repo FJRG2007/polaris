@@ -386,6 +386,16 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   `./.rook/` is read as a fallback when `./.polaris/terminal/` is absent, never
   rewritten. Settings keys keep their names; only paths and env vars change.
   The migration writes a marker so it runs once, and logs what it copied.
+- **Built:** `crates/pterm_core/src/rook_migration.rs`, called from
+  `app/src/lib.rs` before the home directory is created. On the released GUI
+  build with no data profile, when `~/.polaris-terminal-oss` does not exist and
+  `~/.rook-oss` (or `~/.rook`) does, it copies the per-user directories of
+  `dev.rook.RookOss` (Linux: `rook-oss`) into Polaris Terminal's, renaming
+  `rook.sqlite` and its `-wal` / `-shm` files, never overwriting and never
+  following a symbolic link, then assembles the home directory under a
+  temporary name with the `.migrated-from-rook` marker inside and renames it into
+  place, so an interrupted copy runs again on the next launch. Not built yet:
+  the keychain re-read and the per-repository `./.rook/` fallback.
 
 ### The rook.dev links
 
@@ -483,6 +493,10 @@ side before the tree exists. In order:
      send output for a pane that is not attached; at most 16 attached panes per
      socket. After a reconnect the relay sends `attach` again for every pane
      still watched, so attachment state is not kept across sockets.
+     *Built:* the frames and this pane-output state in `crates/polaris_relay`
+     (`PaneOutput`: screen first, 64 KiB chunks, 16 panes, the relay's own
+     meter so nothing is sent to be dropped, newest bytes kept on a flood,
+     `reset` on reconnect). The socket that drives it is not wired into the app yet.
    - Polar: the assistant's provider is the instance's compatible endpoints
      (`/api/v1/chat/completions`, `/api/v1/messages`, `/api/v1/responses`,
      `/api/v1/models`) with the terminal key.
