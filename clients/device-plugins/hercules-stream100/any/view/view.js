@@ -52,12 +52,14 @@ const WORDS = {
             stopped: "Polaris' driver is not on the Stream 100 yet, so its knobs and buttons do nothing here.",
             unplugged: "Polaris sets up its driver when the Stream 100 is plugged in.",
             installed: "Stream 100 driver is set up on this PC.",
+            pending: "The driver is on the Stream 100. Restart Windows to finish setting it up.",
             failed: {
                 declined: "Windows' permission was not given. Choose Set up the driver, then Yes.",
                 unplugged: "The Stream 100 was unplugged. Plug it in and choose Set up the driver.",
                 certificate: "Windows did not create the driver's certificate. Choose Set up the driver to try again.",
                 signing: "Windows did not accept the driver's signature. Choose Set up the driver to try again.",
                 binding: "Windows did not put the driver on the Stream 100. Plug it in again and choose Set up the driver.",
+                restart: "Windows needs a restart to finish. If it still does not work after that, choose Set up the driver.",
                 removing: "The driver could not be removed. Choose Set up the driver to try again.",
                 failed: "The driver setup did not finish. Choose Set up the driver to try again."
             }
@@ -78,12 +80,14 @@ const WORDS = {
             stopped: "El driver de Polaris aún no está en el Stream 100: sus ruedas y botones no hacen nada aquí.",
             unplugged: "Polaris configura su driver en cuanto conectes el Stream 100.",
             installed: "El driver del Stream 100 está configurado en este PC.",
+            pending: "El driver ya está en el Stream 100. Reinicia Windows para terminar de configurarlo.",
             failed: {
                 declined: "No se dio el permiso de Windows. Elige Configurar el driver y luego Sí.",
                 unplugged: "Se desconectó el Stream 100. Conéctalo y elige Configurar el driver.",
                 certificate: "Windows no creó el certificado del driver. Elige Configurar el driver para reintentar.",
                 signing: "Windows no aceptó la firma del driver. Elige Configurar el driver para reintentar.",
                 binding: "Windows no puso el driver en el Stream 100. Reconéctalo y elige Configurar el driver.",
+                restart: "Windows necesita reiniciarse para terminar. Si después sigue sin ir, elige Configurar el driver.",
                 removing: "No se pudo quitar el driver. Elige Configurar el driver para reintentar.",
                 failed: "La configuración del driver no terminó. Elige Configurar el driver para reintentar."
             }
@@ -125,13 +129,14 @@ function fill(text, values) {
 }
 
 const DRIVER_STATES = ["notNeeded", "installed", "needed", "repair", "unplugged"];
-const DRIVER_FAILURES = ["declined", "unplugged", "certificate", "signing", "binding", "removing", "failed"];
+const DRIVER_FAILURES = ["declined", "unplugged", "certificate", "signing", "binding", "restart", "removing", "failed"];
 
 /** The app's answer to `driver.look`, checked field by field, or null to draw nothing. */
 function readDriver(value) {
     if (!value || typeof value !== "object" || !DRIVER_STATES.includes(value.state)) return null;
-    const failure = value.failure === undefined || value.failure === null ? null : DRIVER_FAILURES.includes(value.failure) ? value.failure : "failed";
-    return { state: value.state, hercules: value.hercules === true, installed: value.installed === true, failure };
+    // Once the driver is on the device, an earlier setup's failure no longer applies.
+    const failure = value.state === "installed" || value.failure === undefined || value.failure === null ? null : DRIVER_FAILURES.includes(value.failure) ? value.failure : "failed";
+    return { state: value.state, hercules: value.hercules === true, installed: value.installed === true, pending: value.pending === true, failure };
 }
 
 /**
@@ -150,7 +155,7 @@ function driverSentence(driver) {
         case "unplugged":
             return driver.installed ? null : "unplugged";
         case "installed":
-            return "installed";
+            return driver.pending ? "pending" : "installed";
         default:
             return null;
     }

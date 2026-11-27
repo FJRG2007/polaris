@@ -29,9 +29,10 @@ export const CAT_NAME = "polaris-stream100.cat";
 const USB_DEVICE_CLASS = "{88BAE032-5A81-49f0-BC3D-A4FF138216D6}";
 
 /** Exit codes of the elevated script. */
-export const EXIT = { ok: 0, certificate: 10, signing: 11, binding: 13, unplugged: 14, removing: 20, integrity: 87, declined: DECLINED } as const;
+export const EXIT = { ok: 0, certificate: 10, signing: 11, binding: 13, unplugged: 14, restart: 15, removing: 20, integrity: 87, declined: DECLINED } as const;
 
-export type DriverFailure = "declined" | "unplugged" | "certificate" | "signing" | "binding" | "removing" | "failed";
+/** `restart`: the driver is on the device, but Windows only starts it after a restart (something held the device during the swap). */
+export type DriverFailure = "declined" | "unplugged" | "certificate" | "signing" | "binding" | "restart" | "removing" | "failed";
 
 export function failureOf(code: number): DriverFailure | null {
     switch (code) {
@@ -47,6 +48,8 @@ export function failureOf(code: number): DriverFailure | null {
             return "signing";
         case EXIT.binding:
             return "binding";
+        case EXIT.restart:
+            return "restart";
         case EXIT.removing:
             return "removing";
         default:
@@ -130,9 +133,20 @@ ${inf}
 Add-Type -Namespace PolarisStream100 -Name Setup -MemberDefinition @'
 [DllImport("newdev.dll", CharSet = CharSet.Unicode, SetLastError = true)]
 public static extern bool UpdateDriverForPlugAndPlayDevicesW(IntPtr parent, string hardwareId, string infPath, uint flags, out bool reboot);
+[DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+public static extern int CM_Get_Device_Interface_List_SizeW(out uint size, ref Guid guid, string deviceId, uint flags);
 '@
 function Get-Stream { Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.HardwareID -contains $hw } | Select-Object -First 1 }
 function Get-InfOf([string]$id) { [string](Get-PnpDeviceProperty -InstanceId $id -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data }
+function Test-Ready([string]$id) { $size = [uint32]0; $guid = [Guid]'${DRIVER_INTERFACE_GUID}'; ([PolarisStream100.Setup]::CM_Get_Device_Interface_List_SizeW([ref]$size, [ref]$guid, $id, 0) -eq 0) -and $size -gt 1 }
+function Wait-Ready([string]$id) { for ($i = 0; $i -lt 20; $i++) { if (Test-Ready $id) { return $true }; Start-Sleep -Milliseconds 500 }; $false }
+function Restart-Stream([string]$id) {
+    & $pnputil /restart-device $id | Out-Null
+    if (Wait-Ready $id) { return 0 }
+    try { Disable-PnpDevice -InstanceId $id -Confirm:$false -ErrorAction Stop; Enable-PnpDevice -InstanceId $id -Confirm:$false -ErrorAction Stop } catch { }
+    if (Wait-Ready $id) { return 0 }
+    return ${EXIT.restart}
+}
 function Read-State { if (Test-Path -LiteralPath $statePath) { try { Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json } catch { $null } } else { $null } }
 function Clear-Link([string]$path) { if (Test-Path -LiteralPath $path) { $item = Get-Item -LiteralPath $path -Force; if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { $item.Delete() } } }
 function Lock-Root {
@@ -191,8 +205,9 @@ function Install-Driver {
         $bound = [PolarisStream100.Setup]::UpdateDriverForPlugAndPlayDevicesW([IntPtr]::Zero, $hw, $inf, 1, [ref]$reboot)
         $published = Get-InfOf $device.InstanceId
         if (-not $bound -or -not $published -or $published -eq $previous) { $code = ${EXIT.binding} }
+        elseif ($reboot -or -not (Wait-Ready $device.InstanceId)) { $code = Restart-Stream $device.InstanceId }
     }
-    if ($code -eq 0) {
+    if ($code -eq 0 -or $code -eq ${EXIT.restart}) {
         [pscustomobject]@{ version = 1; published = $published; thumbprint = $cert.Thumbprint; previous = $previous; at = (Get-Date).ToUniversalTime().ToString('o') } | ConvertTo-Json -Compress | Set-Content -LiteralPath $statePath -Encoding ASCII
     } else {
         Remove-OurCerts
@@ -242,24 +257,26 @@ export function launcherCommand(scriptPath: string, sha256: string, action: Driv
 export const LOOK_SCRIPT = [
     "$ErrorActionPreference = 'SilentlyContinue';",
     `$d = Get-PnpDevice -PresentOnly | Where-Object { $_.HardwareID -contains '${HARDWARE_ID}' } | Select-Object -First 1;`,
-    "if ($d) { [pscustomobject]@{ present = $true; service = [string]$d.Service } | ConvertTo-Json -Compress } else { '{\"present\":false,\"service\":\"\"}' }"
+    "if ($d) { [pscustomobject]@{ present = $true; service = [string]$d.Service; problem = [int]$d.ConfigManagerErrorCode } | ConvertTo-Json -Compress } else { '{\"present\":false,\"service\":\"\"}' }"
 ].join(" ");
 
-const lookSchema = z.object({ present: z.boolean(), service: z.string().max(200).nullable().catch("") });
+const lookSchema = z.object({ present: z.boolean(), service: z.string().max(200).nullable().catch(""), problem: z.number().int().optional().catch(undefined) });
 const recordSchema = z.object({ version: z.literal(1), published: z.string().regex(/^oem\d+\.inf$/i), previous: z.string().max(100).nullable().catch(null), thumbprint: z.string().max(100).optional(), at: z.string().max(40).optional() });
 
 export type DriverRecord = z.infer<typeof recordSchema>;
 export interface DriverLook {
     readonly present: boolean;
     readonly service: string;
+    /** Windows' problem code for the device (`ConfigManagerErrorCode`); 0 or absent when it runs. */
+    readonly problem?: number;
 }
 
 /** What the plugin page shows. */
 export type DriverState =
     /** Not Windows, or WinUSB is already on the device by some other tool: nothing to set up. */
     | { readonly state: "notNeeded"; }
-    /** Polaris' driver is on the device. */
-    | { readonly state: "installed"; }
+    /** Polaris' driver is on the device. `pending` while Windows starts it only after a restart. */
+    | { readonly state: "installed"; readonly pending?: boolean; }
     /** The one-time setup has not been done: offer Install. `hercules` when Hercules' driver holds it today. */
     | { readonly state: "needed"; readonly hercules: boolean; }
     /** It was set up, but the device is on another driver now (a Hercules reinstall, Windows Update): offer it again. */
@@ -271,7 +288,11 @@ export function decideDriver(platform: NodeJS.Platform, look: DriverLook | null,
     if (platform !== "win32") return { state: "notNeeded" };
     if (!look || !look.present) return { state: "unplugged", installed: record !== null };
     const service = look.service.toLowerCase();
-    if (service === "winusb") return record ? { state: "installed" } : { state: "notNeeded" };
+    if (service === "winusb") {
+        if (!record) return { state: "notNeeded" };
+        // Code 14 (CM_PROB_NEED_RESTART), or any other: the driver is there, its device not started on it yet.
+        return look.problem ? { state: "installed", pending: true } : { state: "installed" };
+    }
     if (record) return { state: "repair" };
     return { state: "needed", hercules: service === "hercstreammixdevice" };
 }
@@ -306,7 +327,7 @@ export function createDriverRunner(host: OfficialHost, paths: DriverPaths, platf
         if (out.code !== 0) return null;
         try {
             const parsed = lookSchema.safeParse(JSON.parse(out.stdout.trim()));
-            return parsed.success ? { present: parsed.data.present, service: parsed.data.service ?? "" } : null;
+            return parsed.success ? { present: parsed.data.present, service: parsed.data.service ?? "", ...(parsed.data.problem ? { problem: parsed.data.problem } : {}) } : null;
         } catch {
             return null;
         }

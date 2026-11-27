@@ -73,7 +73,10 @@ describe("answerOfficial", () => {
 
     it("answers look, restore and launch from the runner", async () => {
         const { runner, manager, write } = fakes({ ok: false, reason: "cancelled" } as Execute);
-        expect(await answerOfficial(runner, manager as never, "hercules-stream100", { kind: "look" }, write)).toEqual({ found: null, imported: null, backup: null });
+        expect(await answerOfficial(runner, manager as never, "hercules-stream100", { kind: "look" }, write)).toEqual({ found: null, driverInUse: false, imported: null, backup: null });
+        // With Polaris' own driver on the device the page says the official app is not needed.
+        expect(await answerOfficial(runner, manager as never, "hercules-stream100", { kind: "look" }, write, undefined, async () => true)).toMatchObject({ driverInUse: true });
+        expect(await answerOfficial(runner, manager as never, "hercules-stream100", { kind: "look" }, write, undefined, () => Promise.reject(new Error("gone")))).toMatchObject({ driverInUse: false });
         expect(await answerOfficial(runner, manager as never, "hercules-stream100", { kind: "restore" }, write)).toMatchObject({ ok: true, started: true });
         expect(await answerOfficial(runner, manager as never, "hercules-stream100", { kind: "launch" }, write)).toBe(true);
         expect(manager.install).not.toHaveBeenCalled();

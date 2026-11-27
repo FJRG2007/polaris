@@ -165,6 +165,8 @@ export function createPluginManager(options: ManagerOptions) {
     const waiting = new Set<string>();
     /** Plugins being rolled back, so a burst of run changes rolls each back once. */
     const rolling = new Set<string>();
+    /** Plugins held stopped while something needs their device free (`whileStopped`): no reconcile starts them meanwhile. */
+    const held = new Set<string>();
     /** Installs the person asked for that have not ended, so the card shows them at once, even while queued. */
     const asked = new Set<string>();
 
@@ -358,7 +360,7 @@ export function createPluginManager(options: ManagerOptions) {
         for (const [id, plugin] of Object.entries(installed.plugins)) {
             const manifest = plugin.enabled ? await manifestOf(id, plugin.version) : null;
             const entry = manifest && options.platform ? manifest.entries[options.platform] : undefined;
-            if (!manifest || !entry || (devices && !pluginDevicePresent(manifest, devices))) {
+            if (!manifest || !entry || held.has(id) || (devices && !pluginDevicePresent(manifest, devices))) {
                 supervisor.drop(id);
                 continue;
             }
@@ -570,6 +572,23 @@ export function createPluginManager(options: ManagerOptions) {
                 changed();
                 return values;
             });
+        },
+
+        /**
+         * Runs `work` with the plugin stopped and kept stopped, then starts what
+         * should run again. A driver swap needs the device free: a plugin still
+         * holding it (the Hercules SDK route) makes Windows leave the new driver
+         * waiting for a restart. A plug event during `work` does not restart it.
+         */
+        async whileStopped<T>(id: string, work: () => Promise<T>): Promise<T> {
+            held.add(id);
+            supervisor.drop(id);
+            try {
+                return await work();
+            } finally {
+                held.delete(id);
+                await serial(reconcile).catch(() => undefined);
+            }
         },
 
         stop: () => {

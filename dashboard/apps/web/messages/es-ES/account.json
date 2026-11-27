@@ -2700,6 +2700,7 @@
                 "failed": "No funcionó. Vuelve a intentarlo."
             },
             "installed": "{app} está instalada en este equipo.",
+            "notNeeded": "El driver de Polaris está en uso: {app} no hace falta.",
             "backup": {
                 "stop": "Polaris paró la app oficial. Puedes dejarla como estaba.",
                 "uninstall": "Polaris desinstaló la app oficial. Puedes recuperar sus ajustes.",

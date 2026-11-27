@@ -93,6 +93,45 @@ describe("the elevated script", () => {
     });
 });
 
+describe("after the driver swap", () => {
+    const script = driver.driverScript(driver.renderInf(DATE));
+
+    it("waits for our device interface to come up, and restarts the device (hidden, in the same console) when it does not", () => {
+        expect(script).toContain("CM_Get_Device_Interface_List_SizeW");
+        expect(script).toContain(`$guid = [Guid]'${driver.DRIVER_INTERFACE_GUID}'`);
+        expect(script).toContain("elseif ($reboot -or -not (Wait-Ready $device.InstanceId)) { $code = Restart-Stream $device.InstanceId }");
+        expect(script).toContain("& $pnputil /restart-device $id | Out-Null");
+        expect(script).toContain("Disable-PnpDevice -InstanceId $id -Confirm:$false");
+        expect(script).toContain(`return ${driver.EXIT.restart}`);
+    });
+
+    it("keeps the record when only a Windows restart is left, so the driver can still be removed", () => {
+        expect(script).toContain(`if ($code -eq 0 -or $code -eq ${driver.EXIT.restart}) {`);
+    });
+
+    it("goes from Hercules' driver, to ours waiting for a restart, to ours running once the device comes back", () => {
+        const record = { version: 1 as const, published: "oem42.inf", previous: "oem7.inf" };
+        expect(driver.decideDriver("win32", { present: true, service: "HercStreamMixDevice" }, null)).toEqual({ state: "needed", hercules: true });
+        // Re-enumerating: the device is gone for a moment.
+        expect(driver.decideDriver("win32", { present: false, service: "" }, record)).toEqual({ state: "unplugged", installed: true });
+        // WinUSB named on the device, but Windows has not started it on it (code 14).
+        expect(driver.decideDriver("win32", { present: true, service: "WinUSB", problem: 14 }, record)).toEqual({ state: "installed", pending: true });
+        expect(driver.decideDriver("win32", { present: true, service: "WinUSB" }, record)).toEqual({ state: "installed" });
+    });
+
+    it("reads Windows' problem code from the look", async () => {
+        const { host } = fakeHost({ look: JSON.stringify({ present: true, service: "WinUSB", problem: 14 }), record: RECORD });
+        expect(await driver.createDriverRunner(host, PATHS, "win32").state()).toEqual({ state: "installed", pending: true });
+        const running = fakeHost({ look: JSON.stringify({ present: true, service: "WinUSB", problem: 0 }), record: RECORD });
+        expect(await driver.createDriverRunner(running.host, PATHS, "win32").state()).toEqual({ state: "installed" });
+    });
+
+    it("answers a restart still needed as its own reason", async () => {
+        const { host } = fakeHost({ elevated: driver.EXIT.restart });
+        expect(await driver.createDriverRunner(host, PATHS, "win32", () => DATE).install()).toEqual({ ok: false, reason: "restart" });
+    });
+});
+
 describe("the launcher", () => {
     const hash = "A".repeat(64);
 
@@ -140,6 +179,7 @@ describe("deciding what the page offers", () => {
         expect(driver.failureOf(0)).toBeNull();
         expect(driver.failureOf(1223)).toBe("declined");
         expect(driver.failureOf(13)).toBe("binding");
+        expect(driver.failureOf(15)).toBe("restart");
         expect(driver.failureOf(87)).toBe("failed");
         expect(driver.failureOf(-1)).toBe("failed");
     });
@@ -172,6 +212,8 @@ describe("the runner", () => {
         const sha = createHash("sha256").update(Buffer.from(script, "utf8")).digest("hex").toUpperCase();
         expect(run?.env?.POLARIS_ARGS).toContain(sha);
         expect(run?.env?.POLARIS_ARGS).toContain("'install'");
+        // Only Windows' prompt shows: the elevated PowerShell starts hidden.
+        expect(run?.env?.POLARIS_WINDOW).toBe("Hidden");
     });
 
     it("says the prompt was declined", async () => {

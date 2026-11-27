@@ -22,6 +22,12 @@ describe("the official software, as the page reads the app's answers", () => {
         expect(await lookOfficial({ official: () => Promise.reject(new Error("gone")) } as unknown as PluginsBridge, "x")).toBeNull();
     });
 
+    it("knows when Polaris' own driver is in use, and takes an older app's look as not", async () => {
+        expect((await lookOfficial(bridgeAnswering({ ...LOOK, driverInUse: true }), "hercules-stream100"))?.driverInUse).toBe(true);
+        expect((await lookOfficial(bridgeAnswering(LOOK), "hercules-stream100"))?.driverInUse).toBe(false);
+        expect((await lookOfficial(bridgeAnswering({ ...LOOK, driverInUse: "yes" }), "hercules-stream100"))?.driverInUse).toBe(false);
+    });
+
     it("words every reason a choice was not carried out, and an unknown one as a failure", () => {
         expect(readOfficialChoice({ ok: true })).toEqual({ ok: true });
         expect(readOfficialChoice({ ok: false, reason: "declined" })).toEqual({ ok: false, reason: "declined", install: null });
