@@ -3408,7 +3408,7 @@ impl RootView {
     /// until one exists, as when the login slide is skipped.
     fn finish_onboarding_before_polaris_sign_in(
         choices: Option<&SelectedSettings>,
-        ctx: &mut AppContext,
+        ctx: &mut ViewContext<Self>,
     ) {
         mark_local_onboarding_completed(ctx);
         if FeatureFlag::HOAOnboardingFlow.is_enabled() {
