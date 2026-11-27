@@ -14,6 +14,7 @@
  * never going to be accepted.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { loadTwoFactorPolicy } from "@/lib/two-factor-policy-store";
 import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
@@ -153,7 +154,7 @@ export async function SecurityPage({ part }: { part: SecurityPart }) {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t(HEADINGS[part].title)}</h1>
-                <p className="text-sm text-muted-foreground">{t(HEADINGS[part].intro)}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t(HEADINGS[part].intro)}</p>
             </div>
             <Messages namespaces={["accountSecurity", "validation"]}>
                 <SecurityView

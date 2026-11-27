@@ -37,11 +37,13 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogFooter,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    settingType
 } from "@polaris/ui";
 
 export interface SuccessorPerson {
@@ -73,11 +75,11 @@ export function SuccessorCard({
                         <h2 className="flex items-center gap-2 text-sm font-medium">
                             <HeartHandshake className="size-4 shrink-0" /> {t("successor.title")}
                         </h2>
-                        <p className="text-muted-foreground text-xs">{t("successor.description")}</p>
+                        <p className={settingType.hint}>{t("successor.description")}</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
                         {lock ? (
-                            <span className="text-muted-foreground text-xs">{lock.reason}</span>
+                            <span className={settingType.hint}>{lock.reason}</span>
                         ) : (
                             <>
                                 <Button
@@ -108,11 +110,11 @@ export function SuccessorCard({
                     <div className="border-border flex items-center gap-3 rounded-md border px-3 py-2">
                         <Avatar person={{ id: successor.userId, name: successor.name }} size={32} />
                         <div className="min-w-0">
-                            <p className="truncate text-sm" title={successor.name}>
+                            <p className={cn(settingType.body, "truncate")} title={successor.name}>
                                 {successor.name}
                             </p>
                             <p
-                                className="text-muted-foreground truncate text-xs"
+                                className={cn(settingType.hint, "truncate")}
                                 title={successor.contact}
                             >
                                 {successor.contact}
@@ -120,7 +122,7 @@ export function SuccessorCard({
                         </div>
                     </div>
                 ) : (
-                    <p className="border-border text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center text-xs">
+                    <p className={cn(settingType.small, "border-border text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center")}>
                         {t("successor.none")}
                     </p>
                 )}
@@ -199,11 +201,11 @@ function SuccessorDialog({
                     }}
                 >
                     {clearing ? (
-                        <p className="text-muted-foreground text-sm">
+                        <p className={cn(settingType.body, "text-muted-foreground")}>
                             {t("successor.removeBody", { name: current?.name ?? "" })}
                         </p>
                     ) : (
-                        <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                        <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                             {t("successor.search")}
                             <AccountInput
                                 autoFocus
@@ -219,7 +221,7 @@ function SuccessorDialog({
                     <StepUpFields open={open} purpose="account-successor" onChange={setProof} autoSubmit />
 
                     {!clearing && (
-                        <p className="text-muted-foreground text-xs">{t("successor.consent")}</p>
+                        <p className={settingType.hint}>{t("successor.consent")}</p>
                     )}
 
                     <Feedback error={error} />

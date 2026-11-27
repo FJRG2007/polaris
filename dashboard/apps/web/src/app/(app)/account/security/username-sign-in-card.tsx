@@ -19,7 +19,7 @@
  */
 
 import { runAction } from "@/lib/run-action";
-import { useOptimisticToggle } from "@polaris/ui";
+import { settingType, useOptimisticToggle } from "@polaris/ui";
 import { useState } from "react";
 import { setUsernameSignInAction } from "./actions";
 import { Card, CardBody, Switch } from "@polaris/ui";
@@ -55,7 +55,7 @@ export function UsernameSignInCard({
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">{t("usernameSignIn.title")}</h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {username
                                 ? t("usernameSignIn.descriptionNamed", { username })
                                 : t("usernameSignIn.description")}
@@ -68,7 +68,7 @@ export function UsernameSignInCard({
                         aria-label={t("usernameSignIn.label")}
                     />
                 </div>
-                {lock ? <p className="text-xs text-muted-foreground">{lock.reason}</p> : null}
+                {lock ? <p className={settingType.hint}>{lock.reason}</p> : null}
                 <Feedback error={error} />
             </CardBody>
         </Card>

@@ -12,7 +12,18 @@
 
 import { useState, type FormEvent } from "react";
 import { SECURITY_QUESTION_COUNT, SECURITY_QUESTION_SUGGESTIONS, securityQuestionsSchema } from "@polaris/core";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    settingType
+} from "@polaris/ui";
 import { clearSecurityQuestionsAction, setSecurityQuestionsAction } from "./actions";
 import { passwordToSend } from "@/lib/password-proof-client";
 import { SlowSubmitLabel } from "@/components/slow-submit-label";
@@ -145,7 +156,7 @@ export function SecurityQuestionsDialog({
                             />
                         </div>
                     ))}
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("dialog.accountPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>
@@ -204,7 +215,7 @@ export function ClearQuestionsDialog({
                     <DialogDescription>{t("questions.removeDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("dialog.accountPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>

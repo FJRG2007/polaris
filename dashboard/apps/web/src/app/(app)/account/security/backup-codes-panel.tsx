@@ -27,7 +27,8 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuTrigger
+    DropdownMenuTrigger,
+    settingType
 } from "@polaris/ui";
 
 /** Each download format's name on the menu. */
@@ -81,7 +82,7 @@ export function BackupCodesPanel({
     const t = useTranslations("accountSecurity");
     return (
         <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">
+            <span className={settingType.hint}>
                 {label ?? t("backupCodes.panelDefault")}
             </span>
             <div className="grid grid-cols-2 gap-1 rounded-md border border-border bg-muted/30 p-2 font-mono text-xs">

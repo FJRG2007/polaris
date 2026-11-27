@@ -24,7 +24,17 @@ import { regenerateBackupCodesAction } from "./two-factor-actions";
 import { passwordToSend } from "@/lib/password-proof-client";
 import { SlowSubmitLabel } from "@/components/slow-submit-label";
 import { Feedback, SettingCard, type SettingLock } from "./setting-card";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    settingType
+} from "@polaris/ui";
 
 /** Below this, the set is close enough to spent to say so on the card. A person
  *  who has burned seven of ten has been signing in this way for a while and is
@@ -186,7 +196,7 @@ function RegenerateDialog({
                     </div>
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("dialog.currentPassword")}
                             <Input name="password" type="password" required autoComplete="current-password" />
                         </label>

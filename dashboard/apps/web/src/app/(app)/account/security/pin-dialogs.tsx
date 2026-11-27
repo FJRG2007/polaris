@@ -12,7 +12,17 @@ import { useEffect, useState, type FormEvent } from "react";
 import { CodeInput } from "@/components/code-input";
 import { PIN_MAX, PIN_MIN } from "@/components/quick-pin-input";
 import { setPinSchema } from "@polaris/core";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, settingType } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    settingType
+} from "@polaris/ui";
 import { clearPinAction, setPinAction } from "./actions";
 import { passwordToSend } from "@/lib/password-proof-client";
 import { SlowSubmitLabel } from "@/components/slow-submit-label";
@@ -85,7 +95,7 @@ export function SetPinDialog({
                     <DialogDescription>{t("pin.description")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("pin.pin")}
                         <CodeInput
                             name="pin"
@@ -97,7 +107,7 @@ export function SetPinDialog({
                             required
                         />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("pin.confirm")}
                         <CodeInput
                             name="confirmPin"
@@ -113,7 +123,7 @@ export function SetPinDialog({
                             <span className={settingType.error}>{t("known.pinsDiffer")}</span>
                         ) : null}
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("dialog.accountPassword")}
                         <Input
                             name="password"
@@ -179,7 +189,7 @@ export function RemovePinDialog({
                     <DialogDescription>{t("pin.removeDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("dialog.accountPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>

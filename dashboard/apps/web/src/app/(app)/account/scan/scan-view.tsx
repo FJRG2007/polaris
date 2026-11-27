@@ -22,7 +22,7 @@ import { decideQrSignInAction } from "./actions";
 import { QuickPinInput, pinReady } from "@/components/quick-pin-input";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Input, settingType } from "@polaris/ui";
 import { Camera, Check, ShieldQuestion, X } from "lucide-react";
 import type { QrSignInRequest } from "@/lib/qr-sign-in-service";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -154,7 +154,7 @@ function ReadCard({ stale }: { stale: boolean }) {
         <Card>
             <CardBody className="flex flex-col gap-4">
                 {stale ? (
-                    <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    <p className={cn(settingType.small, "rounded-md border border-border bg-muted/40 px-3 py-2 text-muted-foreground")}>
                         {t("scan.stale")}
                     </p>
                 ) : null}
@@ -187,7 +187,7 @@ function ReadCard({ stale }: { stale: boolean }) {
                     onSubmit={onSubmit}
                     className="flex flex-col gap-2 border-t border-border pt-4"
                 >
-                    <label className="text-sm" htmlFor="qr-code">
+                    <label className={settingType.body} htmlFor="qr-code">
                         {t("scan.typeCode")}
                     </label>
                     <div className="flex gap-2">
@@ -208,7 +208,7 @@ function ReadCard({ stale }: { stale: boolean }) {
                             {t("scan.continue")}
                         </Button>
                     </div>
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                 </form>
             </CardBody>
         </Card>
@@ -282,12 +282,12 @@ function DecideCard({
                     ) : (
                         <X className="size-8 text-muted-foreground" aria-hidden />
                     )}
-                    <p className="text-sm">
+                    <p className={settingType.body}>
                         {done === "approved" ? t("scan.approved") : t("scan.refused")}
                     </p>
                     <Link
                         href="/account/scan"
-                        className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                        className={cn(settingType.small, "text-muted-foreground underline underline-offset-2 hover:text-foreground")}
                     >
                         {t("scan.another")}
                     </Link>
@@ -300,8 +300,8 @@ function DecideCard({
         return (
             <Card>
                 <CardBody className="flex flex-col items-center gap-3 py-8 text-center">
-                    <p className="text-sm">{t("scan.expired")}</p>
-                    <p className="text-xs text-muted-foreground">{t("scan.askNew")}</p>
+                    <p className={settingType.body}>{t("scan.expired")}</p>
+                    <p className={settingType.hint}>{t("scan.askNew")}</p>
                     <Link href="/account/scan">
                         <Button variant="outline">{t("scan.again")}</Button>
                     </Link>
@@ -320,13 +320,13 @@ function DecideCard({
                     />
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">{t("scan.decide.title")}</h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("scan.decide.description")}
                         </p>
                     </div>
                 </div>
 
-                <dl className="grid gap-2 rounded-md border border-border p-3 text-sm">
+                <dl className={cn(settingType.body, "grid gap-2 rounded-md border border-border p-3")}>
                     <Detail label={t("scan.decide.device")} value={request.device} />
                     <Detail label={t("scan.decide.from")} value={request.origin} />
                     {request.host ? (
@@ -347,7 +347,7 @@ function DecideCard({
                             void decide(true);
                         }}
                     >
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("scan.decide.pin")}
                             <QuickPinInput
                                 ref={box}
@@ -359,7 +359,7 @@ function DecideCard({
                         </label>
                     </form>
                 ) : (
-                    <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    <p className={cn(settingType.small, "rounded-md border border-border bg-muted/40 px-3 py-2 text-muted-foreground")}>
                         {t.rich("scan.decide.needsPin", {
                             link: (chunks) => (
                                 <Link
@@ -374,7 +374,7 @@ function DecideCard({
                     </p>
                 )}
 
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
 
                 <div className="flex justify-end gap-2">
                     <Button variant="outline" disabled={busy} onClick={() => void decide(false)}>

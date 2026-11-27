@@ -373,7 +373,7 @@ function ScheduleDialog({
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("schedule.appearAs")}
                         </span>
                         <Select
@@ -390,7 +390,7 @@ function ScheduleDialog({
                     </label>
 
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("schedule.margin.label")}
                         </span>
                         <Select
@@ -405,14 +405,14 @@ function ScheduleDialog({
                             }))}
                             onValueChange={(value) => change({ marginMinutes: Number(value) })}
                         />
-                        <span className="text-[0.6875rem] text-foreground-subtle">
+                        <span className={settingType.hint}>
                             {t("schedule.margin.hint")}
                         </span>
                     </label>
 
                     <div className="flex gap-2">
                         <label className="flex flex-1 flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("schedule.from")}
                             </span>
                             <DateInput
@@ -425,7 +425,7 @@ function ScheduleDialog({
                             />
                         </label>
                         <label className="flex flex-1 flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("schedule.until")}
                             </span>
                             <DateInput
@@ -440,7 +440,7 @@ function ScheduleDialog({
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("schedule.onDays")} <span aria-hidden="true">*</span>
                         </span>
                         <div className="flex flex-wrap gap-1">
@@ -455,7 +455,7 @@ function ScheduleDialog({
                                             change({ days: core.toggleDay(draft.days, day) })
                                         }
                                         className={cn(
-                                            "h-8 min-w-[2.75rem] rounded-md border px-2 text-xs transition-colors duration-fast",
+                                            settingType.body, "h-8 min-w-[2.75rem] rounded-md border px-2 transition-colors duration-fast",
                                             on
                                                 ? "border-primary bg-primary text-primary-foreground"
                                                 : "border-border text-muted-foreground hover:bg-muted"
@@ -476,7 +476,7 @@ function ScheduleDialog({
                                     key={preset.label}
                                     size="sm"
                                     variant="ghost"
-                                    className="h-7 px-2 text-[0.6875rem]"
+                                    className={cn(settingType.body, "h-7 px-2")}
                                     onClick={() => change({ days: preset.days })}
                                 >
                                     {preset.label}

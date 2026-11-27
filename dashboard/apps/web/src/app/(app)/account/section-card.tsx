@@ -11,7 +11,7 @@
  */
 
 import type { ReactNode } from "react";
-import { Card, CardBody } from "@polaris/ui";
+import { Card, CardBody, settingType } from "@polaris/ui";
 
 export function SectionCard({
     title,
@@ -31,7 +31,7 @@ export function SectionCard({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0 flex-1 basis-64">
                         <h2 className="text-sm font-medium">{title}</h2>
-                        <p className="text-xs text-muted-foreground">{description}</p>
+                        <p className={settingType.hint}>{description}</p>
                     </div>
                     {action}
                 </div>

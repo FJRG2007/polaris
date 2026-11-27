@@ -9,6 +9,7 @@
  * that repeats.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { ScheduleView } from "./schedule-view";
@@ -33,7 +34,7 @@ export default async function StatusSchedulePage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("schedule.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("schedule.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("schedule.page.intro")}</p>
             </div>
             <ScheduleView
                 schedules={settings.schedules}

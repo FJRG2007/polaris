@@ -18,7 +18,7 @@
 
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useOptimisticToggle } from "@polaris/ui";
+import { settingType, useOptimisticToggle } from "@polaris/ui";
 import { useState } from "react";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { setEmailLinkSignInAction } from "./actions";
@@ -54,7 +54,7 @@ export function EmailLinkCard({
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">{t("emailLink.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("emailLink.description")}</p>
+                        <p className={settingType.hint}>{t("emailLink.description")}</p>
                     </div>
                     <Switch
                         checked={on}
@@ -64,9 +64,9 @@ export function EmailLinkCard({
                     />
                 </div>
                 {canSend ? null : (
-                    <p className="text-xs text-muted-foreground">{t("emailLink.cannotSend")}</p>
+                    <p className={settingType.hint}>{t("emailLink.cannotSend")}</p>
                 )}
-                {lock ? <p className="text-xs text-muted-foreground">{lock.reason}</p> : null}
+                {lock ? <p className={settingType.hint}>{lock.reason}</p> : null}
                 <Feedback error={error} />
             </CardBody>
         </Card>

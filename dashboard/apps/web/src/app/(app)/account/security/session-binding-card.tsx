@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import type { AddressPinScope } from "@polaris/core";
 import { Feedback, type SettingLock } from "./setting-card";
 import { updateSessionBindingAction } from "./actions";
-import { Button, Card, CardBody, Select, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Select, settingType, Switch } from "@polaris/ui";
 import { ADDRESS_PIN_SCOPES } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -62,7 +62,7 @@ export function SessionBindingCard({
             <CardBody className="flex flex-col gap-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("binding.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("binding.description")}</p>
+                    <p className={settingType.hint}>{t("binding.description")}</p>
                 </div>
 
                 {/* Both settings read the same way round - what it does on the left, the
@@ -72,8 +72,8 @@ export function SessionBindingCard({
                 <div className="flex flex-col gap-3">
                     <label className="flex items-start justify-between gap-4">
                         <span className="min-w-0">
-                            <span className="block text-sm">{t("binding.client.label")}</span>
-                            <span className="block text-xs text-muted-foreground">{t("binding.client.hint")}</span>
+                            <span className={cn(settingType.body, "block")}>{t("binding.client.label")}</span>
+                            <span className={cn(settingType.hint, "block")}>{t("binding.client.hint")}</span>
                         </span>
                         <Switch
                             checked={bindClient}
@@ -85,8 +85,8 @@ export function SessionBindingCard({
 
                     <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                         <span className="min-w-[min(100%,16rem)] flex-1">
-                            <span className="block text-sm">{t("binding.address.label")}</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className={cn(settingType.body, "block")}>{t("binding.address.label")}</span>
+                            <span className={cn(settingType.hint, "block")}>
                                 {t(`binding.scopes.${scope}.note` as const)}
                             </span>
                         </span>
@@ -107,7 +107,7 @@ export function SessionBindingCard({
                 {/* The footnote and Save share the last line rather than taking one each:
                     a button alone on a row leaves the width of the card empty beside it. */}
                 <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                    <p className="min-w-0 flex-1 text-xs text-muted-foreground">{t("binding.perSession")}</p>
+                    <p className={cn(settingType.hint, "min-w-0 flex-1")}>{t("binding.perSession")}</p>
                     <div className="flex shrink-0 items-center gap-3">
                         <Feedback error={result?.error} ok={result?.ok} />
                         <Button onClick={() => void save()} disabled={locked || busy || !changed}>

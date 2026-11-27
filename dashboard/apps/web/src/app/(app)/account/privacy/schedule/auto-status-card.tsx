@@ -25,6 +25,7 @@ import {
     CardHeader,
     CardTitle,
     Checkbox,
+    cn,
     Select,
     settingType,
     Switch
@@ -82,7 +83,7 @@ export function AutoStatusCard({
         onChange: (next: AutoPresenceEffect) => void,
         disabled: boolean
     ) => (
-        <label className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <label className={cn(settingType.body, "flex flex-wrap items-center justify-between gap-2")}>
             <span className="min-w-0 text-muted-foreground">{t("auto.effect")}</span>
             <Select
                 value={value}
@@ -99,7 +100,7 @@ export function AutoStatusCard({
     );
 
     const margin = (label: string, value: number, onChange: (next: number) => void) => (
-        <label className="flex min-w-0 flex-col gap-1 text-sm">
+        <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
             <span className="truncate text-muted-foreground" title={label}>
                 {label}
             </span>
@@ -121,14 +122,14 @@ export function AutoStatusCard({
         <Card>
             <CardHeader>
                 <CardTitle>{t("auto.title")}</CardTitle>
-                <p className="text-xs text-muted-foreground">{t("auto.description")}</p>
+                <p className={settingType.hint}>{t("auto.description")}</p>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
-                    <label className="flex items-center justify-between gap-3 text-sm">
+                    <label className={cn(settingType.body, "flex items-center justify-between gap-3")}>
                         <span className="min-w-0">
                             <span className="block font-medium">{t("auto.call")}</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "block")}>
                                 {t("auto.callHint")}
                             </span>
                         </span>
@@ -148,10 +149,10 @@ export function AutoStatusCard({
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <label className="flex items-center justify-between gap-3 text-sm">
+                    <label className={cn(settingType.body, "flex items-center justify-between gap-3")}>
                         <span className="min-w-0">
                             <span className="block font-medium">{t("auto.meeting")}</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "block")}>
                                 {noCalendarApp
                                     ? t(isAdmin ? "auto.noCalendarApp" : "auto.noCalendarAppMember")
                                     : t("auto.meetingHint")}
@@ -172,7 +173,7 @@ export function AutoStatusCard({
                                 !meeting.enabled
                             )}
                             <fieldset
-                                className="flex flex-col gap-1.5 text-sm"
+                                className={cn(settingType.body, "flex flex-col gap-1.5")}
                                 disabled={!meeting.enabled}
                             >
                                 <legend className="mb-1 text-muted-foreground">
@@ -196,7 +197,7 @@ export function AutoStatusCard({
                                     </span>
                                 </label>
                                 {calendars.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className={settingType.hint}>
                                         {t("auto.noCalendars")}
                                     </p>
                                 ) : (
@@ -242,14 +243,14 @@ export function AutoStatusCard({
                                 )}
                                 {meeting.calendars !== null &&
                                 calendars.length > MAX_AUTO_PRESENCE_CALENDARS ? (
-                                    <p className="ps-6 text-xs text-muted-foreground">
+                                    <p className={cn(settingType.hint, "ps-6")}>
                                         {t("auto.calendarLimit", {
                                             count: MAX_AUTO_PRESENCE_CALENDARS
                                         })}
                                     </p>
                                 ) : null}
                             </fieldset>
-                            <label className="flex items-center justify-between gap-3 text-sm">
+                            <label className={cn(settingType.body, "flex items-center justify-between gap-3")}>
                                 <span className="min-w-0">{t("auto.allDay")}</span>
                                 <Switch
                                     checked={meeting.allDay}
@@ -272,7 +273,7 @@ export function AutoStatusCard({
 
                 {error ? <p className={settingType.error}>{error}</p> : null}
                 {done && !changed ? (
-                    <p className="text-xs text-muted-foreground">{t("auto.saved")}</p>
+                    <p className={settingType.hint}>{t("auto.saved")}</p>
                 ) : null}
                 <div className="flex justify-end">
                     <Button

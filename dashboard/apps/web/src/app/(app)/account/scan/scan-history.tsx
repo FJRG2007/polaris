@@ -14,7 +14,7 @@
  */
 
 import { Check, ScanLine, X } from "lucide-react";
-import { Badge, Card, CardBody } from "@polaris/ui";
+import { Badge, Card, CardBody, cn, settingType } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { QrSignInAnswer } from "@/lib/qr-sign-in-service";
@@ -26,11 +26,11 @@ export function ScanHistory({ answers }: { answers: readonly QrSignInAnswer[] })
             <CardBody className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-sm font-medium">{t("scan.history.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("scan.history.description")}</p>
+                    <p className={settingType.hint}>{t("scan.history.description")}</p>
                 </div>
 
                 {answers.length === 0 ? (
-                    <p className="py-4 text-center text-xs text-muted-foreground">
+                    <p className={cn(settingType.hint, "py-4 text-center")}>
                         {t("scan.history.empty")}
                     </p>
                 ) : (
@@ -46,20 +46,20 @@ export function ScanHistory({ answers }: { answers: readonly QrSignInAnswer[] })
                                     <X className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
                                 )}
                                 <div className="min-w-0 flex-1">
-                                    <p className="flex flex-wrap items-center gap-1.5 text-sm">
+                                    <p className={cn(settingType.body, "flex flex-wrap items-center gap-1.5")}>
                                         <span className="min-w-0 truncate">{answer.device}</span>
                                         <Badge variant={answer.allowed ? "success" : "neutral"}>
                                             {answer.allowed ? t("scan.history.signedIn") : t("scan.history.refused")}
                                         </Badge>
                                     </p>
                                     {answer.origin || answer.host ? (
-                                        <p className="truncate text-xs text-muted-foreground">
+                                        <p className={cn(settingType.hint, "truncate")}>
                                             {[answer.origin, answer.host].filter(Boolean).join(" - ")}
                                         </p>
                                     ) : null}
                                     {/* The other half of the answer: not what was let
                                         in, but which of your devices let it. */}
-                                    <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                                    <p className={cn(settingType.hint, "flex flex-wrap items-center gap-1")}>
                                         <ScanLine className="size-3 shrink-0" aria-hidden />
                                         {answer.scannedOn ? (
                                             <span className="min-w-0 truncate">
@@ -71,7 +71,7 @@ export function ScanHistory({ answers }: { answers: readonly QrSignInAnswer[] })
                                         {answer.here ? <Badge variant="neutral">{t("scan.history.thisDevice")}</Badge> : null}
                                     </p>
                                 </div>
-                                <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                                <span className={cn(settingType.hint, "shrink-0 whitespace-nowrap")}>
                                     <RelativeTime iso={answer.at} />
                                 </span>
                             </li>

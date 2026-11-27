@@ -124,13 +124,13 @@ export function PrivacyView({
                                                 {t(`fields.${field}.note` as const)}
                                             </span>
                                             {locked.includes(field) && (
-                                                <span className="block text-[0.6875rem] leading-snug text-muted-foreground">
+                                                <span className={cn(settingType.hint, "block")}>
                                                     {t("lockedByAdmin")}
                                                 </span>
                                             )}
                                         </span>
                                         <Select
-                                            className="h-8 w-full shrink-0 text-xs sm:w-64"
+                                            className={cn(settingType.body, "h-8 w-full shrink-0 sm:w-64")}
                                             aria-label={t(`fields.${field}.label` as const)}
                                             value={draft[field].audience}
                                             disabled={
@@ -173,7 +173,7 @@ export function PrivacyView({
                         </section>
                     ))}
 
-                    <p className="text-[0.6875rem] leading-snug text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t.rich("adminNote", {
                             link: (chunks) => (
                                 <a
@@ -203,7 +203,7 @@ export function PrivacyView({
                             {tc("actions.save")}
                         </Button>
                         {!dirty && (
-                            <span className="text-xs text-muted-foreground">{t("saved")}</span>
+                            <span className={settingType.hint}>{t("saved")}</span>
                         )}
                     </div>
                 </CardBody>
@@ -262,26 +262,26 @@ function Who({
         <div className="flex w-full flex-wrap items-center gap-1.5 ps-0 sm:ps-1">
             <Users className="size-3.5 shrink-0 text-foreground-subtle" />
             {shown.length === 0 ? (
-                <span className="text-[0.6875rem] text-warning">
+                <span className={cn(settingType.small, "text-warning")}>
                     {list ? t("who.emptyList") : t("who.nobody")}
                 </span>
             ) : (
                 <>
                     {list && (
-                        <span className="text-[0.6875rem] text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("who.listName", { name: list.name })}
                         </span>
                     )}
                     {first.map((person) => (
                         <span
                             key={person.id}
-                            className="max-w-[10rem] truncate rounded-full bg-muted px-2 py-0.5 text-[0.6875rem]"
+                            className={cn(settingType.small, "max-w-[10rem] truncate rounded-full bg-muted px-2 py-0.5")}
                         >
                             {person.name}
                         </span>
                     ))}
                     {rest > 0 && (
-                        <span className="text-[0.6875rem] text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("who.more", { count: rest })}
                         </span>
                     )}
@@ -290,7 +290,7 @@ function Who({
             <button
                 type="button"
                 onClick={onEdit}
-                className="rounded text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                className={cn(settingType.small, "rounded text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground")}
             >
                 {t("who.choose")}
             </button>

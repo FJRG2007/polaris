@@ -33,12 +33,14 @@ import { CodeInput, isWholeCode } from "@/components/code-input";
 import { noteAuthenticatorArmedAction } from "@/app/oauth/enroll/actions";
 import {
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    settingType
 } from "@polaris/ui";
 
 /** The `secret` query parameter of an otpauth:// URI, for manual entry. */
@@ -167,7 +169,7 @@ export function EnableTwoFactorDialog({
 
                 {step === "password" ? (
                     <form onSubmit={onPassword} className="flex flex-col gap-3">
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("authenticator.password")}
                             <Input
                                 name="password"
@@ -206,13 +208,13 @@ export function EnableTwoFactorDialog({
                                     fgColor="#000000"
                                 />
                             </div>
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("authenticator.scan")}
                             </span>
                         </div>
 
                         <div className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("authenticator.setupKey")}
                             </span>
                             <div className="flex items-center gap-2">
@@ -231,7 +233,7 @@ export function EnableTwoFactorDialog({
                             </div>
                             <a
                                 href={totpUri}
-                                className="text-xs text-primary underline-offset-2 hover:underline"
+                                className={cn(settingType.small, "text-primary underline-offset-2 hover:underline")}
                             >
                                 {t("authenticator.openInApp")}
                             </a>
@@ -239,7 +241,7 @@ export function EnableTwoFactorDialog({
 
                         <BackupCodesPanel codes={backupCodes} account={account} />
 
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("authenticator.codeFromApp")}
                             <CodeInput
                                 name="code"
@@ -317,7 +319,7 @@ export function DisableTwoFactorDialog({
                     <DialogDescription>{t("authenticator.turnOffDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("authenticator.password")}
                         <Input
                             name="password"

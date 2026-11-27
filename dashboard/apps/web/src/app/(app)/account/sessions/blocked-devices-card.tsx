@@ -10,7 +10,7 @@ import { useState } from "react";
 import { Ban } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { unblockDeviceAction } from "./actions";
-import { Button, Card, CardBody } from "@polaris/ui";
+import { Button, Card, CardBody, cn, settingType } from "@polaris/ui";
 import { SystemMark } from "@/components/client-marks";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
@@ -44,9 +44,9 @@ export function BlockedDevicesCard({ devices }: { devices: readonly BlockedDevic
             <CardBody className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-sm font-medium">{t("sessions.blocked.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("sessions.blocked.hint")}</p>
+                    <p className={settingType.hint}>{t("sessions.blocked.hint")}</p>
                 </div>
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                     {devices.map((device) => (
                         <li
@@ -60,10 +60,10 @@ export function BlockedDevicesCard({ devices }: { devices: readonly BlockedDevic
                                     <Ban aria-hidden className="size-4 shrink-0 text-muted-foreground" />
                                 )}
                                 <div className="min-w-0">
-                                    <p className="truncate text-sm font-medium" title={device.label}>
+                                    <p className={cn(settingType.body, "truncate font-medium")} title={device.label}>
                                         {device.label}
                                     </p>
-                                    <p className="truncate text-xs text-muted-foreground">
+                                    <p className={cn(settingType.hint, "truncate")}>
                                         {device.os ? `${device.os} - ` : null}
                                         {t.rich("sessions.blocked.blockedAt", {
                                             time: () => <RelativeTime key="time" iso={device.createdAt} />

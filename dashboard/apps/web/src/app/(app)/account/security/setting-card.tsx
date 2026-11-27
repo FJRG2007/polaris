@@ -56,7 +56,7 @@ export interface SettingLock {
 
 /** Inline feedback under a dialog's fields. */
 export function Feedback({ error, ok }: { error?: string | null; ok?: string | null }) {
-    if (error) return <p className="text-sm text-danger">{error}</p>;
-    if (ok) return <p className="text-sm text-success">{ok}</p>;
+    if (error) return <p className={settingType.error}>{error}</p>;
+    if (ok) return <p className={cn(settingType.body, "text-success")}>{ok}</p>;
     return null;
 }

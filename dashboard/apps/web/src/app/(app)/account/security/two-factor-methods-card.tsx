@@ -45,6 +45,7 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -52,6 +53,7 @@ import {
     DialogTitle,
     Input,
     Select,
+    settingType,
     Switch
 } from "@polaris/ui";
 
@@ -133,7 +135,7 @@ export function TwoFactorMethodsCard({
             <CardBody className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-sm font-medium">{t("methods.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("methods.description")}</p>
+                    <p className={settingType.hint}>{t("methods.description")}</p>
                 </div>
 
                 <div className="overflow-hidden rounded-md border border-border">
@@ -147,12 +149,12 @@ export function TwoFactorMethodsCard({
                                 className="flex items-start justify-between gap-3 border-t border-border px-3 py-2 first:border-t-0"
                             >
                                 <div className="min-w-0">
-                                    <p className="text-sm">{label}</p>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className={settingType.body}>{label}</p>
+                                    <p className={settingType.hint}>
                                         {status.target ?? t(`methods.${status.method}.description` as const)}
                                     </p>
                                     {status.blocker ? (
-                                        <p className="text-xs text-warning">{knownMessage(t, tv, status.blocker)}</p>
+                                        <p className={cn(settingType.small, "text-warning")}>{knownMessage(t, tv, status.blocker)}</p>
                                     ) : null}
                                 </div>
                                 {isAuthenticator && twoFactorEnabled && totpReady ? (
@@ -163,7 +165,7 @@ export function TwoFactorMethodsCard({
                                         onChange={setAcceptTotp}
                                     />
                                 ) : isAuthenticator ? (
-                                    <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("methods.alwaysOn")}>{t("methods.alwaysOn")}</span>
+                                    <span className={cn(settingType.hint, "min-w-0 max-w-full shrink-0 truncate")} title={t("methods.alwaysOn")}>{t("methods.alwaysOn")}</span>
                                 ) : (
                                     <Switch
                                         checked={on}
@@ -180,19 +182,19 @@ export function TwoFactorMethodsCard({
 
                     <div className="flex items-start justify-between gap-3 border-t border-border px-3 py-2">
                         <div className="min-w-0">
-                            <p className="text-sm">{t("methods.approval.title")}</p>
-                            <p className="text-xs text-muted-foreground">{t("methods.approval.description")}</p>
+                            <p className={settingType.body}>{t("methods.approval.title")}</p>
+                            <p className={settingType.hint}>{t("methods.approval.description")}</p>
                             {approval.enforced ? (
-                                <p className="text-xs text-muted-foreground">{t("methods.approval.enforced")}</p>
+                                <p className={settingType.hint}>{t("methods.approval.enforced")}</p>
                             ) : null}
                             {twoFactorEnabled ? (
-                                <p className="text-xs text-warning">{t("methods.approval.oneOfTwo")}</p>
+                                <p className={cn(settingType.small, "text-warning")}>{t("methods.approval.oneOfTwo")}</p>
                             ) : !approval.hasPin ? (
-                                <p className="text-xs text-warning">{t("methods.approval.pinFirst")}</p>
+                                <p className={cn(settingType.small, "text-warning")}>{t("methods.approval.pinFirst")}</p>
                             ) : (
                                 <Link
                                     href="/account/sessions"
-                                    className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                                    className={cn(settingType.small, "text-muted-foreground underline-offset-2 hover:underline")}
                                 >
                                     {approval.otherSessions === 0
                                         ? t("methods.approval.noOtherSession")
@@ -210,7 +212,7 @@ export function TwoFactorMethodsCard({
                 </div>
 
                 {twoFactorEnabled ? (
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("methods.strictness.label")}
                         <Select
                             value={strictness}
@@ -221,12 +223,12 @@ export function TwoFactorMethodsCard({
                                 label: t(`methods.strictness.${value}` as const)
                             }))}
                         />
-                        <span className="text-xs text-muted-foreground">{t("methods.strictness.hint")}</span>
+                        <span className={settingType.hint}>{t("methods.strictness.hint")}</span>
                     </label>
                 ) : null}
 
                 {twoFactorEnabled ? (
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("methods.offerFirst")}
                         {/* Every offered method is listed, including the ones that are off: a
                             list with one entry looks like the account has one way in, when
@@ -259,8 +261,8 @@ export function TwoFactorMethodsCard({
                 {twoFactorEnabled && trustedDevices > 0 ? (
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                         <div className="min-w-0">
-                            <p className="text-sm">{t("sessions.trusted.title")}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.body}>{t("sessions.trusted.title")}</p>
+                            <p className={settingType.hint}>
                                 {t("methods.remembered", { count: trustedDevices })}
                             </p>
                         </div>
@@ -272,7 +274,7 @@ export function TwoFactorMethodsCard({
                     </div>
                 ) : null}
 
-                <p className="text-xs text-muted-foreground">{t("methods.noSms")}</p>
+                <p className={settingType.hint}>{t("methods.noSms")}</p>
 
                 <div className="flex justify-end">
                     <Button disabled={locked || !changed} onClick={() => setConfirming(true)}>
@@ -358,7 +360,7 @@ function ConfirmDialog({
                     <DialogDescription>{t("methods.confirmDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("dialog.currentPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>

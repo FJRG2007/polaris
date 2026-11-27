@@ -31,6 +31,7 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -77,13 +78,13 @@ export function LockdownCard({
                         <h2 className="text-sm font-medium">
                             {standing.lockedDown ? t("lockdown.lockedTitle") : t("lockdown.title")}
                         </h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {standing.lockedDown ? t("lockdown.lockedDescription") : t("lockdown.description")}
                         </p>
                     </div>
                 </div>
 
-                <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <ul className={cn(settingType.hint, "flex flex-col gap-1")}>
                     {EFFECTS.map((line) => (
                         <li key={line} className="flex gap-2">
                             <span aria-hidden>-</span>
@@ -93,7 +94,7 @@ export function LockdownCard({
                 </ul>
 
                 {standing.lockedDown && standing.lockdownNote ? (
-                    <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                    <p className={cn(settingType.small, "rounded-md bg-muted px-3 py-2 text-muted-foreground")}>
                         {t("lockdown.whatYouSaid", { note: standing.lockdownNote })}
                     </p>
                 ) : null}
@@ -113,7 +114,7 @@ export function LockdownCard({
                 <div className="flex flex-col gap-3 border-t border-border pt-4">
                     <div>
                         <h2 className="text-sm font-medium">{t("lockdown.leaving.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("lockdown.leaving.description")}</p>
+                        <p className={settingType.hint}>{t("lockdown.leaving.description")}</p>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                         <Button variant="secondary" disabled={locked} onClick={() => setAsking("disabled")}>
@@ -257,7 +258,7 @@ function LockdownDialog({
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     {words?.note ? (
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("lockdown.noteLabel")}
                             <Textarea
                                 rows={3}

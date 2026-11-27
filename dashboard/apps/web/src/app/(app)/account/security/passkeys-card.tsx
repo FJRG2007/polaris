@@ -43,6 +43,7 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -167,7 +168,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0 flex-1 basis-64">
                         <h2 className="text-sm font-medium">{t("passkeys.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("passkeys.description")}</p>
+                        <p className={settingType.hint}>{t("passkeys.description")}</p>
                     </div>
                     <Button
                         size="sm"
@@ -185,8 +186,8 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full text-sm">
-                        <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                    <table className={cn(settingType.body, "w-full")}>
+                        <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                             {/* Each column waits for the width that actually holds it, and
                                 nothing arrives at md: that is where the navigation rail
                                 appears, so the content area is narrower there than it was
@@ -220,29 +221,29 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                                 <KeyRound className="size-4 shrink-0 text-muted-foreground" />
                                                 <div className="min-w-0">
                                                     <p className="truncate">{passkey.name}</p>
-                                                    <p className="truncate text-xs text-muted-foreground lg:hidden">
+                                                    <p className={cn(settingType.hint, "truncate lg:hidden")}>
                                                         {t("passkeys.browserOn", { browser: passkey.browser, os: passkey.os })}
                                                     </p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                        <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 lg:table-cell")}>
                                             <PasskeyOrigin passkey={passkey} />
                                         </td>
-                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
+                                        <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 2xl:table-cell")}>
                                             {passkey.ip ? (
                                                 <span className="font-mono">{passkey.ip}</span>
                                             ) : (
                                                 t("passkeys.notRecorded")
                                             )}
                                         </td>
-                                        <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
+                                        <td className={cn(settingType.hint, "hidden max-w-[12rem] px-3 py-2 xl:table-cell")}>
                                             <span className="block truncate font-mono">{passkey.host}</span>
                                         </td>
-                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
+                                        <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 2xl:table-cell")}>
                                             <RelativeTime iso={passkey.addedAt} />
                                         </td>
-                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                        <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 lg:table-cell")}>
                                             {passkey.lastUsedAt ? (
                                                 <RelativeTime iso={passkey.lastUsedAt} />
                                             ) : (
@@ -271,13 +272,13 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                 </div>
 
                 {here && !here.host && (
-                    <p className="text-xs text-warning">{t("passkeys.onIpAddress")}</p>
+                    <p className={cn(settingType.small, "text-warning")}>{t("passkeys.onIpAddress")}</p>
                 )}
                 {here?.host && !here.secure && (
-                    <p className="text-xs text-warning">{t("passkeys.plainHttp", { host: here.host })}</p>
+                    <p className={cn(settingType.small, "text-warning")}>{t("passkeys.plainHttp", { host: here.host })}</p>
                 )}
                 {noneHere && (
-                    <p className="text-xs text-muted-foreground">{t("passkeys.noneHere", { host: here?.host ?? "" })}</p>
+                    <p className={settingType.hint}>{t("passkeys.noneHere", { host: here?.host ?? "" })}</p>
                 )}
 
                 <Feedback error={lock?.reason ?? (asking ? null : error)} />
@@ -300,7 +301,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                     <form onSubmit={confirmPassword} className="flex flex-col gap-3">
                         {/* The name is checked as it is typed against the passkeys on screen, so the
                             problem is named before the device raises a prompt that would only fail. */}
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("passkeys.nameLabel")} *
                             <Input
                                 value={name}
@@ -313,7 +314,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                             />
                             {problem ? <span className={settingType.error}>{problem}</span> : null}
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("dialog.currentPassword")}
                             <Input name="password" type="password" required autoComplete="current-password" />
                         </label>
@@ -365,7 +366,7 @@ function PasskeyOrigin({ passkey }: { passkey: PasskeyView }) {
                 </span>
             </span>
             {passkey.originSeenAt ? (
-                <span className="text-[11px] text-muted-foreground" title={t("passkeys.firstSeenHint")}>
+                <span className={settingType.hint} title={t("passkeys.firstSeenHint")}>
                     {t("passkeys.firstSeen")} <RelativeTime iso={passkey.originSeenAt} />
                 </span>
             ) : null}

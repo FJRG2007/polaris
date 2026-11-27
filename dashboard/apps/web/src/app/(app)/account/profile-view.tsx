@@ -23,7 +23,7 @@ import { updateProfileAction } from "./actions";
 import { UsernameField } from "./username-field";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, type FormEvent } from "react";
-import { Button, Input, Textarea } from "@polaris/ui";
+import { Button, cn, Input, settingType, Textarea } from "@polaris/ui";
 
 interface Profile {
     /** What they are called on screen. Not their name and not their handle. */
@@ -117,7 +117,7 @@ export function ProfileView({
                     neither of the two fields on the account screen: not the name
                     on your documents, not the handle you sign in with - whatever
                     you want to be called, left exactly as you typed it. */}
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     {t("profile.displayName")}
                     <Input
                         value={profile.name}
@@ -127,7 +127,7 @@ export function ProfileView({
                         spellCheck={false}
                         onChange={(event) => setProfile({ ...profile, name: event.target.value })}
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("profile.displayNameHint")}
                     </span>
                 </label>
@@ -144,7 +144,7 @@ export function ProfileView({
                     lockedNote={t("profile.usernameLocked", { when: usernameChangeIn ?? "" })}
                     onChange={(next) => setProfile({ ...profile, username: next })}
                 />
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     {t("details.title")}
                     <Textarea
                         rows={3}
@@ -155,13 +155,13 @@ export function ProfileView({
                             setProfile({ ...profile, description: event.target.value })
                         }
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("profile.aboutHint")}
                     </span>
                 </label>
                 <div className="flex items-center justify-between gap-2">
-                    {result?.error ? <p className="text-sm text-danger">{result.error}</p> : null}
-                    {result?.ok ? <p className="text-sm text-success">{result.ok}</p> : null}
+                    {result?.error ? <p className={settingType.error}>{result.error}</p> : null}
+                    {result?.ok ? <p className={cn(settingType.body, "text-success")}>{result.ok}</p> : null}
                     <Button type="submit" disabled={busy || !changed} className="ms-auto">
                         {busy ? tc("actions.saving") : tc("actions.save")}
                     </Button>

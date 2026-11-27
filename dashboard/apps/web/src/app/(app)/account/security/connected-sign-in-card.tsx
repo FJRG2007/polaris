@@ -27,7 +27,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { StepUpDialog } from "@/components/step-up-dialog";
 import { useCallback, useEffect, useState } from "react";
 import { IntegrationLogo } from "@/components/logos";
-import { Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
+import { Card, CardBody, cn, settingType, Switch, useOptimisticToggle } from "@polaris/ui";
 import { Feedback, type SettingLock } from "./setting-card";
 import { setConnectionSignInAction, setConnectionSignInChallengeAction } from "./actions";
 import * as polls from "../account-polls";
@@ -122,10 +122,10 @@ export function ConnectedSignInCard({
             <CardBody className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-sm font-medium">{t("connected.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("connected.description")}</p>
+                    <p className={settingType.hint}>{t("connected.description")}</p>
                 </div>
                 {accounts.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">{t("connected.empty")}</p>
+                    <p className={settingType.hint}>{t("connected.empty")}</p>
                 ) : (
                     <ul className="flex flex-col gap-2">
                         {accounts.map((account) => (
@@ -193,8 +193,8 @@ function ChallengeRow({
         <div className="flex flex-col gap-1 border-t border-border pt-3">
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <p className="text-sm">{t("connected.challenge.title")}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.body}>{t("connected.challenge.title")}</p>
+                    <p className={settingType.hint}>
                         {t("connected.challenge.description")}
                     </p>
                 </div>
@@ -206,7 +206,7 @@ function ChallengeRow({
                 />
             </div>
             {challenge.enforced ? (
-                <p className="text-xs text-muted-foreground">{t("connected.challenge.enforced")}</p>
+                <p className={settingType.hint}>{t("connected.challenge.enforced")}</p>
             ) : null}
             <Feedback error={error} />
         </div>
@@ -243,8 +243,8 @@ function AccountRow({
             <div className="flex items-center gap-3">
                 <IntegrationLogo slug={account.provider} className="size-5 shrink-0" />
                 <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-sm">{account.label}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className={cn(settingType.body, "truncate")}>{account.label}</span>
+                    <span className={settingType.hint}>
                         {account.allowedHere
                             ? t("connected.allowed", { provider: account.providerName })
                             : t("connected.notAllowed", { provider: account.providerName })}
@@ -258,7 +258,7 @@ function AccountRow({
                 />
             </div>
             {enabled && account.warning ? (
-                <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                <p className={cn(settingType.hint, "flex items-start gap-2")}>
                     <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                     {account.warning}
                 </p>

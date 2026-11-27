@@ -14,6 +14,7 @@
  * passed on to the TV's approval page with the code filled in.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { redirect } from "next/navigation";
 import { tvApprovePath } from "@/lib/tv/scopes";
 import { readUserCode } from "@/lib/device-code";
@@ -56,7 +57,7 @@ export default async function ScanPage({
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("scan.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("scan.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("scan.page.intro")}</p>
             </div>
             <ScanView
                 request={request}

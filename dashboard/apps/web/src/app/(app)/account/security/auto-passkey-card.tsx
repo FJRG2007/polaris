@@ -11,7 +11,7 @@
  */
 
 import { runAction } from "@/lib/run-action";
-import { useOptimisticToggle } from "@polaris/ui";
+import { settingType, useOptimisticToggle } from "@polaris/ui";
 import { useState } from "react";
 import { setAutoPasskeyAction } from "./actions";
 import { Card, CardBody, Switch } from "@polaris/ui";
@@ -37,7 +37,7 @@ export function AutoPasskeyCard({ enabled, lock }: { enabled: boolean; lock?: Se
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">{t("autoPasskey.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("autoPasskey.description")}</p>
+                        <p className={settingType.hint}>{t("autoPasskey.description")}</p>
                     </div>
                     <Switch
                         checked={on}
@@ -46,7 +46,7 @@ export function AutoPasskeyCard({ enabled, lock }: { enabled: boolean; lock?: Se
                         aria-label={t("autoPasskey.label")}
                     />
                 </div>
-                {lock ? <p className="text-xs text-muted-foreground">{lock.reason}</p> : null}
+                {lock ? <p className={settingType.hint}>{lock.reason}</p> : null}
                 <Feedback error={error} />
             </CardBody>
         </Card>

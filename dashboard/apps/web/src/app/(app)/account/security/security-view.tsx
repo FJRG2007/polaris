@@ -26,7 +26,7 @@ import { UsernameSignInCard } from "./username-sign-in-card";
 import { ShieldAlert, Trash2 } from "lucide-react";
 import { BackupCodesCard } from "./backup-codes-card";
 import type { PasskeyView } from "@/lib/passkey-directory";
-import { Button, Card, CardBody, Select } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Select, settingType } from "@polaris/ui";
 import { RemovePinDialog, SetPinDialog } from "./pin-dialogs";
 import { TwoFactorMethodsCard } from "./two-factor-methods-card";
 import { TelegramLinkCard } from "./telegram-link-card";
@@ -209,8 +209,8 @@ export function SecurityView({
                         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                         <div>
                             <h2 className="text-sm font-medium">{t("view.newDevice.title")}</h2>
-                            <p className="text-xs text-muted-foreground">{lock.reason}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{t("view.newDevice.hint")}</p>
+                            <p className={settingType.hint}>{lock.reason}</p>
+                            <p className={cn(settingType.hint, "mt-1")}>{t("view.newDevice.hint")}</p>
                         </div>
                     </CardBody>
                 </Card>
@@ -362,9 +362,9 @@ export function SecurityView({
                         <CardBody className="flex flex-col gap-3">
                             <div>
                                 <h2 className="text-sm font-medium">{t("view.grace.title")}</h2>
-                                <p className="text-xs text-muted-foreground">{t("view.grace.description")}</p>
+                                <p className={settingType.hint}>{t("view.grace.description")}</p>
                             </div>
-                            <label className="flex flex-col gap-1 text-sm sm:max-w-xs">
+                            <label className={cn(settingType.body, "flex flex-col gap-1 sm:max-w-xs")}>
                                 {t("view.grace.label")}
                                 <Select
                                     value={String(grace)}
@@ -376,7 +376,7 @@ export function SecurityView({
                                     }))}
                                 />
                             </label>
-                            <p className="text-xs text-muted-foreground">{t("view.grace.hint")}</p>
+                            <p className={settingType.hint}>{t("view.grace.hint")}</p>
                             <Feedback error={graceResult?.error} ok={graceResult?.ok} />
                         </CardBody>
                     </Card>
@@ -385,10 +385,10 @@ export function SecurityView({
                         <CardBody className="flex flex-col gap-3">
                             <div>
                                 <h2 className="text-sm font-medium">{t("view.limits.title")}</h2>
-                                <p className="text-xs text-muted-foreground">{t("view.limits.description")}</p>
+                                <p className={settingType.hint}>{t("view.limits.description")}</p>
                             </div>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <label className="flex flex-col gap-1 text-sm">
+                                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                     {t("view.limits.idleLock")}
                                     <Select
                                         value={String(limits.idleLockMinutes)}
@@ -402,7 +402,7 @@ export function SecurityView({
                                         }))}
                                     />
                                 </label>
-                                <label className="flex flex-col gap-1 text-sm">
+                                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                     {t("view.limits.signOutAfter")}
                                     <Select
                                         value={String(limits.sessionMaxMinutes)}
@@ -417,7 +417,7 @@ export function SecurityView({
                                     />
                                 </label>
                             </div>
-                            <p className="text-xs text-muted-foreground">{t("view.limits.hint")}</p>
+                            <p className={settingType.hint}>{t("view.limits.hint")}</p>
                             <div className="flex items-center justify-between gap-2">
                                 <Feedback error={limitsResult?.error} ok={limitsResult?.ok} />
                                 <Button

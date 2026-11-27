@@ -22,7 +22,17 @@ import { CodeInput, isWholeCode } from "@/components/code-input";
 import type { StepUpChoice } from "@/lib/step-up";
 import { StepUpFields } from "@/components/step-up-fields";
 import { SECURITY_QUESTION_COUNT, type StepUpProofInput } from "@polaris/core";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    settingType
+} from "@polaris/ui";
 import { SlowSubmitLabel } from "@/components/slow-submit-label";
 import { changePasswordAction, changePasswordOpaqueAction, recoverPasswordAction, sendRecoveryCodeAction } from "./actions";
 import { passwordWouldOpenVault, SAME_AS_VAULT } from "@/lib/vault/would-open";
@@ -129,15 +139,15 @@ export function ChangePasswordDialog({
                     </div>
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("dialog.currentPassword")}
                             <Input name="currentPassword" type="password" required autoComplete="current-password" />
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("password.new")}
                             <Input name="newPassword" type="password" required autoComplete="new-password" />
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("password.confirm")}
                             <Input name="confirmPassword" type="password" required autoComplete="new-password" />
                         </label>
@@ -240,7 +250,7 @@ export function RecoverPasswordDialog({
                 </DialogHeader>
 
                 {!hasQuestions && !canUseAuthenticator ? (
-                    <p className="text-sm text-muted-foreground">{t("password.noWayToVerify")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("password.noWayToVerify")}</p>
                 ) : done ? (
                     <div className="flex flex-col gap-3">
                         <Feedback ok={done} />
@@ -271,7 +281,7 @@ export function RecoverPasswordDialog({
 
                         {method === "questions" && hasQuestions
                             ? questions.map((question, index) => (
-                                  <label key={question} className="flex flex-col gap-1 text-sm">
+                                  <label key={question} className={cn(settingType.body, "flex flex-col gap-1")}>
                                       {questionLabel(t, question)}
                                       <Input
                                           value={answers[index] ?? ""}
@@ -300,7 +310,7 @@ export function RecoverPasswordDialog({
                         ) : null}
 
                         {method === "totp" && canUseAuthenticator ? (
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                 {t("password.authenticatorCode")}
                                 <CodeInput
                                     name="totpCode"
@@ -311,11 +321,11 @@ export function RecoverPasswordDialog({
                             </label>
                         ) : null}
 
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("password.new")}
                             <Input name="newPassword" type="password" required autoComplete="new-password" />
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("password.confirm")}
                             <Input name="confirmPassword" type="password" required autoComplete="new-password" />
                         </label>
