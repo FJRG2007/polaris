@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { browserEnvironment, launchDetached, launchFor, parseRegQuery, registeredLaunch, splitArguments } from "../../src/main/default-browser";
+import { BrowserRefused, browserEnvironment, launchDetached, launchFor, parseRegQuery, registeredLaunch, splitArguments } from "../../src/main/default-browser";
 
 const URL_IN = "https://click.example.com/ls/click?upn=a1B2%2Fx&b=2";
 
@@ -149,6 +149,7 @@ describe("launchDetached", () => {
     it("rejects with the exit code when the running copy did not take it", async () => {
         await expect(launchDetached(node, exitWith(21))).rejects.toThrow(/code 21: .*profile in use/);
         await expect(launchDetached(node, exitWith(1))).rejects.toThrow(/code 1: the browser exited without taking the link/);
+        await expect(launchDetached(node, exitWith(1))).rejects.toBeInstanceOf(BrowserRefused);
     });
 
     it("resolves when the process keeps running: it became the browser", async () => {
@@ -167,5 +168,6 @@ describe("launchDetached", () => {
 
     it("rejects for a program that is not there", async () => {
         await expect(launchDetached(String.raw`C:\nowhere\browser.exe`, [])).rejects.toThrow(/is not there/);
+        await expect(launchDetached(String.raw`C:\nowhere\browser.exe`, [])).rejects.not.toBeInstanceOf(BrowserRefused);
     });
 });

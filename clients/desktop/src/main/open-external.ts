@@ -15,7 +15,12 @@
  *   whether the running copy took the link. When it did not - a browser
  *   started by Polaris that turns the link down while one is already open
  *   (BUG-0020) - Explorer starts it instead, as it does for a link clicked
- *   anywhere else in Windows.
+ *   anywhere else in Windows. Explorer is tried only then: it reports a
+ *   failure with the system's own error box, so after a browser that could
+ *   not be started at all (`spawn EPERM`, a Store browser with no command) it
+ *   is skipped (BUG-0071), and `shell.openExternal` is asked instead - Electron
+ *   calls `ShellExecuteEx` with `SEE_MASK_FLAG_NO_UI` there
+ *   (`shell/common/platform_util_win.cc`), which never shows one.
  * - macOS and Linux: `shell.openExternal`, then `open` / `xdg-open`, whose exit
  *   code says whether the link was handed on.
  *
@@ -41,6 +46,9 @@ export interface OutsideRoute {
     /** Whether resolving means a program took the link. `shell.openExternal`
      *  resolves whether or not a browser opened it. */
     readonly confirms: boolean;
+    /** When set, the route is tried only if the route before it failed with an
+     *  error this accepts; otherwise it is skipped, which is not a refusal. */
+    readonly after?: (previous: unknown) => boolean;
 }
 
 /** Thrown by a route that does not apply here (a Store browser registers no
@@ -96,7 +104,12 @@ export async function openOutsideOutcome(raw: string, deps: OpenExternalDeps): P
     const url = outsideAddress(raw);
     if (!url) return "failed";
     let refused = false;
+    let previous: unknown = null;
     for (const route of deps.routes) {
+        if (route.after && !route.after(previous)) {
+            deps.log(`Skipped ${route.name} for ${logTarget(url)}: the route before it did not start a browser`, null);
+            continue;
+        }
         try {
             await route.run(url);
             deps.log(`Opened ${logTarget(url)} through ${route.name}${route.confirms ? "" : " (not confirmed)"}`, null);
@@ -104,6 +117,7 @@ export async function openOutsideOutcome(raw: string, deps: OpenExternalDeps): P
         } catch (error) {
             if (!(error instanceof RouteUnavailable) && !(error instanceof browser.ShellUnavailable)) refused = true;
             deps.log(`Opening ${logTarget(url)} through ${route.name} failed`, error);
+            previous = error;
         }
     }
     return "failed";
@@ -135,7 +149,14 @@ export function routesFor(platform: NodeJS.Platform, system: typeof outsideSyste
             },
             confirms: true
         };
-        const desktop: OutsideRoute = { name: "the Windows shell (Explorer)", run: (url) => system.shell(url), confirms: false };
+        // Only after a browser that started and turned the link down: Explorer
+        // shows the system's error box for a browser it cannot start (BUG-0071).
+        const desktop: OutsideRoute = {
+            name: "the Windows shell (Explorer)",
+            run: (url) => system.shell(url),
+            confirms: false,
+            after: (previous) => previous instanceof browser.BrowserRefused
+        };
         return [direct, desktop, handOver];
     }
     const opener = platform === "darwin" ? "open" : "xdg-open";

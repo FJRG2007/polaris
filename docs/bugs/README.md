@@ -77,4 +77,5 @@ Security findings are not kept here; they live in
 | BUG-0068 | A device plugin never updates while another program holds its device, and Update gives no answer | Device plugins | Fixed, watching | clients/desktop/src/main/plugins/updates.ts | 2026-11-27 |
 | BUG-0069 | A plugin installed before its driver was a requirement never gets the driver, and its page asks for a manual install | Device plugins | Fixed, watching | clients/desktop/src/main/plugins/requirements.ts | 2026-11-27 |
 | BUG-0070 | The Booking.com connector shows a monogram instead of its logo | Polar | Fixed, watching | dashboard/apps/web/src/components/polar/connector-marks.tsx | 2026-11-27 |
+| BUG-0071 | Opening a link from the desktop app shows Windows' "cannot access the specified device, path, or file" box | Desktop | Fixed, watching | clients/desktop/src/main/open-external.ts | 2026-11-27 |
 | BUG-0072 | Setting up the Stream 100 driver opens a PowerShell window, and the controls are not found after it | Device plugins | Fixed, watching | clients/desktop/src/main/plugins/hercules-driver.ts | 2026-11-27 |
