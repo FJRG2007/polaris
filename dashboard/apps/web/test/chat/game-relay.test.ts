@@ -8,7 +8,8 @@
  * no row on it is reached, and one who lost the conversation or Chat is not; a
  * muted conversation, one set to nothing, and one set to mentions without a
  * mention stay quiet; a blocked author reaches nobody; and nothing is asked at
- * all where no app can show it.
+ * all where no app can show it. A sealed message reaches a channel a game shows
+ * with the words the game bridge opened, and everywhere else with none.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -50,7 +51,10 @@ const fake = vi.hoisted(() => ({
     shown: [] as Record<string, unknown>[],
     asked: [] as unknown[],
     namesRead: 0,
-    authorsRead: 0
+    authorsRead: 0,
+    /** What the game bridge opens of a sealed message, or null when it cannot. */
+    bridged: null as null | Record<string, unknown>,
+    bridgeAsked: [] as string[]
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -127,6 +131,12 @@ vi.mock("@/lib/chat/notify", () => ({
         appMentions: false
     })
 }));
+vi.mock("@/lib/chat/e2ee/sealed-game", () => ({
+    openForGame: async (channelId: string, messageId: string) => {
+        fake.bridgeAsked.push(`${channelId}/${messageId}`);
+        return fake.bridged;
+    }
+}));
 vi.mock("@/lib/blocks", () => ({
     blockedBy: async (userId: string) => fake.blocked.get(userId) ?? new Set()
 }));
@@ -153,6 +163,7 @@ function message(body: string, overrides: Record<string, unknown> = {}) {
         forwarded: false,
         attachments: [],
         poll: null,
+        e2eeEpoch: null,
         channel: { spaceId: null, name: "", kind: "group" },
         ...overrides
     };
@@ -180,6 +191,8 @@ beforeEach(() => {
     fake.asked = [];
     fake.namesRead = 0;
     fake.authorsRead = 0;
+    fake.bridged = null;
+    fake.bridgeAsked = [];
 });
 
 describe("relaying a message into a game", () => {
@@ -392,5 +405,63 @@ describe("a channel a game server shows to everybody playing", () => {
         await relayToGames("m1");
         expect(fake.shown[0]).toMatchObject({ conversation: "Group" });
         expect(fake.shown[0]).not.toHaveProperty("userId");
+    });
+});
+
+describe("a sealed message in a channel a game shows", () => {
+    const sealed = () =>
+        message("", {
+            e2eeEpoch: 3n,
+            channel: { spaceId: "s1", name: "builders", kind: "text" }
+        });
+
+    it("is shown with the words, files and poll answers the game bridge opened", async () => {
+        fake.showing = true;
+        fake.message = sealed();
+        fake.bridged = {
+            body: "meet at the **portal**",
+            files: [{ id: "f1", key: "k", sha256: "h", name: "map.png", type: "image/png", size: 9, spoiler: false }],
+            poll: { options: ["north", "south"] }
+        };
+        await relayToGames("m1");
+        expect(fake.bridgeAsked).toEqual(["c1/m1"]);
+        expect(fake.shown).toEqual([
+            {
+                channelId: "c1",
+                authorId: AUTHOR,
+                conversation: "builders",
+                text: "meet at the portal",
+                files: "map.png",
+                poll: ["north", "south"],
+                forwarded: false
+            }
+        ]);
+    });
+
+    it("goes in with no words when the bridge cannot open it", async () => {
+        fake.showing = true;
+        fake.message = sealed();
+        await relayToGames("m1");
+        expect(fake.shown).toEqual([expect.objectContaining({ text: "", files: null, poll: null })]);
+    });
+
+    it("never reaches a reader's own game with words: the bridge reads only what a game shows", async () => {
+        fake.showing = true;
+        fake.message = message("", { e2eeEpoch: 3n });
+        fake.bridged = { body: "secret plan" };
+        await relayToGames("m1");
+        expect(fake.shown[0]).toMatchObject({ text: "secret plan" });
+        expect(fake.relayed.length).toBeGreaterThan(0);
+        for (const relayed of fake.relayed) expect(relayed).toMatchObject({ text: "" });
+    });
+
+    it("is not opened where no game shows the conversation, nor for a plain message", async () => {
+        fake.message = message("", { e2eeEpoch: 3n });
+        await relayToGames("m1");
+        fake.showing = true;
+        fake.message = message("plain words", { channel: { spaceId: "s1", name: "builders", kind: "text" } });
+        await relayToGames("m1");
+        expect(fake.bridgeAsked).toEqual([]);
+        expect(fake.shown).toEqual([expect.objectContaining({ text: "plain words" })]);
     });
 });

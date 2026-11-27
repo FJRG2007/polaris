@@ -327,7 +327,8 @@ async function serviceAccess(service: ServiceKind, channelId: string): Promise<C
         kind: channel.kind,
         archived: channel.archived,
         member: false,
-        mayPost: !channel.archived && !(channel.space?.archived ?? false),
+        // The game bridge only reads what a game shows; it never writes here.
+        mayPost: service !== "game" && !channel.archived && !(channel.space?.archived ?? false),
         mutedUntil: null,
         adminsOnly: false,
         mayAdminister: false,

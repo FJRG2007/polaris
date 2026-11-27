@@ -40,6 +40,7 @@ import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PolarMemberRow } from "./polar-member-row";
+import { GameBridgeRow } from "./game-link-badge";
 import { SafetyNumberView, usePeerVerified } from "./safety-number";
 import { useConversationSealed } from "./sealed-notice";
 import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
@@ -523,6 +524,7 @@ function InfoBody({
                     </InfoRow>
                 )}
                 <PolarMemberRow channelId={channel.id} rowClass={ROW} />
+                <GameBridgeRow links={channel.gameLinks} rowClass={ROW} />
                 {members.slice(0, MEMBERS_SHOWN).map((member) => (
                     <div key={member.id} className={cn(ROW, "hover:bg-transparent")}>
                         <PersonPressable

@@ -16,30 +16,43 @@
  *   role and a timeout, and Polar has no account. The row goes with the channel.
  * - A webhook in its own channel: it belongs there already (`ChatWebhook`), so it
  *   needs no row.
+ * - The game bridge where a game shows the conversation to everybody playing:
+ *   the operator's link in the game server's own settings puts it there, so it
+ *   needs no row either, and the app that holds the link answers for it
+ *   (`channelShownInGame`). It reads and posts nothing.
  *
  * Server-only.
  */
 
 import { prisma } from "@polaris/db";
-import { POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID } from "./service-ids";
+import { channelShownInGame } from "@/lib/app-extensions/registry";
+import { GAME_SERVICE_ID, POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID } from "./service-ids";
 
-export { POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID };
+export { GAME_SERVICE_ID, POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID };
 
 /** The `service` a `ChatServiceMember` row names. */
 export const POLAR_SERVICE = "polar";
 
-export type ServiceKind = "polar" | "webhook";
+export type ServiceKind = "polar" | "webhook" | "game";
+
+/** The account id each service runs as. */
+export const SERVICE_ACCOUNTS: Readonly<Record<ServiceKind, string>> = {
+    polar: POLAR_SERVICE_ID,
+    webhook: WEBHOOK_SERVICE_ID,
+    game: GAME_SERVICE_ID
+};
 
 /** Which service an account id is, or null for a person. */
 export function serviceKind(accountId: string): ServiceKind | null {
     if (accountId === POLAR_SERVICE_ID) return "polar";
     if (accountId === WEBHOOK_SERVICE_ID) return "webhook";
+    if (accountId === GAME_SERVICE_ID) return "game";
     return null;
 }
 
 /**
- * A service member's MLS device id. Polar runs one device per conversation, a
- * webhook one per webhook (a webhook belongs to one channel): a member is
+ * A service member's MLS device id. Polar and the game bridge run one device
+ * per conversation, a webhook one per webhook (a webhook belongs to one channel): a member is
  * restored from all of its store at once, so one device across every group would
  * load every group for every message.
  */
@@ -50,6 +63,7 @@ export function serviceDevice(owner: string): string {
 /** Whether a service account reaches this conversation. */
 export async function serviceReaches(kind: ServiceKind, channelId: string): Promise<boolean> {
     if (kind === "webhook") return (await prisma.chatWebhook.count({ where: { channelId }, take: 1 })) > 0;
+    if (kind === "game") return channelShownInGame(channelId);
     const row = await prisma.chatServiceMember.findUnique({
         where: { channelId_service: { channelId, service: POLAR_SERVICE } },
         select: { channelId: true }

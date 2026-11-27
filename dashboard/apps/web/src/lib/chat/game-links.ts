@@ -42,6 +42,9 @@ export interface ChatGameLinkView {
     readonly href: string | null;
     /** The commands answered here, for the composer's list. */
     readonly commands: readonly ChatCommandSpec[];
+    /** It shows what is said here to everybody playing - in a sealed
+     *  conversation, read by the game bridge to do it. */
+    readonly shows: boolean;
 }
 
 /**
@@ -84,7 +87,8 @@ export async function gameLinksFor(
             href: (await mayOpen(link.installedAppId, link.ownerId))
                 ? `/game-servers/${link.installedAppId}`
                 : null,
-            commands: link.commands
+            commands: link.commands,
+            shows: link.shows ?? false
         };
         byChannel.set(link.channelId, [...(byChannel.get(link.channelId) ?? []), view]);
     }

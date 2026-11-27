@@ -154,6 +154,9 @@ export const gameServersExtension: AppExtension = {
     relayChannelMessage: async (message) =>
         (await import("./minecraft/chat-link-service")).relayChannelMessage(message),
 
+    showsChatChannel: async (channelId) =>
+        (await (await import("./minecraft/chat-link-service")).serversShowing(channelId)).size > 0,
+
     // The bans, timeouts and kicks on the players linked to an account, for its
     // Account standing page.
     gameSanctions: async (userId) => (await import("./sanctions-service")).sanctionsForUser(userId),

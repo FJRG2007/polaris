@@ -28,7 +28,7 @@ import { withLease } from "@/lib/cron/lease";
 import { nativeMlsMember } from "@polaris/core-rs";
 import type { MlsHistoryKeyStore } from "./mls-history-keys";
 import { commitMlsStore, destroyMlsStore, loadMlsStore, reservedKey, type MlsStoreChange } from "./mls-store";
-import { POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID, serviceDevice, type ServiceKind } from "@/lib/chat/service-members";
+import { SERVICE_ACCOUNTS, serviceDevice, type ServiceKind } from "@/lib/chat/service-members";
 import { MlsDevice, requestError, signatureNoteKey, type MlsDeviceNotes, type MlsDeviceStore, type MlsMemberClass, type MlsTransport } from "./mls-client";
 
 /** Comfortably longer than one operation; a process that dies holding it blocks the device this long. */
@@ -167,8 +167,8 @@ export interface ServiceDeviceOptions {
 }
 
 /**
- * Open the service device of `owner` - the conversation id for Polar, the
- * webhook id for a webhook - register it, run `work` with it, and write what
+ * Open the service device of `owner` - the conversation id for Polar and the
+ * game bridge, the webhook id for a webhook - register it, run `work` with it, and write what
  * it left. Serialised per device in this process and leased across processes,
  * so `work` should be MLS operations only: anything slow (a model's answer)
  * belongs before or after it, outside the lease.
@@ -192,7 +192,7 @@ export async function forgetServiceDevice(kind: ServiceKind, owner: string): Pro
 }
 
 function serviceAddress(kind: ServiceKind, owner: string) {
-    const userId = kind === "polar" ? POLAR_SERVICE_ID : WEBHOOK_SERVICE_ID;
+    const userId = SERVICE_ACCOUNTS[kind];
     const device = serviceDevice(owner);
     return { userId, device, address: `${userId}/${device}` };
 }

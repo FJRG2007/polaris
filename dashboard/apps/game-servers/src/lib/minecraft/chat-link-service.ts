@@ -104,6 +104,7 @@ export async function chatGameLinks(channelIds: readonly string[]): Promise<Chat
     const wanted = new Set(channelIds);
     if (wanted.size === 0 || !MINECRAFT) return [];
     const t = gameCatalogs.translator(await readerLocale(), "minecraft");
+    const { editionOf } = await import("./service");
     const found: ChatGameLink[] = [];
     for (const server of await linkedServers()) {
         const text = linkedChannels(server.link).text;
@@ -122,7 +123,13 @@ export async function chatGameLinks(channelIds: readonly string[]): Promise<Chat
                               ...command,
                               description: t(command.description)
                           }))
-                        : []
+                        : [],
+                // The same test `serversRelaying` makes, so the conversation's
+                // info says it is shown exactly where its messages are.
+                shows:
+                    channelId === text &&
+                    server.link.relay &&
+                    editionOf(server.catalogId) === "java"
             });
         }
     }

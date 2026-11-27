@@ -25,6 +25,7 @@ import {
     chatLinkPatch,
     chatLinkSchema,
     linkRefusal,
+    linkedChannels,
     readChatLink,
     widensLink,
     type ChatLink
@@ -33,7 +34,7 @@ import {
 const { recordAudit } = host.auditService;
 const { requireGameServer } = host.appsInstallAccess;
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
-const { linkableConversations } = host.chatLinks;
+const { linkableConversations, syncGameBridge } = host.chatLinks;
 
 type LinkableConversations = AppHostTypes["LinkableConversations"];
 
@@ -110,6 +111,12 @@ export async function saveChatLinkAction(
         }
         await patchInstallConfig(installedAppId, chatLinkPatch(link));
         forgetLinkedServers();
+        // A sealed conversation shown in the game is read by the game bridge,
+        // which joins it now - or forgets the one no longer shown. Not waited
+        // on: it never fails the save, and the next message shown joins it.
+        for (const channelId of new Set([linkedChannels(current.link).text, linkedChannels(link).text])) {
+            if (channelId) void syncGameBridge(channelId);
+        }
         // `{call.*}` on the side panel reads the call this names: redrawn now
         // rather than on the panel's next turn.
         await applySidebar(access.ownerId, installedAppId).catch(() => undefined);

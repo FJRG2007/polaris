@@ -17,7 +17,7 @@
 
 import { prisma } from "@polaris/db";
 import { getSetting } from "@/lib/setting-store";
-import { POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID } from "@/lib/chat/service-ids";
+import { SERVICE_ACCOUNT_IDS } from "@/lib/chat/service-ids";
 import { SWEEP_EPOCH_FLOOR } from "./mls-history-keys";
 
 export const MAX_KEY_PACKAGES_PER_DEVICE = 100;
@@ -73,7 +73,7 @@ export async function registerDevice(userId: string, device: string, signatureKe
         create: { userId, device, signatureKey: Buffer.from(signatureKey), e2eeVersion, lastSeenAt: now },
         update: { signatureKey: Buffer.from(signatureKey), e2eeVersion, lastSeenAt: now }
     });
-    if (known || userId === POLAR_SERVICE_ID || userId === WEBHOOK_SERVICE_ID) return;
+    if (known || SERVICE_ACCOUNT_IDS.includes(userId)) return;
     try {
         const others = await prisma.mlsDevice.count({ where: { userId, device: { not: device } } });
         if (others > 0) await (await import("@/lib/notifications/security-events")).notifySealedDeviceAdded(userId);
@@ -181,7 +181,7 @@ export async function retireDevice(userId: string, device: string): Promise<void
  * about a lost device.
  */
 export async function retiredDevices(addresses: readonly string[], now = Date.now()): Promise<string[]> {
-    const services = new Set([POLAR_SERVICE_ID, WEBHOOK_SERVICE_ID]);
+    const services = new Set(SERVICE_ACCOUNT_IDS);
     const wanted = [...new Set(addresses)].filter((address) => !services.has(address.slice(0, address.indexOf("/"))));
     if (!wanted.length) return [];
     const parsed = wanted.map((address) => ({ address, userId: address.slice(0, address.indexOf("/")), device: address.slice(address.indexOf("/") + 1) }));

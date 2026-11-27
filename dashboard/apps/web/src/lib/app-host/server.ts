@@ -129,6 +129,7 @@ const load = {
     crmHost: once(() => import("@/lib/crm-host")),
     cloudServersHost: once(() => import("@/lib/cloud-servers-host")),
     chatGameLinks: once(() => import("@/lib/chat/game-links")),
+    chatGameBridge: once(() => import("@/lib/chat/e2ee/sealed-game")),
     chatGameInvites: once(() => import("@/lib/chat/game-server-card-post")),
     chatLive: once(() => import("@/lib/chat/live")),
     chatMeetingEvents: once(() => import("@/lib/chat/meeting-events")),
@@ -381,7 +382,10 @@ export const serverHost = {
     // the linked channel when an announcement is repeated there.
     chatLinks: {
         linkableConversations: later(load.chatGameLinks, "linkableConversations"),
-        postAppNotice: later(load.chatGameLinks, "postAppNotice")
+        postAppNotice: later(load.chatGameLinks, "postAppNotice"),
+        // A link that now shows a sealed conversation in a game, or no longer
+        // does: the game bridge joins its group now, or forgets it.
+        syncGameBridge: later(load.chatGameBridge, "syncGameBridge")
     },
     chatLive: {
         publishChatChange: later(load.chatLive, "publishChatChange")

@@ -719,6 +719,18 @@ export async function channelRelayer(): Promise<
     };
 }
 
+/**
+ * Whether an installed app shows this conversation's messages to everybody in
+ * a game right now. An app that fails to say counts as not showing it, so the
+ * game bridge never reaches a conversation on an error.
+ */
+export async function channelShownInGame(channelId: string): Promise<boolean> {
+    for (const extension of await installedWith("showsChatChannel")) {
+        if (await extension.showsChatChannel!(channelId).catch(() => false)) return true;
+    }
+    return false;
+}
+
 /** Whether this account reaches an app it holds no permission for. */
 export async function appReaches(appId: string, userId: string): Promise<boolean> {
     const extension = extensions().find((entry) => entry.id === appId);

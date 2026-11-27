@@ -2888,6 +2888,8 @@
         "polar": "Polar in this chat",
         "polarHint": "Polar reads what is said here from now on, and so do whoever runs Polaris and the model provider. Ask it with @polar.",
         "polarNotYours": "Only someone who may add people here can change this.",
+        "gameBridge": "Shown in {servers}",
+        "gameBridgeHint": "Everybody playing there sees what is said here, so a game bridge reads it from now on, and so does whoever runs Polaris.",
         "safetyNumber": "Safety number",
         "safetyHint": "Compare these numbers with the ones on {name}'s screen, in person or on a call. If they match, nobody is reading in between.",
         "safetyNoKey": "{name} has not opened sealed chat yet, so there is no number to compare.",

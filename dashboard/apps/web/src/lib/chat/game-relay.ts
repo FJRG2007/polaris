@@ -14,6 +14,12 @@
  * somebody is writing to you; turned off, nothing. Which game, which player and whether they are on is
  * the app's business, behind `relayChatMessage`; core knows nothing of any game.
  *
+ * A sealed message carries no words the server can read. Where a game shows
+ * the conversation to everybody playing, the game bridge - a member the server
+ * runs there, `e2ee/sealed-game.ts` - opens it and the game shows its words;
+ * everywhere else, a reader's own copy included, it goes in with none, which
+ * the game draws as "Sent a message".
+ *
  * Never awaited by the send and never able to fail it: a message going out
  * matters more than any echo of it.
  */
@@ -24,6 +30,7 @@ import { blockedBy } from "@/lib/blocks";
 import { channelRelayer, chatRelayAccounts, chatRelayer } from "@/lib/app-extensions/registry";
 import { conversationName, filesLabel } from "./toasts";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
+import type { RelayedChannelMessage } from "@/lib/app-extensions/types";
 import { SMALL_GROUP_SIZE, inGameChoice } from "./in-game-choice";
 import { messageable, reachableChannelIds } from "./access";
 import { mentionsReader, muteStates, notifyLevels, readerTeams } from "./notify";
@@ -63,6 +70,7 @@ export async function relayToGames(messageId: string): Promise<void> {
             deletedAt: true,
             forwarded: true,
             replyToId: true,
+            e2eeEpoch: true,
             attachments: {
                 orderBy: { createdAt: "asc" },
                 select: { name: true, contentType: true, spoiler: true }
@@ -88,13 +96,12 @@ export async function relayToGames(messageId: string): Promise<void> {
     // conversation's own name - a group without one is not called after its
     // members in front of people who are not in it.
     if (shown && channel.kind !== "dm") {
+        const opened = message.e2eeEpoch !== null ? await openedForGame(channelId, message.id) : null;
         await shown({
             channelId,
             authorId,
             conversation: channel.name || "Group",
-            text,
-            files,
-            poll,
+            ...(opened ?? { text, files, poll }),
             forwarded: message.forwarded
         });
     }
@@ -147,6 +154,35 @@ export async function relayToGames(messageId: string): Promise<void> {
             channelId
         });
     }
+}
+
+/**
+ * A sealed message's words, files and poll answers as the game bridge opens
+ * them, shaped as a plain message's are; null when it does not open (no game
+ * shows the conversation, sealed chat is off, or it was sealed before the
+ * bridge joined), so the game shows it without words.
+ */
+async function openedForGame(
+    channelId: string,
+    messageId: string
+): Promise<Pick<RelayedChannelMessage, "text" | "files" | "poll"> | null> {
+    const { openForGame } = await import("./e2ee/sealed-game");
+    const content = await openForGame(channelId, messageId).catch((error: unknown) => {
+        console.error("polaris: the game bridge could not open a sealed message:", error);
+        return null;
+    });
+    if (!content) return null;
+    return {
+        text: plainExcerpt(content.body, RELAY_EXCERPT),
+        files: filesLabel(
+            (content.files ?? []).map((file) => ({
+                name: file.name,
+                contentType: file.type,
+                spoiler: file.spoiler ?? false
+            }))
+        ),
+        poll: content.poll ? content.poll.options.slice(0, POLL_OPTIONS) : null
+    };
 }
 
 /**

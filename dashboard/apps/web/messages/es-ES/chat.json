@@ -2888,6 +2888,8 @@
         "polar": "Polar en este chat",
         "polarHint": "Polar lee lo que se diga aquí a partir de ahora, igual que quien gestiona Polaris y el proveedor del modelo. Pregúntale con @polar.",
         "polarNotYours": "Solo quien puede añadir gente aquí puede cambiarlo.",
+        "gameBridge": "Se muestra en {servers}",
+        "gameBridgeHint": "Quien juegue allí ve lo que se diga aquí, así que un puente del juego lo lee desde ahora, igual que quien gestiona Polaris.",
         "safetyNumber": "Código seguro",
         "safetyHint": "Compara estos números con los de la pantalla de {name}, en persona o en una llamada. Si coinciden, nadie lee en medio.",
         "safetyNoKey": "{name} aún no ha abierto el chat cifrado, así que no hay número que comparar.",

@@ -296,6 +296,8 @@ export { conversationSealed } from "./sealed-conversation";
 /** One stored sealed message, as a reader opens it. */
 /** Polar's or a webhook's name on its message, as on its plain ones. */
 async function serviceAuthor(kind: ServiceKind, channelId: string, device: string) {
+    // The game bridge reads what a game shows and posts nothing.
+    if (kind === "game") throw new SealedRefusal("unknownDevice");
     // The service name is the `agent` Polar's plain answers carry (`POLAR_AGENT`), so both draw alike.
     if (kind === "polar") return { agent: POLAR_SERVICE, authorLabel: "Polar", webhookId: null }; // i18n-ignore: a name
     // A webhook's device is its id without dashes (`serviceDevice`); it posts only in its own channel.

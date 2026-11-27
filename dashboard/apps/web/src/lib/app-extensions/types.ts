@@ -476,6 +476,15 @@ export interface AppExtension {
     readonly relayChannelMessage?: (message: RelayedChannelMessage) => Promise<void>;
 
     /**
+     * Whether one of its things shows this conversation's messages to everybody
+     * inside what it runs right now - what `relayChannelMessage` would show it
+     * on. In a sealed conversation that is what lets the game bridge, a member
+     * the server runs, join the group and open what it shows. One or two
+     * indexed reads: it is asked on every MLS operation of the bridge.
+     */
+    readonly showsChatChannel?: (channelId: string) => Promise<boolean>;
+
+    /**
      * The bans, timeouts and kicks its servers put on the players linked to this
      * account, for its Account standing page: those in force, and recent ones.
      * They are the servers' decisions, not Polaris's, and are drawn apart.
@@ -572,6 +581,9 @@ export interface ChatGameLink {
     readonly logo: string;
     /** The commands it answers here. Empty where it only feeds the call. */
     readonly commands: readonly ChatCommandSpec[];
+    /** Whether it shows this conversation's messages to everybody playing
+     *  (`showsChatChannel`). Absent from an older app: taken as not. */
+    readonly shows?: boolean;
 }
 
 /** One message said in a conversation, on its way to everybody in a game. */
