@@ -214,3 +214,104 @@ fn settings_default_and_survive_a_damaged_file() {
         .iter()
         .any(|field| field["key"] == "brightness"));
 }
+
+#[test]
+fn a_mac_app_is_named_by_its_outermost_bundle() {
+    let helper = "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/131.0/Helpers/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper";
+    assert_eq!(audio::bundle_program(helper), "Google Chrome");
+    assert_eq!(
+        audio::bundle_program("/Applications/Spotify.app/Contents/MacOS/Spotify"),
+        "Spotify"
+    );
+    assert_eq!(
+        audio::bundle_program("/usr/libexec/avconferenced"),
+        "avconferenced"
+    );
+    let cases = [
+        (
+            "/Applications/Google Chrome.app/Contents/MacOS/x",
+            Category::Browser,
+        ),
+        (
+            "/Applications/zoom.us.app/Contents/MacOS/zoom.us",
+            Category::Calls,
+        ),
+        (
+            "/Applications/Microsoft Teams.app/Contents/MacOS/MSTeams",
+            Category::Calls,
+        ),
+        (
+            "/Applications/Discord.app/Contents/MacOS/Discord",
+            Category::Calls,
+        ),
+        (
+            "/System/Applications/Music.app/Contents/MacOS/Music",
+            Category::Music,
+        ),
+        (
+            "/Applications/Polaris.app/Contents/MacOS/Polaris",
+            Category::Calls,
+        ),
+        (
+            "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+            Category::Browser,
+        ),
+    ];
+    for (path, category) in cases {
+        let program = audio::bundle_program(path);
+        assert_eq!(
+            audio::classify(&session("a", &program), no_games),
+            category,
+            "{path}"
+        );
+    }
+}
+
+#[test]
+fn a_tap_plays_the_app_back_at_the_knobs_gain() {
+    assert_eq!(audio::tap_gain(100, false), 1.0);
+    assert_eq!(audio::tap_gain(0, false), 0.0);
+    assert_eq!(audio::tap_gain(80, true), 0.0);
+    assert!((audio::tap_gain(50, false) - 0.125).abs() < 1e-6);
+    // A stereo tap on a four-channel output: each pair repeats it; the frames
+    // past the tap's are silence.
+    let input = [1.0, 2.0, 3.0, 4.0];
+    let mut output = [9.0f32; 12];
+    audio::mix(&input, 2, &mut output, 4, 0.5);
+    assert_eq!(
+        output,
+        [0.5, 1.0, 0.5, 1.0, 1.5, 2.0, 1.5, 2.0, 0.0, 0.0, 0.0, 0.0]
+    );
+    let mut silent = [9.0f32; 4];
+    audio::mix(&input, 0, &mut silent, 2, 1.0);
+    assert_eq!(silent, [0.0; 4]);
+}
+
+#[test]
+fn macos_asks_once_for_recording_system_audio() {
+    let value = manifest::manifest();
+    for platform in ["darwin-x64", "darwin-arm64"] {
+        let listed = &value["requires"][platform];
+        assert_eq!(listed[0]["key"], "audioCapture", "{platform}");
+        for field in ["label", "hint", "missing", "restored"] {
+            for locale in ["en-US", "es-ES"] {
+                let text = listed[0][field][locale].as_str().unwrap_or_default();
+                assert!(
+                    !text.is_empty() && text.chars().count() <= 120,
+                    "{platform} {field} {locale}"
+                );
+            }
+        }
+    }
+    for code in ["perAppNeedsMacos", "perAppNotAllowed"] {
+        for locale in ["en-US", "es-ES"] {
+            let text = value["statusTexts"][code][locale]
+                .as_str()
+                .unwrap_or_default();
+            assert!(
+                !text.is_empty() && text.chars().count() <= 120,
+                "{code} {locale}"
+            );
+        }
+    }
+}

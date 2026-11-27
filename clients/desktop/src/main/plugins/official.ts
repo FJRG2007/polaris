@@ -14,6 +14,7 @@ import { PLUGIN_PERMISSIONS } from "@polaris/core/device-plugins";
 import { createOfficialRunner, type OfficialHost, type OfficialRunner } from "./hercules-official-run";
 import type { RequirementRunner } from "./requirements";
 import { createUdevRunner, udevRequirement, type UdevRunner } from "./hercules-udev";
+import { createAudioCaptureRunner, installedModuleLoader, AUDIO_CAPTURE_SETTINGS, type AudioCaptureDeps } from "./mac-audio-capture";
 import { createDriverRunner, type DriverFailure, type DriverRunner, type DriverState } from "./hercules-driver";
 
 /** The plugins whose device ships official software Polaris knows how to find. */
@@ -107,6 +108,26 @@ export const DRIVER_REQUIREMENT = "driver";
 /** The key the Stream 100's manifest lists its udev rule under (`requires`, Linux only). */
 export const UDEV_REQUIREMENT = "udevRule";
 
+/** The key the Stream 100's manifest lists recording system audio under (`requires`, macOS only). */
+export const AUDIO_CAPTURE_REQUIREMENT = "audioCapture";
+
+/** Recording system audio for the Stream 100's per-app volume, or null off macOS or for another plugin. */
+export function audioCaptureRunnerFor(id: string, pluginsDir: string, platform: NodeJS.Platform = process.platform, deps?: AudioCaptureDeps): RequirementRunner | null {
+    if (platform !== "darwin" || id !== "hercules-stream100") return null;
+    return createAudioCaptureRunner(
+        deps ?? {
+            load: installedModuleLoader(pluginsDir, id),
+            // Electron only in the running app: the tests pass their own deps.
+            openSettings: async () => {
+                const { shell } = await import("electron");
+                await shell.openExternal(AUDIO_CAPTURE_SETTINGS);
+            },
+            sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
+            now: Date.now
+        }
+    );
+}
+
 /** The udev rule that lets the seat user open the Stream 100, or null off Linux or for another plugin. */
 export function udevRunnerFor(id: string, platform: NodeJS.Platform = process.platform, host: OfficialHost = nodeOfficialHost()): UdevRunner | null {
     return platform === "linux" && id === "hercules-stream100" ? createUdevRunner(host) : null;
@@ -133,8 +154,9 @@ export function driverRequirement(driver: DriverRunner): RequirementRunner {
     };
 }
 
-/** What can set a plugin's requirement up on this machine; only the Stream 100's driver (Windows) and udev rule (Linux) are known. */
+/** What can set a plugin's requirement up on this machine; only the Stream 100's driver (Windows), udev rule (Linux) and system audio recording (macOS) are known. */
 export function requirementRunnerFor(id: string, key: string, pluginsDir: string, platform: NodeJS.Platform = process.platform, host: OfficialHost = nodeOfficialHost()): RequirementRunner | null {
+    if (key === AUDIO_CAPTURE_REQUIREMENT) return audioCaptureRunnerFor(id, pluginsDir, platform);
     if (key === UDEV_REQUIREMENT) {
         const udev = udevRunnerFor(id, platform, host);
         return udev ? udevRequirement(udev) : null;

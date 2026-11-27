@@ -45,6 +45,21 @@ function describe(error, ownership) {
 }
 
 /**
+ * What the header says while the controller works but per-app volume does
+ * not (macOS: before 14.2, or recording system audio not allowed). The whole
+ * output still works; the page offers the permission as a host action.
+ */
+function connectedStatus(access) {
+    if (access === "needsNewerMacos") {
+        return { state: "connected", code: "perAppNeedsMacos", detail: "Knobs for calls, music, games or the browser need macOS 14.2 or later. Whole output works here." };
+    }
+    if (access === "notAllowed" || access === "notAsked") {
+        return { state: "connected", code: "perAppNotAllowed", detail: "Knobs for calls, music, games or the browser need Polaris to be allowed to record system audio." };
+    }
+    return { state: "connected" };
+}
+
+/**
  * Runs the plugin against `port` (the utility process's parentPort) and the
  * native module. Everything it touches is passed in, so it is tested with fakes.
  */
@@ -56,6 +71,7 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     let lastStatus = "";
     let ownership = null;
     let ownershipAt = -Infinity;
+    let accessAt = -Infinity;
     let warnedFeed = false;
     let nextCall = 1;
     const pending = new Map();
@@ -107,6 +123,17 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
         return ownership;
     }
 
+    /** Per-app volume's standing, read again now and then: the person may allow it meanwhile. */
+    function accessNow() {
+        if (typeof native.audioAccess !== "function") return "ready";
+        try {
+            return native.audioAccess();
+        } catch (error) {
+            log("warn", `could not tell whether per-app volume is allowed: ${error?.message ?? error}`);
+            return "ready";
+        }
+    }
+
     function feed(report) {
         if (!controller) controller = new native.Controller(settingsJson());
         let actions = [];
@@ -141,7 +168,11 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
             if (!connected) {
                 connected = true;
                 ownershipAt = -Infinity;
-                status({ state: "connected" });
+                accessAt = -Infinity;
+            }
+            if (now() - accessAt >= OWNERSHIP_EVERY_MS) {
+                accessAt = now();
+                status(connectedStatus(accessNow()));
             }
             if (read.report) feed(read.report);
         }
@@ -175,7 +206,7 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     });
 }
 
-module.exports = { run, describe, RENAMED };
+module.exports = { run, describe, connectedStatus, RENAMED };
 
 /** Started by the plugin host: load the native module, or say plainly that it did not load. */
 function main(port) {

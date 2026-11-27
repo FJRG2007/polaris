@@ -61,11 +61,13 @@ module.exports = {
             { name: "Mail link", schemes: ["mailto"] }
         ],
         appCategoryType: "public.app-category.developer-tools",
-        // macOS asks before a call reaches the microphone or camera, and shows
-        // these words when it does.
+        // macOS asks before a call reaches the microphone or camera, and
+        // before a device plugin taps an app's audio to set its volume (the
+        // Stream 100's knobs, macOS 14.2+), and shows these words when it does.
         extendInfo: {
             NSMicrophoneUsageDescription: "Polaris uses the microphone for calls in Chat.",
-            NSCameraUsageDescription: "Polaris uses the camera for video calls in Chat."
+            NSCameraUsageDescription: "Polaris uses the camera for video calls in Chat.",
+            NSAudioCaptureUsageDescription: "Polaris sets the volume of each app from your controller's knobs."
         },
         icon: ICON,
         // Native binaries cannot be loaded from inside the archive: node-pty's,

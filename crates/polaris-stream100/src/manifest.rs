@@ -59,12 +59,16 @@ pub fn manifest() -> Value {
         // controller (`clients/desktop/src/main/plugins/requirements.ts`): listed
         // in the install consent, one Windows prompt, put back when another
         // driver takes the device. On Linux it adds the udev rule that lets the
-        // signed-in user open it (one polkit prompt). macOS needs nothing.
+        // signed-in user open it (one polkit prompt). On macOS the person
+        // allows Polaris to record system audio, which per-app volume's
+        // process taps need (one system prompt; whole output works without).
         "requires": {
             "win32-x64": [driver_requirement()],
             "win32-arm64": [driver_requirement()],
             "linux-x64": [udev_requirement()],
             "linux-arm64": [udev_requirement()],
+            "darwin-x64": [audio_capture_requirement()],
+            "darwin-arm64": [audio_capture_requirement()],
         },
         // The plugin's own status sentences (`code` in its status messages),
         // in every language, so the page needs no Polaris update to say them.
@@ -85,6 +89,36 @@ fn status_texts() -> Value {
         "herculesDriver": label(
             "Polaris could not read the Stream 100 through the Hercules software. Plug it in again, or reinstall Hercules Stream Control.",
             "Polaris no pudo leer el Stream 100 con el software de Hercules. Vuelve a conectarlo o reinstala Hercules Stream Control.",
+        ),
+        "perAppNeedsMacos": label(
+            "Knobs for calls, music, games or the browser need macOS 14.2 or later. Whole output works here.",
+            "Las ruedas de llamadas, música, juegos o navegador piden macOS 14.2 o posterior. Toda la salida funciona.",
+        ),
+        "perAppNotAllowed": label(
+            "Knobs for calls, music, games or the browser need Polaris to be allowed to record system audio.",
+            "Las ruedas de llamadas, música, juegos o navegador necesitan que Polaris pueda grabar el audio del sistema.",
+        ),
+    })
+}
+
+/// Recording system audio, which macOS asks the person for before Polaris
+/// may tap an app's audio to set its volume (`native/macos.rs`).
+fn audio_capture_requirement() -> Value {
+    use crate::plugin::label;
+    json!({
+        "key": "audioCapture",
+        "label": label("Let Polaris set each app's volume", "Dejar que Polaris ajuste el volumen de cada app"),
+        "hint": label(
+            "macOS asks once to let Polaris record system audio, so each knob can set its apps' volume.",
+            "macOS pide una vez que Polaris pueda grabar el audio del sistema, para ajustar el volumen de cada app.",
+        ),
+        "missing": label(
+            "macOS does not let Polaris record system audio, so knobs for calls, music, games or the browser do nothing.",
+            "macOS no deja a Polaris grabar el audio del sistema: las ruedas por tipo de app no hacen nada.",
+        ),
+        "restored": label(
+            "Polaris can set each app's volume again.",
+            "Polaris vuelve a poder ajustar el volumen de cada app.",
         ),
     })
 }

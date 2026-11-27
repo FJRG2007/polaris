@@ -89,6 +89,21 @@ pub fn audio_status() -> String {
     backend_status(std::env::consts::OS).to_owned()
 }
 
+/// Whether per-app volume can be used on this system (`native::per_app_access`):
+/// the plugin's page header says so when it cannot.
+#[napi(catch_unwind)]
+pub fn audio_access() -> String {
+    native::per_app_access().to_owned()
+}
+
+/// Shows the system's prompt for what per-app volume needs (macOS: recording
+/// system audio). Only the desktop app calls it; the answer is read back with
+/// `audioAccess`.
+#[napi(catch_unwind)]
+pub fn request_audio_access() {
+    native::request_per_app_access();
+}
+
 /// The controller: input reports in; volume and mute applied through this
 /// system's per-app volume; Polaris actions handed back to the caller.
 ///

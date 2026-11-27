@@ -71,6 +71,48 @@
     ],
     "publisher": "Polaris",
     "requires": {
+        "darwin-arm64": [
+            {
+                "hint": {
+                    "en-US": "macOS asks once to let Polaris record system audio, so each knob can set its apps' volume.",
+                    "es-ES": "macOS pide una vez que Polaris pueda grabar el audio del sistema, para ajustar el volumen de cada app."
+                },
+                "key": "audioCapture",
+                "label": {
+                    "en-US": "Let Polaris set each app's volume",
+                    "es-ES": "Dejar que Polaris ajuste el volumen de cada app"
+                },
+                "missing": {
+                    "en-US": "macOS does not let Polaris record system audio, so knobs for calls, music, games or the browser do nothing.",
+                    "es-ES": "macOS no deja a Polaris grabar el audio del sistema: las ruedas por tipo de app no hacen nada."
+                },
+                "restored": {
+                    "en-US": "Polaris can set each app's volume again.",
+                    "es-ES": "Polaris vuelve a poder ajustar el volumen de cada app."
+                }
+            }
+        ],
+        "darwin-x64": [
+            {
+                "hint": {
+                    "en-US": "macOS asks once to let Polaris record system audio, so each knob can set its apps' volume.",
+                    "es-ES": "macOS pide una vez que Polaris pueda grabar el audio del sistema, para ajustar el volumen de cada app."
+                },
+                "key": "audioCapture",
+                "label": {
+                    "en-US": "Let Polaris set each app's volume",
+                    "es-ES": "Dejar que Polaris ajuste el volumen de cada app"
+                },
+                "missing": {
+                    "en-US": "macOS does not let Polaris record system audio, so knobs for calls, music, games or the browser do nothing.",
+                    "es-ES": "macOS no deja a Polaris grabar el audio del sistema: las ruedas por tipo de app no hacen nada."
+                },
+                "restored": {
+                    "en-US": "Polaris can set each app's volume again.",
+                    "es-ES": "Polaris vuelve a poder ajustar el volumen de cada app."
+                }
+            }
+        ],
         "linux-arm64": [
             {
                 "hint": {
@@ -580,9 +622,17 @@
         "herculesDriver": {
             "en-US": "Polaris could not read the Stream 100 through the Hercules software. Plug it in again, or reinstall Hercules Stream Control.",
             "es-ES": "Polaris no pudo leer el Stream 100 con el software de Hercules. Vuelve a conectarlo o reinstala Hercules Stream Control."
+        },
+        "perAppNeedsMacos": {
+            "en-US": "Knobs for calls, music, games or the browser need macOS 14.2 or later. Whole output works here.",
+            "es-ES": "Las ruedas de llamadas, música, juegos o navegador piden macOS 14.2 o posterior. Toda la salida funciona."
+        },
+        "perAppNotAllowed": {
+            "en-US": "Knobs for calls, music, games or the browser need Polaris to be allowed to record system audio.",
+            "es-ES": "Las ruedas de llamadas, música, juegos o navegador necesitan que Polaris pueda grabar el audio del sistema."
         }
     },
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.15",
+    "version": "0.1.16",
     "view": "view/index.html"
 }

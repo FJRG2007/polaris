@@ -81,6 +81,7 @@ describe("the Stream 100 udev rule", () => {
             expect(requirement.key).toBe(UDEV_REQUIREMENT);
             expect(Object.keys(requirement.label)).toEqual(["en-US", "es-ES"]);
         }
-        expect(manifest.requires["darwin-arm64"]).toBeUndefined();
+        // macOS lists recording system audio instead (mac-audio-capture.ts), never the rule.
+        expect(manifest.requires["darwin-arm64"]?.map((item: { key: string; }) => item.key)).toEqual(["audioCapture"]);
     });
 });

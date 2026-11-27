@@ -11,6 +11,7 @@ const folder = new URL("../../../../device-plugins/hercules-stream100/", import.
 const entry = createRequire(import.meta.url)(fileURLToPath(new URL("any/main.cjs", folder))) as {
     run(options: unknown): void;
     describe(error: string, ownership: unknown): { state: string; detail?: string; code?: string; };
+    connectedStatus(access: string): { state: string; detail?: string; code?: string; };
 };
 
 type Read = { report?: Uint8Array; error?: string; };
@@ -80,13 +81,17 @@ describe("Hercules Stream 100 plugin", () => {
         expect(entry.describe("notFound", { ownership: { state: "unknown", service: "Foo" } }).code).toBeUndefined();
         // Its own sentences ship in its manifest, in every language; the page has only the shared ones.
         const manifest = readPluginManifest(JSON.parse(readFileSync(new URL("manifest.json", folder), "utf8")));
-        expect(Object.keys(manifest?.statusTexts ?? {}).sort()).toEqual(["herculesApp", "herculesDriver"]);
+        expect(Object.keys(manifest?.statusTexts ?? {}).sort()).toEqual(["herculesApp", "herculesDriver", "perAppNeedsMacos", "perAppNotAllowed"]);
         for (const [error, held] of cases) {
             const said = entry.describe(error, held);
             const text = said.code ? manifest?.statusTexts?.[said.code] : undefined;
             if (!text) continue;
             expect(Object.keys(text).sort()).toEqual(["en-US", "es-ES"]);
             expect(text["en-US"]).toBe(said.detail);
+        }
+        for (const access of ["needsNewerMacos", "notAllowed"]) {
+            const said = entry.connectedStatus(access);
+            expect(manifest?.statusTexts?.[said.code ?? ""]?.["en-US"]).toBe(said.detail);
         }
     });
 
@@ -202,5 +207,15 @@ describe("Hercules Stream 100 plugin", () => {
                 if (setting.key.startsWith("button")) expect(looks[setting.group!], setting.key).toBe("buttons");
             }
         });
+    });
+});
+
+describe("the header while per-app volume cannot be used", () => {
+    it("says why on macOS, and nothing when it can", () => {
+        expect(entry.connectedStatus("ready")).toEqual({ state: "connected" });
+        expect(entry.connectedStatus("needsNewerMacos")).toMatchObject({ state: "connected", code: "perAppNeedsMacos" });
+        expect(entry.connectedStatus("notAllowed")).toMatchObject({ state: "connected", code: "perAppNotAllowed" });
+        expect(entry.connectedStatus("notAsked")).toMatchObject({ state: "connected", code: "perAppNotAllowed" });
+        for (const access of ["needsNewerMacos", "notAllowed"]) expect(pluginMessageSchema.safeParse({ type: "status", ...entry.connectedStatus(access) }).success).toBe(true);
     });
 });

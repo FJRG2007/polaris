@@ -4,8 +4,9 @@
 //! - Windows: Core Audio sessions on every active output, and the Hercules
 //!   driver / Stream Control probe ([`windows`]).
 //! - Linux: the PulseAudio protocol, which PipeWire also serves ([`linux`]).
-//! - macOS: the whole output through Core Audio ([`macos`]); per-app volume
-//!   there needs process taps (macOS 14.2+) and is not built yet.
+//! - macOS: Core Audio process taps for each app (macOS 14.2+, once the
+//!   person allows system audio recording) and Core Audio's output volume
+//!   ([`macos`]).
 
 use crate::audio::{AudioError, AudioSessions};
 use crate::ownership::Observed;
@@ -34,6 +35,23 @@ pub fn open() -> Result<Box<dyn AudioSessions>, AudioError> {
     return Ok(Box::new(macos::CoreAudioOutput::open()?));
     #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     Err(AudioError::Unsupported)
+}
+
+/// Whether per-app volume can be used here: `ready`, or on macOS `notAsked`,
+/// `notAllowed` (system audio recording is off for Polaris) or
+/// `needsNewerMacos` (before 14.2; the whole output still works).
+pub fn per_app_access() -> &'static str {
+    #[cfg(target_os = "macos")]
+    return macos::access().code();
+    #[cfg(not(target_os = "macos"))]
+    "ready"
+}
+
+/// Asks the person for what per-app volume needs, where the system asks
+/// (macOS: the system audio recording prompt). Nothing elsewhere.
+pub fn request_per_app_access() {
+    #[cfg(target_os = "macos")]
+    macos::request_access();
 }
 
 /// What this system says about the controller. Outside Windows `present` is
