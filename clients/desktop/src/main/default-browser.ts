@@ -241,6 +241,13 @@ export function browserEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
  * resolving means Windows started Explorer with the address, not that a page
  * opened. Rejects with `ShellUnavailable` for an address Explorer would read as
  * more than one argument: it splits its command line at commas.
+ *
+ * Explorer opens the address with its own `ShellExecuteEx`, without
+ * `SEE_MASK_FLAG_NO_UI`, so when it cannot start the browser it shows the
+ * system's error box, titled with the address ("Windows cannot access the
+ * specified device, path, or file", BUG-0071). It is therefore only used right
+ * after the browser itself started and turned the link down (`BrowserRefused`),
+ * which shows the program can be started; never when it could not be started.
  */
 export function handToShell(url: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -267,6 +274,18 @@ export function handToShell(url: string, env: NodeJS.ProcessEnv = process.env): 
 /** `handToShell` cannot be used for this address or on this machine; not a
  *  refusal of the link. */
 export class ShellUnavailable extends Error {}
+
+/**
+ * The browser started and exited without taking the link: it is there and
+ * Windows let it run, it only turned this start down. Distinct from a start
+ * that never happened (`spawn EPERM`, `ENOENT`), after which the shell cannot
+ * start the same program either.
+ */
+export class BrowserRefused extends Error {
+    constructor(message: string, readonly code: number | null) {
+        super(message);
+    }
+}
 
 /**
  * Start the browser detached and wait for what it does with the link.
@@ -299,7 +318,7 @@ export function launchDetached(file: string, args: readonly string[], settleMs: 
         child.once("spawn", () => child.unref());
         child.once("exit", (code) => {
             if (code !== null && HANDED_OVER.has(code)) finish(null);
-            else finish(new Error(`${file} exited with code ${String(code)}: ${exitMeaning(code)}`));
+            else finish(new BrowserRefused(`${file} exited with code ${String(code)}: ${exitMeaning(code)}`, code));
         });
     });
 }
