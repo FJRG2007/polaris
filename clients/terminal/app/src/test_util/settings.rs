@@ -92,6 +92,7 @@ pub fn initialize_settings_for_tests_with_mode(
     if pterm_core::features::FeatureFlag::PtermControlCli.is_enabled() {
         LocalControlSettings::register(app);
     }
+    crate::settings::PolarisControlSettings::register(app);
 
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {

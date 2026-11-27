@@ -26,7 +26,10 @@ use super::{
     validate_action_params, validate_loopback_headers, validate_request_authority,
     validate_tab_create_target,
 };
-use crate::settings::{LocalControlMode, LocalControlModeSetting, LocalControlSettings};
+use crate::local_control::permissions::{is_read_only, relay_allows};
+use crate::settings::{
+    LocalControlMode, LocalControlModeSetting, LocalControlSettings, PolarisControlSettings,
+};
 
 fn settings_with_mode(mode: LocalControlMode) -> LocalControlSettings {
     LocalControlSettings {
@@ -438,5 +441,97 @@ fn disabling_scripting_invalidates_existing_grant_and_prevents_new_grants() {
             .await
             .expect_err("disabled scripting should prevent new grants");
         assert_eq!(err.code, ErrorCode::LocalControlDisabled);
+    });
+}
+
+#[test]
+fn relay_runs_read_only_actions_without_the_control_grant() {
+    for action in [
+        ActionKind::AppPing,
+        ActionKind::WindowList,
+        ActionKind::TabList,
+        ActionKind::PaneList,
+        ActionKind::PaneInspect,
+    ] {
+        assert!(is_read_only(action), "{} reads only", action.as_str());
+        relay_allows(action, false).expect("read-only actions need no grant");
+    }
+}
+
+#[test]
+fn relay_refuses_typing_and_changes_until_control_is_allowed() {
+    for action in [
+        ActionKind::InputInsert,
+        ActionKind::InputReplace,
+        ActionKind::PaneSplit,
+        ActionKind::TabClose,
+        ActionKind::SettingSet,
+        ActionKind::FileOpen,
+        // A setting can name a path or a person, so reading one is a grant too.
+        ActionKind::SettingGet,
+    ] {
+        assert!(
+            !is_read_only(action),
+            "{} is not read-only",
+            action.as_str()
+        );
+        let err = relay_allows(action, false).expect_err("needs the control grant");
+        assert_eq!(err.code, ErrorCode::LocalControlDisabled);
+        assert!(err.message.contains("Let Polaris control this terminal"));
+        relay_allows(action, true).expect("allowed once control is on");
+    }
+}
+
+#[test]
+fn relay_request_is_gated_by_its_own_setting_not_the_cli_flag_or_scripting() {
+    let _flag = FeatureFlag::PtermControlCli.override_enabled(false);
+    ptermui::App::test((), |mut app| async move {
+        crate::test_util::settings::initialize_settings_for_tests(&mut app);
+        let bridge = app.add_singleton_model(LocalControlBridge::new);
+
+        let code = |response: ::local_control::ResponseEnvelope| match response.response {
+            ::local_control::ControlResponse::Ok { .. } => None,
+            ::local_control::ControlResponse::Error { error } => Some(error.code),
+        };
+
+        // Signed in, control off, no CLI flag, no Scripting: reading works.
+        let ping = bridge.update(&mut app, |bridge, ctx| {
+            bridge.handle_relay_request(RequestEnvelope::new(Action::new(ActionKind::AppPing)), ctx)
+        });
+        assert_eq!(code(ping), None);
+
+        // The loopback path is still closed without the flag.
+        let local = bridge.update(&mut app, |bridge, ctx| {
+            let grant = CredentialGrant::new(
+                InstanceId("inst_test".to_owned()),
+                ActionKind::AppPing,
+                Duration::seconds(60),
+            );
+            bridge.handle_request(
+                RequestEnvelope::new(Action::new(ActionKind::AppPing)),
+                grant,
+                ctx,
+            )
+        });
+        assert_eq!(code(local), Some(ErrorCode::LocalControlDisabled));
+
+        // Typing is refused while control is off...
+        let typing = || RequestEnvelope::new(Action::new(ActionKind::InputInsert));
+        let refused = bridge.update(&mut app, |bridge, ctx| {
+            bridge.handle_relay_request(typing(), ctx)
+        });
+        assert_eq!(code(refused), Some(ErrorCode::LocalControlDisabled));
+
+        // ...and gets past the grant once the person turns it on.
+        app.update(|ctx| {
+            PolarisControlSettings::handle(ctx).update(ctx, |settings, ctx| {
+                settings.allow_polaris_control.set_value(true, ctx)
+            })
+        })
+        .expect("control should turn on");
+        let allowed = bridge.update(&mut app, |bridge, ctx| {
+            bridge.handle_relay_request(typing(), ctx)
+        });
+        assert_ne!(code(allowed), Some(ErrorCode::LocalControlDisabled));
     });
 }

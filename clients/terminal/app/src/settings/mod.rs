@@ -26,6 +26,7 @@ pub mod manager;
 pub mod native_preference;
 mod onboarding;
 mod pane;
+mod polaris_control;
 mod privacy;
 mod same_line_prompt_block;
 #[cfg(not(target_family = "wasm"))]
@@ -66,6 +67,7 @@ pub use local_control::*;
 pub use native_preference::*;
 pub(crate) use onboarding::*;
 pub use pane::*;
+pub use polaris_control::*;
 pub use privacy::*;
 use pterm_core::user_preferences::GetUserPreferences as _;
 pub use same_line_prompt_block::*;

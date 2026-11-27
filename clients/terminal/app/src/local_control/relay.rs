@@ -3,8 +3,11 @@
 //! `crates/polaris_relay`).
 //!
 //! One socket per signed-in terminal, dialled out so it works behind NAT. A
-//! controller's `request` runs through the same bridge, checks and handlers as
-//! a local-control request, so Settings > Scripting governs both. `attach`
+//! controller's `request` runs through the same bridge and handlers as a
+//! local-control request, but under its own grant: read-only actions always,
+//! anything that changes the terminal only while "Let Polaris control this
+//! terminal" (Settings > Account) is on. Settings > Scripting and the control
+//! CLI flag govern only the loopback server. `attach`
 //! streams a pane's PTY bytes until `detach`. The socket reconnects with
 //! backoff; a handshake the instance refuses (a revoked or expired key) stops
 //! it until the next sign-in calls [`PolarisRelay::restart`].

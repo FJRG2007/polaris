@@ -48,6 +48,8 @@ use crate::editor::{EditorView, SingleLineEditorOptions, TextOptions};
 #[cfg(feature = "local_fs")]
 use crate::polaris_sign_in::{PolarisSignIn, SignInState};
 use crate::server::ids::ServerId;
+#[cfg(feature = "local_fs")]
+use crate::settings::PolarisControlSettings;
 use crate::settings::cloud_preferences::CloudPreferencesSettings;
 use crate::workspace::WorkspaceAction;
 use crate::workspaces::update_manager::TeamUpdateManager;
@@ -140,6 +142,8 @@ pub enum MainPageAction {
     PolarisCancelSignIn,
     #[cfg(feature = "local_fs")]
     PolarisSignOut,
+    #[cfg(feature = "local_fs")]
+    TogglePolarisControl,
 }
 
 impl MainPageAction {
@@ -268,6 +272,16 @@ impl TypedActionView for MainSettingsPageView {
             MainPageAction::PolarisSignOut => {
                 PolarisSignIn::handle(ctx).update(ctx, |sign_in, ctx| sign_in.sign_out(ctx));
             }
+            #[cfg(feature = "local_fs")]
+            MainPageAction::TogglePolarisControl => {
+                PolarisControlSettings::handle(ctx).update(ctx, |settings, ctx| {
+                    let allowed = settings.allows_changes();
+                    pterm_errors::report_if_error!(
+                        settings.allow_polaris_control.set_value(!allowed, ctx)
+                    );
+                });
+                ctx.notify();
+            }
         }
     }
 }
@@ -312,6 +326,9 @@ impl MainSettingsPageView {
         #[cfg(feature = "local_fs")]
         if ctx.has_singleton_model::<PolarisSignIn>() {
             widgets.push(Box::new(PolarisAccountWidget::default()));
+            if ctx.has_singleton_model::<PolarisControlSettings>() {
+                widgets.push(Box::new(PolarisControlWidget::default()));
+            }
         }
 
         widgets.push(Box::new(SettingsSyncWidget::default()));
@@ -1350,6 +1367,60 @@ impl SettingsPageMeta for MainSettingsPageView {
 impl From<ViewHandle<MainSettingsPageView>> for SettingsPageViewHandle {
     fn from(view_handle: ViewHandle<MainSettingsPageView>) -> Self {
         SettingsPageViewHandle::Main(view_handle)
+    }
+}
+
+/// "Let Polaris control this terminal": off, the signed-in Polaris can only see
+/// this terminal; on, it can also type and act in it. Shown once signed in.
+#[cfg(feature = "local_fs")]
+#[derive(Default)]
+struct PolarisControlWidget {
+    switch_state: SwitchStateHandle,
+}
+
+#[cfg(feature = "local_fs")]
+impl SettingsWidget for PolarisControlWidget {
+    type View = MainSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "polaris control remote relay type typing allow permission"
+    }
+
+    fn should_render(&self, app: &AppContext) -> bool {
+        PolarisSignIn::account(app).is_some()
+    }
+
+    fn render(
+        &self,
+        _view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let allowed = PolarisControlSettings::as_ref(app).allows_changes();
+        let description = if allowed {
+            "Your Polaris can see this terminal, type in it and open or close tabs and panes."
+        } else {
+            "Your Polaris can see this terminal but not type in it or change it."
+        };
+        Container::new(render_body_item::<MainPageAction>(
+            "Let Polaris control this terminal".into(),
+            None,
+            LocalOnlyIconState::Hidden,
+            ToggleState::Enabled,
+            appearance,
+            appearance
+                .ui_builder()
+                .switch(self.switch_state.clone())
+                .check(allowed)
+                .build()
+                .on_click(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(MainPageAction::TogglePolarisControl)
+                })
+                .finish(),
+            Some(description.to_owned()),
+        ))
+        .with_margin_top(VERTICAL_MARGIN)
+        .finish()
     }
 }
 

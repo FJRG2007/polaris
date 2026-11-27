@@ -13,9 +13,18 @@ use crate::local_control::handlers::{
     app_state, close, metadata, metadata_config, settings_surfaces,
 };
 use crate::local_control::permissions::{
-    ensure_action_allowed, ensure_feature_enabled, ensure_protocol_version,
+    ensure_action_allowed, ensure_feature_enabled, ensure_protocol_version, ensure_relay_allows,
 };
 use crate::local_control::resolver::{validate_action_params, validate_action_target};
+
+/// Where a request came from, which decides the grant it is checked against.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Origin {
+    /// The loopback server: the feature flag and Settings > Scripting.
+    Local,
+    /// The Polaris relay: read-only, or "Let Polaris control this terminal".
+    Relay,
+}
 
 /// PtermUI model that executes already-authenticated local-control actions.
 pub struct LocalControlBridge {
@@ -47,8 +56,9 @@ impl LocalControlBridge {
     /// Runs a request that arrived over the Polaris relay. The relay already
     /// checked the controller's key (`terminal.control`) and that it may reach
     /// this terminal, so the request carries a grant for exactly its own
-    /// action; everything else, Settings > Scripting included, is checked as
-    /// for a local request.
+    /// action. Instead of the local-control flag and Settings > Scripting, it
+    /// passes [`ensure_relay_allows`]: read-only actions, or any action while
+    /// "Let Polaris control this terminal" is on.
     pub(super) fn handle_relay_request(
         &mut self,
         request: RequestEnvelope,
@@ -59,21 +69,17 @@ impl LocalControlBridge {
             request.action.kind,
             chrono::Duration::seconds(60),
         );
-        self.handle_request(request, grant, ctx)
+        self.run(request, grant, Origin::Relay, ctx)
     }
 
     /// A pane's current screen and a live receiver of its PTY bytes, for the
-    /// relay's `attach`. `None` when the pane is not a local terminal here, or
-    /// Scripting is off.
+    /// relay's `attach`. `None` when the pane is not a local terminal here.
+    /// Watching only reads, so it needs no grant beyond being signed in.
     pub(super) fn relay_attach(
         &mut self,
         pane: &str,
         ctx: &mut ModelContext<Self>,
     ) -> Option<(String, async_broadcast::Receiver<std::sync::Arc<Vec<u8>>>)> {
-        ensure_feature_enabled().ok()?;
-        if !crate::settings::LocalControlSettings::as_ref(ctx).is_enabled() {
-            return None;
-        }
         let view = metadata::pane_terminal_view(pane, ctx)?;
         view.read(ctx, |view, ctx| {
             Some((view.relay_screen_text(), view.relay_pty_reads(ctx)?))
@@ -86,7 +92,21 @@ impl LocalControlBridge {
         grant: CredentialGrant,
         ctx: &mut ModelContext<Self>,
     ) -> ResponseEnvelope {
-        if let Err(error) = ensure_feature_enabled() {
+        self.run(request, grant, Origin::Local, ctx)
+    }
+
+    fn run(
+        &mut self,
+        request: RequestEnvelope,
+        grant: CredentialGrant,
+        origin: Origin,
+        ctx: &mut ModelContext<Self>,
+    ) -> ResponseEnvelope {
+        let gate = match origin {
+            Origin::Local => ensure_feature_enabled(),
+            Origin::Relay => ensure_relay_allows(request.action.kind, ctx),
+        };
+        if let Err(error) = gate {
             return ResponseEnvelope::error(request.request_id, error);
         }
         if let Err(error) = ensure_protocol_version(request.protocol_version) {
@@ -104,7 +124,9 @@ impl LocalControlBridge {
         if let Err(error) = validate_request_authority(instance_id, &request.action, &grant) {
             return ResponseEnvelope::error(request.request_id, error);
         }
-        if let Err(error) = ensure_action_allowed(request.action.kind, ctx) {
+        if origin == Origin::Local
+            && let Err(error) = ensure_action_allowed(request.action.kind, ctx)
+        {
             return ResponseEnvelope::error(request.request_id, error);
         }
         if let Err(error) = validate_action_target(request.action.kind, &request.target) {
