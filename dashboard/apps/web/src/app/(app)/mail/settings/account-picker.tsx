@@ -13,7 +13,7 @@
  * control that exists to be ignored.
  */
 
-import { cn, Select } from "@polaris/ui";
+import { cn, Select, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 
@@ -55,7 +55,7 @@ export function AccountPicker({
                     aria-selected={account.id === value}
                     onClick={() => onChange(account.id)}
                     className={cn(
-                        "rounded-md px-2.5 py-1 text-[13px]",
+                        settingType.body, "rounded-md px-2.5 py-1",
                         account.id === value
                             ? "bg-card font-medium text-foreground"
                             : "text-muted-foreground hover:bg-card hover:text-foreground"

@@ -29,6 +29,7 @@ import {
 import {
     Button,
     Checkbox,
+    cn,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -36,7 +37,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    settingType
 } from "@polaris/ui";
 
 const LIFETIME_LABELS = {
@@ -108,7 +110,7 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
     return (
         <div className="flex flex-col gap-4">
             <SettingsCard title={t("tokens.title")} description={t("tokens.description")}>
-                {error && <p className="text-sm text-danger">{error}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
 
                 <div className="overflow-hidden rounded-md border border-border/60">
                     {tokens === null ? (
@@ -118,7 +120,7 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
                     ) : tokens.length === 0 ? (
                         <div className="flex flex-col items-center gap-1 px-3 py-8 text-center">
                             <KeyRound className="size-5 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">{t("tokens.empty")}</p>
+                            <p className={cn(settingType.body, "text-muted-foreground")}>{t("tokens.empty")}</p>
                         </div>
                     ) : (
                         tokens.map((token) => {
@@ -129,11 +131,11 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
                                     className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 px-3 py-2.5 last:border-0"
                                 >
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium">{token.name}</p>
+                                        <p className={cn(settingType.body, "truncate font-medium")}>{token.name}</p>
                                         <p className="truncate font-mono text-xs text-muted-foreground">
                                             {token.prefix}...
                                         </p>
-                                        <p className="truncate text-xs text-muted-foreground">
+                                        <p className={cn(settingType.hint, "truncate")}>
                                             <span className={status.className} title={status.title}>
                                                 {status.label}
                                             </span>
@@ -267,7 +269,7 @@ function CreateTokenDialog({
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("tokens.name")}
                         </span>
                         <Input
@@ -278,7 +280,7 @@ function CreateTokenDialog({
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("tokens.expiresLabel")}
                         </span>
                         <Select
@@ -291,19 +293,19 @@ function CreateTokenDialog({
                             aria-label={t("tokens.expiresLabel")}
                         />
                     </label>
-                    <label className="flex items-start gap-2 text-sm">
+                    <label className={cn(settingType.body, "flex items-start gap-2")}>
                         <Checkbox
                             checked={canManage}
                             onChange={(event) => setCanManage(event.target.checked)}
                         />
                         <span>
                             {t("tokens.allowChanges")}
-                            <span className="block text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "block")}>
                                 {t("tokens.allowChangesHint")}
                             </span>
                         </span>
                     </label>
-                    {error && <p className="text-sm text-danger">{error}</p>}
+                    {error && <p className={settingType.error}>{error}</p>}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             {t("tokens.cancel")}

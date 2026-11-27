@@ -23,7 +23,7 @@ import type { MailFolderView } from "@/lib/mailbox/views";
 import { useCallback, useMemo, useState } from "react";
 import { useLiveRead } from "@/components/use-live-resource";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { Button, EmptyState, ProgressBar, Select, useToast } from "@polaris/ui";
+import { Button, cn, EmptyState, ProgressBar, Select, settingType, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { exportSizeAction, importBatchAction, openImportAction } from "@/app/(app)/mail/actions";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
@@ -182,7 +182,7 @@ export function ArchiveView({
             <AccountPicker accounts={accounts} value={account.id} onChange={setAccountId} />
 
             <label className="mt-3 block">
-                <span className="mb-1 block text-[12px] text-muted-foreground">
+                <span className={cn(settingType.hint, "mb-1 block")}>
                     {t("archive.folder")}
                 </span>
                 <Select
@@ -195,7 +195,7 @@ export function ArchiveView({
             <section className="mt-4 rounded-md border border-border">
                 <div className="px-3 py-2.5">
                     <h2 className="text-[13px] font-medium">{t("archive.inTitle")}</h2>
-                    <p className="mt-1 text-[12px] text-muted-foreground">
+                    <p className={cn(settingType.hint, "mt-1")}>
                         {t.rich("archive.inBody", {
                             limit: ARCHIVE_LIMIT_MB,
                             code: (chunks) => <code key={String(chunks)}>{chunks}</code>
@@ -231,7 +231,7 @@ export function ArchiveView({
                                 }
                                 fillClassName="duration-fast"
                             />
-                            <p className="mt-1 text-[12px] text-muted-foreground">
+                            <p className={cn(settingType.hint, "mt-1")}>
                                 {t("archive.progress", {
                                     finished: progress.finished ? "yes" : "no",
                                     done: progress.done,
@@ -242,7 +242,7 @@ export function ArchiveView({
                         </div>
                     ) : null}
                 </div>
-                <p className="border-t border-border px-3 py-2 text-[12px] text-foreground-subtle">
+                <p className={cn(settingType.small, "border-t border-border px-3 py-2 text-foreground-subtle")}>
                     {t("archive.twice")}
                 </p>
             </section>
@@ -250,7 +250,7 @@ export function ArchiveView({
             <section className="mt-4 rounded-md border border-border">
                 <div className="px-3 py-2.5">
                     <h2 className="text-[13px] font-medium">{t("archive.outTitle")}</h2>
-                    <p className="mt-1 text-[12px] text-muted-foreground">
+                    <p className={cn(settingType.hint, "mt-1")}>
                         {t.rich("archive.outBody", {
                             scope: folderId ? "folder" : "mailbox",
                             code: (chunks) => <code key={String(chunks)}>{chunks}</code>
@@ -263,7 +263,7 @@ export function ArchiveView({
                         </a>
                     </Button>
                     {exportCount !== null ? (
-                        <p className="mt-1 text-[12px] text-foreground-subtle">
+                        <p className={cn(settingType.hint, "mt-1")}>
                             {exportCount === 0
                                 ? t("archive.nothingYet")
                                 : t("archive.inFile", { count: exportCount })}

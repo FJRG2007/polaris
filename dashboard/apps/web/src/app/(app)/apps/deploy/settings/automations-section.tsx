@@ -49,7 +49,9 @@ import {
     Input,
     Select,
     Skeleton,
-    isDirty
+    cn,
+    isDirty,
+    settingType
 } from "@polaris/ui";
 import {
     Clock,
@@ -397,20 +399,20 @@ export function AutomationsSection({ projectId }: { projectId: string }) {
                     {t("automations.new")}
                 </Button>
                 {data && !canEdit && (
-                    <p className="text-xs text-muted-foreground">{t("automations.readOnly")}</p>
+                    <p className={settingType.hint}>{t("automations.readOnly")}</p>
                 )}
                 {data && canEdit && atLimit && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("automations.atLimit", { limit: core.DEPLOY_AUTOMATION_LIMIT })}
                     </p>
                 )}
             </div>
 
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && <p className={settingType.error}>{error}</p>}
 
             {loadError ? (
                 <div className="flex flex-col items-center gap-2 rounded-md border border-border/60 px-3 py-8 text-center">
-                    <p className="text-sm text-danger">{loadError}</p>
+                    <p className={settingType.error}>{loadError}</p>
                     <Button size="sm" variant="outline" onClick={load}>
                         {t("automations.retry")}
                     </Button>
@@ -423,7 +425,7 @@ export function AutomationsSection({ projectId }: { projectId: string }) {
             ) : data.automations.length === 0 ? (
                 <div className="flex flex-col items-center gap-1 rounded-md border border-border/60 px-3 py-8 text-center">
                     <Workflow className="size-5 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">{t("automations.empty")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("automations.empty")}</p>
                 </div>
             ) : (
                 <rules.RuleList label={t("automations.title")}>
@@ -578,7 +580,7 @@ export function AutomationsSection({ projectId }: { projectId: string }) {
                         />
                         <CopyButton value={address ?? ""} label={t("automations.copy")} />
                     </div>
-                    <p className="text-xs text-muted-foreground">{t("automations.addressUse")}</p>
+                    <p className={settingType.hint}>{t("automations.addressUse")}</p>
                     <div className="flex justify-end">
                         <Button size="sm" onClick={() => setAddress(null)}>
                             {t("automations.done")}
@@ -642,7 +644,7 @@ function RunHistory({
     const serviceName = (id: string | null) =>
         services.find((entry) => entry.id === id)?.name ?? null;
 
-    if (error) return <p className="text-sm text-danger">{error}</p>;
+    if (error) return <p className={settingType.error}>{error}</p>;
     if (runs === null) {
         return (
             <div aria-busy="true">
@@ -664,10 +666,10 @@ function RunHistory({
                     onToggle={() => setExpanded((held) => (held === entry.id ? null : entry.id))}
                 >
                     {entry.note && (
-                        <p className="text-xs text-muted-foreground">{t(noteKey(entry.note))}</p>
+                        <p className={settingType.hint}>{t(noteKey(entry.note))}</p>
                     )}
                     {entry.steps.length > 0 && (
-                        <ol className="flex flex-col gap-1.5 text-xs">
+                        <ol className={cn(settingType.small, "flex flex-col gap-1.5")}>
                             {entry.steps.map((step, index) => (
                                 <li key={index} className="flex min-w-0 flex-col gap-1">
                                     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -940,7 +942,7 @@ export function AutomationEditor({
                                             ))}
                                         </div>
                                         {next && (
-                                            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <p className={cn(settingType.hint, "flex items-center gap-1")}>
                                                 <Clock className="size-3.5 shrink-0" />
                                                 {core.describeCron(draft.schedule)}
                                                 {" / "}
@@ -952,7 +954,7 @@ export function AutomationEditor({
                                     </div>
                                 )}
                                 {draft.trigger === "webhook" && (
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className={settingType.hint}>
                                         {draft.id && initial.trigger === "webhook"
                                             ? t("automations.webhookKept")
                                             : t("automations.webhookMinted")}
@@ -1211,19 +1213,19 @@ export function AutomationEditor({
                                     />
                                 )}
                                 {services.length === 0 && (
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className={settingType.hint}>
                                         {t("automations.noServices")}
                                     </p>
                                 )}
                                 {!canCommand && services.length > 0 && (
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className={settingType.hint}>
                                         {t("automations.noCommands")}
                                     </p>
                                 )}
                             </Stage>
                         </ol>
 
-                        {problem && <p className="text-sm text-danger">{problem}</p>}
+                        {problem && <p className={settingType.error}>{problem}</p>}
                         <div className="flex justify-end gap-2">
                             <Button size="sm" variant="ghost" disabled={pending} onClick={onClose}>
                                 {t("automations.cancel")}

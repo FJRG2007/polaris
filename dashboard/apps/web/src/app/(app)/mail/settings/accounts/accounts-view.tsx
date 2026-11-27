@@ -38,7 +38,15 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { refusalCause } from "@/lib/mailbox/refusals";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
-import { Button, ConfirmDeleteDialog, Select, Switch, cn, useToast } from "@polaris/ui";
+import {
+    Button,
+    ConfirmDeleteDialog,
+    Select,
+    Switch,
+    cn,
+    settingType,
+    useToast
+} from "@polaris/ui";
 import { useOptimisticToggle } from "@polaris/ui";
 import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
 import {
@@ -164,14 +172,14 @@ export function AccountsView({
     return (
         <div className="space-y-4">
             {outcome === "linked" ? (
-                <p className="rounded-md border border-border bg-card px-3 py-2 text-[13px] text-muted-foreground">
+                <p className={cn(settingType.body, "rounded-md border border-border bg-card px-3 py-2 text-muted-foreground")}>
                     {t("accounts.linked", {
                         provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google"
                     })}
                 </p>
             ) : null}
             {outcome === "not_public" ? (
-                <p className="rounded-md border border-danger-edge bg-card px-3 py-2 text-[13px] text-danger">
+                <p className={cn(settingType.body, "rounded-md border border-danger-edge bg-card px-3 py-2 text-danger")}>
                     {t("accounts.notPublic", {
                         provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google"
                     })}{" "}
@@ -184,13 +192,13 @@ export function AccountsView({
                     )}
                 </p>
             ) : outcome === "wrong_account" ? (
-                <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-[13px]">
+                <p className={cn(settingType.body, "rounded-md border border-warning-edge bg-warning-soft px-3 py-2")}>
                     {t("accounts.wrongAccount", {
                         provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google"
                     })}
                 </p>
             ) : outcome && outcome !== "linked" ? (
-                <p className="rounded-md border border-danger-edge bg-card px-3 py-2 text-[13px] text-danger">
+                <p className={cn(settingType.body, "rounded-md border border-danger-edge bg-card px-3 py-2 text-danger")}>
                     {t("accounts.unfinished")}
                 </p>
             ) : null}
@@ -200,7 +208,7 @@ export function AccountsView({
                     <h2 className="text-[15px] font-semibold tracking-tight">
                         {t("accounts.title")}
                     </h2>
-                    <p className="text-[13px] text-muted-foreground">{t("accounts.lead")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("accounts.lead")}</p>
                 </div>
                 <Button onClick={() => setAdding(true)}>
                     <Plus className="size-4 shrink-0" aria-hidden />
@@ -211,8 +219,8 @@ export function AccountsView({
             {accounts.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border px-4 py-8 text-center">
                     <Mail className="mx-auto size-5 shrink-0 text-foreground-subtle" aria-hidden />
-                    <p className="mt-2 text-[13px] font-medium">{t("noMailboxes.title")}</p>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
+                    <p className={cn(settingType.body, "mt-2 font-medium")}>{t("noMailboxes.title")}</p>
+                    <p className={cn(settingType.body, "mt-1 text-muted-foreground")}>
                         {t("accounts.emptyBody")}
                     </p>
                 </div>
@@ -331,7 +339,7 @@ function AccountRow({
                 {/* A basis, so the switches wrap onto their own line before the
                     address and its state are squeezed to a few letters. */}
                 <div className="min-w-0 flex-1 basis-64">
-                    <p className="flex items-center gap-2 text-[13px] font-medium">
+                    <p className={cn(settingType.body, "flex items-center gap-2 font-medium")}>
                         {account.color ? (
                             <span
                                 className="size-2 shrink-0 rounded-full"
@@ -343,25 +351,25 @@ function AccountRow({
                             {account.label || account.address}
                         </span>
                         {account.serviceName ? (
-                            <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                            <span className={cn(settingType.small, "shrink-0 rounded bg-surface px-1.5 py-0.5 text-muted-foreground")}>
                                 {account.serviceName}
                             </span>
                         ) : null}
                         {account.auth === "oauth" ? (
-                            <span className="min-w-0 max-w-full shrink-0 truncate rounded bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground" title={t("accounts.authorized")}>
+                            <span className={cn(settingType.small, "min-w-0 max-w-full shrink-0 truncate rounded bg-surface px-1.5 py-0.5 text-muted-foreground")} title={t("accounts.authorized")}>
                                 {t("accounts.authorized")}
                             </span>
                         ) : null}
                     </p>
                     <p
-                        className="truncate text-[12px] text-muted-foreground"
+                        className={cn(settingType.hint, "truncate")}
                         title={account.address}
                     >
                         {account.address}
                     </p>
                     <p
                         className={cn(
-                            "mt-0.5 flex items-center gap-1.5 text-[12px]",
+                            settingType.small, "mt-0.5 flex items-center gap-1.5",
                             broken ? "text-danger" : "text-foreground-subtle"
                         )}
                     >
@@ -384,7 +392,7 @@ function AccountRow({
                     </Button>
                 ) : null}
 
-                <label className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground">
+                <label className={cn(settingType.hint, "flex shrink-0 items-center gap-2")}>
                     <Switch
                         checked={unified}
                         onChange={setUnified}
@@ -394,7 +402,7 @@ function AccountRow({
                 </label>
 
                 <label
-                    className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground"
+                    className={cn(settingType.hint, "flex shrink-0 items-center gap-2")}
                     title={t("accounts.notifyHint")}
                 >
                     <Switch
@@ -408,7 +416,7 @@ function AccountRow({
                 {/* How somebody this mailbox is lent to at Can reply or above
                     sends: on its behalf (Sender names them) unless this is on. */}
                 <label
-                    className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground"
+                    className={cn(settingType.hint, "flex shrink-0 items-center gap-2")}
                     title={t("accounts.delegateSendAsHint")}
                 >
                     <Switch
@@ -424,14 +432,14 @@ function AccountRow({
                     is what Polaris did before this existed and is still an
                     answer somebody can give. */}
                 <label
-                    className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground"
+                    className={cn(settingType.hint, "flex shrink-0 items-center gap-2")}
                     title={t("accounts.trashHint")}
                 >
                     {t("accounts.trash")}
                     <Select
                         value={String(trashDays)}
                         aria-label={t("accounts.trashLabel")}
-                        className="h-7 w-44 text-[12px]"
+                        className={cn(settingType.body, "h-7 w-44")}
                         options={MAIL_TRASH_KEEP_CHOICES.map((choice) => ({
                             value: String(choice.days),
                             label: t("accounts.trashKeep", { days: choice.days })

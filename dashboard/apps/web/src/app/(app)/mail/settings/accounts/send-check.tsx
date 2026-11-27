@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import { Button, cn, useToast } from "@polaris/ui";
+import { Button, cn, settingType, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -103,7 +103,7 @@ export function SendCheck({ accountId }: { accountId: string }) {
         <div className="mt-2 flex flex-wrap items-start gap-2 border-t border-border/60 pt-2">
             <p
                 className={cn(
-                    "flex min-w-0 flex-1 items-start gap-1.5 text-[12px]",
+                    settingType.small, "flex min-w-0 flex-1 items-start gap-1.5",
                     look.tone
                 )}
             >

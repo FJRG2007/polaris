@@ -14,7 +14,7 @@ import { useState } from "react";
 import { LifeBuoy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { decideRecoveryRequestAction } from "./actions";
-import { Badge, Button, Card, CardBody } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn, settingType } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { RecoveryRequestView } from "@/lib/account-recovery-service";
@@ -61,7 +61,7 @@ export function RecoveryRequests({ requests }: { requests: RecoveryRequestView[]
                         <LifeBuoy className="size-4 text-warning" />
                         {t("users.recovery.title")}
                     </h2>
-                    <p className="text-xs text-muted-foreground">{t("users.recovery.hint")}</p>
+                    <p className={settingType.hint}>{t("users.recovery.hint")}</p>
                 </div>
                 {waiting.map((request) => (
                     <div
@@ -69,7 +69,7 @@ export function RecoveryRequests({ requests }: { requests: RecoveryRequestView[]
                         className="flex flex-col gap-2 border-t border-border pt-3 first:border-t-0 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
                     >
                         <div className="min-w-0">
-                            <p className="flex flex-wrap items-center gap-1.5 text-sm">
+                            <p className={cn(settingType.body, "flex flex-wrap items-center gap-1.5")}>
                                 <span className="truncate font-medium">{request.userName}</span>
                                 {request.verified ? (
                                     <Badge variant="success">{t("users.recovery.verified")}</Badge>
@@ -77,8 +77,8 @@ export function RecoveryRequests({ requests }: { requests: RecoveryRequestView[]
                                     <Badge variant="warning">{t("users.recovery.unverified")}</Badge>
                                 )}
                             </p>
-                            <p className="truncate text-xs text-muted-foreground">{request.userEmail}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={cn(settingType.hint, "truncate")}>{request.userEmail}</p>
+                            <p className={settingType.hint}>
                                 {request.requestIp
                                     ? t("users.recovery.askedFrom", {
                                           asked: format.dateTime(request.createdAt),
@@ -108,7 +108,7 @@ export function RecoveryRequests({ requests }: { requests: RecoveryRequestView[]
                         </div>
                     </div>
                 ))}
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

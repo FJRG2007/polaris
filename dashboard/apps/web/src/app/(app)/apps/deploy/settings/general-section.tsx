@@ -12,7 +12,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SettingsCard } from "../project-settings";
-import { Button, Input, Select } from "@polaris/ui";
+import { Button, cn, Input, Select, settingType } from "@polaris/ui";
 import { Check, Copy, Download, Loader2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
@@ -101,7 +101,7 @@ export function GeneralSection({
             <SettingsCard title={t("general.info")} description={t("general.infoHint")}>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("general.name")}
                         </span>
                         <Input
@@ -113,7 +113,7 @@ export function GeneralSection({
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("general.description")}
                         </span>
                         <Input
@@ -124,7 +124,7 @@ export function GeneralSection({
                         />
                     </label>
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("general.projectId")}
                         </span>
                         <div className="flex items-center gap-2">
@@ -146,7 +146,7 @@ export function GeneralSection({
                             </Button>
                         </div>
                     </div>
-                    {error && <p className="text-sm text-danger">{error}</p>}
+                    {error && <p className={settingType.error}>{error}</p>}
                     {canManage && (
                         <div className="flex justify-end">
                             <Button onClick={save} disabled={pending || !dirty || !name.trim()}>
@@ -228,8 +228,8 @@ function TemplateCard({
             title={t("general.template.title")}
             description={t("general.template.description")}
         >
-            <p className="text-xs text-muted-foreground">{t("general.template.safe")}</p>
-            {error && <p className="text-sm text-danger">{error}</p>}
+            <p className={settingType.hint}>{t("general.template.safe")}</p>
+            {error && <p className={settingType.error}>{error}</p>}
             <div className="flex justify-end">
                 <Button variant="secondary" onClick={download} disabled={pending || !canManage}>
                     {pending ? (

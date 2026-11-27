@@ -6,6 +6,7 @@
  * instance - so an endpoint added in either place is the same endpoint.
  */
 
+import { settingType } from "@polaris/ui";
 import Link from "next/link";
 import { SettingsCard } from "../project-settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -16,7 +17,7 @@ export function WebhooksSection({ projectId }: { projectId: string }) {
     return (
         <SettingsCard title={t("webhooks.title")} description={t("webhooks.description")}>
             <ProjectWebhooks projectId={projectId} />
-            <p className="text-xs text-muted-foreground">
+            <p className={settingType.hint}>
                 {t.rich("webhooks.everywhere", {
                     link: (chunks) => (
                         <Link key="watch" href="/watch/webhooks" className="text-primary hover:underline">

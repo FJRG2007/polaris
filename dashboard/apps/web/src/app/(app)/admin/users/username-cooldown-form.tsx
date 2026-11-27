@@ -19,7 +19,7 @@
 import { useState, useTransition } from "react";
 import { setUsernameCooldownAction } from "./actions";
 import { USERNAME_COOLDOWN_MAX_DAYS } from "@polaris/core";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Input, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function UsernameCooldownForm({ days }: { days: number }) {
@@ -54,10 +54,10 @@ export function UsernameCooldownForm({ days }: { days: number }) {
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("users.cooldown.title")}</h2>
-                    <p className="max-w-xl text-sm text-muted-foreground">{t("users.cooldown.hint")}</p>
+                    <p className={cn(settingType.body, "max-w-xl text-muted-foreground")}>{t("users.cooldown.hint")}</p>
                 </div>
 
-                <label className="flex max-w-[12rem] flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex max-w-[12rem] flex-col gap-1")}>
                     <span className="font-medium">
                         {t("users.cooldown.label")} <span aria-hidden="true">*</span>
                     </span>
@@ -71,15 +71,15 @@ export function UsernameCooldownForm({ days }: { days: number }) {
                         aria-invalid={value.trim() !== "" && !valid}
                         onChange={(event) => setValue(event.target.value)}
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {parsed === 0 && valid
                             ? t("users.cooldown.daysZero")
                             : t("users.cooldown.days")}
                     </span>
                 </label>
 
-                {error && <p className="text-sm text-danger">{error}</p>}
-                {saved && !dirty && <p className="text-sm text-muted-foreground">{t("users.cooldown.saved")}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
+                {saved && !dirty && <p className={cn(settingType.body, "text-muted-foreground")}>{t("users.cooldown.saved")}</p>}
 
                 <Button className="self-start" size="sm" disabled={!dirty || pending} onClick={save}>
                     {tc("actions.save")}

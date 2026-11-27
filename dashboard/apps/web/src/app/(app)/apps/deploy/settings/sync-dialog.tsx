@@ -23,11 +23,13 @@ import {
     Badge,
     Button,
     Checkbox,
+    cn,
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
-    Select
+    Select,
+    settingType
 } from "@polaris/ui";
 
 type Direction = "pull" | "push";
@@ -268,7 +270,7 @@ export function SyncDialog({
                             />
                         </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {direction === "pull"
                             ? t("sync.pullHint", {
                                   from: other?.name ?? "",
@@ -286,7 +288,7 @@ export function SyncDialog({
                             <div className="h-10 animate-pulse rounded-md bg-muted" />
                         </div>
                     ) : preview && preview.preview.diff.items.length === 0 ? (
-                        <p className="rounded-md border border-border/60 p-3 text-sm text-muted-foreground">
+                        <p className={cn(settingType.body, "rounded-md border border-border/60 p-3 text-muted-foreground")}>
                             {t("sync.inSync", {
                                 from: preview.preview.sourceName,
                                 to: preview.preview.targetName
@@ -294,7 +296,7 @@ export function SyncDialog({
                         </p>
                     ) : preview ? (
                         <div className="flex max-h-[50vh] min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain rounded-md border border-border/60 p-3">
-                            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                            <div className={cn(settingType.small, "flex flex-wrap gap-x-3 gap-y-1")}>
                                 <button
                                     type="button"
                                     className="text-primary hover:underline"
@@ -314,7 +316,7 @@ export function SyncDialog({
                                 <section key={group.key} className="flex min-w-0 flex-col gap-1.5">
                                     <div className="flex min-w-0 items-center gap-2">
                                         <h3
-                                            className="min-w-0 truncate text-sm font-medium"
+                                            className={cn(settingType.body, "min-w-0 truncate font-medium")}
                                             title={group.title}
                                         >
                                             {group.title}
@@ -331,7 +333,7 @@ export function SyncDialog({
                                             const { label, detail } = line(item);
                                             return (
                                                 <li key={item.id} className="min-w-0">
-                                                    <label className="flex min-w-0 items-start gap-2 text-sm">
+                                                    <label className={cn(settingType.body, "flex min-w-0 items-start gap-2")}>
                                                         <Checkbox
                                                             checked={!refusal && picked.has(item.id)}
                                                             disabled={Boolean(refusal) || pending}
@@ -349,14 +351,14 @@ export function SyncDialog({
                                                             </span>
                                                             {detail && (
                                                                 <span
-                                                                    className="truncate text-xs text-muted-foreground"
+                                                                    className={cn(settingType.hint, "truncate")}
                                                                     title={detail}
                                                                 >
                                                                     {detail}
                                                                 </span>
                                                             )}
                                                             {refusal && (
-                                                                <span className="text-xs text-muted-foreground">
+                                                                <span className={settingType.hint}>
                                                                     {t(`sync.refusals.${refusal}`)}
                                                                 </span>
                                                             )}
@@ -369,7 +371,7 @@ export function SyncDialog({
                                 </section>
                             ))}
                             {preview.preview.diff.keptVolumes.length > 0 && (
-                                <p className="text-xs text-muted-foreground">
+                                <p className={settingType.hint}>
                                     {t("sync.keptVolumes", {
                                         names: preview.preview.diff.keptVolumes
                                             .map((volume) => `${volume.service}/${volume.name}`)
@@ -377,12 +379,12 @@ export function SyncDialog({
                                     })}
                                 </p>
                             )}
-                            <p className="text-xs text-muted-foreground">{t("sync.notCopied")}</p>
+                            <p className={settingType.hint}>{t("sync.notCopied")}</p>
                         </div>
                     ) : null}
 
                     {preview && preview.preview.diff.items.length > 0 && (
-                        <label className="flex items-start gap-2 text-sm">
+                        <label className={cn(settingType.body, "flex items-start gap-2")}>
                             <Checkbox
                                 checked={deployNow}
                                 onChange={(event) => setDeployNow(event.target.checked)}
@@ -390,15 +392,15 @@ export function SyncDialog({
                             />
                             <span className="min-w-0">
                                 {t("sync.deployNow")}
-                                <span className="block text-xs text-muted-foreground">
+                                <span className={cn(settingType.hint, "block")}>
                                     {deployNow ? t("sync.deployNowHint") : t("sync.stageHint")}
                                 </span>
                             </span>
                         </label>
                     )}
-                    {blocked && <p className="text-sm text-muted-foreground">{blocked}</p>}
+                    {blocked && <p className={cn(settingType.body, "text-muted-foreground")}>{blocked}</p>}
                     {failures.length > 0 && (
-                        <div className="text-sm text-danger">
+                        <div className={cn(settingType.body, "text-danger")}>
                             <p>{t("sync.partly")}</p>
                             <ul className="list-disc ps-5">
                                 {failures.map((failure, index) => (
@@ -409,7 +411,7 @@ export function SyncDialog({
                             </ul>
                         </div>
                     )}
-                    {error && <p className="text-sm text-danger">{error}</p>}
+                    {error && <p className={settingType.error}>{error}</p>}
                     <div className="flex flex-wrap justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
                             {t("environments.cancel")}

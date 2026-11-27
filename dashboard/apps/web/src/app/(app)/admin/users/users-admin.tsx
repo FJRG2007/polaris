@@ -280,12 +280,12 @@ export function UsersAdmin({
                     <CardBody className="flex flex-col gap-3">
                         <div>
                             <h2 className="text-sm font-medium">{t("users.invites.title")}</h2>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {t("users.invites.hint")}
                             </p>
                         </div>
                         {invites.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
+                            <p className={cn(settingType.body, "text-muted-foreground")}>
                                 {t("users.invites.none")}
                             </p>
                         ) : (
@@ -295,7 +295,7 @@ export function UsersAdmin({
                                     className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0"
                                 >
                                     <div className="min-w-0">
-                                        <p className="flex flex-wrap items-center gap-1.5 text-sm">
+                                        <p className={cn(settingType.body, "flex flex-wrap items-center gap-1.5")}>
                                             <span className="truncate">{invite.email}</span>
                                             <Badge>{t(`users.methods.${invite.method}`)}</Badge>
                                             {invite.role ? <Badge>{invite.role}</Badge> : null}
@@ -310,7 +310,7 @@ export function UsersAdmin({
                                                 </Badge>
                                             ) : null}
                                         </p>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className={settingType.hint}>
                                             {invite.sentAt
                                                 ? t("users.invites.expiresEmailed", {
                                                       expires: format.dateTime(invite.expiresAt),
@@ -340,7 +340,7 @@ export function UsersAdmin({
                             ))
                         )}
                         {!canSendMail ? (
-                            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <p className={cn(settingType.hint, "flex items-center gap-1.5")}>
                                 <Mail className="size-3.5" />
                                 {t("users.invites.noMail")}
                             </p>
@@ -377,8 +377,8 @@ export function UsersAdmin({
             </div>
 
             <div className="overflow-hidden rounded-lg border border-border">
-                <table className="w-full text-sm">
-                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                <table className={cn(settingType.body, "w-full")}>
+                    <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">
                                 {t("users.directory.columns.person")}
@@ -430,7 +430,7 @@ export function UsersAdmin({
                                     <tr className="border-t border-border">
                                         <td
                                             colSpan={4}
-                                            className="px-3 py-3 text-center text-xs text-muted-foreground"
+                                            className={cn(settingType.hint, "px-3 py-3 text-center")}
                                         >
                                             {list.error ? (
                                                 <span className="inline-flex items-center gap-2">
@@ -505,12 +505,12 @@ export function UsersAdmin({
                                                                 />
                                                             </span>
                                                             {user.id === viewerId ? (
-                                                                <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("users.directory.you")}>
+                                                                <span className={cn(settingType.hint, "min-w-0 max-w-full shrink-0 truncate")} title={t("users.directory.you")}>
                                                                     {t("users.directory.you")}
                                                                 </span>
                                                             ) : null}
                                                         </p>
-                                                        <p className="truncate text-xs text-muted-foreground">
+                                                        <p className={cn(settingType.hint, "truncate")}>
                                                             {user.email}
                                                         </p>
                                                     </div>
@@ -544,7 +544,7 @@ export function UsersAdmin({
                                                     ) : null}
                                                 </TagList>
                                             </td>
-                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                            <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 lg:table-cell")}>
                                                 {isOnline(user.lastSeenAt, now) ? (
                                                     <span
                                                         className="inline-flex items-center gap-1.5 text-success"
@@ -570,7 +570,7 @@ export function UsersAdmin({
                                                       })
                                                     : ""}
                                             </td>
-                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                            <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 lg:table-cell")}>
                                                 {format.date(user.createdAt)}
                                             </td>
                                         </tr>

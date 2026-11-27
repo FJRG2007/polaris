@@ -25,7 +25,9 @@ import {
     DialogTitle,
     Input,
     Select,
-    Checkbox
+    Checkbox,
+    settingType,
+    cn
 } from "@polaris/ui";
 import { promoteEnvironmentAction } from "../project-actions";
 
@@ -152,7 +154,7 @@ export function PromoteDialog({
                 </DialogHeader>
                 <div className="flex min-w-0 flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("promotion.into")}
                         </span>
                         <Select
@@ -170,7 +172,7 @@ export function PromoteDialog({
                             }))}
                         />
                     </label>
-                    <label className="flex items-start gap-2 text-sm">
+                    <label className={cn(settingType.body, "flex items-start gap-2")}>
                         <Checkbox
                             checked={includeData}
                             disabled={!canCopyData || (preview !== null && !preview.canCopyData)}
@@ -182,7 +184,7 @@ export function PromoteDialog({
                         />
                         <span className="min-w-0">
                             {t("promotion.includeData")}
-                            <span className="block text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "block")}>
                                 {!canCopyData || (preview !== null && !preview.canCopyData)
                                     ? t("promotion.cannotCopyData")
                                     : t("promotion.includeDataHint")}
@@ -193,7 +195,7 @@ export function PromoteDialog({
                     {plan === null && !error ? (
                         <div className="h-20 animate-pulse rounded-md bg-muted" aria-hidden />
                     ) : plan ? (
-                        <div className="flex max-h-64 min-w-0 flex-col gap-2 overflow-y-auto overscroll-contain rounded-md border border-border/60 p-3 text-sm">
+                        <div className={cn(settingType.body, "flex max-h-64 min-w-0 flex-col gap-2 overflow-y-auto overscroll-contain rounded-md border border-border/60 p-3")}>
                             <p className="font-medium">
                                 {t("promotion.overwrites", { name: target?.name ?? "" })}
                             </p>
@@ -224,7 +226,7 @@ export function PromoteDialog({
                                 </ul>
                             )}
                             {plan.skipped.length > 0 && (
-                                <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                <ul className={cn(settingType.hint, "flex flex-col gap-1")}>
                                     {plan.skipped.map((skip) => (
                                         <li
                                             key={`${skip.kind}:${skip.name}`}
@@ -239,7 +241,7 @@ export function PromoteDialog({
                                     ))}
                                 </ul>
                             )}
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {t("promotion.noDowntime")}
                             </p>
                         </div>
@@ -247,7 +249,7 @@ export function PromoteDialog({
 
                     {needsName && blocked === null && preview && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">
+                            <span className={cn(settingType.hint, "font-medium")}>
                                 {t("promotion.typeName", { name: target?.name ?? "" })}{" "}
                                 <span aria-hidden>*</span>
                             </span>
@@ -261,9 +263,9 @@ export function PromoteDialog({
                         </label>
                     )}
                     {blocked && preview && (
-                        <p className="text-sm text-muted-foreground">{blocked}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{blocked}</p>
                     )}
-                    {error && <p className="text-sm text-danger">{error}</p>}
+                    {error && <p className={settingType.error}>{error}</p>}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
                             {t("environments.cancel")}
@@ -326,17 +328,17 @@ export function PromotionHistory({ projectId, version }: { projectId: string; ve
             title={t("promotion.historyTitle")}
             description={t("promotion.historyDescription")}
         >
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && <p className={settingType.error}>{error}</p>}
             {promotions === null && !error ? (
                 <div className="h-16 animate-pulse rounded-md bg-muted" aria-hidden />
             ) : promotions && promotions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("promotion.historyEmpty")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("promotion.historyEmpty")}</p>
             ) : (
                 <ul className="flex flex-col divide-y divide-border/40 rounded-md border border-border/60">
                     {(promotions ?? []).map((row) => (
                         <li
                             key={row.id}
-                            className="flex min-w-0 flex-col gap-1 px-3 py-2.5 text-sm"
+                            className={cn(settingType.body, "flex min-w-0 flex-col gap-1 px-3 py-2.5")}
                         >
                             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                                 <span className="min-w-0 truncate font-medium">
@@ -346,13 +348,13 @@ export function PromotionHistory({ projectId, version }: { projectId: string; ve
                                     })}
                                     {row.includeData ? t("promotion.withData") : ""}
                                 </span>
-                                <span className="shrink-0 text-xs text-muted-foreground">
+                                <span className={cn(settingType.hint, "shrink-0")}>
                                     {t(`promotion.status.${row.status}`)} -{" "}
                                     {display.date(row.createdAt)}
                                 </span>
                             </div>
                             {row.steps.length > 0 && (
-                                <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                                <ul className={cn(settingType.hint, "flex flex-col gap-0.5")}>
                                     {row.steps.map((step, index) => (
                                         <li
                                             key={`${step.kind}:${step.name}:${index}`}

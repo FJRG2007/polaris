@@ -14,7 +14,7 @@ import type { DeviceSessionView } from "@/lib/device-sessions/sessions";
 import type { SessionView } from "@/lib/session-directory";
 import { SessionsTable } from "@/components/sessions-table";
 import type { DirectoryUser } from "@/lib/user-admin-service";
-import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
+import { Button, Card, CardBody, settingType, Skeleton } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -51,7 +51,7 @@ export function SessionsSection({ user }: { user: DirectoryUser }) {
                         <h2 className="text-sm font-medium">
                             {t("usersDetail.account.sessions.title")}
                         </h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("usersDetail.account.sessions.hint", { name: user.name })}
                         </p>
                     </div>
@@ -90,7 +90,7 @@ export function SessionsSection({ user }: { user: DirectoryUser }) {
                 ) : (
                     <Skeleton className="h-24 w-full rounded-lg" />
                 )}
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("usersDetail.account.sessions.lastSeen", {
                         seen: user.lastSeenAt ? "yes" : "no",
                         time: user.lastSeenAt ? format.dateTime(user.lastSeenAt) : "",
@@ -100,7 +100,7 @@ export function SessionsSection({ user }: { user: DirectoryUser }) {
                         country: user.lastCountry ?? ""
                     })}
                 </p>
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

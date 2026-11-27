@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { PageHeader } from "@polaris/ui";
+import { cn, PageHeader, settingType } from "@polaris/ui";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { RecycleBinSettings } from "../recycle-bin-settings";
@@ -32,7 +32,7 @@ export default async function DeploySettingsPage() {
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <Link data-swipe-back
                 href="/apps/deploy"
-                className="mb-3 inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                className={cn(settingType.body, "mb-3 inline-flex w-fit items-center gap-1.5 text-muted-foreground hover:text-foreground")}
             >
                 <ArrowLeft className="size-4 shrink-0" />
                 {t("binSettings.back")}

@@ -12,7 +12,7 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { Button, Select } from "@polaris/ui";
+import { Button, cn, Select, settingType } from "@polaris/ui";
 import { SettingsCard } from "../project-settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { VariablesEditor } from "../variables-editor";
@@ -43,7 +43,7 @@ export function SharedVariablesSection({
         return (
             <>
                 <SettingsCard title={t("sharedVariables.title")} description={t("sharedVariables.emptyHint")}>
-                    <p className="text-sm text-muted-foreground">{t("sharedVariables.noEnvironments")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("sharedVariables.noEnvironments")}</p>
                     {canManage && (
                         <div>
                             <Button variant="ghost" onClick={() => setCreating(true)}>

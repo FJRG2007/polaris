@@ -14,15 +14,24 @@ import type { UserOverviewAccount } from "./data";
 import { viewAsUserAction } from "@/app/(app)/view-as-actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, Select, Switch, useOptimisticToggle } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    cn,
+    Select,
+    settingType,
+    Switch,
+    useOptimisticToggle
+} from "@polaris/ui";
 import { setAdminAccessAction, setUserRoleAction } from "../actions";
 
 /** A labelled fact in the identity grid. */
 function Fact({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="min-w-0">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="truncate text-sm">{children}</dd>
+            <dt className={settingType.hint}>{label}</dt>
+            <dd className={cn(settingType.body, "truncate")}>{children}</dd>
         </div>
     );
 }
@@ -87,8 +96,8 @@ export function OverviewControls({
                     <h2 className="text-sm font-medium">{t("usersDetail.account.access.title")}</h2>
                     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                         <div className="min-w-[min(100%,16rem)] flex-1">
-                            <p className="text-sm">{t("usersDetail.account.access.role")}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.body}>{t("usersDetail.account.access.role")}</p>
+                            <p className={settingType.hint}>
                                 {t("usersDetail.account.access.roleHint")}
                             </p>
                         </div>
@@ -111,11 +120,11 @@ export function OverviewControls({
                     </div>
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <p className="flex items-center gap-1.5 text-sm">
+                            <p className={cn(settingType.body, "flex items-center gap-1.5")}>
                                 <Eye className="size-4 shrink-0 text-muted-foreground" />
                                 {t("usersDetail.account.access.openAccount")}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {t("usersDetail.account.access.openHint", { name: user.name })}
                             </p>
                         </div>
@@ -131,11 +140,11 @@ export function OverviewControls({
                     </div>
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <p className="flex items-center gap-1.5 text-sm">
+                            <p className={cn(settingType.body, "flex items-center gap-1.5")}>
                                 <Shield className="size-4 shrink-0 text-muted-foreground" />
                                 {t("usersDetail.account.access.admin")}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {t("usersDetail.account.access.adminHint")}
                             </p>
                         </div>
@@ -150,7 +159,7 @@ export function OverviewControls({
                     </div>
                 </section>
 
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

@@ -22,6 +22,7 @@ import { banLengthOptions, banVerb } from "./ban-lengths";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -80,7 +81,7 @@ export function SuspendDialog({
                     <DialogDescription>{t("users.ban.description")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("users.ban.reason")}
                         <Input
                             value={reason}
@@ -88,7 +89,7 @@ export function SuspendDialog({
                             onChange={(event) => setReason(event.target.value)}
                         />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("users.ban.length")}
                         <Select
                             value={length}

@@ -11,7 +11,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { Button, Select } from "@polaris/ui";
+import { Button, cn, Select, settingType } from "@polaris/ui";
 import { useState, useTransition } from "react";
 import { Loader2, Network } from "lucide-react";
 import { SettingsCard } from "../project-settings";
@@ -100,7 +100,7 @@ function EnvironmentNetworkRow({
     return (
         <div className="flex flex-col gap-2 border-b border-border/40 px-3 py-3 last:border-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                <p className={cn(settingType.body, "flex min-w-0 items-center gap-2 font-medium")}>
                     <Network className="size-4 text-muted-foreground" />
                     <span className="truncate" title={environment.name}>{environment.name}</span>
                 </p>
@@ -116,24 +116,24 @@ function EnvironmentNetworkRow({
                     aria-label={t("networking.modeLabel", { name: environment.name })}
                 />
             </div>
-            <p className="text-xs text-muted-foreground">{t(MODE_HINTS[mode])}</p>
+            <p className={settingType.hint}>{t(MODE_HINTS[mode])}</p>
             {mode === "links" && environment.linkCount === 0 && (
-                <p className="text-xs text-warning">
+                <p className={cn(settingType.small, "text-warning")}>
                     {t("networking.noLinks")}
                 </p>
             )}
             {mode !== "shared" && !privateNetworksHere && (
-                <p className="text-xs text-warning">
+                <p className={cn(settingType.small, "text-warning")}>
                     {t("networking.needsUpdate")}
                 </p>
             )}
             {dirty && environment.networkMode === "shared" && (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("networking.leavesShared")}
                 </p>
             )}
-            {error && <p className="text-sm text-danger">{error}</p>}
-            {outcome && <p className="text-xs text-muted-foreground">{outcome}</p>}
+            {error && <p className={settingType.error}>{error}</p>}
+            {outcome && <p className={settingType.hint}>{outcome}</p>}
             {canManage && dirty && (
                 <div className="flex flex-wrap justify-end gap-2">
                     <Button variant="ghost" onClick={() => setMode(environment.networkMode)} disabled={pending}>

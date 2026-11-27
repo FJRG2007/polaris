@@ -10,7 +10,7 @@
 
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Button, Switch } from "@polaris/ui";
+import { Button, cn, settingType, Switch } from "@polaris/ui";
 import { useState, useTransition } from "react";
 import { SettingsCard } from "../project-settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -57,8 +57,8 @@ export function FeatureFlagsSection({
                         className="flex items-start justify-between gap-3 rounded-md border border-border/60 p-3"
                     >
                         <span className="min-w-0">
-                            <span className="block text-sm font-medium">{flag.label}</span>
-                            <span className="block text-xs text-muted-foreground">{flag.description}</span>
+                            <span className={cn(settingType.body, "block font-medium")}>{flag.label}</span>
+                            <span className={cn(settingType.hint, "block")}>{flag.description}</span>
                         </span>
                         <Switch
                             checked={flags[flag.id]}
@@ -70,7 +70,7 @@ export function FeatureFlagsSection({
                 ))}
             </div>
 
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && <p className={settingType.error}>{error}</p>}
 
             {canManage && (
                 <div className="flex justify-end">

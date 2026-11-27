@@ -6,7 +6,7 @@
  */
 
 import { useState, useTransition } from "react";
-import { useOptimisticToggle } from "@polaris/ui";
+import { cn, settingType, useOptimisticToggle } from "@polaris/ui";
 import { setConfirmTrashAction, setTrashKeepDaysAction } from "./actions";
 import { MAIL_TRASH_KEEP_CHOICES } from "@polaris/core";
 import type { DrivePreferences } from "@/lib/drive-preferences";
@@ -49,12 +49,12 @@ export function DriveSettings({ initial }: { initial: DrivePreferences }) {
             <CardBody className="flex flex-col gap-2">
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 flex-col gap-1">
-                        <span id="drive-confirm-trash" className="text-sm font-medium">
+                        <span id="drive-confirm-trash" className={cn(settingType.body, "font-medium")}>
                             {t("settings.confirmTrash")}
                         </span>
                         <span
                             id="drive-confirm-trash-hint"
-                            className="text-muted-foreground text-sm"
+                            className={cn(settingType.body, "text-muted-foreground")}
                         >
                             {t("settings.confirmTrashHint")}
                         </span>
@@ -68,8 +68,8 @@ export function DriveSettings({ initial }: { initial: DrivePreferences }) {
                 </div>
                 <div className="flex flex-wrap items-start justify-between gap-4 border-t border-border pt-3">
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
-                        <span className="text-sm font-medium">{t("settings.trashKeep")}</span>
-                        <span id="drive-trash-keep-hint" className="text-muted-foreground text-sm">
+                        <span className={cn(settingType.body, "font-medium")}>{t("settings.trashKeep")}</span>
+                        <span id="drive-trash-keep-hint" className={cn(settingType.body, "text-muted-foreground")}>
                             {t("settings.trashKeepHint")}
                         </span>
                     </div>
@@ -87,7 +87,7 @@ export function DriveSettings({ initial }: { initial: DrivePreferences }) {
                     />
                 </div>
                 {error ? (
-                    <p role="alert" className="text-danger text-sm">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 ) : null}

@@ -15,7 +15,7 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { agentModelChoices, saveAgentDefaultsAction } from "../actions";
-import { Button, Card, CardBody, Select } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Select, settingType } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { resolveAgentPolicy, type AgentPolicy } from "@polaris/core";
 import type { AgentDefaultsView } from "@/lib/agents/agent-defaults-service";
@@ -77,7 +77,7 @@ export function SettingsView({
 
     return (
         <div className="space-y-4">
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
 
             {rows.map((row) => (
                 <AgentDefaultsCard
@@ -106,9 +106,9 @@ export function SettingsView({
             {adding ? (
                 <Card>
                     <CardBody className="space-y-3">
-                        <p className="text-sm font-medium">{t("settings.oneAccount")}</p>
+                        <p className={cn(settingType.body, "font-medium")}>{t("settings.oneAccount")}</p>
                         {addable.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">{t("settings.allHaveOwn")}</p>
+                            <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.allHaveOwn")}</p>
                         ) : (
                             <Select
                                 value=""

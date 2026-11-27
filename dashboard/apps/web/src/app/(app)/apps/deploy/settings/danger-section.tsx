@@ -15,7 +15,7 @@ import { deleteProjectAction } from "../actions";
 import { SettingsCard } from "../project-settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Trash2, TriangleAlert } from "lucide-react";
-import { Button, ConfirmDeleteDialog } from "@polaris/ui";
+import { Button, cn, ConfirmDeleteDialog, settingType } from "@polaris/ui";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
 
 export function DangerSection({
@@ -53,7 +53,7 @@ export function DangerSection({
                 description={t("danger.description")}
             >
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("danger.counts", { environments: settings.environments.length, services: settings.serviceCount })}
                     </p>
                     {isOwner ? (
@@ -61,16 +61,16 @@ export function DangerSection({
                             <Trash2 className="size-4" /> {t("danger.delete")}
                         </Button>
                     ) : (
-                        <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <p className={cn(settingType.hint, "inline-flex items-center gap-1.5")}>
                             <TriangleAlert className="size-3.5" />
                             {t("danger.ownerOnly", { owner: settings.ownerName })}
                         </p>
                     )}
                 </div>
-                {error && <p className="text-sm text-danger">{error}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
             </SettingsCard>
 
-            <p className="text-xs text-muted-foreground">
+            <p className={settingType.hint}>
                 {t("danger.singleService")}
             </p>
 

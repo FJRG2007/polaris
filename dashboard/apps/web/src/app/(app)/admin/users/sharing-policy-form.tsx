@@ -12,7 +12,7 @@
 
 import { useState, useTransition } from "react";
 import { setSharingPolicyAction } from "./actions";
-import { Button, Card, CardBody, Select } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Select, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DELEGATED_SHARING_MODES, type DelegatedSharingMode, type SharingPolicy } from "@polaris/core";
 
@@ -52,10 +52,10 @@ export function SharingPolicyForm({
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("users.sharing.title")}</h2>
-                    <p className="max-w-xl text-sm text-muted-foreground">{t(`users.sharing.modes.${mode}.hint`)}</p>
+                    <p className={cn(settingType.body, "max-w-xl text-muted-foreground")}>{t(`users.sharing.modes.${mode}.hint`)}</p>
                 </div>
 
-                <label className="flex max-w-sm flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex max-w-sm flex-col gap-1")}>
                     <span className="font-medium">{t("users.sharing.label")}</span>
                     <Select
                         value={mode}
@@ -69,7 +69,7 @@ export function SharingPolicyForm({
                 </label>
 
                 {mode === "invite" && (
-                    <label className="flex max-w-sm flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex max-w-sm flex-col gap-1")}>
                         <span className="font-medium">{t("users.sharing.roleLabel")}</span>
                         <Select
                             value={inviteRole}
@@ -77,12 +77,12 @@ export function SharingPolicyForm({
                             options={roles}
                             aria-label={t("users.sharing.roleSelectLabel")}
                         />
-                        <span className="text-xs text-muted-foreground">{t("users.sharing.roleHint")}</span>
+                        <span className={settingType.hint}>{t("users.sharing.roleHint")}</span>
                     </label>
                 )}
 
-                {error && <p className="text-sm text-danger">{error}</p>}
-                {saved && !dirty && <p className="text-sm text-muted-foreground">{t("users.sharing.saved")}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
+                {saved && !dirty && <p className={cn(settingType.body, "text-muted-foreground")}>{t("users.sharing.saved")}</p>}
 
                 <Button className="self-start" size="sm" disabled={!dirty || pending} onClick={save}>
                     {tc("actions.save")}

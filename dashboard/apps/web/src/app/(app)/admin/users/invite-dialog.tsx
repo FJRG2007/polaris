@@ -123,7 +123,7 @@ export function InviteDialog({
                     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="flex flex-col gap-1">
-                                <label className="text-sm">{t("usersInvite.email")}</label>
+                                <label className={settingType.body}>{t("usersInvite.email")}</label>
                                 <Input
                                     type="email"
                                     placeholder={t("usersInvite.emailPlaceholder")}
@@ -137,7 +137,7 @@ export function InviteDialog({
                                 ) : null}
                             </div>
                             <div className="flex flex-col gap-1">
-                                <label className="text-sm">{t("usersInvite.role")}</label>
+                                <label className={settingType.body}>{t("usersInvite.role")}</label>
                                 <Select
                                     aria-label={t("usersInvite.role")}
                                     value={values.role}
@@ -147,7 +147,7 @@ export function InviteDialog({
                                         label: role.name
                                     }))}
                                 />
-                                <p className="text-xs text-muted-foreground">
+                                <p className={settingType.hint}>
                                     {roles.find((role) => role.name === values.role)?.grants === 0
                                         ? t("usersInvite.roleNoApp")
                                         : t("usersInvite.roleHint")}
@@ -156,14 +156,14 @@ export function InviteDialog({
                         </div>
 
                         <fieldset className="flex flex-col gap-2">
-                            <legend className="pb-1 text-sm">{t("usersInvite.method")}</legend>
+                            <legend className={cn(settingType.body, "pb-1")}>{t("usersInvite.method")}</legend>
                             {METHODS.map((option) => {
                                 const unavailable = option === "magic" && !canSendMail;
                                 return (
                                     <label
                                         key={option}
                                         className={cn(
-                                            "flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm transition-colors",
+                                            settingType.body, "flex cursor-pointer items-start gap-2 rounded-md border p-2 transition-colors",
                                             method === option
                                                 ? "border-primary bg-primary/5"
                                                 : "border-border hover:bg-muted",
@@ -182,7 +182,7 @@ export function InviteDialog({
                                             <span className="block">
                                                 {t(`usersInvite.methods.${option}.label`)}
                                             </span>
-                                            <span className="block text-xs text-muted-foreground">
+                                            <span className={cn(settingType.hint, "block")}>
                                                 {unavailable
                                                     ? t("usersInvite.noMail")
                                                     : t(`usersInvite.methods.${option}.hint`)}
@@ -198,7 +198,7 @@ export function InviteDialog({
                                 type="button"
                                 onClick={() => setAdvanced((open) => !open)}
                                 aria-expanded={advanced}
-                                className="flex items-center gap-1 text-start text-sm text-muted-foreground hover:text-foreground"
+                                className={cn(settingType.body, "flex items-center gap-1 text-start text-muted-foreground hover:text-foreground")}
                             >
                                 <ChevronDown
                                     className={cn(
@@ -214,8 +214,8 @@ export function InviteDialog({
                                     <div className="flex flex-col gap-2">
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="min-w-0">
-                                                <p className="text-sm">{t("usersInvite.otp.title")}</p>
-                                                <p className="text-xs text-muted-foreground">
+                                                <p className={settingType.body}>{t("usersInvite.otp.title")}</p>
+                                                <p className={settingType.hint}>
                                                     {t("usersInvite.otp.hint")}
                                                 </p>
                                             </div>
@@ -240,8 +240,8 @@ export function InviteDialog({
 
                                     <div className="flex flex-col gap-2">
                                         <div>
-                                            <p className="text-sm">{t("usersInvite.where.title")}</p>
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className={settingType.body}>{t("usersInvite.where.title")}</p>
+                                            <p className={settingType.hint}>
                                                 {t("usersInvite.where.hint")}
                                             </p>
                                         </div>
@@ -253,7 +253,7 @@ export function InviteDialog({
                                     </div>
                                 </div>
                             ) : (
-                                <p className="text-xs text-muted-foreground">
+                                <p className={settingType.hint}>
                                     {accessRulesAreEmpty(rules) && !usePassword
                                         ? t("usersInvite.summaryNone")
                                         : t("usersInvite.summarySet")}
@@ -261,7 +261,7 @@ export function InviteDialog({
                             )}
                         </div>
 
-                        {error ? <p className="text-sm text-danger">{error}</p> : null}
+                        {error ? <p className={settingType.error}>{error}</p> : null}
                         <div className="flex justify-end gap-2">
                             <Button
                                 type="button"
@@ -293,7 +293,7 @@ function IssuedInvite({ issued, onDone }: { issued: Issued; onDone: () => void }
         <div className="flex flex-col gap-3">
             {issued.code ? (
                 <div className="rounded-md border border-border bg-muted/40 p-3">
-                    <p className="mb-1 text-xs text-muted-foreground">
+                    <p className={cn(settingType.hint, "mb-1")}>
                         {t("usersInvite.issued.readCode")}
                     </p>
                     <div className="flex items-center gap-2">
@@ -306,7 +306,7 @@ function IssuedInvite({ issued, onDone }: { issued: Issued; onDone: () => void }
             ) : null}
             {issued.url ? (
                 <div className="rounded-md border border-border bg-muted/40 p-3">
-                    <p className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <p className={cn(settingType.hint, "mb-1 flex items-center gap-1.5")}>
                         {issued.sendError ? (
                             <Mail className="size-3.5" />
                         ) : (
@@ -323,11 +323,11 @@ function IssuedInvite({ issued, onDone }: { issued: Issued; onDone: () => void }
                 </div>
             ) : null}
             {issued.sendError ? (
-                <p className="text-sm text-warning">
+                <p className={cn(settingType.body, "text-warning")}>
                     {t("usersInvite.issued.sendError", { error: issued.sendError })}
                 </p>
             ) : null}
-            <p className="text-xs text-muted-foreground">
+            <p className={settingType.hint}>
                 {t("usersInvite.issued.shownOnce")}
             </p>
             <div className="flex justify-end">

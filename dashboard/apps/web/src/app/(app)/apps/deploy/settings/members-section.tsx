@@ -30,7 +30,9 @@ import {
     DialogTitle,
     Input,
     Select,
-    isDirty
+    cn,
+    isDirty,
+    settingType
 } from "@polaris/ui";
 import {
     listProjectMembersAction,
@@ -305,7 +307,7 @@ export function MembersSection({ projectId }: { projectId: string }) {
     return (
         <div className="flex flex-col gap-4">
             <SettingsCard title={t("members.title")} description={t("members.description")}>
-                {error && <p className="text-sm text-danger">{error}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
 
                 <div className="overflow-hidden rounded-md border border-border/60">
                     {members === null ? (
@@ -322,7 +324,7 @@ export function MembersSection({ projectId }: { projectId: string }) {
                                     <div className="flex min-w-0 flex-1 items-center gap-2.5">
                                         <PrincipalFace entry={entry} />
                                         <div className="min-w-0">
-                                            <p className="flex items-center gap-2 truncate text-sm font-medium">
+                                            <p className={cn(settingType.body, "flex items-center gap-2 truncate font-medium")}>
                                                 {entry.name}
                                                 {entry.isOwner && (
                                                     <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[0.625rem] text-muted-foreground">
@@ -337,7 +339,7 @@ export function MembersSection({ projectId }: { projectId: string }) {
                                                     </span>
                                                 )}
                                             </p>
-                                            <p className="truncate text-xs text-muted-foreground">
+                                            <p className={cn(settingType.hint, "truncate")}>
                                                 {summarize(entry)}
                                             </p>
                                         </div>
@@ -390,7 +392,7 @@ export function MembersSection({ projectId }: { projectId: string }) {
 
                 <dl className="flex flex-col gap-1">
                     {PROJECT_ROLES.map((entry) => (
-                        <div key={entry} className="flex gap-2 text-xs">
+                        <div key={entry} className={cn(settingType.small, "flex gap-2")}>
                             <dt className="w-20 shrink-0 font-medium">
                                 {PROJECT_ROLE_LABELS[entry]}
                             </dt>
@@ -517,7 +519,7 @@ function AccessDialog({
                 <div className="flex flex-col gap-4 pt-2">
                     {!draft.entryId && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">
+                            <span className={cn(settingType.hint, "font-medium")}>
                                 {t("members.for")}
                             </span>
                             <Select
@@ -537,7 +539,7 @@ function AccessDialog({
 
                     {draft.principal === "user" && !draft.entryId && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">
+                            <span className={cn(settingType.hint, "font-medium")}>
                                 {t("members.identifier")}
                             </span>
                             <Input
@@ -547,7 +549,7 @@ function AccessDialog({
                                 placeholder="someone@example.com"
                                 autoComplete="off"
                             />
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("members.needsAccount")}
                             </span>
                         </label>
@@ -555,7 +557,7 @@ function AccessDialog({
 
                     {draft.principal === "team" && !draft.entryId && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">
+                            <span className={cn(settingType.hint, "font-medium")}>
                                 {t("members.team")}
                             </span>
                             {teamOptions.length > 0 ? (
@@ -566,7 +568,7 @@ function AccessDialog({
                                     aria-label={t("members.team")}
                                 />
                             ) : (
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {t("members.noTeam")}
                                 </span>
                             )}
@@ -575,7 +577,7 @@ function AccessDialog({
 
                     {draft.principal === "org" && !draft.entryId && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">
+                            <span className={cn(settingType.hint, "font-medium")}>
                                 {t("members.organization")}
                             </span>
                             {orgOptions.length > 0 ? (
@@ -586,7 +588,7 @@ function AccessDialog({
                                     aria-label={t("members.organization")}
                                 />
                             ) : (
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {t("members.noOrganization")}
                                 </span>
                             )}
@@ -594,11 +596,11 @@ function AccessDialog({
                     )}
 
                     {draft.principal === "everyone" && !draft.entryId && (
-                        <p className="text-xs text-muted-foreground">{t("members.everyone")}</p>
+                        <p className={settingType.hint}>{t("members.everyone")}</p>
                     )}
 
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("members.theyMay")}
                         </span>
                         <Select
@@ -618,7 +620,7 @@ function AccessDialog({
                                 )
                             ).map((area) => (
                                 <div key={area} className="flex flex-col gap-1.5">
-                                    <p className="text-xs font-medium">{area}</p>
+                                    <p className={cn(settingType.small, "font-medium")}>{area}</p>
                                     {PROJECT_CAPABILITIES.filter(
                                         (capability) =>
                                             PROJECT_CAPABILITY_META[capability].area === area &&
@@ -626,7 +628,7 @@ function AccessDialog({
                                     ).map((capability) => (
                                         <label
                                             key={capability}
-                                            className="flex items-start gap-2 text-xs"
+                                            className={cn(settingType.small, "flex items-start gap-2")}
                                         >
                                             <Checkbox
                                                 checked={draft.capabilities.includes(capability)}
@@ -653,11 +655,11 @@ function AccessDialog({
                     )}
 
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("members.environments")}
                         </span>
                         {everyEnvironment && (
-                            <label className="flex items-center gap-2 text-xs">
+                            <label className={cn(settingType.small, "flex items-center gap-2")}>
                                 <Checkbox
                                     checked={draft.environmentIds.length === 0}
                                     onChange={(event) =>
@@ -675,7 +677,7 @@ function AccessDialog({
                             environments.map((environment) => (
                                 <label
                                     key={environment.id}
-                                    className={`flex items-center gap-2 text-xs${everyEnvironment ? " ps-5" : ""}`}
+                                    className={cn(settingType.small, "flex items-center gap-2", everyEnvironment ? " ps-5" : "")}
                                 >
                                     <Checkbox
                                         checked={draft.environmentIds.includes(environment.id)}
@@ -689,7 +691,7 @@ function AccessDialog({
                     </div>
 
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("members.expires")}
                         </span>
                         <Select
@@ -707,7 +709,7 @@ function AccessDialog({
                         />
                     </label>
 
-                    {error && <p className="text-sm text-danger">{error}</p>}
+                    {error && <p className={settingType.error}>{error}</p>}
 
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>

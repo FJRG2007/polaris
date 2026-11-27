@@ -18,7 +18,7 @@ import { NetworkingCard } from "./networking-card";
 import { deleteEnvironmentAction } from "../actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, ConfirmDeleteDialog, Input, Select } from "@polaris/ui";
+import { Button, cn, ConfirmDeleteDialog, Input, Select, settingType } from "@polaris/ui";
 import { NewEnvironmentDialog } from "../new-environment-dialog";
 import { PromoteDialog, PromotionHistory } from "./promote-dialog";
 import { SyncDialog } from "./sync-dialog";
@@ -130,7 +130,7 @@ export function EnvironmentsSection({
                 title={t("environments.title")}
                 description={t("environments.description")}
             >
-                {error && <p className="text-sm text-danger">{error}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
                 <div className="overflow-hidden rounded-md border border-border/60">
                     {settings.environments.map((environment) => (
                         <div
@@ -173,7 +173,7 @@ export function EnvironmentsSection({
                                     </>
                                 ) : (
                                     <div className="min-w-0">
-                                        <p className="flex items-center gap-2 truncate text-sm font-medium">
+                                        <p className={cn(settingType.body, "flex items-center gap-2 truncate font-medium")}>
                                             {environment.name}
                                             {environment.stage && (
                                                 <span className="rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-medium text-muted-foreground">
@@ -200,7 +200,7 @@ export function EnvironmentsSection({
                                                     </a>
                                                 )}
                                         </p>
-                                        <p className="truncate text-xs text-muted-foreground">
+                                        <p className={cn(settingType.hint, "truncate")}>
                                             {t("environments.services", {
                                                 count: environment.serviceCount
                                             })}

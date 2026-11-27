@@ -10,6 +10,7 @@
  * one place that fixes it is more useful than a second copy of the form.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import Link from "next/link";
 import { useCallback } from "react";
 import { SettingsCard } from "../project-settings";
@@ -161,7 +162,7 @@ function IntegrationRow({
                     {icon}
                 </span>
                 <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 truncate text-sm font-medium">
+                    <p className={cn(settingType.body, "flex items-center gap-1.5 truncate font-medium")}>
                         {name}
                         {connected ? (
                             <CheckCircle2 className="size-3.5 shrink-0 text-success" />
@@ -169,12 +170,12 @@ function IntegrationRow({
                             <CircleDashed className="size-3.5 shrink-0 text-muted-foreground" />
                         )}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground">{detail}</p>
+                    <p className={cn(settingType.hint, "truncate")}>{detail}</p>
                 </div>
             </div>
             <Link
                 href={href}
-                className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-primary transition-colors hover:bg-muted"
+                className={cn(settingType.small, "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-primary transition-colors hover:bg-muted")}
             >
                 {connected ? t("integrations.manage") : t("integrations.connect")}{" "}
                 <ExternalLink className="size-3" />

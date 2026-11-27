@@ -8,7 +8,7 @@
  */
 
 import Link from "next/link";
-import { cn } from "@polaris/ui";
+import { cn, settingType } from "@polaris/ui";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -34,7 +34,7 @@ export function UserSectionNav({ userId }: { userId: string }) {
                         href={href}
                         aria-current={current ? "page" : undefined}
                         className={cn(
-                            "whitespace-nowrap rounded-md px-2.5 py-1 text-[13px]",
+                            settingType.body, "whitespace-nowrap rounded-md px-2.5 py-1",
                             current
                                 ? "bg-card font-medium text-foreground"
                                 : "text-muted-foreground hover:bg-card hover:text-foreground"

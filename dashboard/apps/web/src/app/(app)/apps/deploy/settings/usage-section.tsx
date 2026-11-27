@@ -14,7 +14,7 @@
  */
 
 import { useCallback } from "react";
-import { Button } from "@polaris/ui";
+import { Button, cn, settingType } from "@polaris/ui";
 import { SettingsCard } from "../project-settings";
 import { COLLECT_TICK_MS } from "@/lib/metrics-shared";
 import { useLiveRead } from "@/components/use-live-resource";
@@ -90,7 +90,7 @@ export function UsageSection({ projectId }: { projectId: string }) {
                             />
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {usage?.sampledAt
                                     ? t("usage.sampled", { time: display.dateTime(usage.sampledAt) })
                                     : t("usage.noSamples")}
@@ -105,17 +105,17 @@ export function UsageSection({ projectId }: { projectId: string }) {
                 {/* A read that failed with nothing to show is the failure; one that
                     failed over figures already on screen only means they stopped
                     moving, which is a warning rather than an error. */}
-                {error && <p className="text-sm text-danger">{error}</p>}
-                {stale && <p className="text-sm text-warning">{t("usage.stale", { reason: stale })}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
+                {stale && <p className={cn(settingType.body, "text-warning")}>{t("usage.stale", { reason: stale })}</p>}
             </SettingsCard>
 
             <MonthCard projectId={projectId} />
 
             <SettingsCard title={t("usage.byService")} description={t("usage.byServiceHint")}>
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[32rem] text-sm">
+                    <table className={cn(settingType.body, "w-full min-w-[32rem]")}>
                         <thead>
-                            <tr className="border-b border-border/60 text-start text-xs text-muted-foreground">
+                            <tr className={cn(settingType.small, "border-b border-border/60 text-start text-muted-foreground")}>
                                 <th className="px-2 py-1.5 font-medium">{t("usage.service")}</th>
                                 <th className="px-2 py-1.5 font-medium">{t("usage.environment")}</th>
                                 <th className="px-2 py-1.5 text-end font-medium">{t("usage.cpu")}</th>
@@ -195,8 +195,8 @@ function MonthCard({ projectId }: { projectId: string }) {
             description={data && !data.statement.rates ? t("usage.monthNoPrices") : t("usage.monthWithPrices")}
         >
             <StatementTotals view={data} />
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
-            {stale ? <p className="text-sm text-warning">{t("usage.stale", { reason: stale })}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
+            {stale ? <p className={cn(settingType.body, "text-warning")}>{t("usage.stale", { reason: stale })}</p> : null}
         </SettingsCard>
     );
 }
@@ -204,9 +204,9 @@ function MonthCard({ projectId }: { projectId: string }) {
 function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
     return (
         <div className="rounded-md border border-border/60 p-3">
-            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className={settingType.hint}>{label}</p>
             <p className="mt-0.5 text-lg font-medium tabular-nums">{value}</p>
-            <p className="text-xs text-muted-foreground">{hint}</p>
+            <p className={settingType.hint}>{hint}</p>
         </div>
     );
 }
