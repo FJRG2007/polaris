@@ -37,6 +37,49 @@ impl LocalControlBridge {
         self.instance_id = Some(instance_id);
     }
 
+    /// The identity relay requests run under; local control's when it is
+    /// published, else one made for this run (local control is not published
+    /// on Windows, the relay is).
+    fn ensure_instance_id(&mut self) -> InstanceId {
+        self.instance_id.get_or_insert_with(InstanceId::new).clone()
+    }
+
+    /// Runs a request that arrived over the Polaris relay. The relay already
+    /// checked the controller's key (`terminal.control`) and that it may reach
+    /// this terminal, so the request carries a grant for exactly its own
+    /// action; everything else, Settings > Scripting included, is checked as
+    /// for a local request.
+    pub(super) fn handle_relay_request(
+        &mut self,
+        request: RequestEnvelope,
+        ctx: &mut ModelContext<Self>,
+    ) -> ResponseEnvelope {
+        let grant = CredentialGrant::new(
+            self.ensure_instance_id(),
+            request.action.kind,
+            chrono::Duration::seconds(60),
+        );
+        self.handle_request(request, grant, ctx)
+    }
+
+    /// A pane's current screen and a live receiver of its PTY bytes, for the
+    /// relay's `attach`. `None` when the pane is not a local terminal here, or
+    /// Scripting is off.
+    pub(super) fn relay_attach(
+        &mut self,
+        pane: &str,
+        ctx: &mut ModelContext<Self>,
+    ) -> Option<(String, async_broadcast::Receiver<std::sync::Arc<Vec<u8>>>)> {
+        ensure_feature_enabled().ok()?;
+        if !crate::settings::LocalControlSettings::as_ref(ctx).is_enabled() {
+            return None;
+        }
+        let view = metadata::pane_terminal_view(pane, ctx)?;
+        view.read(ctx, |view, ctx| {
+            Some((view.relay_screen_text(), view.relay_pty_reads(ctx)?))
+        })
+    }
+
     pub(super) fn handle_request(
         &mut self,
         request: RequestEnvelope,

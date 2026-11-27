@@ -38,6 +38,14 @@ impl Entity for PtyRecorder {
 }
 
 impl PtyRecorder {
+    /// A live receiver of this session's PTY bytes, for the Polaris relay's
+    /// pane output. `None` for sessions without a local PTY.
+    pub fn activate_pty_reads(&self) -> Option<async_broadcast::Receiver<Arc<Vec<u8>>>> {
+        self.pty_reads_rx
+            .as_ref()
+            .map(InactiveReceiver::activate_cloned)
+    }
+
     /// Creates a new recorder. Recording is enabled for a session if it
     /// is toggled on or if the global recording mode in [`DebugSettings`]
     /// is set.

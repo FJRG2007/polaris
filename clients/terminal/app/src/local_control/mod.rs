@@ -60,6 +60,7 @@
 mod bridge;
 mod handlers;
 mod permissions;
+mod relay;
 mod resolver;
 
 use std::collections::HashMap;
@@ -86,6 +87,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
 pub use bridge::LocalControlBridge;
+pub use relay::PolarisRelay;
 #[cfg(any(unix, test))]
 use chrono::Duration;
 use permissions::ensure_feature_enabled;
