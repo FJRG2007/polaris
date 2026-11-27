@@ -47,6 +47,8 @@ export interface SupervisorOptions {
     readonly now?: () => number;
     readonly setTimer?: (run: () => void, ms: number) => unknown;
     readonly clearTimer?: (timer: unknown) => void;
+    /** The app's language (`es-ES`), sent on every start so a plugin's own texts follow it. */
+    readonly locale?: () => string;
 }
 
 export const HEALTHY_MS = 60_000;
@@ -118,7 +120,7 @@ export function createSupervisor(options: SupervisorOptions) {
             }
         });
         child.onExit(() => crashed(slot, generation));
-        child.postMessage({ type: "start", id: manifest.id, version: manifest.version, permissions: slot.wanted.granted, devices, settings: slot.wanted.settings });
+        child.postMessage({ type: "start", id: manifest.id, version: manifest.version, permissions: slot.wanted.granted, devices, settings: slot.wanted.settings, ...(options.locale ? { locale: options.locale() } : {}) });
         changed();
     }
 

@@ -23,6 +23,48 @@ pub(crate) fn label(en: &str, es: &str) -> Value {
     json!({ "en-US": en, "es-ES": es })
 }
 
+/// The language the screen is drawn in: one Polaris ships, or `en-US` for
+/// any other (the same fallback the plugin page's texts use).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Locale {
+    #[default]
+    EnUs,
+    EsEs,
+}
+
+impl Locale {
+    /// A BCP 47 tag as the desktop app reports it (`es-ES`, `es_MX`, `es`,
+    /// `en-GB`, ...): any Spanish one is Spanish, anything else English.
+    pub fn from_tag(tag: &str) -> Self {
+        let language = tag.trim().split(['-', '_']).next().unwrap_or_default();
+        if language.eq_ignore_ascii_case("es") {
+            Locale::EsEs
+        } else {
+            Locale::EnUs
+        }
+    }
+
+    /// One of a pair of texts, in this language.
+    pub fn pick<'a>(self, en: &'a str, es: &'a str) -> &'a str {
+        match self {
+            Locale::EnUs => en,
+            Locale::EsEs => es,
+        }
+    }
+}
+
+/// A knob choice's name on the controller's screen, where a column fits nine
+/// characters: the page's own label where it fits, a shorter word where not.
+pub fn screen_name(value: &str) -> (&'static str, &'static str) {
+    match value {
+        "system" => ("System", "Sistema"),
+        "other" => ("Other", "Otras"),
+        "output" => ("Output", "Salida"),
+        "none" => ("", ""),
+        other => choice_label(other),
+    }
+}
+
 fn choice_label(value: &str) -> (&'static str, &'static str) {
     match value {
         "calls" => ("Calls", "Llamadas"),
@@ -52,7 +94,7 @@ fn options(values: &[&str]) -> Value {
     )
 }
 
-fn knob_value(target: &Target) -> &'static str {
+pub(crate) fn knob_value(target: &Target) -> &'static str {
     match target {
         Target::Category { category } => match category {
             Category::Music => "music",
@@ -142,7 +184,7 @@ pub fn plugin_settings() -> Value {
         24,
         defaults.tuning.dead_band.into(),
     ));
-    list.push(json!({ "kind": "choice", "key": "display", "group": "screen", "label": label("Screen shows", "La pantalla muestra"), "options": options(DISPLAY_CHOICES), "default": "mixer" }));
+    list.push(json!({ "kind": "choice", "key": "display", "group": "screen", "label": label("Screen shows", "La pantalla muestra"), "hint": label("With no call or nothing playing it shows the knobs. macOS does not let apps read what is playing.", "Sin llamada o sin nada sonando muestra las ruedas. macOS no deja a las apps leer lo que suena."), "options": options(DISPLAY_CHOICES), "default": "mixer" }));
     list.push(json!({ "kind": "range", "key": "brightness", "group": "screen", "label": label("Screen brightness", "Brillo de la pantalla"), "min": 10, "max": 100, "step": 5, "default": defaults.brightness }));
     Value::Array(list)
 }
@@ -215,6 +257,32 @@ pub fn settings_from_plugin(values: &Map<String, Value>) -> Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn any_spanish_tag_is_spanish_and_anything_else_english() {
+        for tag in ["es-ES", "es", "es_MX", "ES-419", " es-AR "] {
+            assert_eq!(Locale::from_tag(tag), Locale::EsEs, "{tag}");
+        }
+        for tag in ["en-US", "en-GB", "fr-FR", "", "est", "-es"] {
+            assert_eq!(Locale::from_tag(tag), Locale::EnUs, "{tag}");
+        }
+        assert_eq!(Locale::EsEs.pick("Music", "Música"), "Música");
+        assert_eq!(Locale::EnUs.pick("Music", "Música"), "Music");
+    }
+
+    #[test]
+    fn every_knob_choice_has_a_screen_name_that_fits_its_column() {
+        for value in KNOB_CHOICES {
+            let (en, es) = screen_name(value);
+            assert!(
+                en.chars().count() <= 9 && es.chars().count() <= 9,
+                "{value}"
+            );
+            assert_eq!(en.is_empty(), *value == "none", "{value}");
+        }
+        // The page's own words where they fit.
+        assert_eq!(screen_name("music"), choice_label("music"));
+    }
 
     fn defaults_of(list: &Value) -> Map<String, Value> {
         list.as_array()

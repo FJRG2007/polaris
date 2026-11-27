@@ -7,6 +7,7 @@
 //! - macOS: Core Audio process taps for each app (macOS 14.2+, once the
 //!   person allows system audio recording) and Core Audio's output volume
 //!   ([`macos`]).
+//! - What is playing, from the system's media session ([`media`]).
 
 use crate::audio::{AudioError, AudioSessions};
 use crate::ownership::Observed;
@@ -18,6 +19,7 @@ pub mod libusb;
 pub mod linux;
 #[cfg(target_os = "macos")]
 pub mod macos;
+pub mod media;
 #[cfg(windows)]
 pub mod sdk;
 #[cfg(windows)]

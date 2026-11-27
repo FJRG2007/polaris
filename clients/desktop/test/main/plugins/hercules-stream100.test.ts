@@ -17,8 +17,12 @@ const entry = createRequire(import.meta.url)(fileURLToPath(new URL("any/main.cjs
 type Read = { report?: Uint8Array; error?: string; };
 
 /** A native module whose reader answers the scripted reads, then waits forever. Nothing touches a real device or volume. */
-function fakeNative(reads: Read[], actions: string[][] = []) {
+function fakeNative(reads: Read[], actions: string[][] = [], playing: () => Promise<string> = async () => "null") {
     const feed = vi.fn(() => actions.shift() ?? []);
+    const setLocale = vi.fn();
+    const setCall = vi.fn();
+    const setNowPlaying = vi.fn();
+    const nowPlaying = vi.fn(playing);
     const setSettings = vi.fn();
     const reset = vi.fn();
     const close = vi.fn();
@@ -35,11 +39,15 @@ function fakeNative(reads: Read[], actions: string[][] = []) {
             feed = feed;
             setSettings = setSettings;
             reset = reset;
+            setLocale = setLocale;
+            setCall = setCall;
+            setNowPlaying = setNowPlaying;
         },
+        nowPlaying,
         settingsFromPlugin: (values: string) => `full:${values}`,
         ownershipJson: () => JSON.stringify({ observed: {}, ownership: { state: "herculesSdk" } })
     };
-    return { native, feed, setSettings, reset, close };
+    return { native, feed, setSettings, reset, close, setLocale, setCall, setNowPlaying, nowPlaying };
 }
 
 function fakePort() {
@@ -119,6 +127,63 @@ describe("Hercules Stream 100 plugin", () => {
         deliver({ type: "stop" });
         expect(fake.close).toHaveBeenCalled();
         expect(exit).toHaveBeenCalledWith(0);
+    });
+
+    it("draws the screen in the app's language, or this system's on an app that sends none", async () => {
+        const spanish = fakeNative([]);
+        const first = fakePort();
+        entry.run({ port: first.port, native: spanish.native, every: () => null, exit: vi.fn() });
+        first.deliver({ type: "start", id: "hercules-stream100", version: "0.1.0", permissions: [], devices: [], settings: {}, locale: "es-ES" });
+        expect(spanish.setLocale).toHaveBeenCalledWith("es-ES");
+
+        const older = fakeNative([]);
+        const second = fakePort();
+        entry.run({ port: second.port, native: older.native, every: () => null, exit: vi.fn() });
+        second.deliver({ type: "start", id: "hercules-stream100", version: "0.1.0", permissions: [], devices: [], settings: {} });
+        expect(older.setLocale).toHaveBeenCalledWith(Intl.DateTimeFormat().resolvedOptions().locale);
+    });
+
+    it("follows the app's call on the call page, and treats a refused or older app as no call", async () => {
+        const fake = fakeNative([]);
+        const { port, sent, deliver } = fakePort();
+        const ticks: (() => void)[] = [];
+        entry.run({ port, native: fake.native, every: (tick: () => void) => ticks.push(tick), exit: vi.fn() });
+        deliver({ type: "start", id: "hercules-stream100", version: "0.1.0", permissions: ["polaris-actions"], devices: [], settings: { display: "call" } });
+        const asked = () => sent.filter((message) => (message as { method?: string; }).method === "polaris.state") as { id: number; }[];
+        expect(asked()).toHaveLength(1);
+        for (const message of sent) expect(pluginMessageSchema.safeParse(message).success).toBe(true);
+        const call = { participants: [{ id: "u1", name: "Ana", speaking: true, muted: false, deafened: false }], selfMuted: true, selfDeafened: false };
+        deliver({ type: "reply", id: asked()[0]!.id, ok: true, value: { call } });
+        await flush();
+        expect(fake.setCall).toHaveBeenLastCalledWith(JSON.stringify(call));
+
+        ticks[0]!();
+        deliver({ type: "reply", id: asked()[1]!.id, ok: false, error: "unknown-method" });
+        await flush();
+        expect(fake.setCall).toHaveBeenLastCalledWith("null");
+        // Never reads what is playing on the call page.
+        expect(fake.nowPlaying).not.toHaveBeenCalled();
+    });
+
+    it("shows what the system says is playing on the now-playing page, and nothing when it cannot say", async () => {
+        const answers = [async () => JSON.stringify({ title: "Canción", artist: "Rosalía", playing: true }), async () => { throw new Error("no bus"); }];
+        const fake = fakeNative([], [], () => answers.shift()!());
+        const { port, sent, deliver } = fakePort();
+        const ticks: (() => void)[] = [];
+        entry.run({ port, native: fake.native, every: (tick: () => void) => ticks.push(tick), exit: vi.fn() });
+        deliver({ type: "start", id: "hercules-stream100", version: "0.1.0", permissions: [], devices: [], settings: { display: "nowPlaying" } });
+        await flush();
+        expect(fake.setNowPlaying).toHaveBeenLastCalledWith(JSON.stringify({ title: "Canción", artist: "Rosalía", playing: true }));
+        ticks[0]!();
+        await flush();
+        expect(fake.setNowPlaying).toHaveBeenLastCalledWith("null");
+        expect(sent).toContainEqual({ type: "log", level: "warn", text: "could not read what is playing: no bus" });
+        // The mixer page reads neither.
+        deliver({ type: "settings", settings: { display: "mixer" } });
+        ticks[0]!();
+        await flush();
+        expect(fake.nowPlaying).toHaveBeenCalledTimes(2);
+        expect(sent.some((message) => (message as { method?: string; }).method === "polaris.state")).toBe(false);
     });
 
     it("forgets the knobs' baseline when the controller goes away", async () => {

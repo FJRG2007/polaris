@@ -8,8 +8,11 @@ use polaris_stream100::display::{
     MAX_TRANSFER_PACKETS, PACKET_SIZE, SCREEN_OFF, SCREEN_ON, TILE_OFFSETS, WIDTH,
 };
 use polaris_stream100::engine::{Command, Engine, Output};
+use polaris_stream100::plugin::Locale;
 use polaris_stream100::report::KnobMap;
-use polaris_stream100::screen::{render, Knob, Painter, Screen, TILE_EVERY};
+use polaris_stream100::screen::{
+    render, Call, Knob, NowPlaying, Painter, Person, Screen, TILE_EVERY,
+};
 use polaris_stream100::session::KEEPALIVE_EVERY;
 use polaris_stream100::settings::{DisplayMode, Settings};
 use std::time::{Duration, Instant};
@@ -169,6 +172,9 @@ fn page(volume: u8) -> Screen {
             knob("Games", None, false),
             knob("A very long program name", Some(0), false),
         ],
+        locale: Locale::EnUs,
+        call: None,
+        playing: None,
     }
 }
 
@@ -423,4 +429,150 @@ fn the_engine_shows_each_knob_after_this_report_applies() {
     assert_eq!(screen.knobs[1], knob("Music", Some(70), true));
     assert_eq!(screen.knobs[2], knob("Games", None, false));
     assert_eq!(screen.knobs[3], knob("Output", Some(57), false));
+}
+
+fn lit(frame: &IndexedFrame, x: std::ops::Range<usize>, y: std::ops::Range<usize>) -> usize {
+    y.flat_map(|row| x.clone().map(move |column| (column, row)))
+        .filter(|&(column, row)| pixel(frame, column, row) != pixel(frame, 2, 2))
+        .count()
+}
+
+fn person(name: &str, speaking: bool, muted: bool) -> Person {
+    Person {
+        name: name.to_owned(),
+        speaking,
+        muted,
+        deafened: false,
+    }
+}
+
+#[test]
+fn spanish_accents_are_drawn_and_differ_from_the_plain_letters() {
+    // Same word, one accented: the accent dots sit above the letters.
+    let mut plain = page(50);
+    plain.knobs[1].label = "MUSICA".to_owned();
+    let mut accented = page(50);
+    accented.knobs[1].label = "Música".to_owned();
+    let (plain, accented) = (render(&plain).unwrap(), render(&accented).unwrap());
+    assert_ne!(plain, accented);
+    // The label's letters start at row 18; the accent is drawn in 14..18 (x 120 is the divider).
+    assert_eq!(lit(&plain, 121..240, 14..18), 0);
+    assert!(lit(&accented, 121..240, 14..18) > 0);
+    // Every Spanish letter has a glyph of its own, none is the unknown box.
+    let unknown = {
+        let mut screen = page(50);
+        screen.knobs[1].label = "\u{4e2d}".to_owned();
+        render(&screen).unwrap()
+    };
+    for letter in ["Á", "É", "Í", "Ó", "Ú", "Ñ", "Ü", "¿", "¡", "á", "ñ", "ü"] {
+        let mut screen = page(50);
+        screen.knobs[1].label = letter.to_owned();
+        let frame = render(&screen).unwrap();
+        assert_ne!(frame, unknown, "{letter}");
+        assert_ne!(frame, plain, "{letter}");
+    }
+    // Lower case draws as upper case.
+    let upper = {
+        let mut screen = page(50);
+        screen.knobs[1].label = "ÑÚ".to_owned();
+        render(&screen).unwrap()
+    };
+    let lower = {
+        let mut screen = page(50);
+        screen.knobs[1].label = "ñú".to_owned();
+        render(&screen).unwrap()
+    };
+    assert_eq!(upper, lower);
+}
+
+fn call() -> Call {
+    Call {
+        participants: vec![
+            person("Ana", true, false),
+            person("Bea", false, true),
+            person("Carlos", false, false),
+        ],
+        self_muted: false,
+        self_deafened: false,
+    }
+}
+
+#[test]
+fn the_call_page_shows_the_call_and_falls_back_to_the_knobs_without_one() {
+    let mut screen = page(50);
+    screen.mode = DisplayMode::Call;
+    let mixer = render(&page(50)).unwrap();
+    // No call: the knobs.
+    assert_eq!(render(&screen).unwrap(), mixer);
+    screen.call = Some(call());
+    let in_call = render(&screen).unwrap();
+    assert_ne!(in_call, mixer);
+    // Ana is speaking: her row's square is lit; Carlos' is not.
+    assert!(lit(&in_call, 16..26, 106..116) > 0);
+    assert_eq!(lit(&in_call, 16..26, 166..176), 0);
+    // Muting this computer changes the page, and so does the language.
+    let mut muted = screen.clone();
+    muted.call.as_mut().unwrap().self_muted = true;
+    assert_ne!(render(&muted).unwrap(), in_call);
+    let mut spanish = screen.clone();
+    spanish.locale = Locale::EsEs;
+    assert_ne!(render(&spanish).unwrap(), in_call);
+    // Many people: five rows, the last counting the rest, nothing below.
+    let mut crowded = screen.clone();
+    crowded.call.as_mut().unwrap().participants = (0..40)
+        .map(|n| person(&format!("P{n}"), false, false))
+        .collect();
+    let frame = render(&crowded).unwrap();
+    assert!(lit(&frame, 0..WIDTH, 224..240) > 0);
+    assert_eq!(lit(&frame, 0..WIDTH, 256..HEIGHT), 0);
+}
+
+#[test]
+fn the_now_playing_page_shows_the_track_and_falls_back_to_the_knobs() {
+    let mut screen = page(50);
+    screen.mode = DisplayMode::NowPlaying;
+    let mixer = render(&page(50)).unwrap();
+    assert_eq!(render(&screen).unwrap(), mixer);
+    screen.playing = NowPlaying::new(
+        "  Canción de una noche muy larga que no cabe en dos líneas de la pantalla ",
+        "Rosalía",
+        true,
+    );
+    let playing = render(&screen).unwrap();
+    assert_ne!(playing, mixer);
+    // Title on two lines, artist under it, all inside the margins.
+    assert!(lit(&playing, 0..WIDTH, 76..104) > 0);
+    assert!(lit(&playing, 0..WIDTH, 120..148) > 0);
+    assert!(lit(&playing, 0..WIDTH, 190..211) > 0);
+    assert_eq!(lit(&playing, 0..16, 0..HEIGHT), 0);
+    assert_eq!(lit(&playing, WIDTH - 16..WIDTH, 0..HEIGHT), 0);
+    let mut paused = screen.clone();
+    paused.playing.as_mut().unwrap().playing = false;
+    assert_ne!(render(&paused).unwrap(), playing);
+    // A session that names nothing is nothing playing.
+    assert_eq!(NowPlaying::new(" ", "\u{7}", true), None);
+    assert_eq!(
+        NowPlaying::new("a\nb", "", false).map(|now| now.title),
+        Some("ab".to_owned())
+    );
+}
+
+#[test]
+fn a_new_call_or_track_redraws_the_page() {
+    let mut painter = Painter::default();
+    let start = Instant::now();
+    let mut screen = page(50);
+    screen.mode = DisplayMode::Call;
+    screen.call = Some(call());
+    painter.show(&screen);
+    let first = run(&mut painter, start, Duration::from_secs(3));
+    assert_eq!(draws(&first).len(), 32);
+    screen.call.as_mut().unwrap().self_deafened = true;
+    painter.show(&screen);
+    let second = run(
+        &mut painter,
+        start + Duration::from_secs(3),
+        Duration::from_secs(3),
+    );
+    assert_eq!(draws(&second).len(), 32);
 }

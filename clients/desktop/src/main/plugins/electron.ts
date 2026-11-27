@@ -216,6 +216,7 @@ export function startDevicePlugins(showPolaris: (path?: string) => void): Plugin
         platform: pluginPlatform(process.platform, process.arch),
         appVersion: app.getVersion(),
         fetcher: (url, init) => net.fetch(url, init),
+        locale: () => app.getLocale(),
         fork,
         call: async (id, method, params) => {
             if (method === "settings.get") return manager?.settings(id) ?? null;

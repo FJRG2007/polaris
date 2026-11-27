@@ -563,6 +563,10 @@
         {
             "default": "mixer",
             "group": "screen",
+            "hint": {
+                "en-US": "With no call or nothing playing it shows the knobs. macOS does not let apps read what is playing.",
+                "es-ES": "Sin llamada o sin nada sonando muestra las ruedas. macOS no deja a las apps leer lo que suena."
+            },
             "key": "display",
             "kind": "choice",
             "label": {
@@ -633,6 +637,6 @@
         }
     },
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.16",
+    "version": "0.1.17",
     "view": "view/index.html"
 }

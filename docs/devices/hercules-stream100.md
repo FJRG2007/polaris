@@ -106,8 +106,26 @@ with what it follows, its volume as a number and a bar (red when muted, a
 dash when nothing it follows is playing), on a fixed seven-colour palette so a
 redraw never resends it. A page is redrawn only when it changes; a page that
 changes mid-draw waits for that draw to end; a brightness change alone is one
-`0x31` command; "Off" sends `0x13`. "Call" and "Now playing" show the mixer
-page until the plugin has a call roster and a now-playing source.
+`0x31` command; "Off" sends `0x13`.
+
+The page's words follow the desktop app's language (`locale` on the plugin's
+`start`, or the system's on an app older than that): Spanish for any `es-*`
+tag, English for everything else. The 5x7 font has two rows above each
+letter for an accent, so Á É Í Ó Ú Ñ Ü ¿ ¡ are drawn as themselves; other
+accents drop to the plain letter and a character the font has no letter for
+is a hollow box.
+
+"Call" shows the Polaris call the app reports (`polaris.state`, read every
+second and right after a call button): how many are in it, this computer's
+microphone and sound, and up to five people with who is speaking and who is
+muted. The app's call state has no camera, so the page does not show one.
+"Now playing" shows the title and artist from the system's media session:
+the GlobalSystemMediaTransportControls session manager on Windows, MPRIS on
+the session D-Bus on Linux (a playing player before a paused one). macOS has
+no such source an app may read: MediaRemote answers only Apple-entitled
+processes since macOS 15.4 (ungive/mediaremote-adapter), so there the page
+says so and the screen shows the knobs. With no call, or nothing playing,
+both show the knobs.
 
 `screen::Painter` decides all of it and hands over ready transfers, so every
 transport (WinUSB today, libusb on Linux and macOS) sends the same bytes.

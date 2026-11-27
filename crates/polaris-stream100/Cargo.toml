@@ -1,6 +1,6 @@
 [package]
 name = "polaris-stream100"
-version = "0.1.16"
+version = "0.1.17"
 description = "Polaris' driver for the Hercules Stream 100: its USB protocol, knob handling, display frames and per-app audio categories (docs/devices/hercules-stream100.md)."
 edition.workspace = true
 rust-version.workspace = true
@@ -21,7 +21,14 @@ usb = ["dep:nusb"]
 # HID API on Windows, `usb` elsewhere) and, on Windows, who holds the device.
 # Built only into the plugin's own binding, never into anything a machine
 # without the controller loads.
-native = ["usb", "dep:windows", "dep:pulseaudio", "dep:libusb1-sys", "dep:libc"]
+native = [
+    "usb",
+    "dep:windows",
+    "dep:pulseaudio",
+    "dep:zbus",
+    "dep:libusb1-sys",
+    "dep:libc",
+]
 
 [dependencies]
 serde = { workspace = true }
@@ -51,10 +58,16 @@ windows = { version = "=0.62.2", optional = true, features = [
     "Win32_Security_WinTrust",
     "Win32_System_LibraryLoader",
     "Win32_UI_Shell",
+    "Media_Control",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 pulseaudio = { version = "=0.3.2", optional = true }
+# MPRIS on the session bus, for what is playing (pure Rust, no libdbus).
+zbus = { version = "=5.19.0", optional = true, default-features = false, features = [
+    "async-io",
+    "blocking-api",
+] }
 
 # libusb, built from its vendored source into the module (nothing to install
 # on the machine): the isochronous OUT endpoint the keep-alive and the screen

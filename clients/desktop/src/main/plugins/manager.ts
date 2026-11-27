@@ -71,6 +71,8 @@ export interface ManagerOptions {
     /** The timer a crashed plugin is restarted on (the supervisor's own by default). For the tests. */
     readonly restartTimer?: (run: () => void, ms: number) => unknown;
     readonly log?: (id: string, level: "info" | "warn" | "error", text: string) => void;
+    /** The app's language, handed to each plugin when it starts. */
+    readonly locale?: () => string;
     readonly catalogUrl?: string;
     readonly keys?: readonly TrustedKey[];
     readonly now?: () => number;
@@ -124,6 +126,7 @@ export function createPluginManager(options: ManagerOptions) {
         call: options.call,
         onChange: runChanged,
         log: options.log,
+        ...(options.locale ? { locale: options.locale } : {}),
         ...(options.restartTimer ? { setTimer: options.restartTimer } : {})
     });
     let catalog: PluginCatalog | null = null;

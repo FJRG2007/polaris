@@ -30,12 +30,13 @@ class FakeChild implements PluginChild {
     }
 }
 
-function harness(granted: WantedPlugin["granted"] = ["usb", "polaris-actions"]) {
+function harness(granted: WantedPlugin["granted"] = ["usb", "polaris-actions"], locale?: () => string) {
     let clock = 0;
     const timers: { run: () => void; ms: number; }[] = [];
     const children: FakeChild[] = [];
     const calls: string[] = [];
     const supervisor = createSupervisor({
+        ...(locale ? { locale } : {}),
         fork: () => {
             const child = new FakeChild();
             children.push(child);
@@ -63,6 +64,15 @@ function harness(granted: WantedPlugin["granted"] = ["usb", "polaris-actions"]) 
 }
 
 describe("plugin supervisor", () => {
+    it("tells it the app's language when it has one, and nothing when it does not", () => {
+        const spanish = harness(undefined, () => "es-ES");
+        spanish.supervisor.want(spanish.wanted);
+        expect(spanish.children[0]?.sent[0]).toMatchObject({ type: "start", locale: "es-ES" });
+        const plain = harness();
+        plain.supervisor.want(plain.wanted);
+        expect(plain.children[0]?.sent[0]).not.toHaveProperty("locale");
+    });
+
     it("starts it with its permissions and settings, and marks it running once it says so", () => {
         const { supervisor, wanted, children } = harness();
         supervisor.want(wanted);

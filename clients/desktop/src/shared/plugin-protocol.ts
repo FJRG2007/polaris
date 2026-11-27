@@ -61,7 +61,7 @@ export const PLUGIN_PARAMS = {
 } as const satisfies Record<PluginMethod, z.ZodType>;
 
 export type AppMessage =
-    | { readonly type: "start"; readonly id: string; readonly version: string; readonly permissions: readonly PluginPermission[]; readonly devices: readonly UsbDevice[]; readonly settings: Record<string, PluginSettingValue>; }
+    | { readonly type: "start"; readonly id: string; readonly version: string; readonly permissions: readonly PluginPermission[]; readonly devices: readonly UsbDevice[]; readonly settings: Record<string, PluginSettingValue>; readonly locale?: string; }
     | { readonly type: "devices"; readonly devices: readonly UsbDevice[]; }
     | { readonly type: "settings"; readonly settings: Record<string, PluginSettingValue>; }
     | { readonly type: "reply"; readonly id: number; readonly ok: true; readonly value: unknown; }

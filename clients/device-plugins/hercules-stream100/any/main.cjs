@@ -6,6 +6,11 @@
  * The native module (`stream100.node`, crates/polaris-stream100-node) reads the
  * controller on a worker thread and turns each report into volume changes on
  * this thread; the call actions it hands back are run by the app.
+ *
+ * The screen is drawn in the app's language (`locale` on `start`, or this
+ * system's on an app older than that). Its "Call" page follows the app's call
+ * state (`polaris.state`) and its "Now playing" page the system's media
+ * session (`nowPlaying()`), each read every WATCH_MS while that page is chosen.
  */
 
 "use strict";
@@ -17,6 +22,16 @@ const WAIT_MS = 500;
 const RETRY_MS = 3_000;
 const OWNERSHIP_EVERY_MS = 15_000;
 const CALL_TIMEOUT_MS = 10_000;
+const WATCH_MS = 1_000;
+
+/** This system's language, for an app that does not send its own. */
+function systemLocale() {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().locale || "en-US";
+    } catch {
+        return "en-US";
+    }
+}
 
 /**
  * What the plugin's page header says while the controller cannot be read.
@@ -63,7 +78,7 @@ function connectedStatus(access) {
  * Runs the plugin against `port` (the utility process's parentPort) and the
  * native module. Everything it touches is passed in, so it is tested with fakes.
  */
-function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) => setTimeout(done, ms)), exit = (code) => process.exit(code) }) {
+function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) => setTimeout(done, ms)), exit = (code) => process.exit(code), every = (tick, ms) => setInterval(tick, ms), stopEvery = (timer) => clearInterval(timer) }) {
     let values = {};
     let controller = null;
     let reader = null;
@@ -73,6 +88,10 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     let ownershipAt = -Infinity;
     let accessAt = -Infinity;
     let warnedFeed = false;
+    let warnedPlaying = false;
+    let locale = "en-US";
+    let watcher = null;
+    let watching = false;
     let nextCall = 1;
     const pending = new Map();
 
@@ -105,10 +124,45 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
         });
     }
 
+    function ensureController() {
+        if (!controller) {
+            controller = new native.Controller(settingsJson());
+            controller.setLocale(locale);
+        }
+        return controller;
+    }
+
     async function act(id) {
         const action = RENAMED[id] ?? id;
         const reply = await call("polaris.action", { action });
         if (!reply.ok) log("warn", `the app did not run ${action}: ${reply.error}`);
+        // A mute or deafen shows on the call page now, not at the next read.
+        else if (action.startsWith("call.")) void watch();
+    }
+
+    /** Reads what the chosen page shows: the app's call, or what is playing. */
+    async function watch() {
+        if (watching || !running) return;
+        watching = true;
+        try {
+            if (values.display === "call") {
+                const reply = await call("polaris.state");
+                // An app older than `polaris.state`, or one that refused it: no call.
+                const state = reply.ok ? reply.value?.call ?? null : null;
+                if (running) ensureController().setCall(JSON.stringify(state));
+            } else if (values.display === "nowPlaying") {
+                let playing = "null";
+                try {
+                    playing = await native.nowPlaying();
+                } catch (error) {
+                    if (!warnedPlaying) log("warn", `could not read what is playing: ${error?.message ?? error}`);
+                    warnedPlaying = true;
+                }
+                if (running) ensureController().setNowPlaying(playing);
+            }
+        } finally {
+            watching = false;
+        }
     }
 
     function ownershipNow() {
@@ -135,10 +189,9 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     }
 
     function feed(report) {
-        if (!controller) controller = new native.Controller(settingsJson());
         let actions = [];
         try {
-            actions = controller.feed(report, now());
+            actions = ensureController().feed(report, now());
         } catch (error) {
             if (!warnedFeed) log("error", `could not change the volume: ${error?.message ?? error}`);
             warnedFeed = true;
@@ -180,6 +233,8 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
 
     function stop() {
         running = false;
+        if (watcher !== null) stopEvery(watcher);
+        watcher = null;
         reader?.close();
         for (const resolve of pending.values()) resolve({ ok: false, error: "stopped" });
         pending.clear();
@@ -193,12 +248,18 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
             values = message.settings ?? {};
             if (running) return;
             running = true;
+            locale = typeof message.locale === "string" && message.locale ? message.locale : systemLocale();
+            ensureController();
             reader = new native.Reader();
             send({ type: "ready" });
             void loop();
+            watcher = every(() => void watch(), WATCH_MS);
+            watcher?.unref?.();
+            void watch();
         } else if (message.type === "settings") {
             values = message.settings ?? {};
             controller?.setSettings(settingsJson());
+            void watch();
         } else if (message.type === "reply") {
             pending.get(message.id)?.(message);
             pending.delete(message.id);
@@ -206,7 +267,7 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     });
 }
 
-module.exports = { run, describe, connectedStatus, RENAMED };
+module.exports = { run, describe, connectedStatus, systemLocale, RENAMED };
 
 /** Started by the plugin host: load the native module, or say plainly that it did not load. */
 function main(port) {

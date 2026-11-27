@@ -2,7 +2,8 @@
 //! frames go out in.
 //!
 //! - [`Screen`]: the page the settings ask for (each knob's name, volume and
-//!   mute, the brightness), built by the engine from the audio state.
+//!   mute; the Polaris call; what is playing; the brightness), built by the
+//!   engine from the audio state, in the desktop app's language.
 //! - [`render`]: that page as a 480x272 indexed image, with a fixed palette
 //!   so a redraw never has to resend it.
 //! - [`Painter`]: everything one session sends on the display interface -
@@ -19,8 +20,10 @@ use crate::display::{
     self, IndexedFrame, Sequence, ACK, CUSTOM_BACKGROUND, END, HEIGHT, HOST_KEEPALIVE,
     PALETTE_COLORS, SCREEN_OFF, SCREEN_ON, WIDTH,
 };
+use crate::plugin::Locale;
 use crate::session::KEEPALIVE_EVERY;
 use crate::settings::DisplayMode;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -34,12 +37,88 @@ pub struct Knob {
     pub muted: bool,
 }
 
+/// Somebody in the call, as the desktop app's call state names them.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Person {
+    pub name: String,
+    pub speaking: bool,
+    pub muted: bool,
+    pub deafened: bool,
+}
+
+/// The Polaris call this computer is in: the shape the desktop app answers
+/// `polaris.state` with (`call`, `clients/desktop/src/shared/voice-widget.ts`).
+/// Whether the camera is on is not part of it, so the page does not claim it.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Call {
+    pub participants: Vec<Person>,
+    pub self_muted: bool,
+    pub self_deafened: bool,
+}
+
+/// More people than this are counted, not kept.
+const MAX_PEOPLE: usize = 64;
+/// Longest name or title kept, in characters.
+const MAX_TEXT: usize = 120;
+
+/// `text` with control characters dropped, trimmed and cut to [`MAX_TEXT`].
+fn clean(text: &str) -> String {
+    text.chars()
+        .filter(|c| !c.is_control())
+        .collect::<String>()
+        .trim()
+        .chars()
+        .take(MAX_TEXT)
+        .collect()
+}
+
+impl Call {
+    /// The same call with every name cleaned and at most [`MAX_PEOPLE`] kept.
+    pub fn bounded(mut self) -> Self {
+        self.participants.truncate(MAX_PEOPLE);
+        for person in &mut self.participants {
+            person.name = clean(&person.name);
+        }
+        self
+    }
+}
+
+/// What the system's media session says is playing.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct NowPlaying {
+    pub title: String,
+    pub artist: String,
+    /// Playing, rather than paused.
+    pub playing: bool,
+}
+
+impl NowPlaying {
+    /// A media session's texts, cleaned; `None` when it names nothing.
+    pub fn new(title: &str, artist: &str, playing: bool) -> Option<Self> {
+        let (title, artist) = (clean(title), clean(artist));
+        (!title.is_empty() || !artist.is_empty()).then_some(Self {
+            title,
+            artist,
+            playing,
+        })
+    }
+}
+
 /// The page the screen should show.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Screen {
     pub mode: DisplayMode,
     pub brightness: u8,
     pub knobs: [Knob; 4],
+    /// The language its words are drawn in.
+    pub locale: Locale,
+    /// The call `Call` mode shows; with none it shows the knobs.
+    pub call: Option<Call>,
+    /// What `NowPlaying` mode shows; with nothing it shows the knobs.
+    pub playing: Option<NowPlaying>,
 }
 
 impl Screen {
@@ -49,7 +128,11 @@ impl Screen {
 
     /// Whether the pixels differ (brightness is a command of its own).
     fn same_picture(&self, other: &Screen) -> bool {
-        self.is_off() == other.is_off() && (self.is_off() || self.knobs == other.knobs)
+        let unlit = |screen: &Screen| Screen {
+            brightness: 0,
+            ..screen.clone()
+        };
+        self.is_off() == other.is_off() && (self.is_off() || unlit(self) == unlit(other))
     }
 }
 
@@ -94,8 +177,13 @@ fn palette() -> [u16; PALETTE_COLORS] {
     palette
 }
 
-/// A 5x7 glyph, one row per byte, bit 4 the leftmost column.
-fn glyph(c: char) -> [u8; 7] {
+/// Rows above a letter's body, where an accent goes.
+const ACCENT_ROWS: usize = 2;
+/// A glyph's height in font dots: the accent rows, then a 5x7 body.
+const GLYPH_ROWS: usize = ACCENT_ROWS + 7;
+
+/// A 5x7 letter body, one row per byte, bit 4 the leftmost column.
+fn body(c: char) -> [u8; 7] {
     match c {
         '0' => [0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e],
         '1' => [0x04, 0x0c, 0x04, 0x04, 0x04, 0x04, 0x0e],
@@ -144,24 +232,52 @@ fn glyph(c: char) -> [u8; 7] {
         '(' => [0x02, 0x04, 0x08, 0x08, 0x08, 0x04, 0x02],
         ')' => [0x08, 0x04, 0x02, 0x02, 0x02, 0x04, 0x08],
         '_' => [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f],
+        '!' => [0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04],
+        '?' => [0x0e, 0x11, 0x01, 0x02, 0x04, 0x00, 0x04],
+        '¡' => [0x04, 0x00, 0x04, 0x04, 0x04, 0x04, 0x04],
+        '¿' => [0x04, 0x00, 0x04, 0x08, 0x10, 0x11, 0x0e],
+        ',' => [0x00, 0x00, 0x00, 0x00, 0x0c, 0x04, 0x08],
+        '"' => [0x0a, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00],
+        '#' => [0x0a, 0x1f, 0x0a, 0x0a, 0x1f, 0x0a, 0x00],
         ' ' => [0; 7],
-        _ => [0x0e, 0x11, 0x01, 0x02, 0x04, 0x00, 0x04],
+        // Anything the font has no letter for: a hollow box.
+        _ => [0x1f, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1f],
     }
 }
 
-/// The text as the font can draw it: upper case, accents dropped.
+/// A letter with its accent: the accent rows, then the body.
+fn glyph(c: char) -> [u8; GLYPH_ROWS] {
+    let (base, accent) = match c {
+        'Á' => ('A', [0x02, 0x04]),
+        'É' => ('E', [0x02, 0x04]),
+        'Í' => ('I', [0x02, 0x04]),
+        'Ó' => ('O', [0x02, 0x04]),
+        'Ú' => ('U', [0x02, 0x04]),
+        'Ñ' => ('N', [0x0d, 0x16]),
+        'Ü' => ('U', [0x00, 0x0a]),
+        other => (other, [0, 0]),
+    };
+    let mut rows = [0u8; GLYPH_ROWS];
+    rows[..ACCENT_ROWS].copy_from_slice(&accent);
+    rows[ACCENT_ROWS..].copy_from_slice(&body(base));
+    rows
+}
+
+/// The text as the font can draw it: upper case; the Spanish accents kept
+/// (Á É Í Ó Ú Ñ Ü ¿ ¡), any other accent dropped.
 fn printable(text: &str) -> Vec<char> {
     text.chars()
         .flat_map(char::to_uppercase)
         .map(|c| match c {
-            'Á' | 'À' | 'Â' | 'Ä' | 'Ã' | 'Å' => 'A',
-            'É' | 'È' | 'Ê' | 'Ë' => 'E',
-            'Í' | 'Ì' | 'Î' | 'Ï' => 'I',
-            'Ó' | 'Ò' | 'Ô' | 'Ö' | 'Õ' => 'O',
-            'Ú' | 'Ù' | 'Û' | 'Ü' => 'U',
-            'Ñ' => 'N',
+            'À' | 'Â' | 'Ä' | 'Ã' | 'Å' => 'A',
+            'È' | 'Ê' | 'Ë' => 'E',
+            'Ì' | 'Î' | 'Ï' => 'I',
+            'Ò' | 'Ô' | 'Ö' | 'Õ' => 'O',
+            'Ù' | 'Û' => 'U',
             'Ç' => 'C',
             '\u{2013}' | '\u{2014}' => '-',
+            '\u{2018}' | '\u{2019}' => '\'',
+            '\u{201c}' | '\u{201d}' => '"',
             other => other,
         })
         .collect()
@@ -179,9 +295,8 @@ impl Canvas {
         }
     }
 
-    /// Text centred on `center`, at `scale` pixels per font dot, cut to
-    /// `max` characters (the last becomes `.` when cut).
-    fn text(&mut self, text: &str, center: usize, y: usize, scale: usize, max: usize, color: u8) {
+    /// `chars` cut to `max` (the last becomes `.` when cut).
+    fn fit(text: &str, max: usize) -> Vec<char> {
         let mut chars = printable(text);
         if chars.len() > max {
             chars.truncate(max);
@@ -189,19 +304,32 @@ impl Canvas {
                 *last = '.';
             }
         }
+        chars
+    }
+
+    /// Text from `left`, its letters' tops at `y` (accents sit above), at
+    /// `scale` pixels per font dot, cut to `max` characters.
+    fn text_at(&mut self, text: &str, left: usize, y: usize, scale: usize, max: usize, color: u8) {
         let advance = 6 * scale;
-        let width = (chars.len() * advance).saturating_sub(scale);
-        let left = center.saturating_sub(width / 2);
-        for (index, c) in chars.iter().enumerate() {
+        let top = y.saturating_sub(ACCENT_ROWS * scale);
+        for (index, c) in Self::fit(text, max).iter().enumerate() {
             for (row, bits) in glyph(*c).iter().enumerate() {
                 for column in 0..5 {
                     if bits & (0x10 >> column) != 0 {
                         let x = left + index * advance + column * scale;
-                        self.rect(x, y + row * scale, scale, scale, color);
+                        self.rect(x, top + row * scale, scale, scale, color);
                     }
                 }
             }
         }
+    }
+
+    /// Text centred on `center`, otherwise as [`Canvas::text_at`].
+    fn text(&mut self, text: &str, center: usize, y: usize, scale: usize, max: usize, color: u8) {
+        let count = Self::fit(text, max).len();
+        let width = (count * 6 * scale).saturating_sub(scale);
+        let left = center.saturating_sub(width / 2);
+        self.text_at(text, left, y, scale, max, color);
     }
 }
 
@@ -213,17 +341,33 @@ const BAR_TOP: usize = 104;
 const BAR_HEIGHT: usize = 148;
 const BAR_WIDTH: usize = 28;
 
+/// Space kept clear at the screen's left and right edges.
+const MARGIN: usize = 16;
+
 /// The page as an image. `Off` draws nothing: the screen is switched off.
+/// `Call` with no call and `NowPlaying` with nothing playing show the knobs.
 pub fn render(screen: &Screen) -> Option<IndexedFrame> {
     if screen.is_off() {
         return None;
     }
-    // Call and NowPlaying fall back to the mixer (settings.rs): Polaris has
-    // no call roster or now-playing source in the plugin yet.
     let mut canvas = Canvas {
         pixels: vec![BACKGROUND; WIDTH * HEIGHT],
     };
-    for (index, knob) in screen.knobs.iter().enumerate() {
+    match (screen.mode, &screen.call, &screen.playing) {
+        (DisplayMode::Call, Some(call), _) => call_page(&mut canvas, call, screen.locale),
+        (DisplayMode::NowPlaying, _, Some(playing)) => {
+            playing_page(&mut canvas, playing, screen.locale)
+        }
+        _ => mixer_page(&mut canvas, &screen.knobs),
+    }
+    Some(IndexedFrame {
+        palette: palette(),
+        pixels: canvas.pixels,
+    })
+}
+
+fn mixer_page(canvas: &mut Canvas, knobs: &[Knob; 4]) {
+    for (index, knob) in knobs.iter().enumerate() {
         let left = index * COLUMN;
         let center = left + COLUMN / 2;
         if index > 0 {
@@ -250,10 +394,112 @@ pub fn render(screen: &Screen) -> Option<IndexedFrame> {
             );
         }
     }
-    Some(IndexedFrame {
-        palette: palette(),
-        pixels: canvas.pixels,
-    })
+}
+
+/// People listed on the call page; the rest are counted.
+const CALL_ROWS: usize = 5;
+const CALL_ROW_TOP: usize = 104;
+const CALL_ROW_HEIGHT: usize = 30;
+
+/// The call: how many are in it, this computer's microphone and sound, and
+/// the people in it (who is speaking, who is muted).
+fn call_page(canvas: &mut Canvas, call: &Call, locale: Locale) {
+    let count = call.participants.len();
+    let header = format!("{} - {count}", locale.pick("In call", "En llamada"));
+    canvas.text(&header, WIDTH / 2, 16, 3, 24, TEXT);
+    let (mic, mic_color) = if call.self_muted {
+        (locale.pick("Muted", "Silenciado"), MUTED)
+    } else {
+        (locale.pick("Mic on", "Micro activo"), FILL)
+    };
+    let (sound, sound_color) = if call.self_deafened {
+        (locale.pick("Deafened", "Ensordecido"), MUTED)
+    } else {
+        (locale.pick("Hearing", "Oyendo"), FILL)
+    };
+    canvas.text(mic, WIDTH / 4, 60, 2, 17, mic_color);
+    canvas.text(sound, WIDTH * 3 / 4, 60, 2, 17, sound_color);
+    canvas.rect(MARGIN, 88, WIDTH - 2 * MARGIN, 1, DIVIDER);
+    let shown = if count > CALL_ROWS {
+        CALL_ROWS - 1
+    } else {
+        count
+    };
+    for (row, person) in call.participants.iter().take(shown).enumerate() {
+        let y = CALL_ROW_TOP + row * CALL_ROW_HEIGHT;
+        // A lit square for whoever is speaking.
+        if person.speaking {
+            canvas.rect(MARGIN, y + 2, 10, 10, FILL);
+        }
+        let color = if person.muted || person.deafened {
+            DIM
+        } else {
+            TEXT
+        };
+        canvas.text_at(&person.name, MARGIN + 20, y, 2, 25, color);
+        let state = if person.deafened {
+            locale.pick("Deafened", "Ensordecido")
+        } else if person.muted {
+            locale.pick("Muted", "Silenciado")
+        } else {
+            ""
+        };
+        let width = state.chars().count() * 12;
+        canvas.text_at(state, WIDTH - MARGIN - width, y, 2, 11, MUTED);
+    }
+    if count > shown {
+        let more = format!("+{} {}", count - shown, locale.pick("more", "más"));
+        let y = CALL_ROW_TOP + shown * CALL_ROW_HEIGHT;
+        canvas.text_at(&more, MARGIN + 20, y, 2, 25, DIM);
+    }
+}
+
+/// `text` in at most `lines` lines of `width` characters, broken between
+/// words where it can; the last line is cut with `.` when it does not fit.
+fn wrap(text: &str, width: usize, lines: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut words = text.split_whitespace().peekable();
+    while out.len() < lines && words.peek().is_some() {
+        let mut line = String::new();
+        while let Some(word) = words.peek() {
+            let needed =
+                line.chars().count() + usize::from(!line.is_empty()) + word.chars().count();
+            if needed > width && !line.is_empty() {
+                break;
+            }
+            if !line.is_empty() {
+                line.push(' ');
+            }
+            line.push_str(word);
+            words.next();
+        }
+        out.push(line);
+    }
+    if let (Some(last), Some(_)) = (out.last_mut(), words.peek()) {
+        // More words than lines: mark the cut.
+        let kept: String = last.chars().take(width.saturating_sub(1)).collect();
+        *last = format!("{kept}.");
+    }
+    out
+}
+
+/// What is playing: playing or paused, the title (two lines) and the artist.
+fn playing_page(canvas: &mut Canvas, playing: &NowPlaying, locale: Locale) {
+    let state = if playing.playing {
+        locale.pick("Now playing", "Suena ahora")
+    } else {
+        locale.pick("Paused", "En pausa")
+    };
+    canvas.text(state, WIDTH / 2, 24, 2, 36, DIM);
+    // 4 pixels a dot: 24 a letter, 18 letters between the margins.
+    let title_width = (WIDTH - 2 * MARGIN) / 24;
+    for (line, text) in wrap(&playing.title, title_width, 2).iter().enumerate() {
+        canvas.text(text, WIDTH / 2, 76 + line * 44, 4, title_width, TEXT);
+    }
+    let artist_width = (WIDTH - 2 * MARGIN) / 18;
+    canvas.text(&playing.artist, WIDTH / 2, 190, 3, artist_width, DIM);
+    let bar = if playing.playing { FILL } else { TRACK };
+    canvas.rect(MARGIN, HEIGHT - 24, WIDTH - 2 * MARGIN, 4, bar);
 }
 
 /// Time between two tiles: the official software sends one tile every

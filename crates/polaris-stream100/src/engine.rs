@@ -7,10 +7,11 @@
 //! (the plugin process) applies the commands and the engine stays pure and
 //! tested without a device.
 
-use crate::audio::{resolve, Category, Session, Target};
+use crate::audio::{resolve, Session, Target};
 use crate::encoder::{apply, Encoder};
+use crate::plugin::{knob_value, screen_name, Locale};
 use crate::report::{Decoder, Event, KnobMap, Report};
-use crate::screen::{Knob, Screen};
+use crate::screen::{Call, Knob, NowPlaying, Screen};
 use crate::settings::Settings;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -51,6 +52,9 @@ pub struct Engine {
     decoder: Decoder,
     encoders: [Encoder; 4],
     games: HashSet<String>,
+    locale: Locale,
+    call: Option<Call>,
+    playing: Option<NowPlaying>,
 }
 
 impl Engine {
@@ -60,6 +64,9 @@ impl Engine {
             decoder: Decoder::new(knobs),
             encoders: Default::default(),
             games: HashSet::new(),
+            locale: Locale::default(),
+            call: None,
+            playing: None,
         }
     }
 
@@ -78,6 +85,31 @@ impl Engine {
     /// program key (`program_key`), for the Games category.
     pub fn set_games(&mut self, keys: impl IntoIterator<Item = String>) {
         self.games = keys.into_iter().collect();
+    }
+
+    /// The language the screen is drawn in. Answers whether it changed.
+    pub fn set_locale(&mut self, locale: Locale) -> bool {
+        std::mem::replace(&mut self.locale, locale) != locale
+    }
+
+    /// The Polaris call this computer is in, as the desktop app reports it
+    /// (`None`: no call). Answers whether it changed.
+    pub fn set_call(&mut self, call: Option<Call>) -> bool {
+        let call = call.map(Call::bounded);
+        if self.call == call {
+            return false;
+        }
+        self.call = call;
+        true
+    }
+
+    /// What the system's media session says is playing. Answers whether it changed.
+    pub fn set_now_playing(&mut self, playing: Option<NowPlaying>) -> bool {
+        if self.playing == playing {
+            return false;
+        }
+        self.playing = playing;
+        true
     }
 
     /// Forgets the decoder baseline and pending counts (reconnect, lock).
@@ -199,7 +231,7 @@ impl Engine {
             }
         }
         let knobs = std::array::from_fn(|knob| {
-            let label = knob_label(&self.settings.knobs[knob]);
+            let label = knob_label(&self.settings.knobs[knob], self.locale);
             match self.targets(knob, &sessions) {
                 None => Knob {
                     label,
@@ -223,6 +255,9 @@ impl Engine {
             mode: self.settings.display,
             brightness: self.settings.brightness,
             knobs,
+            locale: self.locale,
+            call: self.call.clone(),
+            playing: self.playing.clone(),
         }
     }
 
@@ -255,27 +290,21 @@ impl Engine {
     }
 }
 
-/// A knob's name on the screen: its category, the program it follows
-/// without the extension, or `Output`.
-fn knob_label(target: &Target) -> String {
+/// A knob's name on the screen, in `locale`: its category or `Output` (the
+/// plugin page's words, [`screen_name`]), or the program it follows without
+/// the extension.
+fn knob_label(target: &Target, locale: Locale) -> String {
     match target {
-        Target::Category { category } => match category {
-            Category::Music => "Music",
-            Category::Calls => "Calls",
-            Category::Games => "Games",
-            Category::Browser => "Browser",
-            Category::System => "System",
-            Category::Other => "Other",
-        }
-        .to_owned(),
         Target::Program { program } => program
             .rsplit(['/', '\\'])
             .next()
             .unwrap_or(program)
             .trim_end_matches(".exe")
             .to_owned(),
-        Target::Output => "Output".to_owned(),
-        Target::None => String::new(),
+        other => {
+            let (en, es) = screen_name(knob_value(other));
+            locale.pick(en, es).to_owned()
+        }
     }
 }
 
@@ -310,6 +339,33 @@ mod tests {
         let mut engine = Engine::new(Settings::default(), KnobMap::default());
         engine.feed(&report(0, [0; 4]), 0, &[], Output::default());
         engine
+    }
+
+    #[test]
+    fn knob_names_follow_the_locale_and_program_names_never_do() {
+        let mut engine = engine();
+        let names = |engine: &Engine| {
+            engine
+                .screen(&[], Output::default(), &[])
+                .knobs
+                .map(|knob| knob.label)
+        };
+        assert_eq!(names(&engine), ["Calls", "Music", "Games", "Output"]);
+        assert!(engine.set_locale(Locale::from_tag("es-ES")));
+        assert!(!engine.set_locale(Locale::EsEs));
+        assert_eq!(names(&engine), ["Llamadas", "Música", "Juegos", "Salida"]);
+        let mut knobs = Settings::default().knobs;
+        knobs[0] = Target::Program {
+            program: r"C:\Games\Obs64.exe".into(),
+        };
+        engine.set_settings(Settings {
+            knobs,
+            ..Default::default()
+        });
+        assert_eq!(names(&engine)[0], "Obs64");
+        // An unknown language falls back to English.
+        engine.set_locale(Locale::from_tag("fr-FR"));
+        assert_eq!(names(&engine)[1], "Music");
     }
 
     #[test]

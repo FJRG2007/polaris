@@ -13,8 +13,9 @@ use napi_derive::napi;
 use polaris_stream100::audio::{backend_status, AudioError, AudioSessions, Session};
 use polaris_stream100::engine::{Command, Engine, Output};
 use polaris_stream100::native::input::Input;
+use polaris_stream100::plugin::Locale;
 use polaris_stream100::report::KnobMap;
-use polaris_stream100::screen;
+use polaris_stream100::screen::{self, Call, NowPlaying};
 use polaris_stream100::settings::{schema, Settings};
 use polaris_stream100::transport::TransportError;
 use polaris_stream100::{manifest, native, ownership, plugin};
@@ -116,6 +117,16 @@ pub struct Controller {
 }
 
 impl Controller {
+    /// Posts the page as it stands now, without waiting for a knob; with no
+    /// audio backend it follows at the next report instead.
+    fn repaint(&mut self) {
+        if let Ok(mixer) = self.mixer() {
+            if let (Ok(sessions), Ok((volume, muted))) = (mixer.sessions(), mixer.output_volume()) {
+                screen::post(self.engine.screen(&sessions, Output { volume, muted }, &[]));
+            }
+        }
+    }
+
     fn mixer(&mut self) -> napi::Result<&mut Box<dyn AudioSessions>> {
         if self.mixer.is_none() {
             self.mixer = Some(native::open().map_err(audio_error)?);
@@ -139,12 +150,38 @@ impl Controller {
     #[napi(catch_unwind)]
     pub fn set_settings(&mut self, settings: String) {
         self.engine.set_settings(Settings::from_json(&settings));
-        // The screen follows a new mode or brightness without waiting for a
-        // knob; with no audio backend it follows at the next report instead.
-        if let Ok(mixer) = self.mixer() {
-            if let (Ok(sessions), Ok((volume, muted))) = (mixer.sessions(), mixer.output_volume()) {
-                screen::post(self.engine.screen(&sessions, Output { volume, muted }, &[]));
-            }
+        // The screen follows a new mode or brightness without waiting for a knob.
+        self.repaint();
+    }
+
+    /// The desktop app's language (`es-ES`, `en-US`, ...) for the screen's
+    /// words; any language Polaris does not ship draws in English.
+    #[napi(catch_unwind)]
+    pub fn set_locale(&mut self, locale: String) {
+        if self.engine.set_locale(Locale::from_tag(&locale)) {
+            self.repaint();
+        }
+    }
+
+    /// The Polaris call as the app answers `polaris.state` (its `call`: JSON,
+    /// `null` when there is none). Anything not of that shape is no call.
+    #[napi(catch_unwind)]
+    pub fn set_call(&mut self, call: String) {
+        let call = serde_json::from_str::<Option<Call>>(&call).unwrap_or_default();
+        if self.engine.set_call(call) {
+            self.repaint();
+        }
+    }
+
+    /// What is playing, as [`now_playing`] answers it (JSON, `null` for nothing).
+    #[napi(catch_unwind)]
+    pub fn set_now_playing(&mut self, playing: String) {
+        let playing = serde_json::from_str::<Option<NowPlaying>>(&playing)
+            .ok()
+            .flatten()
+            .and_then(|now| NowPlaying::new(&now.title, &now.artist, now.playing));
+        if self.engine.set_now_playing(playing) {
+            self.repaint();
         }
     }
 
@@ -203,6 +240,33 @@ impl Controller {
         }
         Ok(actions)
     }
+}
+
+/// One read of the system's media session, on a worker thread: the
+/// Windows one waits on its own asynchronous calls.
+pub struct ReadNowPlaying;
+
+impl Task for ReadNowPlaying {
+    type Output = String;
+    type JsValue = String;
+
+    fn compute(&mut self) -> napi::Result<String> {
+        let playing = std::panic::catch_unwind(native::media::now_playing)
+            .map_err(|_| napi::Error::from_reason("reading what is playing failed"))?
+            .map_err(napi::Error::from_reason)?;
+        json(&playing)
+    }
+
+    fn resolve(&mut self, _env: Env, output: String) -> napi::Result<String> {
+        Ok(output)
+    }
+}
+
+/// What the system's media session says is playing, as `NowPlaying` JSON
+/// (`null` for nothing, and always on macOS), for `Controller.setNowPlaying`.
+#[napi(ts_return_type = "Promise<string>")]
+pub fn now_playing() -> AsyncTask<ReadNowPlaying> {
+    AsyncTask::new(ReadNowPlaying)
 }
 
 /// What one [`Reader::next`] answers: a report, nothing within the wait, or
