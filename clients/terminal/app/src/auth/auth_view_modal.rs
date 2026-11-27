@@ -1,17 +1,15 @@
 use std::collections::HashMap;
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use pterm_core::features::FeatureFlag;
-use pterm_core::{safe_anyhow, safe_error};
+use pterm_core::safe_anyhow;
 use pterm_errors::{ErrorExt, report_error};
-use ptermui::actions::StandardAction;
 use ptermui::elements::{
     ChildAnchor, ChildView, Container, Fill, HighlightedHyperlink, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
 };
-use ptermui::keymap::FixedBinding;
 use ptermui::ui_components::components::{Coords, UiComponentStyles};
 use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
@@ -21,7 +19,7 @@ use url::Url;
 
 use super::UserUid;
 use super::auth_manager::{AuthManager, AuthManagerEvent};
-use super::auth_view_body::{AuthStep, AuthViewBodyAction, AuthViewBodyEvent};
+use super::auth_view_body::AuthViewBodyEvent;
 use super::credentials::RefreshToken;
 use super::login_failure_notification::{self, LoginFailureReason};
 use crate::appearance::Appearance;
@@ -29,44 +27,9 @@ use crate::auth::auth_view_body::AuthViewBody;
 use crate::modal::Modal;
 use crate::root_view::unthemed_window_border;
 use crate::server::server_api::auth::UserAuthenticationError;
-use crate::util::bindings::CustomAction;
-
-pub fn init(app: &mut AppContext) {
-    use ptermui::keymap::macros::*;
-
-    app.register_fixed_bindings([
-        // Bindings for paste require the StandardAction and CustomAction binding to work on all platforms.
-        FixedBinding::custom(
-            CustomAction::Paste,
-            AuthViewAction::PasteAuthUrl,
-            "Paste",
-            id!(AuthView::ui_name()),
-        ),
-        FixedBinding::standard(
-            StandardAction::Paste,
-            AuthViewAction::PasteAuthUrl,
-            id!(AuthView::ui_name()),
-        ),
-    ]);
-
-    // For linux and Windows, default paste binding is ctrl+shift+v for PTY reasons.
-    // This can be confusing for users in some cases (and we might want
-    // to solve it in a more general way later). In the meantime, we
-    // add a basic ctrl+v binding for the auth view, since there is no
-    // terminal to interact with yet.
-    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows"))]
-    app.register_fixed_bindings([FixedBinding::new(
-        "cmdorctrl-v",
-        AuthViewAction::PasteAuthUrl,
-        id!(AuthView::ui_name()),
-    )]);
-}
 
 #[derive(Clone, Debug)]
 pub enum AuthViewAction {
-    /// Triggered when the user attempts to paste something while the auth view
-    /// modal is visible.
-    PasteAuthUrl,
     DismissErrorNotification,
 }
 
@@ -127,14 +90,6 @@ impl AuthRedirectPayload {
             ))
         }
     }
-
-    /// Like [`from_url()`], except first parses the given [`raw_url`] into a [`Url`] struct.
-    pub fn from_raw_url(raw_url: String) -> Result<Self> {
-        match Url::parse(&raw_url) {
-            Ok(parsed_url) => AuthRedirectPayload::from_url(parsed_url),
-            Err(error) => Err(anyhow!(error)),
-        }
-    }
 }
 
 const MODAL_WIDTH: f32 = 352.;
@@ -155,10 +110,8 @@ impl AuthView {
             AuthViewBodyEvent::SignUpButtonClicked => {
                 me.dismiss_error_notification(ctx);
             }
-            AuthViewBodyEvent::AuthTokenEntered(token) => {
-                me.last_login_failure_reason = None;
-                me.handle_pasted_auth_url(token.clone(), ctx);
-                ctx.notify();
+            AuthViewBodyEvent::PolarisSignInRequested => {
+                me.open_polaris_sign_in(ctx);
             }
             AuthViewBodyEvent::LoginLaterClicked => {
                 me.handle_login_later(ctx);
@@ -202,25 +155,6 @@ impl AuthView {
         );
     }
 
-    fn set_auth_step(&mut self, ctx: &mut ViewContext<Self>, step: AuthStep) {
-        self.update_auth_body(
-            ctx,
-            |body: &mut AuthViewBody, _: &mut ViewContext<'_, AuthViewBody>| {
-                body.set_auth_step(step)
-            },
-        );
-    }
-
-    pub fn skip_to_browser_open_step(&mut self, ctx: &mut ViewContext<Self>) {
-        self.set_auth_step(ctx, AuthStep::BrowserOpen);
-    }
-
-    pub fn start_sign_in(&mut self, ctx: &mut ViewContext<Self>) {
-        self.update_auth_body(ctx, |body, ctx| {
-            body.handle_action(&AuthViewBodyAction::Login, ctx);
-        });
-    }
-
     fn focus(&self, ctx: &mut ViewContext<Self>) {
         ctx.focus(&self.auth_screen_modal);
         ctx.notify();
@@ -234,38 +168,25 @@ impl AuthView {
     fn close(&mut self, ctx: &mut ViewContext<Self>) {
         self.update_auth_body(
             ctx,
-            |body: &mut AuthViewBody, ctx: &mut ViewContext<'_, AuthViewBody>| {
-                body.reset_login_screen(ctx)
+            |body: &mut AuthViewBody, _: &mut ViewContext<'_, AuthViewBody>| {
+                body.reset_login_screen()
             },
         );
         self.dismiss_error_notification(ctx);
         ctx.emit(AuthViewEvent::Close);
     }
 
-    /// Parses the given 'clipboard_content' string into a URL which is assumed to represent the
-    /// OAuth redirect URL containing the user's refresh token after the user authenticated Polaris Terminal.
-    fn handle_pasted_auth_url(&mut self, pasted_url: String, ctx: &mut ViewContext<Self>) {
-        self.set_auth_token_input_editable(false, ctx);
-        match AuthRedirectPayload::from_raw_url(pasted_url) {
-            Ok(redirect_payload) => {
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    auth_manager.initialize_user_from_auth_payload(redirect_payload, true, ctx);
-                });
-            }
-            Err(error) => {
-                safe_error!(
-                    safe: ("Failed to parse AuthRedirectPayload from redirect URL"),
-                    full: ("Failed to parse AuthRedirectPayload from redirect URL: {error:#}")
-                );
-                self.last_login_failure_reason =
-                    Some(LoginFailureReason::InvalidRedirectUrl { was_pasted: true });
-                self.set_auth_token_input_editable(true, ctx);
-            }
+    /// The Polaris sign-in lives in Settings > Account. Before the first
+    /// workspace exists, the sign-in screen is skipped so there is one to open
+    /// it in; a closeable prompt just closes.
+    fn open_polaris_sign_in(&mut self, ctx: &mut ViewContext<Self>) {
+        match self.auth_view_variant {
+            AuthViewVariant::Initial => self.handle_login_later(ctx),
+            AuthViewVariant::RequireLoginCloseable
+            | AuthViewVariant::HitDriveObjectLimitCloseable
+            | AuthViewVariant::ShareRequirementCloseable => self.close(ctx),
         }
-    }
-
-    fn set_auth_token_input_editable(&mut self, is_editable: bool, ctx: &mut ViewContext<Self>) {
-        self.update_auth_body(ctx, |body, ctx| body.set_input_editable(is_editable, ctx))
+        ctx.emit(AuthViewEvent::OpenPolarisSignIn);
     }
 
     fn update_auth_body<S, F>(&mut self, ctx: &mut ViewContext<Self>, cb: F) -> S
@@ -308,12 +229,9 @@ impl AuthView {
                     self.last_login_failure_reason =
                         Some(LoginFailureReason::FailedUserAuthentication);
                 }
-
-                self.set_auth_token_input_editable(true, ctx);
             }
             AuthManagerEvent::CreateAnonymousUserFailed => {
                 self.last_login_failure_reason = Some(LoginFailureReason::FailedUserAuthentication);
-                self.set_auth_token_input_editable(true, ctx);
             }
             AuthManagerEvent::MintCustomTokenFailed(_err) => {
                 self.last_login_failure_reason = Some(LoginFailureReason::FailedMintCustomToken);
@@ -327,6 +245,8 @@ impl AuthView {
 #[derive(PartialEq, Eq)]
 pub enum AuthViewEvent {
     Close,
+    /// Open Settings > Account, where the Polaris sign-in is.
+    OpenPolarisSignIn,
 }
 
 impl Entity for AuthView {
@@ -389,12 +309,6 @@ impl TypedActionView for AuthView {
 
     fn handle_action(&mut self, action: &AuthViewAction, ctx: &mut ViewContext<Self>) {
         match action {
-            AuthViewAction::PasteAuthUrl => {
-                self.last_login_failure_reason = None;
-                self.update_auth_body(ctx, |body, ctx| body.handle_paste(ctx));
-
-                ctx.notify();
-            }
             AuthViewAction::DismissErrorNotification => {
                 self.dismiss_error_notification(ctx);
             }

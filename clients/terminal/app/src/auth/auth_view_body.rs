@@ -1,11 +1,8 @@
-use anyhow::anyhow;
 use lazy_static::lazy_static;
 use pterm_core::features::FeatureFlag;
 use pterm_core::ui::appearance::DEFAULT_COMMAND_PALETTE_FONT_SIZE;
 use pterm_core::ui::builder::UiBuilder;
-use pterm_errors::report_error;
 use ptermui::accessibility::{AccessibilityContent, PtermA11yRole};
-use ptermui::clipboard::ClipboardContent;
 use ptermui::color::ColorU;
 use ptermui::elements::{
     Align, Border, Container, CornerRadius, CrossAxisAlignment, Dismiss, Fill, Flex,
@@ -16,11 +13,9 @@ use ptermui::keymap::FixedBinding;
 use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, UpdateModel, View,
-    ViewContext, ViewHandle,
+    ViewContext,
 };
 
-use super::AuthStateProvider;
-use super::auth_manager::AuthManager;
 use super::auth_view_modal::AuthViewVariant;
 use super::auth_view_shared_helpers::{
     PrivacySettingsActions, PrivacySettingsHandles, action_button_color_and_variant,
@@ -29,15 +24,10 @@ use super::auth_view_shared_helpers::{
 };
 use crate::appearance::Appearance;
 use crate::auth::auth_view_shared_helpers::render_offline_contents;
-use crate::editor::{
-    EditorView, InteractionState, SingleLineEditorOptions, TextColors, TextOptions,
-};
-use crate::experiments::{AuthFlowInstructions, Experiment};
 use crate::modal::MODAL_CORNER_RADIUS;
 use crate::network::NetworkStatus;
-use crate::server::telemetry::{AnonymousUserSignupEntrypoint, LoginEventSource, TelemetryEvent};
+use crate::server::telemetry::{LoginEventSource, TelemetryEvent};
 use crate::settings::{AISettings, PrivacySettings};
-use crate::themes::theme::Fill as ThemeFill;
 use crate::util::color::{darken, lighten};
 use crate::{send_telemetry_from_ctx, send_telemetry_sync_from_ctx};
 
@@ -46,19 +36,9 @@ const TOS_URL: &str = "https://fjrg2007.github.io/polaris";
 const COMMON_BODY_UI_FONT_SIZE: f32 = 12.;
 const AUTH_MODAL_GAP: f32 = 16.;
 
-const AUTH_TOKEN_INPUT_PLACEHOLDER_TEXT: &str = "Auth Token";
-const AUTH_TOKEN_INPUT_PLACEHOLDER_TEXT_EXPERIMENTAL: &str = "Browser auth token";
-
-const AUTH_TOKEN_INPUT_BORDER_RADIUS: Radius = Radius::Pixels(4.);
-
 lazy_static! {
     static ref BODY_TEXT_COLOR: ColorU = ColorU::new(157, 157, 157, 255);
     static ref HOVERED_BODY_TEXT_COLOR: ColorU = lighten(*BODY_TEXT_COLOR);
-    static ref AUTH_TOKEN_INPUT_BACKGROUND: Fill = ColorU::white().into();
-    static ref AUTH_TOKEN_INPUT_TEXT_COLOR: ThemeFill = ThemeFill::Solid(ColorU::black());
-    static ref AUTH_TOKEN_INPUT_TEXT_DISABLED: ThemeFill =
-        AUTH_TOKEN_INPUT_TEXT_COLOR.with_opacity(20);
-    static ref AUTH_TOKEN_INPUT_TEXT_HINT: ThemeFill = AUTH_TOKEN_INPUT_TEXT_COLOR.with_opacity(40);
 }
 
 pub fn init(app: &mut AppContext) {
@@ -78,11 +58,8 @@ pub fn init(app: &mut AppContext) {
 
 #[derive(Default)]
 struct MouseStateHandles {
-    login_link_mouse_state_handle: MouseStateHandle,
     enter_login_later_mouse_state_handle: MouseStateHandle,
     confirm_login_later_mouse_state_handle: MouseStateHandle,
-    show_auth_token_input_mouse_state_handle: MouseStateHandle,
-    copy_browser_url_mouse_state_handle: MouseStateHandle,
     tos_mouse_state_handle: MouseStateHandle,
     sign_up_mouse_state_handle: MouseStateHandle,
     learn_more_mouse_state_handle: MouseStateHandle,
@@ -101,11 +78,7 @@ pub struct AuthViewBody {
     mouse_state_handles: MouseStateHandles,
     privacy_settings_handles: PrivacySettingsHandles,
     active_overlay: Option<AuthViewOverlay>,
-    auth_token_input: ViewHandle<EditorView>,
-    show_auth_token_input: bool,
-    auth_step: AuthStep,
     loginless_step: LoginlessStep,
-    copy_url_click_count: u8,
     allow_loginless: bool,
 }
 
@@ -117,20 +90,11 @@ enum LoginlessStep {
     Initiated,
 }
 
-pub enum AuthStep {
-    SelectAuthPathway,
-    BrowserOpen,
-}
-
 #[derive(Clone, Copy, Debug)]
 pub enum AuthViewBodyAction {
-    Login,
     InitiateLoginLater,
     LoginLater,
-    EnterToken,
-    CopyLoginUrl,
     Signup,
-    SignupAnonymousUser,
     ShowOverlay(AuthViewOverlay),
     HideOverlay,
     ToggleTelemetry,
@@ -141,47 +105,6 @@ pub enum AuthViewBodyAction {
 
 impl AuthViewBody {
     pub fn new(variant: AuthViewVariant, ctx: &mut ViewContext<Self>) -> Self {
-        let experiment_group = AuthFlowInstructions::get_group(ctx);
-        let auth_token_input = ctx.add_typed_action_view(|ctx| {
-            let appearance = Appearance::as_ref(ctx);
-            let mut editor = EditorView::single_line(
-                SingleLineEditorOptions {
-                    text: TextOptions {
-                        font_size_override: Some(COMMON_BODY_UI_FONT_SIZE),
-                        font_family_override: Some(appearance.ui_font_family()),
-                        text_colors_override: Some(TextColors {
-                            default_color: *AUTH_TOKEN_INPUT_TEXT_COLOR,
-                            disabled_color: *AUTH_TOKEN_INPUT_TEXT_DISABLED,
-                            hint_color: *AUTH_TOKEN_INPUT_TEXT_HINT,
-                        }),
-                        ..Default::default()
-                    },
-                    soft_wrap: false,
-                    ..Default::default()
-                },
-                ctx,
-            );
-
-            let placeholder_text =
-                if matches!(experiment_group, Some(AuthFlowInstructions::Experiment)) {
-                    AUTH_TOKEN_INPUT_PLACEHOLDER_TEXT_EXPERIMENTAL
-                } else {
-                    AUTH_TOKEN_INPUT_PLACEHOLDER_TEXT
-                };
-
-            editor.set_placeholder_text(placeholder_text, ctx);
-            editor
-        });
-
-        ctx.subscribe_to_view(&auth_token_input, |me, _, event, ctx| {
-            use crate::editor::Event::{AltEnter, CmdEnter, Enter, Paste, ShiftEnter};
-            match event {
-                AltEnter | CmdEnter | Enter | Paste | ShiftEnter => me.emit_token_entered(ctx),
-                _ => {}
-            };
-            ctx.notify();
-        });
-
         let allow_loginless = !FeatureFlag::ForceLogin.is_enabled();
 
         let network_status = NetworkStatus::handle(ctx);
@@ -194,52 +117,17 @@ impl AuthViewBody {
             mouse_state_handles: Default::default(),
             privacy_settings_handles: Default::default(),
             active_overlay: None,
-            auth_token_input,
-            show_auth_token_input: false,
-            auth_step: AuthStep::SelectAuthPathway,
             loginless_step: LoginlessStep::Start,
-            copy_url_click_count: 0,
             allow_loginless,
         }
     }
 
-    pub fn handle_paste(&mut self, ctx: &mut ViewContext<Self>) {
-        self.show_auth_token_input = true;
-        self.auth_token_input
-            .update(ctx, |editor, ctx| editor.paste(ctx));
-    }
-
-    pub fn reset_login_screen(&mut self, ctx: &mut ViewContext<Self>) {
-        self.reset_auth_token_input(ctx);
-        self.auth_step = AuthStep::SelectAuthPathway;
+    pub fn reset_login_screen(&mut self) {
         self.loginless_step = LoginlessStep::Start;
-        self.copy_url_click_count = 0;
-    }
-
-    fn reset_auth_token_input(&mut self, ctx: &mut ViewContext<Self>) {
-        self.set_input_editable(true, ctx);
-        self.auth_token_input
-            .update(ctx, |editor, ctx| editor.clear_buffer(ctx));
-        self.show_auth_token_input = false;
-    }
-
-    pub fn set_input_editable(&mut self, is_editable: bool, ctx: &mut ViewContext<Self>) {
-        let interaction_state = match is_editable {
-            false => InteractionState::Disabled,
-            true => InteractionState::Editable,
-        };
-        self.auth_token_input.update(ctx, |editor, ctx| {
-            editor.set_interaction_state(interaction_state, ctx)
-        });
     }
 
     pub fn set_variant(&mut self, variant: AuthViewVariant) {
         self.variant = variant;
-    }
-
-    fn emit_token_entered(&self, ctx: &mut ViewContext<Self>) {
-        let text = self.auth_token_input.as_ref(ctx).buffer_text(ctx);
-        ctx.emit(AuthViewBodyEvent::AuthTokenEntered(text));
     }
 
     fn privacy_settings_actions(&self) -> PrivacySettingsActions<AuthViewBodyAction> {
@@ -249,59 +137,6 @@ impl AuthViewBody {
             toggle_cloud_conversation_storage: AuthViewBodyAction::ToggleCloudConversationStorage,
             hide_overlay: AuthViewBodyAction::HideOverlay,
         }
-    }
-
-    fn render_auth_token_suggest(&self, ui_builder: &UiBuilder) -> Box<dyn Element> {
-        Flex::row()
-            .with_child(
-                ui_builder
-                    .link(
-                        "Click here to paste your token from the browser".into(),
-                        None,
-                        Some(Box::new(|ctx| {
-                            ctx.dispatch_typed_action(AuthViewBodyAction::EnterToken);
-                        })),
-                        self.mouse_state_handles
-                            .show_auth_token_input_mouse_state_handle
-                            .clone(),
-                    )
-                    .soft_wrap(false)
-                    .build()
-                    .finish(),
-            )
-            .finish()
-    }
-
-    fn render_auth_token_input(&self, appearance: &Appearance) -> Option<Box<dyn Element>> {
-        if !self.show_auth_token_input {
-            return None;
-        }
-
-        Some(
-            appearance
-                .ui_builder()
-                .text_input(self.auth_token_input.clone())
-                .with_style(UiComponentStyles {
-                    background: Some(*AUTH_TOKEN_INPUT_BACKGROUND),
-                    border_width: Some(0.),
-                    border_radius: Some(CornerRadius::with_all(AUTH_TOKEN_INPUT_BORDER_RADIUS)),
-                    padding: Some(Coords {
-                        top: 12.,
-                        bottom: 12.,
-                        left: 16.,
-                        right: 16.,
-                    }),
-                    margin: Some(Coords {
-                        top: 8.,
-                        bottom: 0.,
-                        left: 0.,
-                        right: 0.,
-                    }),
-                    ..Default::default()
-                })
-                .build()
-                .finish(),
-        )
     }
 
     fn render_privacy_information(
@@ -421,7 +256,6 @@ impl AuthViewBody {
 
     fn render_sign_up_button(
         &self,
-        is_anonymous: bool,
         appearance: &Appearance,
         ui_builder: &UiBuilder,
     ) -> Box<dyn Element> {
@@ -454,17 +288,7 @@ impl AuthViewBody {
             ..hover_button_style
         };
 
-        let on_click_action = if is_anonymous
-            && matches!(
-                self.variant,
-                AuthViewVariant::RequireLoginCloseable
-                    | AuthViewVariant::HitDriveObjectLimitCloseable
-                    | AuthViewVariant::ShareRequirementCloseable
-            ) {
-            AuthViewBodyAction::SignupAnonymousUser
-        } else {
-            AuthViewBodyAction::Signup
-        };
+        let on_click_action = AuthViewBodyAction::Signup;
 
         ui_builder
             .button_with_custom_styles(
@@ -475,38 +299,11 @@ impl AuthViewBody {
                 Some(click_button_style),
                 None,
             )
-            .with_centered_text_label("Sign up".into())
+            .with_centered_text_label("Sign in to your Polaris".into())
             .build()
             .on_click(move |ctx, _, _| {
                 ctx.dispatch_typed_action(on_click_action);
             })
-            .finish()
-    }
-
-    fn render_sign_in_row(&self, ui_builder: &UiBuilder) -> Box<dyn Element> {
-        Flex::row()
-            .with_child(
-                ui_builder
-                    .span("Already have an account? ")
-                    .build()
-                    .finish(),
-            )
-            .with_child(
-                ui_builder
-                    .link(
-                        "Sign in".into(),
-                        None,
-                        Some(Box::new(|ctx| {
-                            ctx.dispatch_typed_action(AuthViewBodyAction::Login);
-                        })),
-                        self.mouse_state_handles
-                            .login_link_mouse_state_handle
-                            .clone(),
-                    )
-                    .soft_wrap(false)
-                    .build()
-                    .finish(),
-            )
             .finish()
     }
 
@@ -640,7 +437,7 @@ impl AuthViewBody {
             AuthViewVariant::Initial => "Welcome to Polaris Terminal!",
             AuthViewVariant::RequireLoginCloseable
             | AuthViewVariant::HitDriveObjectLimitCloseable
-            | AuthViewVariant::ShareRequirementCloseable => "Sign up for Polaris Terminal",
+            | AuthViewVariant::ShareRequirementCloseable => "Sign in to your Polaris",
         };
 
         ui_builder
@@ -681,7 +478,6 @@ impl AuthViewBody {
 
     fn render_select_auth_pathway_content(
         &self,
-        is_anonymous: bool,
         appearance: &Appearance,
         ui_builder: &UiBuilder,
         app: &AppContext,
@@ -692,10 +488,7 @@ impl AuthViewBody {
         let header = Container::new(self.render_header(appearance, ui_builder))
             .with_margin_bottom(AUTH_MODAL_GAP)
             .finish();
-        let sign_up_button = self.render_sign_up_button(is_anonymous, appearance, ui_builder);
-        let sign_in_row = Container::new(self.render_sign_in_row(ui_builder))
-            .with_margin_top(AUTH_MODAL_GAP)
-            .finish();
+        let sign_up_button = self.render_sign_up_button(appearance, ui_builder);
         let force_login_disclaimer = self.render_force_login_disclaimer(appearance, ui_builder);
 
         match self.variant {
@@ -718,9 +511,9 @@ impl AuthViewBody {
                                 self.render_sign_in_later_confirm_row(ui_builder)
                             }
                         };
-                        vec![logo, header, sign_up_button, sign_in_row, sign_up_later_row]
+                        vec![logo, header, sign_up_button, sign_up_later_row]
                     } else {
-                        vec![logo, header, sign_up_button, sign_in_row]
+                        vec![logo, header, sign_up_button]
                     };
 
                     contents.append(&mut self.render_privacy_information(appearance, ui_builder));
@@ -736,95 +529,11 @@ impl AuthViewBody {
             }
         }
     }
-
-    fn render_browser_open_content(
-        &self,
-        appearance: &Appearance,
-        ui_builder: &UiBuilder,
-    ) -> Vec<Box<dyn Element>> {
-        let logo = Container::new(self.render_logo_row(appearance, ui_builder))
-            .with_margin_bottom(AUTH_MODAL_GAP)
-            .finish();
-
-        let header_styles = UiComponentStyles {
-            font_family_id: Some(appearance.header_font_family()),
-            font_color: Some(appearance.theme().active_ui_text_color().into()),
-            font_size: Some(20.),
-            font_weight: Some(Weight::Semibold),
-            ..Default::default()
-        };
-
-        let header = Container::new(
-            ui_builder
-                .paragraph("Sign in on your browser \nto continue")
-                .with_style(header_styles)
-                .build()
-                .finish(),
-        )
-        .with_margin_bottom(AUTH_MODAL_GAP)
-        .finish();
-
-        let hint = Container::new(
-            Flex::column()
-                .with_child(
-                    Flex::row()
-                        .with_child(
-                            ui_builder
-                                .span("If your browser hasn't launched, ")
-                                .build()
-                                .finish(),
-                        )
-                        .with_child(
-                            ui_builder
-                                .link(
-                                    "copy the URL".into(),
-                                    None,
-                                    Some(Box::new(|event_ctx| {
-                                        event_ctx.dispatch_typed_action(
-                                            AuthViewBodyAction::CopyLoginUrl,
-                                        );
-                                    })),
-                                    self.mouse_state_handles
-                                        .copy_browser_url_mouse_state_handle
-                                        .clone(),
-                                )
-                                .soft_wrap(false)
-                                .build()
-                                .finish(),
-                        )
-                        .finish(),
-                )
-                .with_child(
-                    ui_builder
-                        .span("and open the page manually.")
-                        .build()
-                        .finish(),
-                )
-                .finish(),
-        )
-        .finish();
-
-        let mut contents = vec![logo, header, hint];
-
-        let auth_token = Container::new(match self.render_auth_token_input(appearance) {
-            Some(auth_token_input) => auth_token_input,
-            _ => self.render_auth_token_suggest(ui_builder),
-        })
-        .with_margin_top(AUTH_MODAL_GAP)
-        .finish();
-
-        contents.push(auth_token);
-        contents
-    }
-
-    pub fn set_auth_step(&mut self, step: AuthStep) {
-        self.auth_step = step;
-    }
 }
 
 pub enum AuthViewBodyEvent {
-    SignUpButtonClicked,
-    AuthTokenEntered(String),
+    /// The person asked to sign in; the Polaris sign-in lives in Settings > Account.
+    PolarisSignInRequested,
     LoginLaterClicked,
     Close,
 }
@@ -838,20 +547,6 @@ impl TypedActionView for AuthViewBody {
 
     fn handle_action(&mut self, action: &AuthViewBodyAction, ctx: &mut ViewContext<Self>) {
         match action {
-            AuthViewBodyAction::Login => {
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::LoginButtonClicked {
-                        source: LoginEventSource::AuthModal,
-                    },
-                    ctx
-                );
-                self.auth_step = AuthStep::BrowserOpen;
-
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    let sign_in_url = auth_manager.sign_in_url();
-                    ctx.open_url(&sign_in_url);
-                });
-            }
             AuthViewBodyAction::InitiateLoginLater => {
                 send_telemetry_from_ctx!(
                     TelemetryEvent::LoginLaterButtonClicked {
@@ -872,67 +567,11 @@ impl TypedActionView for AuthViewBody {
                 );
                 ctx.emit(AuthViewBodyEvent::LoginLaterClicked);
             }
-            AuthViewBodyAction::EnterToken => {
-                self.auth_token_input
-                    .update(ctx, |editor, ctx| editor.paste(ctx));
-                self.show_auth_token_input = true;
-
-                ctx.notify();
-            }
-            AuthViewBodyAction::CopyLoginUrl => {
-                self.copy_url_click_count += 1;
-                if AuthStateProvider::as_ref(ctx)
-                    .get()
-                    .is_user_anonymous()
-                    .unwrap_or_default()
-                {
-                    AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                        auth_manager.copy_anonymous_user_linking_url_to_clipboard(ctx);
-                    });
-                } else {
-                    AuthManager::handle(ctx).update(ctx, |auth_manager, inner_ctx| {
-                        let sign_in_url = auth_manager.sign_in_url();
-                        inner_ctx.clipboard().write(ClipboardContent {
-                            plain_text: sign_in_url.clone(),
-                            paths: Some(vec![sign_in_url]),
-                            ..Default::default()
-                        });
-                    });
-                }
-            }
             AuthViewBodyAction::Signup => {
                 // Send synchronously since this is an important event in the sign up funnel and we
                 // don't want to lose events if the user quits before the event queue is flushed.
                 send_telemetry_sync_from_ctx!(TelemetryEvent::SignUpButtonClicked, ctx);
-                self.auth_step = AuthStep::BrowserOpen;
-
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    let sign_up_url = auth_manager.sign_up_url();
-                    ctx.open_url(&sign_up_url);
-                });
-            }
-            AuthViewBodyAction::SignupAnonymousUser => {
-                let entrypoint = match self.variant {
-                    AuthViewVariant::RequireLoginCloseable
-                    | AuthViewVariant::ShareRequirementCloseable => {
-                        AnonymousUserSignupEntrypoint::LoginGatedFeature
-                    }
-                    AuthViewVariant::HitDriveObjectLimitCloseable => {
-                        AnonymousUserSignupEntrypoint::HitDriveObjectLimit
-                    }
-                    AuthViewVariant::Initial => {
-                        report_error!(anyhow!(
-                            "Anonymous user initiated sign-up from unexpected AuthView variant"
-                        ));
-                        AnonymousUserSignupEntrypoint::Unknown
-                    }
-                };
-
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    auth_manager.initiate_anonymous_user_linking(entrypoint, ctx);
-                });
-                self.auth_step = AuthStep::BrowserOpen;
-                ctx.emit(AuthViewBodyEvent::SignUpButtonClicked);
+                ctx.emit(AuthViewBodyEvent::PolarisSignInRequested);
             }
             AuthViewBodyAction::ShowOverlay(overlay) => {
                 if let AuthViewOverlay::PrivacySettings = overlay {
@@ -993,7 +632,7 @@ impl View for AuthViewBody {
     fn accessibility_contents(&self, _: &AppContext) -> Option<AccessibilityContent> {
         Some(AccessibilityContent::new(
             "Welcome to Polaris Terminal!",
-            "Press enter to open your browser to Sign Up or Sign In.",
+            "Press enter to sign in to your Polaris.",
             PtermA11yRole::HelpRole,
         ))
     }
@@ -1014,18 +653,12 @@ impl View for AuthViewBody {
             appearance.line_height_ratio(),
         );
 
-        let is_anonymous = AuthStateProvider::as_ref(app)
-            .get()
-            .is_user_anonymous()
-            .unwrap_or_default();
-
         let mut content = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
-        content = content.with_children(match self.auth_step {
-            AuthStep::SelectAuthPathway => {
-                self.render_select_auth_pathway_content(is_anonymous, appearance, &ui_builder, app)
-            }
-            AuthStep::BrowserOpen => self.render_browser_open_content(appearance, &ui_builder),
-        });
+        content = content.with_children(self.render_select_auth_pathway_content(
+            appearance,
+            &ui_builder,
+            app,
+        ));
 
         let content = content.finish();
 

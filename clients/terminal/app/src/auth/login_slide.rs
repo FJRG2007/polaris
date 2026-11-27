@@ -1,5 +1,3 @@
-use std::cell::Cell;
-
 use onboarding::components::feature_optout_dialog::{
     FeatureOptOutDialog, render_feature_optout_dialog,
 };
@@ -8,39 +6,32 @@ use onboarding::{OnboardingEvent, OnboardingIntention, POLARIS_TERMINAL_DRIVE_FE
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use pterm_core::features::FeatureFlag;
-use pterm_core::safe_error;
 use pterm_core::ui::Icon;
 use pterm_core::ui::theme::color::internal_colors;
-use ptermui::actions::StandardAction;
-use ptermui::clipboard::ClipboardContent;
 use ptermui::elements::{
     Align, Border, CacheOption, ChildAnchor, ClippedScrollStateHandle, ConstrainedBox, Container,
-    CornerRadius, CrossAxisAlignment, Dismiss, Fill, Flex, FormattedTextElement,
-    HighlightedHyperlink, Image, MainAxisAlignment, MainAxisSize, MouseStateHandle,
-    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack,
+    CornerRadius, CrossAxisAlignment, Dismiss, Flex, FormattedTextElement, HighlightedHyperlink,
+    Image, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack,
 };
 use ptermui::fonts::Weight;
 use ptermui::keymap::{FixedBinding, Keystroke};
 use ptermui::text_layout::TextAlignment;
-use ptermui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use ptermui::ui_components::components::{UiComponent, UiComponentStyles};
 use ptermui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, UpdateModel, View,
-    ViewContext, ViewHandle,
+    ViewContext,
 };
 use ui_components::{Component as _, Options as _, button};
 
 use crate::appearance::Appearance;
 use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
-use crate::auth::auth_view_modal::AuthRedirectPayload;
 use crate::auth::auth_view_shared_helpers::{
     PrivacySettingsActions, PrivacySettingsHandles, render_privacy_settings_toggles,
 };
 use crate::auth::login_failure_notification::{self, LoginFailureReason};
-use crate::editor::{EditorView, SingleLineEditorOptions, TextColors, TextOptions};
 use crate::server::telemetry::{LoginEventSource, TelemetryEvent};
 use crate::settings::PrivacySettings;
-use crate::themes::theme::Fill as ThemeFill;
-use crate::util::bindings::CustomAction;
 use crate::{send_telemetry_from_ctx, send_telemetry_sync_from_ctx};
 
 const TOS_URL: &str = "https://fjrg2007.github.io/polaris";
@@ -68,25 +59,7 @@ pub fn init(app: &mut AppContext) {
             LoginSlideAction::DismissOverlayOrBack,
             id!(LoginSlideView::ui_name()),
         ),
-        FixedBinding::custom(
-            CustomAction::Paste,
-            LoginSlideAction::PasteAuthUrl,
-            "Paste",
-            id!(LoginSlideView::ui_name()),
-        ),
-        FixedBinding::standard(
-            StandardAction::Paste,
-            LoginSlideAction::PasteAuthUrl,
-            id!(LoginSlideView::ui_name()),
-        ),
     ]);
-
-    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows"))]
-    app.register_fixed_bindings([FixedBinding::new(
-        "cmdorctrl-v",
-        LoginSlideAction::PasteAuthUrl,
-        id!(LoginSlideView::ui_name()),
-    )]);
 }
 
 impl LoginPurpose {
@@ -132,22 +105,21 @@ pub enum LoginSlideAction {
     DismissDialog,
     DismissOverlayOrBack,
     Back,
-    BackToSelectAuthPathway,
-    CopyLoginUrl,
-    EnterToken,
     ShowPrivacySettings,
     HideOverlay,
     ToggleTelemetry,
     ToggleCrashReporting,
     ToggleCloudConversationStorage,
     DismissNotification,
-    PasteAuthUrl,
 }
 
 #[derive(Clone, Debug)]
 pub enum LoginSlideEvent {
     BackToOnboarding,
     LoginLaterConfirmed,
+    /// Sign-in was asked for: finish onboarding and open Settings > Account,
+    /// where the Polaris sign-in is.
+    PolarisSignInRequested,
 }
 
 /// How the user arrived at the login slide. Controls which step is shown first
@@ -171,7 +143,6 @@ pub enum LoginSlideSource {
 
 enum LoginStep {
     SelectAuthPathway,
-    BrowserOpen,
     PrivacySettings,
 }
 
@@ -201,8 +172,6 @@ enum LoginPurpose {
 // View
 // ---------------------------------------------------------------------------
 
-const AUTH_TOKEN_INPUT_BORDER_RADIUS: Radius = Radius::Pixels(4.);
-
 pub struct LoginSlideView {
     /// Whether this path wants AI (agent intent) vs. not (terminal intention).
     /// Used to gate the cloud-conversation-storage toggle and AI wording in the
@@ -227,15 +196,10 @@ pub struct LoginSlideView {
     last_login_failure_reason: Option<LoginFailureReason>,
     source: LoginSlideSource,
 
-    // Auth token input (browser-open step)
-    auth_token_input: ViewHandle<EditorView>,
-    show_auth_token_input: bool,
-
     // Buttons
     back_button: button::Button,
     skip_button: button::Button,
     login_button: button::Button,
-    browser_back_button: button::Button,
     done_button: button::Button,
     dialog_login_button: button::Button,
     dialog_skip_button: button::Button,
@@ -244,8 +208,6 @@ pub struct LoginSlideView {
     // Mouse states for links
     tos_mouse_state: MouseStateHandle,
     privacy_settings_mouse_state: MouseStateHandle,
-    copy_url_mouse_state: MouseStateHandle,
-    enter_token_mouse_state: MouseStateHandle,
 
     // Privacy settings overlay (shared with AuthViewBody)
     privacy_settings_handles: PrivacySettingsHandles,
@@ -307,12 +269,6 @@ fn resolve_visual_path(
 }
 
 impl LoginSlideView {
-    /// Whether the auth token input editor is currently rendered and should be focusable.
-    /// This is only true on the BrowserOpen step after the user clicks to paste their token.
-    pub fn is_auth_token_input_visible(&self) -> bool {
-        matches!(self.step, LoginStep::BrowserOpen) && self.show_auth_token_input
-    }
-
     pub fn is_account_first_onboarding(&self) -> bool {
         matches!(self.source, LoginSlideSource::AccountFirstOnboarding)
     }
@@ -331,52 +287,15 @@ impl LoginSlideView {
             me.handle_auth_manager_event(event, ctx);
         });
 
-        let auth_token_input = ctx.add_typed_action_view(|ctx| {
-            let appearance = Appearance::as_ref(ctx);
-            let text_color = ThemeFill::Solid(ColorU::black());
-            let mut editor = EditorView::single_line(
-                SingleLineEditorOptions {
-                    text: TextOptions {
-                        font_size_override: Some(12.),
-                        font_family_override: Some(appearance.ui_font_family()),
-                        text_colors_override: Some(TextColors {
-                            default_color: text_color,
-                            disabled_color: text_color.with_opacity(20),
-                            hint_color: text_color.with_opacity(40),
-                        }),
-                        ..Default::default()
-                    },
-                    soft_wrap: false,
-                    ..Default::default()
-                },
-                ctx,
-            );
-            editor.set_placeholder_text("Auth Token", ctx);
-            editor
-        });
-
-        ctx.subscribe_to_view(&auth_token_input, |me, _, event, ctx| {
-            use crate::editor::Event::{AltEnter, CmdEnter, Enter, Paste, ShiftEnter};
-            match event {
-                AltEnter | CmdEnter | Enter | Paste | ShiftEnter => {
-                    let text = me.auth_token_input.as_ref(ctx).buffer_text(ctx);
-                    me.handle_pasted_auth_url(text, ctx);
-                }
-                _ => {}
-            };
-            ctx.notify();
-        });
-
         let view = Self {
             ai_enabled,
             uses_third_party_agents,
             intention,
             theme_visual_path: resolve_visual_path(intention, theme_name, use_vertical_tabs),
             step: match source {
-                LoginSlideSource::OnboardingFlow | LoginSlideSource::AccountFirstOnboarding => {
-                    LoginStep::SelectAuthPathway
-                }
-                LoginSlideSource::LoginExistingUserFromWelcome => LoginStep::BrowserOpen,
+                LoginSlideSource::OnboardingFlow
+                | LoginSlideSource::AccountFirstOnboarding
+                | LoginSlideSource::LoginExistingUserFromWelcome => LoginStep::SelectAuthPathway,
                 LoginSlideSource::PrivacySettingsFromTerminalIntentionTheme => {
                     LoginStep::PrivacySettings
                 }
@@ -384,20 +303,15 @@ impl LoginSlideView {
             active_overlay: None,
             last_login_failure_reason: None,
             source,
-            auth_token_input,
-            show_auth_token_input: false,
             back_button: button::Button::default(),
             skip_button: button::Button::default(),
             login_button: button::Button::default(),
-            browser_back_button: button::Button::default(),
             done_button: button::Button::default(),
             dialog_login_button: button::Button::default(),
             dialog_skip_button: button::Button::default(),
             dialog_close_button: button::Button::default(),
             tos_mouse_state: MouseStateHandle::default(),
             privacy_settings_mouse_state: MouseStateHandle::default(),
-            copy_url_mouse_state: MouseStateHandle::default(),
-            enter_token_mouse_state: MouseStateHandle::default(),
             privacy_settings_handles: PrivacySettingsHandles::default(),
             scroll_state: ClippedScrollStateHandle::new(),
             close_login_notification_mouse_state: MouseStateHandle::default(),
@@ -464,25 +378,6 @@ impl LoginSlideView {
         }
     }
 
-    fn handle_pasted_auth_url(&mut self, pasted_url: String, ctx: &mut ViewContext<Self>) {
-        match AuthRedirectPayload::from_raw_url(pasted_url) {
-            Ok(redirect_payload) => {
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    auth_manager.initialize_user_from_auth_payload(redirect_payload, true, ctx);
-                });
-            }
-            Err(error) => {
-                safe_error!(
-                    safe: ("Failed to parse AuthRedirectPayload from redirect URL"),
-                    full: ("Failed to parse AuthRedirectPayload from redirect URL: {error:#}")
-                );
-                self.last_login_failure_reason =
-                    Some(LoginFailureReason::InvalidRedirectUrl { was_pasted: true });
-            }
-        }
-        ctx.notify();
-    }
-
     fn handle_login_later(&mut self, ctx: &mut ViewContext<Self>) {
         self.send_account_first_action("create_account", "skip_account", ctx);
         // Send synchronously since this is an important event in the sign up funnel and we
@@ -493,6 +388,11 @@ impl LoginSlideView {
             },
             ctx
         );
+        self.skip_cloud_account(ctx);
+        ctx.emit(LoginSlideEvent::LoginLaterConfirmed);
+    }
+
+    fn skip_cloud_account(&mut self, ctx: &mut ViewContext<Self>) {
         if FeatureFlag::SkipFirebaseAnonymousUser.is_enabled() {
             AuthManager::handle(ctx).update(ctx, |_, ctx| {
                 ctx.emit(AuthManagerEvent::SkippedLogin);
@@ -502,12 +402,13 @@ impl LoginSlideView {
                 auth_manager.create_anonymous_user(None, ctx);
             });
         }
-        ctx.emit(LoginSlideEvent::LoginLaterConfirmed);
     }
 
-    /// Starts the browser sign-up flow. Shared by the Continue button and the
-    /// skip dialog's cancel button.
-    fn start_login(&mut self, ctx: &mut ViewContext<Self>) {
+    /// Sign-in lives in Settings > Account (the Polaris device sign-in), so the
+    /// slide finishes onboarding without a cloud account and asks the root
+    /// view to open that page. Shared by the Continue button and the skip
+    /// dialog's cancel button.
+    pub fn start_login(&mut self, ctx: &mut ViewContext<Self>) {
         self.send_account_first_action("create_account", "continue_signup", ctx);
         send_telemetry_from_ctx!(
             TelemetryEvent::LoginButtonClicked {
@@ -516,46 +417,19 @@ impl LoginSlideView {
             ctx
         );
         self.last_login_failure_reason = None;
-        self.step = LoginStep::BrowserOpen;
-        if matches!(self.source, LoginSlideSource::AccountFirstOnboarding) {
-            send_telemetry_from_ctx!(
-                OnboardingEvent::SlideViewed {
-                    slide_name: "browser_auth".to_string(),
-                },
-                ctx
-            );
-        }
-        AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-            let sign_up_url = auth_manager.sign_up_url();
-            ctx.open_url(&sign_up_url);
-        });
-        ctx.notify();
+        self.skip_cloud_account(ctx);
+        ctx.emit(LoginSlideEvent::PolarisSignInRequested);
     }
 
     // ------------------------------------------------------------------
-    // Rendering — main layout
+    // Rendering
     // ------------------------------------------------------------------
 
-    fn render_content(
-        &self,
-        appearance: &Appearance,
-        app: &AppContext,
-        editor_rendered: &Cell<bool>,
-    ) -> Box<dyn Element> {
+    fn render_content(&self, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
         match self.step {
             LoginStep::SelectAuthPathway => {
                 let children = self.render_select_auth_content(appearance);
                 let bottom_nav = self.render_select_auth_bottom_nav(appearance);
-                slide_content::onboarding_slide_content(
-                    children,
-                    bottom_nav,
-                    self.scroll_state.clone(),
-                    appearance,
-                )
-            }
-            LoginStep::BrowserOpen => {
-                let children = self.render_browser_open_content(appearance, editor_rendered);
-                let bottom_nav = self.render_browser_open_bottom_nav(appearance);
                 slide_content::onboarding_slide_content(
                     children,
                     bottom_nav,
@@ -857,177 +731,7 @@ impl LoginSlideView {
     }
 
     // ------------------------------------------------------------------
-    // Step 2: Browser open
-    // ------------------------------------------------------------------
-
-    fn render_browser_open_content(
-        &self,
-        appearance: &Appearance,
-        editor_rendered: &Cell<bool>,
-    ) -> Vec<Box<dyn Element>> {
-        let theme = appearance.theme();
-        let sub_text_color = internal_colors::text_sub(theme, theme.background().into_solid());
-        let ui_builder = appearance.ui_builder();
-
-        let sub_text_styles = UiComponentStyles {
-            font_color: Some(sub_text_color),
-            ..Default::default()
-        };
-
-        let title = FormattedTextElement::from_str(
-            "Sign in on your browser to continue",
-            appearance.ui_font_family(),
-            36.,
-        )
-        .with_color(internal_colors::text_main(
-            theme,
-            theme.background().into_solid(),
-        ))
-        .with_weight(Weight::Medium)
-        .with_alignment(TextAlignment::Left)
-        .finish();
-
-        let hint = Flex::column()
-            .with_child(
-                Flex::row()
-                    .with_child(
-                        ui_builder
-                            .span("If your browser hasn't launched, ")
-                            .with_style(sub_text_styles)
-                            .build()
-                            .finish(),
-                    )
-                    .with_child(
-                        ui_builder
-                            .link(
-                                "copy the URL".into(),
-                                None,
-                                Some(Box::new(|ctx| {
-                                    ctx.dispatch_typed_action(LoginSlideAction::CopyLoginUrl);
-                                })),
-                                self.copy_url_mouse_state.clone(),
-                            )
-                            .soft_wrap(false)
-                            .build()
-                            .finish(),
-                    )
-                    .with_child(
-                        ui_builder
-                            .span(" and open")
-                            .with_style(sub_text_styles)
-                            .build()
-                            .finish(),
-                    )
-                    .finish(),
-            )
-            .with_child(
-                ui_builder
-                    .span("the page manually.")
-                    .with_style(sub_text_styles)
-                    .build()
-                    .finish(),
-            )
-            .finish();
-
-        // Auth token: show either the "Click here" link or the input box.
-        // When showing the input, we use `editor_rendered` (a Cell<bool> passed
-        // from render()) so the ChildView is only created on the FIRST call of
-        // this closure. static_left calls the left-content closure twice (for
-        // narrow and wide layouts); creating two ChildViews for the same editor
-        // breaks focus/event dispatch.
-        let auth_token: Box<dyn Element> = if self.show_auth_token_input {
-            if editor_rendered.get() {
-                // Second call (two-column layout, the default): render the real editor.
-                ui_builder
-                    .text_input(self.auth_token_input.clone())
-                    .with_style(UiComponentStyles {
-                        background: Some(Fill::Solid(ColorU::white())),
-                        border_width: Some(0.),
-                        border_radius: Some(CornerRadius::with_all(AUTH_TOKEN_INPUT_BORDER_RADIUS)),
-                        padding: Some(Coords {
-                            top: 12.,
-                            bottom: 12.,
-                            left: 16.,
-                            right: 16.,
-                        }),
-                        margin: Some(Coords {
-                            top: 8.,
-                            bottom: 0.,
-                            left: 0.,
-                            right: 0.,
-                        }),
-                        ..Default::default()
-                    })
-                    .build()
-                    .finish()
-            } else {
-                // First call (narrow layout fallback): placeholder.
-                editor_rendered.set(true);
-                Container::new(ptermui::elements::Empty::new().finish())
-                    .with_padding_top(12.)
-                    .with_padding_bottom(12.)
-                    .with_padding_left(16.)
-                    .with_padding_right(16.)
-                    .with_margin_top(8.)
-                    .finish()
-            }
-        } else {
-            Flex::row()
-                .with_child(
-                    ui_builder
-                        .link(
-                            "Click here to paste your token from the browser".into(),
-                            None,
-                            Some(Box::new(|ctx| {
-                                ctx.dispatch_typed_action(LoginSlideAction::EnterToken);
-                            })),
-                            self.enter_token_mouse_state.clone(),
-                        )
-                        .soft_wrap(false)
-                        .build()
-                        .finish(),
-                )
-                .finish()
-        };
-
-        let header = Flex::column()
-            .with_main_axis_size(MainAxisSize::Min)
-            .with_cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_child(title)
-            .with_child(Container::new(hint).with_margin_top(16.).finish())
-            .with_child(Container::new(auth_token).with_margin_top(16.).finish())
-            .finish();
-
-        vec![header]
-    }
-
-    fn render_browser_open_bottom_nav(&self, appearance: &Appearance) -> Box<dyn Element> {
-        let back_button = self.browser_back_button.render(
-            appearance,
-            button::Params {
-                content: button::Content::Label("Back".into()),
-                theme: &button::themes::Naked,
-                options: button::Options {
-                    on_click: Some(Box::new(|ctx, _app, _pos| {
-                        ctx.dispatch_typed_action(LoginSlideAction::BackToSelectAuthPathway);
-                    })),
-                    ..button::Options::default(appearance)
-                },
-            },
-        );
-
-        if matches!(self.login_purpose(), LoginPurpose::AccountFirst) {
-            onboarding_bottom_nav(appearance, 2, 3, Some(back_button), None)
-        } else {
-            Flex::row()
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_child(back_button)
-                .finish()
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Step 3: Privacy settings (inline in left column)
+    // Step 2: Privacy settings (inline in left column)
     // ------------------------------------------------------------------
 
     fn render_privacy_settings_content(
@@ -1235,11 +939,8 @@ impl View for LoginSlideView {
         }
 
         // Two-column slide layout
-        // static_left calls the left closure twice (narrow + wide). We use a
-        // Cell<bool> so the editor ChildView is only created once.
-        let editor_rendered = Cell::new(false);
         let slide = layout::static_left(
-            || self.render_content(appearance, app, &editor_rendered),
+            || self.render_content(appearance, app),
             || self.render_visual(),
         );
         stack.add_child(slide);
@@ -1342,24 +1043,6 @@ impl TypedActionView for LoginSlideView {
                             ctx.notify();
                         }
                     }
-                } else if matches!(self.step, LoginStep::BrowserOpen) {
-                    // PrivacySettingsFromTerminalIntentionTheme starts on the
-                    // privacy-settings step and should never transition into the
-                    // select-auth-pathway step. If this branch is ever reached
-                    // for that source, route back to onboarding instead.
-                    match self.source {
-                        LoginSlideSource::LoginExistingUserFromWelcome
-                        | LoginSlideSource::PrivacySettingsFromTerminalIntentionTheme => {
-                            ctx.emit(LoginSlideEvent::BackToOnboarding);
-                        }
-                        LoginSlideSource::OnboardingFlow
-                        | LoginSlideSource::AccountFirstOnboarding => {
-                            self.send_account_first_action("browser_auth", "back", ctx);
-                            self.step = LoginStep::SelectAuthPathway;
-                            ctx.focus_self();
-                            ctx.notify();
-                        }
-                    }
                 } else {
                     self.send_account_first_action("create_account", "back", ctx);
                     ctx.emit(LoginSlideEvent::BackToOnboarding);
@@ -1368,43 +1051,6 @@ impl TypedActionView for LoginSlideView {
             LoginSlideAction::Back => {
                 self.send_account_first_action("create_account", "back", ctx);
                 ctx.emit(LoginSlideEvent::BackToOnboarding);
-            }
-            LoginSlideAction::BackToSelectAuthPathway => match self.source {
-                // PrivacySettingsFromTerminalIntentionTheme only ever shows the
-                // privacy-settings step; treat "back" the same as login-from-
-                // welcome and return to onboarding rather than falling through
-                // to a step this source was designed to skip.
-                LoginSlideSource::LoginExistingUserFromWelcome
-                | LoginSlideSource::PrivacySettingsFromTerminalIntentionTheme => {
-                    ctx.emit(LoginSlideEvent::BackToOnboarding);
-                }
-                LoginSlideSource::OnboardingFlow | LoginSlideSource::AccountFirstOnboarding => {
-                    self.send_account_first_action("browser_auth", "back", ctx);
-                    self.step = LoginStep::SelectAuthPathway;
-                    ctx.focus_self();
-                    ctx.notify();
-                }
-            },
-            LoginSlideAction::CopyLoginUrl => {
-                AuthManager::handle(ctx).update(ctx, |auth_manager, inner_ctx| {
-                    let auth_url =
-                        if matches!(self.source, LoginSlideSource::AccountFirstOnboarding) {
-                            auth_manager.sign_up_url()
-                        } else {
-                            auth_manager.sign_in_url()
-                        };
-                    inner_ctx.clipboard().write(ClipboardContent {
-                        plain_text: auth_url.clone(),
-                        paths: Some(vec![auth_url]),
-                        ..Default::default()
-                    });
-                });
-            }
-            LoginSlideAction::EnterToken => {
-                self.auth_token_input
-                    .update(ctx, |editor, ctx| editor.paste(ctx));
-                self.show_auth_token_input = true;
-                ctx.notify();
             }
             LoginSlideAction::ShowPrivacySettings => {
                 send_telemetry_sync_from_ctx!(
@@ -1462,13 +1108,6 @@ impl TypedActionView for LoginSlideView {
             LoginSlideAction::DismissNotification => {
                 self.last_login_failure_reason = None;
                 ctx.notify();
-            }
-            LoginSlideAction::PasteAuthUrl => {
-                self.last_login_failure_reason = None;
-                let clipboard_content = ctx.clipboard().read();
-                if !clipboard_content.plain_text.is_empty() {
-                    self.handle_pasted_auth_url(clipboard_content.plain_text, ctx);
-                }
             }
         }
     }
