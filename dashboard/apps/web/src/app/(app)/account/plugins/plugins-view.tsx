@@ -978,13 +978,13 @@ export function PluginPage({ id }: { id: string; }) {
             {back}
 
             <DetailHeader mark={<PluginIcon entry={entry} size={72} />} name={manifest.name} byline={say(t, "card.by", { publisher: manifest.publisher })}>
-                <p className="break-words text-sm">{manifest.summary}</p>
+                <p className={cn(settingType.body, "break-words")}>{manifest.summary}</p>
                 {run ? (
                     <div className="mt-1">
                         <StatusBadge status={run.status} label={run.label} />
                     </div>
                 ) : null}
-                {run?.detail ? <p className="text-muted-foreground break-words text-sm">{run.detail}</p> : null}
+                {run?.detail ? <p className={cn(settingType.body, "text-muted-foreground break-words")}>{run.detail}</p> : null}
             </DetailHeader>
 
             <section className="flex min-w-0 flex-col gap-3" aria-label={say(t, "detail.actions")}>
@@ -1010,14 +1010,14 @@ export function PluginPage({ id }: { id: string; }) {
                 </div>
                 {actions.map((action) =>
                     action.detail ? (
-                        <p key={action.id} className="text-muted-foreground break-words text-sm">
+                        <p key={action.id} className={cn(settingType.body, "text-muted-foreground break-words")}>
                             {pluginText(action.detail, locale)}
                         </p>
                     ) : null
                 )}
                 {installed ? (
                     <label className="flex min-w-0 items-center justify-between gap-3 sm:justify-start">
-                        <span className="min-w-0 text-sm">{say(t, "detail.enabled")}</span>
+                        <span className={cn(settingType.body, "min-w-0")}>{say(t, "detail.enabled")}</span>
                         <Switch checked={installed.enabled} onChange={toggle} disabled={busy} aria-label={say(t, "detail.enabled")} />
                     </label>
                 ) : null}
@@ -1066,9 +1066,9 @@ export function PluginPage({ id }: { id: string; }) {
 
             <DetailSection title={say(t, "detail.permissions")}>
                 {manifest.permissions.length === 0 && requirements.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">{say(t, "install.none")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{say(t, "install.none")}</p>
                 ) : (
-                    <ul className="text-muted-foreground flex list-disc flex-col gap-1 ps-5 text-sm">
+                    <ul className={cn(settingType.body, "text-muted-foreground flex list-disc flex-col gap-1 ps-5")}>
                         {manifest.permissions.map((permission) => (
                             <li key={permission} className="break-words">
                                 {say(t, `permission.${PERMISSION_KEY[permission]}`)}
