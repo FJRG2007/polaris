@@ -14,6 +14,7 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
+import { answerText } from "@/lib/polar/control-tags";
 import { POLAR_TITLE_MAX } from "@/lib/polar/shared";
 import { classifyProviderFailure, failureLogLine } from "@/lib/polar/provider-failure";
 import { generateText, type LanguageModel, type LanguageModelUsage, type UIMessage } from "ai";
@@ -55,7 +56,7 @@ const titleSchema = z.string().min(1).max(POLAR_TITLE_MAX);
  */
 export function sanitizeTitle(raw: string): string | null {
     const line =
-        raw
+        answerText(raw)
             .split(/\r?\n/)
             .map((entry) => entry.trim())
             .find(Boolean) ?? "";

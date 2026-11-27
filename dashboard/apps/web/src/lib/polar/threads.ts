@@ -12,6 +12,7 @@
 import { randomUUID } from "node:crypto";
 import type { UIMessage } from "ai";
 import { prisma, Prisma } from "@polaris/db";
+import { answerText, shownParts } from "@/lib/polar/control-tags";
 import { FAILURE_PART, keepStoredFailures } from "@/lib/polar/provider-failure";
 import { polarCodeTaskSchema, type PolarCodeTask } from "@/lib/polar/code-task";
 import {
@@ -54,7 +55,8 @@ type StoredRow = {
 function toRow(row: StoredRow): PolarThreadRow {
     return {
         id: row.id,
-        title: row.title,
+        // A title named before the markup was cleaned reads without it.
+        title: answerText(row.title).trim() || row.title,
         updatedAt: row.updatedAt.toISOString(),
         pinnedAt: row.pinnedAt?.toISOString() ?? null,
         archivedAt: row.archivedAt?.toISOString() ?? null,
@@ -264,7 +266,7 @@ export async function getPolarThread(userId: string, id: string): Promise<PolarT
     const loaded = new Set(rows.map((row) => row.id));
     return {
         id: thread.id,
-        title: thread.title,
+        title: answerText(thread.title).trim() || thread.title,
         projectId: thread.projectId,
         archivedAt: thread.archivedAt?.toISOString() ?? null,
         choice: (thread.choice as ModelChoice | null) ?? null,
@@ -276,7 +278,8 @@ export async function getPolarThread(userId: string, id: string): Promise<PolarT
             id: row.id,
             parentId: row.parentId && loaded.has(row.parentId) ? row.parentId : null,
             role: row.role as UIMessage["role"],
-            parts: (Array.isArray(row.parts) ? row.parts : []) as UIMessage["parts"],
+            // An answer saved before its markup was cleaned reads cleaned.
+            parts: shownParts(row.role, (Array.isArray(row.parts) ? row.parts : []) as UIMessage["parts"]),
             metadata: row.metadata ?? undefined
         }))
     };

@@ -22,6 +22,7 @@
 
 import { z } from "zod";
 import { generateText, type UIMessage } from "ai";
+import { answerText } from "@/lib/polar/control-tags";
 import {
     FAILURE_PART,
     failureLogLine,
@@ -72,7 +73,7 @@ const suggestionSchema = z.string().min(2).max(POLAR_SUGGESTION_MAX);
  */
 export function sanitizeSuggestion(raw: string): string | null {
     const line =
-        raw
+        answerText(raw)
             .split(/\r?\n/)
             .map((entry) => entry.trim())
             .find(Boolean) ?? "";

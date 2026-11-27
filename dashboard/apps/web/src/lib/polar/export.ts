@@ -15,6 +15,7 @@ import { Marked } from "marked";
 import { prisma } from "@polaris/db";
 import { escapeHtml } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
+import { shownParts } from "@/lib/polar/control-tags";
 import { compactionOf } from "@/lib/polar/compaction";
 import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 import { isVisualPart, visualPartMarkdown } from "@/lib/polar/visuals";
@@ -270,7 +271,7 @@ export async function readExportThread(userId: string, id: string): Promise<Expo
             id: message.id,
             parentId: message.parentId,
             role: message.role,
-            parts: Array.isArray(message.parts) ? (message.parts as unknown[]) : [],
+            parts: shownParts(message.role, Array.isArray(message.parts) ? (message.parts as unknown[]) : []),
             metadata: message.metadata ?? null,
             createdAt: message.createdAt.toISOString()
         }))

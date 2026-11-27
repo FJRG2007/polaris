@@ -33,6 +33,7 @@ import { generateToken, hashToken } from "@polaris/core/tokens";
 import { blockedBetween } from "@/lib/blocks";
 import { translatorFor } from "@/lib/i18n/translate";
 import { discoverableBy } from "@/lib/privacy-service";
+import { shownParts } from "@/lib/polar/control-tags";
 import { compactionOf } from "@/lib/polar/compaction";
 import { polarAttachmentId } from "@/lib/polar/shared";
 import { isVisualPart, visualOf, visualPartMarkdown } from "@/lib/polar/visuals";
@@ -376,13 +377,16 @@ async function snapshotOf(share: SnapshotShare): Promise<SharedPolarThread> {
         )
             .filter((row) => row.role === "user" || row.role === "assistant")
             .filter((row) => !compactionOf(row))
-            .map((row) => ({
-                id: row.id,
-                role: row.role as "user" | "assistant",
-                text: textOf(row.parts),
-                files: filesOf(row.parts),
-                blocks: blocksOf(row.parts)
-            }))
+            .map((row) => {
+                const parts = shownParts(row.role, Array.isArray(row.parts) ? row.parts : []);
+                return {
+                    id: row.id,
+                    role: row.role as "user" | "assistant",
+                    text: textOf(parts),
+                    files: filesOf(parts),
+                    blocks: blocksOf(parts)
+                };
+            })
             .filter((row) => row.text.length > 0 || row.files.length > 0)
     };
 }

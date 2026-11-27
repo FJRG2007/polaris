@@ -22,6 +22,7 @@ import type { ChatCredential } from "@/lib/agents/model-keys";
 import type { FailureKind } from "@/lib/polar/provider-failure";
 import { routeMiddleware, type RouteStep } from "@/lib/polar/router/chain";
 import { isFreeModel, polarOutputTokens, type LanguageModelV4 } from "@/lib/polar/credit";
+import { controlTagsMiddleware } from "@/lib/polar/control-tags";
 
 /** Most steps one call may walk. */
 export const STEPS_MOST = 16;
@@ -77,13 +78,19 @@ export interface PlanEntry {
     build: (credential: ChatCredential) => LanguageModel;
 }
 
-/** One step for one key. Its model is built once, when first asked. */
+/** One step for one key. Its model is built once, when first asked, and every
+ *  answer it gives has its control markup taken out (`control-tags.ts`), so
+ *  the router, the stored answer and every preview read the same text. */
 export function plannedStep(entry: PlanEntry, credential: ChatCredential): PlannedStep {
     let built: LanguageModel | null = null;
     return {
         option: entry.option,
         credential,
-        model: () => (built ??= entry.build(credential)) as LanguageModelV4,
+        model: () =>
+            (built ??= wrapLanguageModel({
+                model: entry.build(credential) as LanguageModelV4,
+                middleware: controlTagsMiddleware
+            })) as LanguageModelV4,
         modelId: entry.option.model,
         provider: entry.option.provider,
         free: isFreeModel(entry.option),
