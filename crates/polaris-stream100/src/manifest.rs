@@ -87,8 +87,8 @@ fn status_texts() -> Value {
             "Cierra Hercules Stream Control para usar el Stream 100 aquí. Mientras está abierto, tiene el control.",
         ),
         "herculesDriver": label(
-            "Polaris could not read the Stream 100 through the Hercules software. Plug it in again, or reinstall Hercules Stream Control.",
-            "Polaris no pudo leer el Stream 100 con el software de Hercules. Vuelve a conectarlo o reinstala Hercules Stream Control.",
+            "The Stream 100 still has the Hercules driver. It works here once Polaris' driver is on it.",
+            "El Stream 100 aún tiene el driver de Hercules. Funciona aquí en cuanto tenga el driver de Polaris.",
         ),
         "perAppNeedsMacos": label(
             "Knobs for calls, music, games or the browser need macOS 14.2 or later. Whole output works here.",
@@ -128,14 +128,14 @@ fn driver_requirement() -> Value {
     use crate::plugin::label;
     json!({
         "key": "driver",
-        "label": label("Install a driver for the Stream 100", "Instalar un driver para el Stream 100"),
+        "label": label("Set up the driver", "Configurar el driver"),
         "hint": label(
             "Polaris sets up its driver for the Stream 100 (Windows asks once).",
             "Polaris instala su driver para el Stream 100 (Windows pide permiso una vez).",
         ),
         "missing": label(
-            "Polaris' driver is not set up, so the Stream 100 works only through the Hercules software, if installed.",
-            "El driver de Polaris no está instalado: el Stream 100 solo funciona con el software de Hercules, si está.",
+            "Polaris' driver is not on the Stream 100 yet, so its knobs and buttons do nothing here.",
+            "El driver de Polaris aún no está en el Stream 100: sus ruedas y botones no hacen nada aquí.",
         ),
         "restored": label(
             "Another driver had taken the Stream 100. Polaris put its own back.",
