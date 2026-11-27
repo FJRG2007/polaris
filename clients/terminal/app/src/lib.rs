@@ -44,8 +44,6 @@ mod interval_timer;
 mod linear;
 #[cfg(feature = "local_fs")]
 mod local_control;
-#[cfg(feature = "local_fs")]
-mod polaris_account;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod login_item;
 mod menu;
@@ -56,6 +54,8 @@ mod notification;
 mod palette;
 mod persistence;
 mod platform;
+#[cfg(feature = "local_fs")]
+mod polaris_account;
 mod prefix;
 #[cfg(target_os = "macos")]
 mod preview_config_migration;

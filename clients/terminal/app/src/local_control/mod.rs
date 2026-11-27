@@ -87,7 +87,6 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
 pub use bridge::LocalControlBridge;
-pub use relay::PolarisRelay;
 #[cfg(any(unix, test))]
 use chrono::Duration;
 use permissions::ensure_feature_enabled;
@@ -95,6 +94,7 @@ use permissions::ensure_feature_enabled;
 use permissions::{ensure_action_allowed, ensure_protocol_version};
 use pterm_core::channel::ChannelState;
 use ptermui::{Entity, ModelContext, ModelSpawner, SingletonEntity};
+pub use relay::PolarisRelay;
 #[cfg(unix)]
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
