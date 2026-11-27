@@ -9,10 +9,11 @@
 //!   is then read through the Hercules SDK ([`super::sdk`]), and when that is
 //!   not possible either, opening answers [`TransportError::NotFound`] and
 //!   [`crate::ownership`] says why.
-//! - **Linux**: the USB transport ([`crate::transport`]).
-//! - **macOS**: not yet; the HID manager route is not written.
+//! - **Linux and macOS**: libusb ([`super::libusb`]), running the same
+//!   session as the WinUSB route: start-up reads, keep-alive, reports.
 //!
-//! Through the HID API nothing is written to the device. Through WinUSB the
+//! Through the HID API nothing is written to the device. Through WinUSB and
+//! libusb the
 //! only writes are the documented start-up reads and the keep-alive
 //! ([`crate::session`]). Through the SDK, the SDK's own thread keeps its
 //! session alive while the device is open; Polaris sets nothing on it.
@@ -25,9 +26,9 @@ use std::time::Duration;
 pub struct Input {
     #[cfg(windows)]
     inner: Windows,
-    #[cfg(target_os = "linux")]
-    inner: crate::transport::Input,
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    inner: super::libusb::LibUsbInput,
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     inner: std::convert::Infallible,
 }
 
@@ -35,7 +36,7 @@ impl Input {
     pub fn open() -> Result<Self, TransportError> {
         #[cfg(windows)]
         return Ok(Self {
-            inner: match super::winusb::WinUsbInput::open() {
+            inner: match super::winusb::open() {
                 Ok(input) => Windows::WinUsb(input),
                 Err(TransportError::NotFound) => match hid::HidInput::open() {
                     Ok(input) => Windows::Hid(input),
@@ -45,11 +46,11 @@ impl Input {
                 Err(error) => return Err(error),
             },
         });
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         return Ok(Self {
-            inner: crate::transport::Input::open()?,
+            inner: super::libusb::open()?,
         });
-        #[cfg(not(any(windows, target_os = "linux")))]
+        #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
         Err(TransportError::Unsupported)
     }
 
@@ -61,9 +62,9 @@ impl Input {
             Windows::Hid(input) => input.next(timeout),
             Windows::Sdk(input) => input.next(timeout),
         };
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         return self.inner.next(timeout);
-        #[cfg(not(any(windows, target_os = "linux")))]
+        #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
         match self.inner {}
     }
 }

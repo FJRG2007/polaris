@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { join } from "node:path";
 import type { PluginManager } from "./manager";
+import { createUdevRunner } from "./hercules-udev";
 import { spawn, execFile } from "node:child_process";
 import { access, mkdir, open, rename, writeFile } from "node:fs/promises";
 import { PLUGIN_PERMISSIONS, type PluginSettingValue } from "@polaris/core/device-plugins";
@@ -86,9 +87,15 @@ export function officialRunnerFor(id: string, pluginsDir: string, platform: Node
     });
 }
 
-/** The Stream 100's own WinUSB driver on this machine, or null off Windows or for another plugin. */
+/**
+ * What lets Polaris open the Stream 100 on this machine: its own WinUSB driver
+ * on Windows, the udev rule on Linux. Null on macOS (nothing is needed there)
+ * and for another plugin.
+ */
 export function driverRunnerFor(id: string, pluginsDir: string, platform: NodeJS.Platform = process.platform, host: OfficialHost = nodeOfficialHost()): DriverRunner | null {
-    if (platform !== "win32" || id !== "hercules-stream100") return null;
+    if (id !== "hercules-stream100") return null;
+    if (platform === "linux") return createUdevRunner(host);
+    if (platform !== "win32") return null;
     const env = process.env;
     return createDriverRunner(host, { systemRoot: env.SystemRoot ?? env.WINDIR ?? "C:\\Windows", programData: env.ProgramData ?? "C:\\ProgramData", dataDir: join(pluginsDir, "official", id) }, platform);
 }

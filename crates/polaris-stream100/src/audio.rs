@@ -256,7 +256,9 @@ pub fn backend_status(os: &str) -> &'static str {
     match os {
         "windows" => "Core Audio sessions on every active output",
         "linux" => "the PulseAudio protocol, served by PulseAudio and PipeWire",
-        "macos" => "not yet: needs macOS 14.2 process taps",
+        "macos" => {
+            "the whole output only: per-app volume needs macOS 14.2 process taps, not built yet"
+        }
         _ => "not supported",
     }
 }

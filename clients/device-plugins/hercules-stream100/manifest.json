@@ -8,7 +8,11 @@
         }
     ],
     "entries": {
+        "darwin-arm64": "main.cjs",
+        "darwin-x64": "main.cjs",
+        "linux-arm64": "main.cjs",
         "linux-x64": "main.cjs",
+        "win32-arm64": "main.cjs",
         "win32-x64": "main.cjs"
     },
     "groups": [
@@ -76,8 +80,8 @@
         {
             "default": false,
             "hint": {
-                "en-US": "Windows only. Replaces the Hercules driver, so no Hercules software is needed. Windows asks for permission.",
-                "es-ES": "Solo Windows. Sustituye al driver de Hercules, sin necesitar su software. Windows pide permiso."
+                "en-US": "Windows and Linux. No Hercules software needed: on Windows it replaces the Hercules driver, on Linux it lets Polaris open the controller. Asks for permission once.",
+                "es-ES": "Windows y Linux. Sin software de Hercules: en Windows sustituye su driver, en Linux deja a Polaris abrir el controlador. Pide permiso una vez."
             },
             "key": "polarisDriver",
             "kind": "toggle",
@@ -492,6 +496,6 @@
         }
     ],
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.9",
+    "version": "0.1.10",
     "view": "view/index.html"
 }

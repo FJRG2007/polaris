@@ -86,3 +86,98 @@ fn the_interface_guid_string_and_number_agree() {
         DEVICE_INTERFACE_GUID_U128
     );
 }
+
+/// A link that records what the session asks of it.
+#[derive(Default)]
+struct Recorder {
+    display: bool,
+    controls: Vec<polaris_stream100::session::Setup>,
+    packets: Vec<[u8; PACKET_SIZE]>,
+    reports: Vec<Vec<u8>>,
+    waits: Vec<Duration>,
+}
+
+impl polaris_stream100::session::Link for Recorder {
+    type Error = ();
+
+    fn control_in(&mut self, setup: polaris_stream100::session::Setup) {
+        self.controls.push(setup);
+    }
+
+    fn start_display(&mut self) -> bool {
+        self.display
+    }
+
+    fn write_packet(&mut self, packet: &[u8; PACKET_SIZE], _wait: Duration) {
+        self.packets.push(*packet);
+    }
+
+    fn read_report(
+        &mut self,
+        buffer: &mut [u8; polaris_stream100::report::REPORT_LEN],
+        wait: Duration,
+    ) -> Result<Option<usize>, ()> {
+        self.waits.push(wait);
+        let Some(report) = self.reports.pop() else {
+            std::thread::sleep(wait);
+            return Ok(None);
+        };
+        buffer[..report.len()].copy_from_slice(&report);
+        Ok(Some(report.len()))
+    }
+}
+
+#[test]
+fn every_link_starts_with_the_display_then_the_documented_reads() {
+    let session = polaris_stream100::session::Session::start(Recorder {
+        display: true,
+        ..Default::default()
+    });
+    assert!(session.has_display());
+    assert_eq!(
+        session.link().controls,
+        vec![(0xc0, 0x52, 0, 0, 2), (0xc0, 0x02, 0, 0, 2)]
+    );
+}
+
+#[test]
+fn a_session_keeps_the_controller_alive_while_it_waits() {
+    let mut session = polaris_stream100::session::Session::start(Recorder {
+        display: true,
+        ..Default::default()
+    });
+    let read = session.next(Duration::from_millis(600)).unwrap();
+    assert!(read.is_none());
+    let link = session.link();
+    // One keep-alive at once, then one every 250 ms of the 600 ms wait.
+    assert!(
+        link.packets.len() >= 3,
+        "{} keep-alives",
+        link.packets.len()
+    );
+    assert!(link.packets.iter().all(|packet| is_valid(&packet[..9])));
+    // No read blocks past the next keep-alive.
+    assert!(link.waits.iter().all(|wait| *wait <= KEEPALIVE_EVERY));
+}
+
+#[test]
+fn without_the_display_interface_no_keep_alive_is_sent_and_input_is_still_read() {
+    let mut report = vec![0u8; 64];
+    report[0] = 0x01;
+    let mut session = polaris_stream100::session::Session::start(Recorder {
+        display: false,
+        reports: vec![report],
+        ..Default::default()
+    });
+    assert!(!session.has_display());
+    let read = session.next(Duration::from_millis(100)).unwrap();
+    assert!(session.link().packets.is_empty());
+    assert_eq!(
+        read,
+        polaris_stream100::report::Report::parse(&{
+            let mut bytes = vec![0u8; 64];
+            bytes[0] = 0x01;
+            bytes
+        })
+    );
+}

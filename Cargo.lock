@@ -1841,6 +1841,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "libusb1-sys"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da050ade7ac4ff1ba5379af847a10a10a8e284181e060105bf8d86960ce9ce0f"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+ "vcpkg",
+]
+
+[[package]]
 name = "link-section"
 version = "0.19.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2533,8 +2545,10 @@ dependencies = [
 
 [[package]]
 name = "polaris-stream100"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
+ "libc",
+ "libusb1-sys",
  "nusb",
  "pulseaudio",
  "serde",

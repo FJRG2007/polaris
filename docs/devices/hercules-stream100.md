@@ -20,7 +20,7 @@ exists. No source code was copied from either.
 | --- | --- |
 | USB id | `06f8:e053` (Guillemot / Hercules) |
 | Device class | `00/00/00`, composite (`USB\COMPOSITE` in its compatible ids) |
-| Interface 0 | input: interrupt IN endpoint `0x81`, 64-byte reports. Handled as HID by macOS's HID manager, so it is a HID interface (to confirm with a descriptor dump, below) |
+| Interface 0 | input: interrupt IN endpoint `0x81`, 64-byte reports. Vendor-specific (class `0xFF`) per cont1nuity/hercules-stream-linux `docs/DEVICE-IO.md`, so neither Linux nor macOS binds a class driver and libusb claims it directly |
 | Interface 1 | display: alternate setting 1, isochronous OUT endpoint `0x01`, 952-byte packets |
 | Firmware | `HSM01_S32L4R7_v1_42` ships with Stream Control 2.05.8 |
 
@@ -237,12 +237,13 @@ first run.
 | --- | --- |
 | Input report decoding, knob engine, display message framing and checksum, image conversion, audio categories, ownership, manifest, settings (read field by field: one bad value resets only itself) | done, unit-tested (`cargo test -p polaris-stream100`) |
 | Input on Windows (feature `native`) | the HID API: the largest input collection of `06f8:e053`, opened read-only and shared, one overlapped read at a time with a timeout. Windows puts the report id first (`0` when the device numbers none) and `report::from_hid_read` brings it back to the USB transfer's bytes. Exercised against another HID device (opens, times out, cancels cleanly); never against the Stream 100, which the Hercules driver holds |
-| Input on Linux | the USB transport (`nusb`); needs the `uaccess` rule for the device, and without it the plugin says the system does not let Polaris open it |
-| Input on macOS | not written (HID manager), so no package is built for macOS |
+| Session on Linux and macOS | `session::Session`, the same driver the WinUSB route runs (start-up reads, keep-alive, reports), over libusb (`native::libusb`, libusb 1.0 built from its vendored source into the module: nothing to install). Each system supplies only a `session::Link`. Built by CI; never run on a real unit on either system |
+| Linux access | the `uaccess` udev rule `/etc/udev/rules.d/70-polaris-stream100.rules` (sorted before `73-seat-late.rules`, where udev turns the tag into the seat user's ACL), installed by the desktop app with one polkit prompt (`pkexec`) when "Polaris driver on this PC" is switched on, removed when it is switched off (`clients/desktop/src/main/plugins/hercules-udev.ts`). Without it the plugin says the system does not let Polaris open the controller |
+| macOS access | nothing to set up: no driver claims the vendor interfaces |
 | Display transport | not written: `nusb` 0.2 has no isochronous transfers, and initialization is not understood (above) |
-| Per-app audio backends | Windows Core Audio and PulseAudio/PipeWire done; macOS answers unsupported |
+| Per-app audio backends | Windows Core Audio and PulseAudio/PipeWire (PipeWire through `pipewire-pulse`) done. macOS: the whole output only (Core Audio volume and mute of the default output, `native::macos`); per-app volume is not built. macOS has no per-app volume API: per-app mixers either install a HAL audio driver (Background Music) or, on macOS 14.2+, mute each app with a process tap (`AudioHardwareCreateProcessTap`) and play it back through a private aggregate device at its own gain, which also needs the desktop app to declare `NSAudioCaptureUsageDescription` and the person to grant audio capture. Until then a knob set to an app category does nothing on macOS, and the plugin's audio status says so |
 | Desktop binding (`crates/polaris-stream100-node`) | `Controller` (reports in, volume out, actions back) and `Reader` (reads on a worker thread, `await reader.next(500)`) |
-| Device plugin (`clients/device-plugins/hercules-stream100`) | manifest generated from the crate (`cargo run -p polaris-stream100 --example manifest`, a test keeps them equal), entry `any/main.cjs`, native module built per platform by `.github/workflows/device-plugins.yml` (Windows x64, Linux x64). Settings live only on the plugin's page, never in the app's own settings |
+| Device plugin (`clients/device-plugins/hercules-stream100`) | manifest generated from the crate (`cargo run -p polaris-stream100 --example manifest`, a test keeps them equal), entry `any/main.cjs`, native module built per platform by `.github/workflows/device-plugins.yml` (Windows, Linux and macOS, x64 and arm64; Windows arm64 and macOS x64 cross-compiled). Settings live only on the plugin's page, never in the app's own settings |
 | Game category | the engine takes running games (`Controller.setGames`), but the plugin protocol has no method that hands them over yet, so Games follows only the apps the classifier knows |
 
 ### Needed from a real device
