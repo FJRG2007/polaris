@@ -746,7 +746,22 @@
             "key": "Clave",
             "openKey": "Abrir el uso de {name}",
             "removedKey": "Clave borrada",
-            "quietKeys": "{count, plural, one {# clave más no tuvo} other {# claves más no tuvieron}} llamadas en este periodo."
+            "quietKeys": "{count, plural, one {# clave más no tuvo} other {# claves más no tuvieron}} llamadas en este periodo.",
+            "byClient": "Por cliente",
+            "client": "Cliente",
+            "byAddress": "Por dirección",
+            "address": "Dirección",
+            "noClient": "Sin user-agent",
+            "noAddress": "Sin dirección",
+            "otherClient": "Otros programas",
+            "otherAddresses": "Otras direcciones",
+            "otherCallers": "El resto",
+            "notRecorded": "Sin registrar",
+            "notRecordedHint": "Llamadas anteriores al recuento de clientes.",
+            "showAddresses": "Ver enteras",
+            "maskAddresses": "Ocultar",
+            "maskedHint": "Direcciones mostradas por su red (/24, /48).",
+            "revealFailed": "No se cargaron las direcciones completas. Reinténtalo."
         }
     },
     "connections": {

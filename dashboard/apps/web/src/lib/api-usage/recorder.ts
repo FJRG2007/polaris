@@ -5,7 +5,8 @@
  * the call as a key's once the key is accepted, so a call answered for a session,
  * an OAuth token or nobody is never counted. The call is added to an in-memory
  * tally and the tally is written every few seconds, one upsert per key, hour,
- * route and status that moved - so a burst of a thousand calls to one route is
+ * route and status that moved (and one per program family and address that
+ * called) - so a burst of a thousand calls to one route is
  * one write, not a thousand, and nothing is written while the call is answered.
  *
  * The cost of that is the last few seconds of counts when the process stops.
@@ -15,6 +16,7 @@
 
 import { prisma } from "@polaris/db";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { clientFamily, originIp, originUserAgent } from "@polaris/core";
 import { matchDocumentedRoute } from "@/lib/api-docs/routes";
 
 /** Upper bounds, in ms, of the latency columns; past the last is `msOver`. */
@@ -40,6 +42,18 @@ const FLUSH_EVERY_MS = 10_000;
 const FLUSH_AT_ENTRIES = 500;
 /** What a call to a path this deployment does not document is filed under. */
 export const OTHER_ROUTE = "(other)";
+/** What a call that named no address is filed under. */
+export const NO_ADDRESS = "";
+/** What the addresses past `ADDRESSES_PER_HOUR` in one key's hour are filed under. */
+export const OTHER_ADDRESSES = "*";
+/**
+ * The most addresses one key's hour is counted under, one row each. A key
+ * replayed from a botnet would otherwise write a row per address; past this the
+ * rest are summed as one, which is what a usage table could show of them anyway.
+ */
+export const ADDRESSES_PER_HOUR = 200;
+/** The longest address kept: an IPv6 address with a zone fits; a forged header does not. */
+const ADDRESS_MAX = 64;
 
 interface Slot {
     keyId: string | null;
@@ -64,7 +78,20 @@ export interface Tally {
     latency: Record<LatencyColumn, number>;
 }
 
+/** Who called: the program's family and the address, per key and hour. */
+export interface CallerTally {
+    keyId: string;
+    hour: Date;
+    client: string;
+    ip: string;
+    calls: number;
+    errors: number;
+}
+
 const pending = new Map<string, Tally>();
+const pendingCallers = new Map<string, CallerTally>();
+/** The addresses each key's hour has been counted under, for the cap. */
+const addressesSeen = new Map<string, Set<string>>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 let sweptHour = 0;
 
@@ -94,6 +121,10 @@ export function recordKeyCall(call: {
     status: number;
     ms: number;
     at?: Date;
+    /** The caller's user-agent, read down to its family; absent for none sent. */
+    userAgent?: string | null;
+    /** The caller's address as the proxy forwarded it. */
+    ip?: string | null;
 }): void {
     const method = call.method.toUpperCase();
     const route = matchDocumentedRoute(method, call.pathname)?.path ?? OTHER_ROUTE;
@@ -117,17 +148,52 @@ export function recordKeyCall(call: {
     tally.calls += 1;
     tally.totalMs += ms;
     tally.latency[latencyColumn(ms)] += 1;
+    countCaller(call.keyId, hour, call.userAgent, call.ip, call.status >= 400);
 
-    if (pending.size >= FLUSH_AT_ENTRIES) void flushKeyCalls();
+    if (pending.size >= FLUSH_AT_ENTRIES || pendingCallers.size >= FLUSH_AT_ENTRIES)
+        void flushKeyCalls();
     else if (!timer) {
         timer = setTimeout(() => void flushKeyCalls(), FLUSH_EVERY_MS);
         timer.unref?.();
     }
 }
 
+function countCaller(
+    keyId: string,
+    hour: Date,
+    userAgent: string | null | undefined,
+    address: string | null | undefined,
+    failed: boolean
+): void {
+    const client = clientFamily(userAgent);
+    let ip = address?.trim().slice(0, ADDRESS_MAX) ?? NO_ADDRESS;
+    if (ip !== NO_ADDRESS) {
+        const slot = `${keyId}|${hour.getTime()}`;
+        let seen = addressesSeen.get(slot);
+        if (!seen) addressesSeen.set(slot, (seen = new Set()));
+        if (!seen.has(ip)) {
+            if (seen.size >= ADDRESSES_PER_HOUR) ip = OTHER_ADDRESSES;
+            else seen.add(ip);
+        }
+    }
+    const id = `${keyId}|${hour.getTime()}|${client}|${ip}`;
+    let tally = pendingCallers.get(id);
+    if (!tally) {
+        tally = { keyId, hour, client, ip, calls: 0, errors: 0 };
+        pendingCallers.set(id, tally);
+    }
+    tally.calls += 1;
+    if (failed) tally.errors += 1;
+}
+
 /** What is waiting to be written. For tests. */
 export function pendingKeyCalls(): Tally[] {
     return [...pending.values()];
+}
+
+/** The callers waiting to be written. For tests. */
+export function pendingKeyCallers(): CallerTally[] {
+    return [...pendingCallers.values()];
 }
 
 /**
@@ -142,6 +208,8 @@ export async function flushKeyCalls(now = new Date()): Promise<void> {
     }
     const batch = [...pending.values()];
     pending.clear();
+    const callers = [...pendingCallers.values()];
+    pendingCallers.clear();
     for (const tally of batch) {
         const where = {
             apiKeyId_hour_method_route_status: {
@@ -180,13 +248,41 @@ export async function flushKeyCalls(now = new Date()): Promise<void> {
         }
     }
 
+    for (const tally of callers) {
+        const where = {
+            apiKeyId: tally.keyId,
+            hour: tally.hour,
+            client: tally.client,
+            ip: tally.ip
+        };
+        try {
+            await prisma.apiKeyCallerHour.upsert({
+                where: { apiKeyId_hour_client_ip: where },
+                create: { ...where, calls: tally.calls, errors: tally.errors },
+                update: {
+                    calls: { increment: tally.calls },
+                    errors: { increment: tally.errors }
+                },
+                select: { calls: true }
+            });
+        } catch (caught) {
+            console.warn(
+                "[api-usage] could not write a key's caller counts",
+                caught instanceof Error ? caught.message : caught
+            );
+        }
+    }
+
     const hour = hourOf(now).getTime();
     if (hour !== sweptHour) {
         sweptHour = hour;
+        // Only the current hour's addresses still matter for the cap.
+        for (const slot of addressesSeen.keys())
+            if (Number(slot.slice(slot.indexOf("|") + 1)) < hour) addressesSeen.delete(slot);
         try {
-            await prisma.apiKeyCallHour.deleteMany({
-                where: { hour: { lt: new Date(hour - RETENTION_DAYS * 24 * 60 * 60 * 1000) } }
-            });
+            const before = new Date(hour - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+            await prisma.apiKeyCallHour.deleteMany({ where: { hour: { lt: before } } });
+            await prisma.apiKeyCallerHour.deleteMany({ where: { hour: { lt: before } } });
         } catch (caught) {
             console.warn(
                 "[api-usage] could not trim old call counts",
@@ -221,7 +317,9 @@ export function withKeyUsage<Args extends [Request, ...unknown[]]>(
                         method: request.method,
                         pathname: new URL(request.url).pathname,
                         status,
-                        ms: performance.now() - started
+                        ms: performance.now() - started,
+                        userAgent: originUserAgent(request.headers),
+                        ip: originIp(request.headers)
                     });
                 }
             }

@@ -14,10 +14,12 @@ import { operationId } from "@/lib/api-docs/openapi";
 import { DOCUMENTED_ROUTES } from "@/lib/api-docs/routes";
 import {
     USAGE_RANGES,
+    windowStart,
     keyUsageReport,
     usageReport,
     type KeyUsageReport
 } from "@/lib/api-usage/report";
+import { callerReport, type CallerShare } from "@/lib/api-usage/callers";
 
 const inputSchema = z.object({ keyId: z.string().uuid(), range: z.enum(USAGE_RANGES) });
 
@@ -92,4 +94,38 @@ export async function accountUsageAction(
         { shares: true }
     );
     return { usage: { ...report, anchors: anchorsOf(report), labels } };
+}
+
+const addressesSchema = z.object({
+    keyId: z.string().uuid().optional(),
+    range: z.enum(USAGE_RANGES)
+});
+
+/**
+ * The addresses behind a usage report in full, for the owner who asked to see
+ * them: one key's (by id AND owner) or, without a key, every key of theirs.
+ * The report itself only ever carries them masked.
+ */
+export async function usageAddressesAction(
+    input: unknown
+): Promise<{ addresses?: CallerShare[]; error?: "notFound" | "invalid" }> {
+    const user = await requireUser();
+    const parsed = addressesSchema.safeParse(input);
+    if (!parsed.success) return { error: "invalid" };
+    const keys = await prisma.apiKey.findMany({
+        where: {
+            userId: user.id,
+            kind: { notIn: DEVICE_KINDS },
+            ...(parsed.data.keyId ? { id: parsed.data.keyId } : {})
+        },
+        select: { id: true },
+        take: ACCOUNT_KEYS
+    });
+    if (keys.length === 0) return parsed.data.keyId ? { error: "notFound" } : { addresses: [] };
+    const report = await callerReport(
+        keys.map((key) => key.id),
+        new Date(windowStart(parsed.data.range)),
+        { reveal: true }
+    );
+    return { addresses: report.addresses };
 }

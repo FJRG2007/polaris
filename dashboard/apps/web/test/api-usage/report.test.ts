@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 const queries: Record<string, any>[] = [];
+const callerQueries: Record<string, any>[] = [];
 const at = (iso: string) => new Date(iso);
 
 vi.mock("@polaris/db", () => ({
@@ -46,6 +47,25 @@ vi.mock("@polaris/db", () => ({
                     { status: 404, _sum: { calls: 1 } },
                     { status: 502, _sum: { calls: 1 } }
                 ];
+            }
+        },
+        apiKeyCallerHour: {
+            aggregate: async (args: Record<string, any>) => {
+                callerQueries.push(args);
+                return { _sum: { calls: 11 } };
+            },
+            groupBy: async (args: Record<string, any>) => {
+                callerQueries.push(args);
+                return args.by[0] === "client"
+                    ? [
+                          { client: "curl", _sum: { calls: 9, errors: 1 } },
+                          { client: "", _sum: { calls: 2, errors: 0 } }
+                      ]
+                    : [
+                          { ip: "203.0.113.7", _sum: { calls: 6, errors: 1 } },
+                          { ip: "2001:db8:abcd:12::1", _sum: { calls: 3, errors: 0 } },
+                          { ip: "", _sum: { calls: 2, errors: 0 } }
+                      ];
             }
         }
     }
@@ -97,6 +117,26 @@ describe("a key's usage report", () => {
         expect(result.p50).toEqual({ ms: 38, over: false });
         expect(result.p99).toEqual({ ms: 5000, over: true });
         expect(result.keys).toEqual([]);
+    });
+
+    it("names who called, addresses masked to their network, and what predates the counting as unrecorded", async () => {
+        callerQueries.length = 0;
+        const result = await report.keyUsageReport("k1", "24h", new Date("2026-10-15T10:30:00Z"));
+        expect(callerQueries).toHaveLength(3);
+        for (const query of callerQueries) {
+            expect(query.where.apiKeyId).toBe("k1");
+            expect(query.where.hour.gte.toISOString()).toBe("2026-10-14T11:00:00.000Z");
+            if (query.take) expect(query.take).toBe(50);
+        }
+        expect(result.clients).toEqual([
+            { name: "curl", calls: 9, errors: 1 },
+            { name: "", calls: 2, errors: 0 }
+        ]);
+        expect(result.addresses.map((row) => row.name)).toEqual(["203.0.113.0/24", "2001:db8:abcd::/48", ""]);
+        // 15 calls in the route rollup, 11 with a caller row.
+        expect(result.unrecorded).toBe(4);
+        const revealed = await report.usageReport(["k1"], "24h", { now: new Date("2026-10-15T10:30:00Z"), reveal: true });
+        expect(revealed.addresses[0]!.name).toBe("203.0.113.7");
     });
 
     it("sums several keys as one and names each key's share", async () => {

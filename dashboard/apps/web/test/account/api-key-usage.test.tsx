@@ -15,7 +15,8 @@ const state = vi.hoisted(() => ({
     lookups: [] as Record<string, unknown>[],
     reports: [] as string[],
     listed: [] as Record<string, unknown>[],
-    summed: [] as { keyIds: string[]; options: unknown }[]
+    summed: [] as { keyIds: string[]; options: unknown }[],
+    revealed: [] as { keyIds: string[]; options: unknown }[]
 }));
 
 vi.mock("@/lib/session", () => ({ requireUser: async () => ({ id: "user-1", isAdmin: false }) }));
@@ -58,8 +59,16 @@ const quietReport = (range: string) => ({
     keys: []
 });
 
+vi.mock("@/lib/api-usage/callers", () => ({
+    callerReport: async (keyIds: string[], _since: Date, options: unknown) => {
+        state.revealed.push({ keyIds, options });
+        return { clients: [], addresses: [{ name: "203.0.113.7", calls: 1, errors: 0 }], recorded: 1 };
+    }
+}));
+
 vi.mock("@/lib/api-usage/report", () => ({
     USAGE_RANGES: ["24h", "7d", "30d", "90d"],
+    windowStart: () => 0,
     usageReport: async (keyIds: string[], range: string, options: unknown) => {
         state.summed.push({ keyIds, options });
         return quietReport(range);
@@ -82,7 +91,7 @@ vi.mock("@/lib/api-usage/report", () => ({
     }
 }));
 
-const { accountUsageAction, keyUsageAction } = await import(
+const { accountUsageAction, keyUsageAction, usageAddressesAction } = await import(
     "@/app/(app)/account/api-keys/usage-actions"
 );
 const { UsageData, usageCsv } = await import("@/app/(app)/account/api-keys/[keyId]/usage/key-usage-view");
@@ -92,6 +101,23 @@ beforeEach(() => {
     state.reports.length = 0;
     state.listed.length = 0;
     state.summed.length = 0;
+    state.revealed.length = 0;
+});
+
+describe("revealing the full addresses", () => {
+    it("reads only the owner's keys, and only then asks for the addresses unmasked", async () => {
+        const result = await usageAddressesAction({ keyId: OWN_KEY, range: "24h" });
+        expect(state.listed).toEqual([
+            { userId: "user-1", kind: { notIn: ["cli", "streamdeck", "tv", "terminal"] }, id: OWN_KEY }
+        ]);
+        expect(state.revealed).toEqual([{ keyIds: [OWN_KEY], options: { reveal: true } }]);
+        expect(result.addresses?.[0]?.name).toBe("203.0.113.7");
+    });
+
+    it("refuses a malformed request before touching the database", async () => {
+        expect(await usageAddressesAction({ keyId: "nope", range: "24h" })).toEqual({ error: "invalid" });
+        expect(state.listed).toEqual([]);
+    });
 });
 
 describe("the account's usage overview", () => {
@@ -218,6 +244,33 @@ describe("the usage data region", () => {
         expect(markup).toContain("<svg");
         expect(markup).toContain("Export CSV");
         expect(markup).not.toContain("By key");
+        // A report kept from before callers were counted draws no caller tables.
+        expect(markup).not.toContain("By client");
+    });
+
+    it("lists the callers, addresses masked, with what predates the counting as not recorded", () => {
+        const usage = {
+            ...empty,
+            total: 10,
+            classes: { success: 10, client: 0, server: 0 },
+            series: [{ t: Date.UTC(2026, 9, 15, 9), calls: 10, errors: 0 }],
+            clients: [
+                { name: "Python requests", calls: 6, errors: 0 },
+                { name: "", calls: 1, errors: 0 }
+            ],
+            addresses: [{ name: "203.0.113.0/24", calls: 7, errors: 0 }],
+            unrecorded: 3
+        };
+        const markup = renderToStaticMarkup(
+            withMessages(<UsageData load={{ state: "ready", usage }} onRetry={() => {}} keyId={OWN_KEY} />)
+        );
+        expect(markup).toContain("By client");
+        expect(markup).toContain("Python requests");
+        expect(markup).toContain("No user-agent sent");
+        expect(markup).toContain("203.0.113.0/24");
+        expect(markup).toContain("Not recorded");
+        expect(markup).toContain("30%");
+        expect(markup).toContain("Show full");
     });
 
     it("lists each key's share on the overview, a row opening that key", () => {

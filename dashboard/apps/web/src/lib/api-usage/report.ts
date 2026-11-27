@@ -4,13 +4,14 @@
  *
  * Every read is a GROUP BY on the keys' own rows inside the window, through the
  * primary key (key first, hour second): calls over time, by route, by status,
- * by key.
+ * by key, and who called (lib/api-usage/callers).
  * The only work left here is folding hours into days for the long windows and
  * reading percentiles off the summed latency histogram.
  */
 
 import { prisma } from "@polaris/db";
 import type { UsageRange } from "./ranges";
+import { callerReport, type CallerShare } from "./callers";
 import { LATENCY_BOUNDS, LATENCY_COLUMNS, hourOf, type LatencyColumn } from "./recorder";
 
 export { USAGE_RANGES, type UsageRange } from "./ranges";
@@ -70,6 +71,12 @@ export interface KeyUsageReport {
     statuses: { status: number; calls: number }[];
     /** Every key with calls in the window, busiest first; empty for one key's report. */
     keys: KeyShare[];
+    /** The calling programs' families, busiest first. */
+    clients: CallerShare[];
+    /** The addresses called from, busiest first; masked unless the report was revealed. */
+    addresses: CallerShare[];
+    /** Calls with no caller recorded (made before callers were counted). */
+    unrecorded: number;
 }
 
 /** The most routes and keys a report lists; the rest are summed as "other". */
@@ -140,12 +147,29 @@ export function foldSeries(
     return points;
 }
 
+/** A range's buckets and its first and last, the hours or days the report spans. */
+function windowOf(range: UsageRange, now: Date) {
+    const hours = RANGE_HOURS[range];
+    const bucket: "hour" | "day" = hours > 24 * 7 ? "day" : "hour";
+    const step = bucket === "day" ? DAY_MS : HOUR_MS;
+    const lastHour = hourOf(now).getTime();
+    const to = bucket === "day" ? Math.floor(lastHour / DAY_MS) * DAY_MS : lastHour;
+    const from = to - (bucket === "day" ? hours / 24 - 1 : hours - 1) * step;
+    return { bucket, step, from, to };
+}
+
+/** Where a range's report starts, in ms: the same window the report reads. */
+export function windowStart(range: UsageRange, now = new Date()): number {
+    return windowOf(range, now).from;
+}
+
 export function keyUsageReport(
     keyId: string,
     range: UsageRange,
-    now = new Date()
+    now = new Date(),
+    reveal = false
 ): Promise<KeyUsageReport> {
-    return usageReport([keyId], range, { now });
+    return usageReport([keyId], range, { now, reveal });
 }
 
 /**
@@ -156,15 +180,9 @@ export function keyUsageReport(
 export async function usageReport(
     keyIds: readonly string[],
     range: UsageRange,
-    options: { now?: Date; shares?: boolean } = {}
+    options: { now?: Date; shares?: boolean; reveal?: boolean } = {}
 ): Promise<KeyUsageReport> {
-    const now = options.now ?? new Date();
-    const hours = RANGE_HOURS[range];
-    const bucket = hours > 24 * 7 ? "day" : "hour";
-    const step = bucket === "day" ? DAY_MS : HOUR_MS;
-    const lastHour = hourOf(now).getTime();
-    const to = bucket === "day" ? Math.floor(lastHour / DAY_MS) * DAY_MS : lastHour;
-    const from = to - (bucket === "day" ? hours / 24 - 1 : hours - 1) * step;
+    const { bucket, step, from, to } = windowOf(range, options.now ?? new Date());
     const where = {
         apiKeyId: keyIds.length === 1 ? keyIds[0]! : { in: [...keyIds] },
         hour: { gte: new Date(from) }
@@ -172,7 +190,7 @@ export async function usageReport(
     const failed = { ...where, status: { gte: 400 } };
     const several = options.shares ?? keyIds.length > 1;
 
-    const [byHour, errorsByHour, byRoute, errorsByRoute, byStatus, all, byKey, errorsByKey] =
+    const [byHour, errorsByHour, byRoute, errorsByRoute, byStatus, all, byKey, errorsByKey, callers] =
         await Promise.all([
             prisma.apiKeyCallHour.groupBy({ by: ["hour"], where, _sum: { calls: true } }),
             prisma.apiKeyCallHour.groupBy({ by: ["hour"], where: failed, _sum: { calls: true } }),
@@ -211,7 +229,8 @@ export async function usageReport(
                       where: failed,
                       _sum: { calls: true }
                   })
-                : Promise.resolve([])
+                : Promise.resolve([]),
+            callerReport(keyIds, new Date(from), { reveal: options.reveal })
         ]);
 
     const errorsAt = new Map(errorsByHour.map((row) => [row.hour.getTime(), row._sum.calls ?? 0]));
@@ -252,12 +271,13 @@ export async function usageReport(
         else classes.success += row.calls;
     }
 
+    const total = statuses.reduce((sum, row) => sum + row.calls, 0);
     return {
         range,
         from,
         to,
         bucket,
-        total: statuses.reduce((sum, row) => sum + row.calls, 0),
+        total,
         classes,
         p50: percentile(overall, 0.5),
         p95: percentile(overall, 0.95),
@@ -274,6 +294,9 @@ export async function usageReport(
                 p50: percentile(histogram, 0.5),
                 p95: percentile(histogram, 0.95)
             };
-        })
+        }),
+        clients: callers.clients,
+        addresses: callers.addresses,
+        unrecorded: Math.max(0, total - callers.recorded)
     };
 }

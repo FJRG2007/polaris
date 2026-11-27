@@ -746,7 +746,22 @@
             "key": "Key",
             "openKey": "Open the usage of {name}",
             "removedKey": "Deleted key",
-            "quietKeys": "{count, plural, one {# more key had} other {# more keys had}} no calls in this period."
+            "quietKeys": "{count, plural, one {# more key had} other {# more keys had}} no calls in this period.",
+            "byClient": "By client",
+            "client": "Client",
+            "byAddress": "By address",
+            "address": "Address",
+            "noClient": "No user-agent sent",
+            "noAddress": "No address told",
+            "otherClient": "Other programs",
+            "otherAddresses": "Other addresses",
+            "otherCallers": "The rest",
+            "notRecorded": "Not recorded",
+            "notRecordedHint": "Calls made before callers were counted.",
+            "showAddresses": "Show full",
+            "maskAddresses": "Mask",
+            "maskedHint": "Addresses are shown to their network (/24, /48).",
+            "revealFailed": "Full addresses could not be loaded. Try again."
         }
     },
     "connections": {

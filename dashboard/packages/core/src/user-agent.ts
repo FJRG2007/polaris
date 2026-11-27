@@ -357,6 +357,63 @@ export function describeDevice(
     return describeClient(userAgent, brands, platform).label;
 }
 
+/**
+ * The program family behind an API call, for a usage table: "curl", "Python
+ * requests", "Chrome". A family and not the user-agent itself, so a version bump
+ * does not split one caller into many rows and the stored value says nothing a
+ * header did not already say in fewer words.
+ *
+ * Tools and libraries are read first - most of them write a single
+ * `name/version` token - and only then the browsers, which every library that
+ * imitates one also names. The order follows the HTTP-client tables of
+ * ua-parser-js and Cloudflare's user-agent breakdown.
+ */
+const CLIENT_FAMILIES: readonly { readonly test: RegExp; readonly name: string }[] = [
+    { test: /^curl\//i, name: "curl" },
+    { test: /^Wget\//i, name: "Wget" },
+    { test: /^HTTPie\//i, name: "HTTPie" },
+    { test: /^PostmanRuntime\//i, name: "Postman" },
+    { test: /^insomnia\//i, name: "Insomnia" },
+    { test: /^Bruno\//i, name: "Bruno" },
+    { test: /\bPowerShell\//i, name: "PowerShell" },
+    { test: /^python-requests\//i, name: "Python requests" },
+    { test: /^python-httpx\//i, name: "Python httpx" },
+    { test: /^Python\/[\d.]+ aiohttp\//i, name: "Python aiohttp" },
+    { test: /^Python-urllib\//i, name: "Python urllib" },
+    { test: /^(?:Anthropic|OpenAI)\/(?:Python|JS)\b/i, name: "AI SDK" },
+    { test: /^axios\//i, name: "axios" },
+    { test: /^node-fetch\b/i, name: "node-fetch" },
+    { test: /^got\b/i, name: "got" },
+    { test: /^(?:undici|node)\b/i, name: "Node.js" },
+    { test: /^Deno\//i, name: "Deno" },
+    { test: /^Bun\//i, name: "Bun" },
+    { test: /^Go-http-client\//i, name: "Go" },
+    { test: /^okhttp\//i, name: "OkHttp" },
+    { test: /^(?:Java|Apache-HttpClient)\//i, name: "Java" },
+    { test: /^Ruby\b|^Faraday\b/i, name: "Ruby" },
+    { test: /^reqwest\b|^hyper\//i, name: "Rust" },
+    { test: /^Dart\//i, name: "Dart" },
+    { test: /^GuzzleHttp\//i, name: "PHP Guzzle" },
+    { test: /^libwww-perl\//i, name: "Perl" },
+    { test: /^GitHub-Hookshot\//i, name: "GitHub" },
+    { test: /\bclaude-code\//i, name: "Claude Code" },
+    { test: /\bmcp-remote\b|\bModelContextProtocol\b/i, name: "MCP client" }
+];
+
+/** What `clientFamily` answers when the call sent no user-agent at all. */
+export const NO_CLIENT = "";
+/** What `clientFamily` answers for a user-agent it cannot place. */
+export const OTHER_CLIENT = "(other)";
+
+export function clientFamily(userAgent: string | null | undefined): string {
+    const agent = userAgent?.trim();
+    if (!agent) return NO_CLIENT;
+    for (const entry of CLIENT_FAMILIES) if (entry.test.test(agent)) return entry.name;
+    if (!/^Mozilla\//.test(agent)) return OTHER_CLIENT;
+    const browser = browserFromUserAgent(agent).name;
+    return browser === "Browser" ? OTHER_CLIENT : browser;
+}
+
 // ---------------------------------------------------------------------------
 // Restricting a credential to particular clients
 // ---------------------------------------------------------------------------

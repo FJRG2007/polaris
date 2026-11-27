@@ -9,15 +9,17 @@
 
 import Link from "next/link";
 import { createDisplayFormat, describeDevice } from "@polaris/core";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useDisplayFormat, useDisplayPreferences } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { csvCell } from "@/lib/access/grant-use-csv";
 import type { KeyUsage, UsageKeyLabel } from "@/app/(app)/account/api-keys/usage-actions";
-import { ArrowLeft, BookOpen, Download, Pencil, RotateCw } from "lucide-react";
-import { Badge, Button, SegmentedControl, Skeleton, cn } from "@polaris/ui";
+import { usageAddressesAction } from "@/app/(app)/account/api-keys/usage-actions";
+import type { CallerShare } from "@/lib/api-usage/callers";
+import { ArrowLeft, BookOpen, Download, Eye, EyeOff, Pencil, RotateCw } from "lucide-react";
+import { Badge, Button, CopyButton, SegmentedControl, Skeleton, cn } from "@polaris/ui";
 import type { Percentile } from "@/lib/api-usage/report";
 import { USAGE_RANGES, type UsageRange } from "@/lib/api-usage/ranges";
 import * as polls from "../../../account-polls";
@@ -150,7 +152,11 @@ export function KeyUsageView({ apiKey }: { apiKey: UsageKey }) {
                 <p className="text-xs text-muted-foreground">{t("apiKeys.usage.kept")}</p>
             </div>
 
-            <UsageData load={load} onRetry={() => setAttempt((count) => count + 1)} />
+            <UsageData
+                load={load}
+                onRetry={() => setAttempt((count) => count + 1)}
+                keyId={apiKey.id}
+            />
         </div>
     );
 }
@@ -161,9 +167,12 @@ export function UsageData({
     onRetry,
     labels,
     emptyHint,
-    exportName
+    exportName,
+    keyId
 }: {
     load: Load;
+    /** The key a single key's screen is about; absent for the overview. */
+    keyId?: string;
     onRetry: () => void;
     /** Every key of the account, for the overview's per-key table. */
     labels?: UsageKeyLabel[];
@@ -198,7 +207,14 @@ export function UsageData({
             </div>
         );
     }
-    return <UsageReport usage={usage} labels={labels} exportName={exportName ?? "api-usage"} />;
+    return (
+        <UsageReport
+            usage={usage}
+            labels={labels}
+            exportName={exportName ?? "api-usage"}
+            keyId={keyId}
+        />
+    );
 }
 
 function UsageSkeleton() {
@@ -288,11 +304,13 @@ export function usageCsv(
 function UsageReport({
     usage,
     labels,
-    exportName
+    exportName,
+    keyId
 }: {
     usage: KeyUsage;
     labels?: UsageKeyLabel[];
     exportName: string;
+    keyId?: string;
 }) {
     const t = useTranslations("account");
     const format = useDisplayFormat();
@@ -520,7 +538,212 @@ function UsageReport({
                     </div>
                 </section>
             </div>
+
+            <CallersTables key={usage.range} usage={usage} keyId={keyId} />
         </div>
+    );
+}
+
+/** A caller row's name as read: the program's family or the address, or what stands for neither. */
+function callerName(kind: "client" | "address", name: string, t: Translate): string {
+    if (name === "") return t(kind === "client" ? "apiKeys.usage.noClient" : "apiKeys.usage.noAddress");
+    if (kind === "client" && name === "(other)") return t("apiKeys.usage.otherClient");
+    if (kind === "address" && name === "*") return t("apiKeys.usage.otherAddresses");
+    return name;
+}
+
+/**
+ * Who called: the programs and the addresses, each with the calls and errors it
+ * made. Addresses come masked to their network; the owner can show them in
+ * full, which asks for them separately so the report itself never holds them.
+ * Calls from before callers were counted close each table as "Not recorded".
+ */
+function CallersTables({ usage, keyId }: { usage: KeyUsage; keyId?: string; }) {
+    const t = useTranslations("account");
+    const [full, setFull] = useState<CallerShare[] | null>(null);
+    const [revealing, setRevealing] = useState(false);
+    const [revealFailed, setRevealFailed] = useState(false);
+    // A report kept for the tab from before callers were counted has neither list.
+    const clients = usage.clients ?? [];
+    const addresses = full ?? usage.addresses ?? [];
+    const unrecorded = usage.unrecorded ?? 0;
+    if (clients.length === 0 && addresses.length === 0 && unrecorded === 0) return null;
+
+    const toggle = async () => {
+        if (full) {
+            setFull(null);
+            return;
+        }
+        setRevealing(true);
+        setRevealFailed(false);
+        try {
+            const result = await usageAddressesAction({ keyId, range: usage.range });
+            if (result.addresses) setFull(result.addresses);
+            else setRevealFailed(true);
+        } catch {
+            setRevealFailed(true);
+        } finally {
+            setRevealing(false);
+        }
+    };
+
+    return (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <CallerTable
+                title={t("apiKeys.usage.byClient")}
+                head={t("apiKeys.usage.client")}
+                rows={clients.map((row) => ({ ...row, label: callerName("client", row.name, t) }))}
+                total={usage.total}
+                unrecorded={unrecorded}
+            />
+            <CallerTable
+                title={t("apiKeys.usage.byAddress")}
+                head={t("apiKeys.usage.address")}
+                rows={addresses.map((row) => ({
+                    ...row,
+                    label: callerName("address", row.name, t),
+                    copy: full && row.name !== "" && row.name !== "*" ? row.name : undefined
+                }))}
+                total={usage.total}
+                unrecorded={unrecorded}
+                mono
+                action={
+                    addresses.length > 0 ? (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void toggle()}
+                            disabled={revealing}
+                            aria-pressed={full !== null}
+                        >
+                            {full ? (
+                                <EyeOff className="size-4 shrink-0" />
+                            ) : (
+                                <Eye className="size-4 shrink-0" />
+                            )}
+                            {t(full ? "apiKeys.usage.maskAddresses" : "apiKeys.usage.showAddresses")}
+                        </Button>
+                    ) : null
+                }
+                note={
+                    revealFailed
+                        ? t("apiKeys.usage.revealFailed")
+                        : full
+                          ? undefined
+                          : t("apiKeys.usage.maskedHint")
+                }
+                noteTone={revealFailed ? "text-danger" : undefined}
+            />
+        </div>
+    );
+}
+
+function CallerTable({
+    title,
+    head,
+    rows,
+    total,
+    unrecorded,
+    mono,
+    action,
+    note,
+    noteTone
+}: {
+    title: string;
+    head: string;
+    rows: (CallerShare & { label: string; copy?: string; })[];
+    total: number;
+    unrecorded: number;
+    mono?: boolean;
+    action?: ReactNode;
+    note?: string;
+    noteTone?: string;
+}) {
+    const t = useTranslations("account");
+    const format = useDisplayFormat();
+    const number = (value: number) => format.number(value);
+    const share = (value: number) =>
+        format.number(total > 0 ? value / total : 0, { style: "percent", maximumFractionDigits: 1 });
+    const listed = rows.reduce((sum, row) => sum + row.calls, 0);
+    const rest = Math.max(0, total - unrecorded - listed);
+    const cell = "whitespace-nowrap px-3 py-2 text-end tabular-nums";
+    return (
+        <section className="flex min-w-0 flex-col gap-2">
+            <div className="flex min-h-8 flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold">{title}</h2>
+                {action}
+            </div>
+            <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="w-full text-sm">
+                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                        <tr>
+                            <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
+                                {head}
+                            </th>
+                            <th scope="col" className="px-3 py-2 text-end font-medium">
+                                {t("apiKeys.usage.calls")}
+                            </th>
+                            <th scope="col" className="px-3 py-2 text-end font-medium">
+                                {t("apiKeys.usage.errors")}
+                            </th>
+                            <th scope="col" className="px-3 py-2 text-end font-medium">
+                                {t("apiKeys.usage.share")}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map((row) => (
+                            <tr key={row.name} className="border-t border-border">
+                                <td className="max-w-0 px-3 py-2">
+                                    <span className="flex min-w-0 items-center gap-2">
+                                        <span
+                                            className={cn("min-w-0 truncate", mono && "font-mono text-xs")}
+                                            title={row.label}
+                                        >
+                                            {row.label}
+                                        </span>
+                                        {row.copy ? (
+                                            <CopyButton value={row.copy} className="shrink-0" />
+                                        ) : null}
+                                    </span>
+                                </td>
+                                <td className={cell}>{number(row.calls)}</td>
+                                <td
+                                    className={cn(
+                                        cell,
+                                        row.errors > 0 ? "text-danger" : "text-muted-foreground"
+                                    )}
+                                >
+                                    {number(row.errors)}
+                                </td>
+                                <td className={cn(cell, "text-muted-foreground")}>{share(row.calls)}</td>
+                            </tr>
+                        ))}
+                        {rest > 0 ? (
+                            <tr className="border-t border-border text-muted-foreground">
+                                <td className="max-w-0 truncate px-3 py-2">{t("apiKeys.usage.otherCallers")}</td>
+                                <td className={cell}>{number(rest)}</td>
+                                <td className={cell}>-</td>
+                                <td className={cell}>{share(rest)}</td>
+                            </tr>
+                        ) : null}
+                        {unrecorded > 0 ? (
+                            <tr className="border-t border-border text-muted-foreground">
+                                <td className="max-w-0 px-3 py-2">
+                                    <span className="block truncate" title={t("apiKeys.usage.notRecordedHint")}>
+                                        {t("apiKeys.usage.notRecorded")}
+                                    </span>
+                                </td>
+                                <td className={cell}>{number(unrecorded)}</td>
+                                <td className={cell}>-</td>
+                                <td className={cell}>{share(unrecorded)}</td>
+                            </tr>
+                        ) : null}
+                    </tbody>
+                </table>
+            </div>
+            {note ? <p className={cn("text-xs text-muted-foreground", noteTone)}>{note}</p> : null}
+        </section>
     );
 }
 

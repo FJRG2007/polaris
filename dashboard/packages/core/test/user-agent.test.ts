@@ -11,6 +11,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    NO_CLIENT,
+    OTHER_CLIENT,
+    clientFamily,
     describeClient,
     describeDevice,
     userAgentAllowed,
@@ -338,5 +341,27 @@ describe("what the user-agent said on its own", () => {
         const reading = describeClient(null);
         expect(reading.claimedBrowser).toBe("Unknown browser");
         expect(reading.claimedOs).toBe("Unknown OS");
+    });
+});
+
+describe("the program family behind an API call", () => {
+    it("names tools and libraries by their family, whatever the version", () => {
+        expect(clientFamily("curl/8.4.0")).toBe("curl");
+        expect(clientFamily("curl/7.81.0")).toBe("curl");
+        expect(clientFamily("python-requests/2.31.0")).toBe("Python requests");
+        expect(clientFamily("Python/3.12 aiohttp/3.9.1")).toBe("Python aiohttp");
+        expect(clientFamily("Go-http-client/2.0")).toBe("Go");
+        expect(clientFamily("node")).toBe("Node.js");
+        expect(clientFamily("PostmanRuntime/7.36.0")).toBe("Postman");
+        expect(clientFamily("Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.22631; en-US) PowerShell/7.4.1")).toBe("PowerShell");
+    });
+
+    it("reads a browser as the browser, and keeps none-sent apart from unknown", () => {
+        expect(
+            clientFamily("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+        ).toBe("Chrome");
+        expect(clientFamily(undefined)).toBe(NO_CLIENT);
+        expect(clientFamily("  ")).toBe(NO_CLIENT);
+        expect(clientFamily("my-deploy-script/1.0")).toBe(OTHER_CLIENT);
     });
 });

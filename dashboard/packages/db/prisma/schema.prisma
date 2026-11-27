@@ -1788,6 +1788,7 @@ model ApiKey {
     groups  ApiKeyAccessGroup[]
     usage   ApiKeyUsage[]
     calls   ApiKeyCallHour[]
+    callers ApiKeyCallerHour[]
     terminalInstance TerminalInstance?
     tvUpdate TvUpdateRequest?
     tvPreference TvPreference?
@@ -1902,6 +1903,27 @@ model ApiKeyCallHour {
     apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
 
     @@id([apiKeyId, hour, method, route, status])
+    @@index([hour])
+}
+
+/// Who called with an API key, per hour: the calling program's family and the
+/// address the call came from. Beside ApiKeyCallHour rather than in it, so the
+/// route rollup keeps its key; hours before this was recorded have no rows here
+/// and read as "Not recorded".
+model ApiKeyCallerHour {
+    apiKeyId String   @db.Uuid
+    /// The start of the hour, UTC.
+    hour     DateTime
+    /// The program's family as clientFamily() names it; "" when no user-agent was sent.
+    client   String
+    /// The caller's address; "" when none was told, "*" for addresses past the hourly cap.
+    ip       String
+    calls    Int      @default(0)
+    errors   Int      @default(0)
+
+    apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+    @@id([apiKeyId, hour, client, ip])
     @@index([hour])
 }
 

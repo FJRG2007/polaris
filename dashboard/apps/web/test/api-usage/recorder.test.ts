@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const upserts: Record<string, any>[] = [];
 const deletes: Record<string, any>[] = [];
+const callerUpserts: Record<string, any>[] = [];
+const callerDeletes: Record<string, any>[] = [];
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -12,6 +14,16 @@ vi.mock("@polaris/db", () => ({
             },
             deleteMany: async (args: Record<string, any>) => {
                 deletes.push(args);
+                return { count: 0 };
+            }
+        },
+        apiKeyCallerHour: {
+            upsert: async (args: Record<string, any>) => {
+                callerUpserts.push(args);
+                return { calls: 1 };
+            },
+            deleteMany: async (args: Record<string, any>) => {
+                callerDeletes.push(args);
                 return { count: 0 };
             }
         }
@@ -26,6 +38,8 @@ beforeEach(async () => {
     await recorder.flushKeyCalls(new Date("2026-10-15T10:00:00Z"));
     upserts.length = 0;
     deletes.length = 0;
+    callerUpserts.length = 0;
+    callerDeletes.length = 0;
 });
 
 describe("recording a key's calls", () => {
@@ -131,5 +145,51 @@ describe("recording a key's calls", () => {
             handler(new Request("https://polaris.example.test/api/v1/me"))
         ).rejects.toThrow("boom");
         expect(recorder.pendingKeyCalls()).toMatchObject([{ status: 500 }]);
+    });
+
+    it("counts who called - the program's family and the address - and trims those rows with the rest", async () => {
+        const handler = recorder.withKeyUsage(async (_request: Request) => {
+            recorder.noteKeyCall(KEY);
+            return new Response(null, { status: 404 });
+        });
+        const call = (agent: string | null, ip: string | null) => {
+            const headers: Record<string, string> = {};
+            if (agent) headers["user-agent"] = agent;
+            if (ip) headers["x-forwarded-for"] = `${ip}, 10.0.0.1`;
+            return handler(new Request("https://polaris.example.test/api/v1/me", { headers }));
+        };
+        await call("curl/8.4.0", "203.0.113.7");
+        await call("curl/8.11.1", "203.0.113.7");
+        await call(null, null);
+        const callers = recorder.pendingKeyCallers();
+        expect(callers).toHaveLength(2);
+        expect(callers).toContainEqual(
+            expect.objectContaining({ client: "curl", ip: "203.0.113.7", calls: 2, errors: 2 })
+        );
+        expect(callers).toContainEqual(expect.objectContaining({ client: "", ip: "", calls: 1 }));
+        await recorder.flushKeyCalls(new Date("2026-10-15T12:00:00Z"));
+        expect(callerUpserts).toHaveLength(2);
+        expect(callerUpserts[0]!.where.apiKeyId_hour_client_ip).toMatchObject({ apiKeyId: KEY });
+        expect(callerUpserts[0]!.update.calls).toEqual({ increment: 2 });
+        expect(callerDeletes).toHaveLength(1);
+        expect(callerDeletes[0]!.where.hour.lt.toISOString()).toBe("2026-07-17T12:00:00.000Z");
+    });
+
+    it("files the addresses past the hourly cap under one row", () => {
+        const at = new Date("2026-10-15T13:05:00Z");
+        for (let i = 0; i <= recorder.ADDRESSES_PER_HOUR + 5; i++) {
+            recorder.recordKeyCall({
+                keyId: KEY,
+                method: "GET",
+                pathname: "/api/v1/me",
+                status: 200,
+                ms: 10,
+                at,
+                ip: `198.51.${i >> 8}.${i & 255}`
+            });
+        }
+        const callers = recorder.pendingKeyCallers();
+        expect(callers).toHaveLength(recorder.ADDRESSES_PER_HOUR + 1);
+        expect(callers.find((row) => row.ip === recorder.OTHER_ADDRESSES)?.calls).toBe(6);
     });
 });
