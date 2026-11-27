@@ -693,7 +693,8 @@
         "list": "List",
         "month": "Month",
         "week": "Week",
-        "year": "Year"
+        "year": "Year",
+        "schedule": "Schedule"
     },
     "zonePicker": {
         "floating": "No time zone (floating)",
@@ -711,5 +712,11 @@
         "keepMine": "Keep mine",
         "drop": "Drop",
         "kept": "Saved on this device. Made when Polaris is back."
+    },
+    "phone": {
+        "dayCell": "{day}, {count, plural, =0 {nothing planned} one {# event} other {# events}}",
+        "emptyRange": "Nothing planned for these days.",
+        "from": "From {time}",
+        "until": "Until {time}"
     }
 }

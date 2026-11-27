@@ -8,7 +8,17 @@
 
 import { useCalendarT } from "./i18n";
 import { viewKey } from "./shortcuts";
-import { Check, ChevronDown } from "lucide-react";
+import {
+    Calendar,
+    CalendarDays,
+    CalendarRange,
+    Check,
+    ChevronDown,
+    Columns3,
+    LayoutList,
+    RectangleVertical,
+    type LucideIcon
+} from "lucide-react";
 import { VIEWS, type CalendarPreferences, type CalendarViewName } from "../lib/preferences";
 import {
     Button,
@@ -26,14 +36,35 @@ import {
 export const VIEW_SWITCHES = ["showWeekends", "showDeclined", "showDoneTasks"] as const;
 export type ViewSwitch = (typeof VIEW_SWITCHES)[number];
 
+/** What the compact (phone) button draws for each view. */
+const VIEW_ICONS: Record<CalendarViewName, LucideIcon> = {
+    list: LayoutList,
+    day: RectangleVertical,
+    days: Columns3,
+    week: CalendarRange,
+    month: CalendarDays,
+    year: Calendar
+};
+
+function ViewIcon({ view, className }: { view: CalendarViewName; className?: string }) {
+    const Icon = VIEW_ICONS[view];
+    return <Icon aria-hidden className={className} />;
+}
+
 export function ViewPicker({
     view,
     customDays,
     preferences,
+    views = VIEWS,
+    compact = false,
     onView,
     onToggle
 }: {
     view: CalendarViewName;
+    /** The views offered; a phone offers fewer (phone-view.ts). */
+    views?: readonly CalendarViewName[];
+    /** An icon in place of the name, on a phone's narrow header. */
+    compact?: boolean;
     customDays: number;
     preferences: Pick<CalendarPreferences, ViewSwitch | "keyboardShortcuts" | "showTasks">;
     onView: (view: CalendarViewName) => void;
@@ -41,7 +72,11 @@ export function ViewPicker({
 }) {
     const t = useCalendarT();
     const bindings = useShortcutBindings();
-    const nameOf = (entry: CalendarViewName) => t(`views.${entry}`, { count: customDays });
+    // A phone's list is its schedule, named the way Google's phone app names it.
+    const nameOf = (entry: CalendarViewName) =>
+        compact && entry === "list"
+            ? t("views.schedule")
+            : t(`views.${entry}`, { count: customDays });
     // Done tasks are only a choice while tasks are drawn at all.
     const switches = VIEW_SWITCHES.filter(
         (name) => name !== "showDoneTasks" || preferences.showTasks
@@ -49,13 +84,25 @@ export function ViewPicker({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" aria-label={t("header.view")}>
-                    <span className="min-w-0 truncate">{nameOf(view)}</span>
-                    <ChevronDown className="size-3.5" />
-                </Button>
+                {compact ? (
+                    <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        className="size-11"
+                        aria-label={`${t("header.view")}: ${nameOf(view)}`}
+                        title={nameOf(view)}
+                    >
+                        <ViewIcon view={view} className="size-5" />
+                    </Button>
+                ) : (
+                    <Button size="sm" variant="outline" aria-label={t("header.view")}>
+                        <span className="min-w-0 truncate">{nameOf(view)}</span>
+                        <ChevronDown className="size-3.5" />
+                    </Button>
+                )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">
-                {VIEWS.map((entry) => {
+                {views.map((entry) => {
                     const key = preferences.keyboardShortcuts ? viewKey(bindings, entry) : null;
                     return (
                         <DropdownMenuItem
@@ -65,8 +112,9 @@ export function ViewPicker({
                             onSelect={() => onView(entry)}
                             className={cn(entry === view && "font-medium text-primary")}
                         >
+                            {compact ? <ViewIcon view={entry} /> : null}
                             {nameOf(entry)}
-                            {key ? <MenuShortcut keys={key} /> : null}
+                            {key && !compact ? <MenuShortcut keys={key} /> : null}
                         </DropdownMenuItem>
                     );
                 })}

@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import {
     AlarmClock,
     CalendarCheck,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     Keyboard,
@@ -59,6 +60,8 @@ import { MiniMonth } from "./mini-month";
 import { holdWakeStream } from "./live-stream";
 import { useSwipeStep } from "./swipe-step";
 import { ViewPicker } from "./view-picker";
+import { PhoneMonth, PhoneSchedule } from "./phone-views";
+import * as phoneView from "./phone-view";
 import type { PartStat } from "../engine";
 import { TodoEditor } from "./todo-editor";
 import { TaskCard } from "./task-card";
@@ -237,6 +240,9 @@ export function CalendarScreen({ path }: { path: string[] }) {
     const [pinned, setAnchor] = useState<string | null>(route.date);
     const anchor = pinned ?? today;
     const viewChosen = useRef(route.view !== null);
+    /** A phone-sized screen: its own views, kept on this device (phone-view.ts). */
+    const phone = phoneView.usePhone();
+    const customDays = phoneView.daysFor(phone, preferences.customDays);
     const [selected, setSelected] = useState<Selected>(null);
     const [popover, setPopover] = useState<Popover>(null);
     const [editor, setEditor] = useState<EditorTarget | null>(
@@ -275,16 +281,22 @@ export function CalendarScreen({ path }: { path: string[] }) {
 
     // The view the calendar was left on, once the settings have arrived - unless
     // the address named one.
+    // A phone opens on the view this device was left on (the schedule at
+    // first), never on the account's, which is the desktop's.
     useEffect(() => {
-        if (!viewChosen.current && preferencesRead.data) {
+        if (viewChosen.current) return;
+        if (phoneView.phoneNow()) {
+            viewChosen.current = true;
+            setView(phoneView.openingPhoneView(null, phoneView.readPhoneView()));
+        } else if (preferencesRead.data) {
             viewChosen.current = true;
             setView(preferencesRead.data.view);
         }
     }, [preferencesRead.data]);
 
     const span = useMemo(
-        () => time.viewWindow(view, anchor, firstDay, preferences.customDays),
-        [view, anchor, firstDay, preferences.customDays]
+        () => time.viewWindow(view, anchor, firstDay, customDays),
+        [view, anchor, firstDay, customDays]
     );
     const instants = useMemo(() => time.windowInstants(span, zone), [span, zone]);
     const rangeKey = cacheKey(
@@ -461,7 +473,8 @@ export function CalendarScreen({ path }: { path: string[] }) {
     const chooseView = (next: CalendarViewName) => {
         viewChosen.current = true;
         setView(next);
-        void savePreferences({ view: next });
+        if (phone) phoneView.writePhoneView(next);
+        else void savePreferences({ view: next });
     };
     const goToday = () => {
         setAnchor(null);
@@ -469,7 +482,9 @@ export function CalendarScreen({ path }: { path: string[] }) {
     };
     const step = (direction: 1 | -1) =>
         setAnchor((current) =>
-            time.stepAnchor(view, current ?? today, direction, preferences.customDays)
+            phone
+                ? phoneView.phoneStep(view, current ?? today, direction)
+                : time.stepAnchor(view, current ?? today, direction, customDays)
         );
     const swipeArea = useRef<HTMLElement>(null);
     useSwipeStep(swipeArea, step);
@@ -1621,14 +1636,14 @@ export function CalendarScreen({ path }: { path: string[] }) {
 
     return (
         <div data-cal-ready className="flex h-full min-h-0 flex-col">
-            <header className="flex flex-wrap items-center gap-1.5 border-b border-border bg-surface px-3 py-2 sm:gap-2">
+            <header className="flex flex-wrap items-center gap-1.5 border-b border-border bg-surface px-3 py-2 max-md:flex-nowrap max-md:gap-0.5 max-md:px-1 max-md:py-1 sm:gap-2">
                 {/* Wide enough for the range it names: on a phone the controls
                     wrap below it rather than squeezing it out of sight. */}
-                <div className="flex min-w-0 flex-1 basis-60 items-center gap-1">
+                <div className="flex min-w-0 flex-1 basis-60 items-center gap-1 max-md:basis-0 max-md:gap-0.5">
                     <Button
                         size="icon-sm"
                         variant="ghost"
-                        className="lg:hidden"
+                        className="max-md:size-11 lg:hidden"
                         aria-label={t("header.calendars")}
                         title={t("header.calendars")}
                         onClick={() => setDrawer(true)}
@@ -1647,7 +1662,10 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                       day: time.formatDay(today, locale, { dateStyle: "full" })
                                   })
                         }
-                        className={todayShown ? "opacity-50" : undefined}
+                        className={cn(
+                            "max-md:order-last max-md:size-11 max-md:border-0 max-md:px-0",
+                            todayShown && "opacity-50"
+                        )}
                         onClick={() => {
                             if (!todayShown) goToday();
                         }}
@@ -1658,6 +1676,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                     <Button
                         size="icon-sm"
                         variant="ghost"
+                        className="max-md:hidden"
                         aria-label={t("header.previous")}
                         title={t("header.previous")}
                         onClick={() => step(-1)}
@@ -1667,6 +1686,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                     <Button
                         size="icon-sm"
                         variant="ghost"
+                        className="max-md:hidden"
                         aria-label={t("header.next")}
                         title={t("header.next")}
                         onClick={() => step(1)}
@@ -1677,14 +1697,15 @@ export function CalendarScreen({ path }: { path: string[] }) {
                         <button
                             id="calendar-heading"
                             type="button"
-                            className="max-w-full truncate rounded px-1 text-start"
+                            className="flex max-w-full items-center gap-0.5 rounded px-1 text-start max-md:min-h-11"
                             aria-label={t("header.goTo", { label })}
                             title={t("header.goTo", { label })}
                             onClick={(event) =>
                                 setPicker(event.currentTarget.getBoundingClientRect())
                             }
                         >
-                            {label}
+                            <span className="min-w-0 truncate first-letter:uppercase">{label}</span>
+                            <ChevronDown aria-hidden className="size-4 shrink-0 md:hidden" />
                         </button>
                     </h1>
                     {rangeRead.loading ? (
@@ -1694,7 +1715,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                         />
                     ) : null}
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 max-md:gap-0.5">
                     <CalendarSearch
                         occurrences={shownRange?.occurrences ?? []}
                         colorOf={colorOf}
@@ -1705,13 +1726,16 @@ export function CalendarScreen({ path }: { path: string[] }) {
                     />
                     <ViewPicker
                         view={view}
-                        customDays={preferences.customDays}
+                        customDays={customDays}
                         preferences={preferences}
+                        views={phone ? phoneView.PHONE_VIEWS : undefined}
+                        compact={phone}
                         onView={chooseView}
                         onToggle={(name) => void savePreferences({ [name]: !preferences[name] })}
                     />
                     <Button
                         size="sm"
+                        className="max-md:hidden"
                         aria-label={t("header.newEvent")}
                         title={t("header.newEvent")}
                         onClick={createNow}
@@ -1724,6 +1748,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                             <Button
                                 size="icon-sm"
                                 variant="ghost"
+                                className="max-md:size-11"
                                 aria-label={t("header.more")}
                                 title={t("header.more")}
                             >
@@ -1757,9 +1782,22 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                 <Keyboard />
                                 {t("header.shortcuts")}
                             </DropdownMenuItem>
+                            {/* On a phone the header has no room for these two. */}
+                            <DropdownMenuItem asChild className="md:hidden">
+                                <Link href="/calendar/time">
+                                    <AlarmClock />
+                                    {t("header.time")}
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild className="md:hidden">
+                                <Link href="/calendar/settings">
+                                    <Settings />
+                                    {t("header.settings")}
+                                </Link>
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button asChild size="icon-sm" variant="ghost">
+                    <Button asChild size="icon-sm" variant="ghost" className="max-md:hidden">
                         <Link
                             href="/calendar/time"
                             aria-label={t("header.time")}
@@ -1768,7 +1806,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                             <AlarmClock />
                         </Link>
                     </Button>
-                    <Button asChild size="icon-sm" variant="ghost">
+                    <Button asChild size="icon-sm" variant="ghost" className="max-md:hidden">
                         <Link
                             href="/calendar/settings"
                             aria-label={t("header.settings")}
@@ -1899,92 +1937,148 @@ export function CalendarScreen({ path }: { path: string[] }) {
                         />
                     ) : (
                         <div className="min-h-0 flex-1">
-                            <GridMenu
-                                resolve={resolveTarget}
-                                heldRange={() => selectionRef.current}
-                                onOpenChange={(open, target) => {
-                                    setMenuOpen(open);
-                                    if (!open) return;
-                                    menuOpenedAt.current = Date.now();
-                                    setMenuUsed(true);
-                                    // What the menu is about stays highlighted while it is open.
-                                    setSelection(target?.kind === "slot" ? target.range : null);
-                                    // A card open on something else is done with.
-                                    setPopover(null);
-                                }}
-                                calendars={calendars ?? []}
-                                clipboard={clipboard}
-                                taskLists={taskLists.lists}
-                                showsOnlyDay={(day) => view === "day" && anchor === day}
-                                actions={menuActions}
-                            >
-                                <Suspense fallback={<GridSkeleton />}>
-                                    <GridView
-                                        view={view}
-                                        anchor={anchor}
-                                        customDays={preferences.customDays}
-                                        zone={zone}
-                                        secondaryZone={preferences.secondaryTimezone}
-                                        locale={locale}
-                                        hour12={hour12}
-                                        firstDay={firstDay}
-                                        showWeekends={preferences.showWeekends}
-                                        showWeekNumbers={preferences.showWeekNumbers}
-                                        now={now}
-                                        fadePast={preferences.fadePast}
-                                        scrollToNowSignal={nowSignal}
-                                        slotMinutes={preferences.slotMinutes}
-                                        dayStart={preferences.dayStart}
-                                        eventLimit={preferences.monthEvents}
-                                        businessHours={businessHours}
-                                        events={events}
-                                        selectedId={selected?.id ?? null}
-                                        selection={selection}
-                                        words={{
-                                            allDay: t("grid.allDay"),
-                                            noEvents: t("grid.noEvents"),
-                                            week: t("grid.week"),
-                                            more: (count) => t("grid.more", { count }),
-                                            secondaryZone: t("grid.secondaryZone", {
-                                                zone: preferences.secondaryTimezone ?? ""
-                                            }),
-                                            day: (day) =>
-                                                time.formatDay(day, locale, { dateStyle: "full" })
-                                        }}
-                                        onSelectRange={(range, anchorRect) => {
-                                            if (
-                                                menuOpen ||
-                                                Date.now() - menuOpenedAt.current < MENU_SETTLE_MS
-                                            )
-                                                return false;
-                                            startCreate(range.start, range.end, anchorRect);
-                                            return true;
-                                        }}
-                                        onItemClick={(item, id, anchorRect) =>
-                                            openItem(item, id, anchorRect)
-                                        }
-                                        onTaskToggle={(task) => void toggleTask(task)}
-                                        onItemFocus={(id) => {
-                                            const found = events.find((event) => event.id === id);
-                                            if (found)
-                                                setSelected({
-                                                    id,
-                                                    item: (
-                                                        found.extendedProps as { item: GridItem }
-                                                    ).item
-                                                });
-                                        }}
-                                        onChange={(change) => void applyChange(change)}
-                                        onTaskDrop={(taskId, at) => void scheduleTask(taskId, at)}
-                                        onOpenDay={(day, next) => {
-                                            setAnchor(day);
-                                            chooseView(next);
-                                        }}
-                                    />
-                                </Suspense>
-                            </GridMenu>
+                            {phone && view === "list" ? (
+                                <PhoneSchedule
+                                    window={span}
+                                    events={events}
+                                    today={today}
+                                    locale={locale}
+                                    hour12={hour12}
+                                    loading={!shownRange}
+                                    onItemClick={(item, id, anchorRect) =>
+                                        openItem(item, id, anchorRect)
+                                    }
+                                />
+                            ) : phone && view === "month" ? (
+                                <PhoneMonth
+                                    anchor={anchor}
+                                    firstDay={firstDay}
+                                    events={events}
+                                    today={today}
+                                    locale={locale}
+                                    hour12={hour12}
+                                    loading={!shownRange}
+                                    onPick={setAnchor}
+                                    onOpenDay={(day) => {
+                                        setAnchor(day);
+                                        chooseView("day");
+                                    }}
+                                    onItemClick={(item, id, anchorRect) =>
+                                        openItem(item, id, anchorRect)
+                                    }
+                                />
+                            ) : (
+                                <GridMenu
+                                    resolve={resolveTarget}
+                                    heldRange={() => selectionRef.current}
+                                    onOpenChange={(open, target) => {
+                                        setMenuOpen(open);
+                                        if (!open) return;
+                                        menuOpenedAt.current = Date.now();
+                                        setMenuUsed(true);
+                                        // What the menu is about stays highlighted while it is open.
+                                        setSelection(target?.kind === "slot" ? target.range : null);
+                                        // A card open on something else is done with.
+                                        setPopover(null);
+                                    }}
+                                    calendars={calendars ?? []}
+                                    clipboard={clipboard}
+                                    taskLists={taskLists.lists}
+                                    showsOnlyDay={(day) => view === "day" && anchor === day}
+                                    actions={menuActions}
+                                >
+                                    <Suspense fallback={<GridSkeleton />}>
+                                        <GridView
+                                            view={view}
+                                            anchor={anchor}
+                                            customDays={customDays}
+                                            zone={zone}
+                                            secondaryZone={preferences.secondaryTimezone}
+                                            locale={locale}
+                                            hour12={hour12}
+                                            firstDay={firstDay}
+                                            showWeekends={preferences.showWeekends}
+                                            showWeekNumbers={preferences.showWeekNumbers}
+                                            now={now}
+                                            fadePast={preferences.fadePast}
+                                            scrollToNowSignal={nowSignal}
+                                            slotMinutes={preferences.slotMinutes}
+                                            dayStart={preferences.dayStart}
+                                            eventLimit={
+                                                // A phone keeps the all-day strip to two lines, the rest behind "+N more".
+                                                phone && preferences.monthEvents === "fit"
+                                                    ? 2
+                                                    : preferences.monthEvents
+                                            }
+                                            businessHours={businessHours}
+                                            events={events}
+                                            selectedId={selected?.id ?? null}
+                                            selection={selection}
+                                            words={{
+                                                allDay: t("grid.allDay"),
+                                                noEvents: t("grid.noEvents"),
+                                                week: t("grid.week"),
+                                                more: (count) => t("grid.more", { count }),
+                                                secondaryZone: t("grid.secondaryZone", {
+                                                    zone: preferences.secondaryTimezone ?? ""
+                                                }),
+                                                day: (day) =>
+                                                    time.formatDay(day, locale, {
+                                                        dateStyle: "full"
+                                                    })
+                                            }}
+                                            onSelectRange={(range, anchorRect) => {
+                                                if (
+                                                    menuOpen ||
+                                                    Date.now() - menuOpenedAt.current <
+                                                        MENU_SETTLE_MS
+                                                )
+                                                    return false;
+                                                startCreate(range.start, range.end, anchorRect);
+                                                return true;
+                                            }}
+                                            onItemClick={(item, id, anchorRect) =>
+                                                openItem(item, id, anchorRect)
+                                            }
+                                            onTaskToggle={(task) => void toggleTask(task)}
+                                            onItemFocus={(id) => {
+                                                const found = events.find(
+                                                    (event) => event.id === id
+                                                );
+                                                if (found)
+                                                    setSelected({
+                                                        id,
+                                                        item: (
+                                                            found.extendedProps as {
+                                                                item: GridItem;
+                                                            }
+                                                        ).item
+                                                    });
+                                            }}
+                                            onChange={(change) => void applyChange(change)}
+                                            onTaskDrop={(taskId, at) =>
+                                                void scheduleTask(taskId, at)
+                                            }
+                                            onOpenDay={(day, next) => {
+                                                setAnchor(day);
+                                                chooseView(next);
+                                            }}
+                                        />
+                                    </Suspense>
+                                </GridMenu>
+                            )}
                         </div>
                     )}
+                    {phone && !(calendars && calendars.length === 0) ? (
+                        <Button
+                            className="absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] end-4 z-20 size-14 rounded-2xl p-0 shadow-lg [&_svg]:size-6 md:hidden"
+                            aria-label={t("header.newEvent")}
+                            title={t("header.newEvent")}
+                            onClick={createNow}
+                        >
+                            <Plus />
+                        </Button>
+                    ) : null}
                 </main>
             </div>
 
