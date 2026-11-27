@@ -30,6 +30,7 @@ test("only packaged files count as a change of the package", () => {
     assert.equal(packagedPath("hercules-stream100", "clients/device-plugins/hercules-stream100/manifest.json"), true);
     assert.equal(packagedPath("hercules-stream100", "crates/polaris-stream100/src/plugin.rs"), true);
     assert.equal(packagedPath("hercules-stream100", "clients/device-plugins/hercules-stream100/listing.json"), false);
+    assert.equal(packagedPath("hercules-stream100", "clients/device-plugins/hercules-stream100/picture.webp"), false);
     assert.equal(packagedPath("hercules-stream100", "crates/polaris-stream100/tests/integration.rs"), false);
     assert.equal(packagedPath("hercules-stream100", "clients/device-plugins/other/any/main.cjs"), false);
 });

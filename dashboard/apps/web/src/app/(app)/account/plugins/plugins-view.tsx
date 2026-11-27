@@ -10,13 +10,14 @@
  */
 
 import Link from "next/link";
-import { formatBytes } from "@polaris/core";
+import { useRouter } from "next/navigation";
+import { formatBytes, initialsInk, tintFor } from "@polaris/core";
 import { Loader2, Package } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
-import { StoreCard, StatusBadge } from "@polaris/ui/store-card";
+import { StoreCard, StatusBadge, StorePreview } from "@polaris/ui/store-card";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { OverflowMenu, StoreFilters, StoreNoMatch, StoreSection } from "@polaris/ui/store-layout";
+import { OverflowMenu, StoreCardSkeletons, StoreFilters, StoreNoMatch, StoreSection, type OverflowEntry } from "@polaris/ui/store-layout";
 import { Badge, Button, ControlSlider, SegmentedControl, Select, Skeleton, Switch, useToast } from "@polaris/ui";
 import {
     PLUGIN_ACTIONS,
@@ -26,6 +27,7 @@ import {
     pluginSettingAnchor,
     pluginSettingSections,
     readPluginSettingValues,
+    readPluginsSnapshot,
     type PluginEntry,
     type PluginManifest,
     type PluginSetting,
@@ -201,51 +203,204 @@ function NotHere({ state }: { state: PluginsState }) {
     return null;
 }
 
-function StoreSkeleton() {
+/** Uninstall one plugin, once the person confirms it in the page's own dialog. */
+function useUninstall(bridge: PluginsBridge | null): [(id: string, name: string) => void, ReactNode] {
+    const t = useTranslations("account");
+    const toast = useToast();
+    const [confirm, element] = useConfirm();
+    const start = (id: string, name: string) => {
+        void (async () => {
+            const ok = await confirm({ title: say(t, "detail.uninstallTitle", { name }), description: say(t, "detail.uninstallBody"), confirmLabel: say(t, "detail.uninstall"), danger: true });
+            if (!ok || !bridge) return;
+            const done = await bridge.uninstall(id).catch(() => false);
+            if (!done) toast.show({ title: say(t, "menu.uninstallFailed") });
+        })();
+    };
+    return [start, element];
+}
+
+/**
+ * The card's menu, as the Polaris apps' cards have it: the plugin's page, its
+ * settings, the update, automatic updates, turning it off and uninstalling it.
+ * Only what the desktop app can do; while it installs, what would race the
+ * install is switched off with the reason.
+ */
+function pluginMenu(
+    t: Words,
+    {
+        listing,
+        snapshot,
+        bridge,
+        offer,
+        href,
+        name,
+        go,
+        onInstall,
+        onUninstall,
+        onFailed
+    }: {
+        listing: PluginListing;
+        snapshot: PluginsSnapshot;
+        bridge: PluginsBridge;
+        offer: PluginOffer;
+        href: string;
+        name: string;
+        go: (href: string) => void;
+        onInstall: (entry: PluginEntry) => void;
+        onUninstall: (id: string, name: string) => void;
+        onFailed: (key: string) => void;
+    }
+): OverflowEntry[] {
+    const entries: OverflowEntry[] = [{ key: "details", label: say(t, "card.details"), onSelect: () => go(href) }];
+    const installed = listing.installed;
+    if (!installed) return entries;
+    const busy = offer.kind === "installing";
+    const hint = busy ? say(t, "menu.busy") : undefined;
+    if (installed.manifest) entries.push({ key: "settings", label: say(t, "detail.settings"), onSelect: () => go(`${href}#settings`) });
+    const entry = listing.entry;
+    if (offer.kind === "update" && entry) entries.push({ key: "update", label: say(t, "card.update", { version: offer.version }), onSelect: () => onInstall(entry) });
+    const setAutoUpdate = bridge.setAutoUpdate;
+    if (snapshot.autoUpdate !== null && setAutoUpdate) {
+        const on = installed.autoUpdate ?? snapshot.autoUpdate;
+        entries.push({
+            key: "auto",
+            label: on ? say(t, "menu.autoOff") : say(t, "menu.autoOn"),
+            onSelect: () =>
+                void setAutoUpdate(listing.id, !on)
+                    .then((done) => {
+                        if (!done) throw new Error("refused");
+                    })
+                    .catch(() => onFailed("auto.failed"))
+        });
+    }
+    entries.push({
+        key: "enabled",
+        label: installed.enabled ? say(t, "menu.turnOff") : say(t, "menu.turnOn"),
+        disabled: busy,
+        hint,
+        onSelect: () =>
+            void bridge
+                .setEnabled(listing.id, !installed.enabled)
+                .then((done) => {
+                    if (!done) throw new Error("refused");
+                })
+                .catch(() => onFailed("detail.toggleFailed"))
+    });
+    entries.push({ key: "uninstall", label: say(t, "detail.uninstall"), danger: true, disabled: busy, hint, onSelect: () => onUninstall(listing.id, name) });
+    return entries;
+}
+
+type Check = { readonly kind: "idle" | "checking" | "failed" } | { readonly kind: "done"; readonly count: number };
+
+/**
+ * Look at the plugin list now instead of waiting for the next scheduled look
+ * (the app keeps one for hours): "Checking..." while it looks, then what it
+ * found. A newer version shows on its card as soon as the list arrives.
+ */
+function CheckForUpdates({ bridge }: { bridge: PluginsBridge }) {
+    const t = useTranslations("account");
+    const [check, setCheck] = useState<Check>({ kind: "idle" });
+    const run = () => {
+        if (check.kind === "checking") return;
+        setCheck({ kind: "checking" });
+        void (async () => {
+            const outcome = await bridge.refresh().catch(() => "failed" as const);
+            const read = outcome === "failed" ? null : readPluginsSnapshot(await bridge.get().catch(() => null));
+            setCheck(read ? { kind: "done", count: read.installed.filter((item) => item.update).length } : { kind: "failed" });
+        })();
+    };
+    const checking = check.kind === "checking";
+    const result =
+        check.kind === "failed" ? say(t, "check.failed") : check.kind === "done" ? (check.count > 0 ? say(t, "check.found", { count: check.count }) : say(t, "check.none")) : "";
     return (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-hidden>
-            <Skeleton className="h-40 w-full" />
-            <Skeleton className="h-40 w-full" />
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="min-w-0 text-sm text-muted-foreground" role="status" aria-live="polite">
+                {result}
+            </span>
+            <Button size="sm" variant="secondary" onClick={run} disabled={checking} aria-busy={checking}>
+                {checking ? <Loader2 className="size-4 animate-spin" /> : null}
+                {checking ? say(t, "check.running") : say(t, "check.action")}
+            </Button>
         </div>
     );
 }
 
-function PluginCard({ listing, snapshot, onInstall, kind }: { listing: PluginListing; snapshot: PluginsSnapshot; onInstall: (entry: PluginEntry) => void; kind?: string }) {
+function PluginCard({
+    listing,
+    snapshot,
+    bridge,
+    onInstall,
+    kind
+}: {
+    listing: PluginListing;
+    snapshot: PluginsSnapshot;
+    bridge: PluginsBridge;
+    onInstall: (entry: PluginEntry) => void;
+    kind?: string;
+}) {
     const t = useTranslations("account");
+    const router = useRouter();
+    const toast = useToast();
+    const [uninstall, uninstallDialog] = useUninstall(bridge);
     const manifest = manifestOf(listing);
     if (!manifest) return null;
     const offer = pluginOffer(snapshot, listing.id, listing.entry);
     const run = listing.installed ? runLabel(t, listing.installed) : null;
     const href = hrefOf(listing.id);
+    const tint = tintFor(listing.id);
+    const entries = pluginMenu(t, {
+        listing,
+        snapshot,
+        bridge,
+        offer,
+        href,
+        name: manifest.name,
+        go: (to) => router.push(to),
+        onInstall,
+        onUninstall: uninstall,
+        onFailed: (key) => toast.show({ title: say(t, key) })
+    });
     return (
-        <StoreCard
-            preview={
-                <div className="grid aspect-[16/10] place-items-center bg-muted">
-                    <PluginIcon entry={listing.entry} size={56} />
-                </div>
-            }
-            mark={<PluginIcon entry={listing.entry} size={40} />}
-            title={
-                <Link href={href} className="block truncate font-medium hover:underline" title={manifest.name}>
-                    {manifest.name}
-                </Link>
-            }
-            byline={say(t, "card.by", { publisher: manifest.publisher })}
-            summary={manifest.summary}
-            badges={
-                <>
-                    {kind ? <Badge className="border-primary/40 text-primary">{kind}</Badge> : null}
-                    <Badge>{say(t, `category.${manifest.category}`)}</Badge>
-                </>
-            }
-            status={run ? <StatusBadge status={run.status} label={run.label} /> : null}
-            actions={
-                <>
-                    <OfferButton offer={offer} href={href} onInstall={() => listing.entry && onInstall(listing.entry)} />
-                    <OverflowMenu label={say(t, "card.more", { name: manifest.name })} entries={[{ key: "details", label: say(t, "card.details"), onSelect: () => window.location.assign(href) }]} />
-                </>
-            }
-        />
+        <>
+            <StoreCard
+                preview={
+                    <Link href={href} tabIndex={-1} aria-hidden className="block border-b border-border">
+                        <StorePreview
+                            name={manifest.name}
+                            summary={manifest.summary}
+                            mark={<PluginIcon entry={listing.entry} size={44} />}
+                            tint={tint}
+                            ink={initialsInk(tint)}
+                            shot={null}
+                            photo={listing.entry?.picture ?? null}
+                            alt={say(t, "card.picture", { name: manifest.name })}
+                        />
+                    </Link>
+                }
+                mark={<PluginIcon entry={listing.entry} size={40} />}
+                title={
+                    <Link href={href} className="block truncate font-medium hover:underline" title={manifest.name}>
+                        {manifest.name}
+                    </Link>
+                }
+                byline={say(t, "card.by", { publisher: manifest.publisher })}
+                summary={manifest.summary}
+                badges={
+                    <>
+                        {kind ? <Badge className="border-primary/40 text-primary">{kind}</Badge> : null}
+                        <Badge>{say(t, `category.${manifest.category}`)}</Badge>
+                    </>
+                }
+                status={run ? <StatusBadge status={run.status} label={run.label} /> : null}
+                actions={
+                    <>
+                        <OfferButton offer={offer} href={href} onInstall={() => listing.entry && onInstall(listing.entry)} />
+                        <OverflowMenu label={say(t, "card.more", { name: manifest.name })} entries={entries} />
+                    </>
+                }
+            />
+            {uninstallDialog}
+        </>
     );
 }
 
@@ -271,12 +426,17 @@ export function PluginsStore() {
 
     let body: ReactNode;
     if (state.kind === "browser" || state.kind === "old-app") body = <NotHere state={state} />;
-    else if (!snapshot) body = <StoreSkeleton />;
-    else if (shown.length > 0) {
+    else if (!snapshot || state.kind !== "ready") {
+        body = (
+            <StoreSection label={say(t, `tabs.${tab}`)}>
+                <StoreCardSkeletons />
+            </StoreSection>
+        );
+    } else if (shown.length > 0) {
         body = (
             <StoreSection label={say(t, `tabs.${tab}`)}>
                 {shown.map((listing) => (
-                    <PluginCard key={listing.id} listing={listing} snapshot={snapshot} onInstall={startInstall} />
+                    <PluginCard key={listing.id} listing={listing} snapshot={snapshot} bridge={state.bridge} onInstall={startInstall} />
                 ))}
             </StoreSection>
         );
@@ -287,16 +447,19 @@ export function PluginsStore() {
 
     return (
         <div className="flex min-w-0 flex-col gap-4">
-            <SegmentedControl
-                value={tab}
-                onValueChange={(value: string) => setTab(value as Tab)}
-                aria-label={say(t, "page.title")}
-                options={[
-                    { value: "browse", label: say(t, "tabs.browse") },
-                    { value: "installed", label: say(t, "tabs.installed") },
-                    { value: "updates", label: updates > 0 ? `${say(t, "tabs.updates")} (${updates})` : say(t, "tabs.updates") }
-                ]}
-            />
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+                <SegmentedControl
+                    value={tab}
+                    onValueChange={(value: string) => setTab(value as Tab)}
+                    aria-label={say(t, "page.title")}
+                    options={[
+                        { value: "browse", label: say(t, "tabs.browse") },
+                        { value: "installed", label: say(t, "tabs.installed") },
+                        { value: "updates", label: updates > 0 ? `${say(t, "tabs.updates")} (${updates})` : say(t, "tabs.updates") }
+                    ]}
+                />
+                {state.kind === "ready" || state.kind === "loading" ? <CheckForUpdates bridge={state.bridge} /> : null}
+            </div>
             <StoreFilters
                 query={query}
                 onQueryChange={setQuery}
@@ -342,12 +505,8 @@ export function PluginsShelf({ query, category, byName, label, kind }: { query: 
                 <NotHere state={state} />
             </div>
         );
-    } else if (!snapshot) {
-        body = (
-            <div className="col-span-full min-w-0">
-                <StoreSkeleton />
-            </div>
-        );
+    } else if (!snapshot || state.kind !== "ready") {
+        body = <StoreCardSkeletons />;
     } else if (shown.length === 0) {
         if (needle || category || snapshot.catalog) return null;
         body = (
@@ -355,7 +514,7 @@ export function PluginsShelf({ query, category, byName, label, kind }: { query: 
                 <Notice>{say(t, "empty.offline")}</Notice>
             </div>
         );
-    } else body = shown.map((listing) => <PluginCard key={listing.id} listing={listing} snapshot={snapshot} onInstall={startInstall} kind={kind} />);
+    } else body = shown.map((listing) => <PluginCard key={listing.id} listing={listing} snapshot={snapshot} bridge={state.bridge} onInstall={startInstall} kind={kind} />);
 
     return (
         <>
@@ -690,8 +849,8 @@ export function PluginPage({ id }: { id: string }) {
     const t = useTranslations("account");
     const state = usePlugins();
     const toast = useToast();
-    const [confirm, confirmElement] = useConfirm();
     const bridge = state.kind === "ready" || state.kind === "loading" ? state.bridge : null;
+    const [startUninstall, confirmElement] = useUninstall(bridge);
     const [startInstall, installDialog] = useInstallFlow(bridge, state.kind === "ready" ? state.snapshot : null);
 
     const back = (
@@ -731,10 +890,6 @@ export function PluginPage({ id }: { id: string }) {
     const run = installed ? runLabel(t, installed) : null;
     const size = entry && state.snapshot.platform ? entry.packages[state.snapshot.platform]?.size : undefined;
 
-    const uninstall = async () => {
-        const ok = await confirm({ title: say(t, "detail.uninstallTitle", { name: manifest.name }), description: say(t, "detail.uninstallBody"), confirmLabel: say(t, "detail.uninstall"), danger: true });
-        if (ok) await state.bridge.uninstall(id).catch(() => false);
-    };
     const toggle = (enabled: boolean) => {
         void state.bridge
             .setEnabled(id, enabled)
@@ -768,7 +923,7 @@ export function PluginPage({ id }: { id: string }) {
                     {installed ? (
                         <>
                             <Switch checked={installed.enabled} onChange={toggle} aria-label={say(t, "detail.enabled")} />
-                            <Button variant="secondary" onClick={() => void uninstall()}>
+                            <Button variant="secondary" onClick={() => startUninstall(id, manifest.name)}>
                                 {say(t, "detail.uninstall")}
                             </Button>
                         </>
@@ -793,7 +948,7 @@ export function PluginPage({ id }: { id: string }) {
             {installed?.failed ? <Notice>{say(t, "notice.failed", { version: installed.failed })}</Notice> : null}
             {installed ? <AutoUpdateRow bridge={state.bridge} snapshot={state.snapshot} id={id} /> : null}
             {installed && installed.manifest ? (
-                <section className="flex min-w-0 flex-col gap-2" aria-label={say(t, "detail.settings")}>
+                <section id="settings" className="flex min-w-0 scroll-mt-4 flex-col gap-2" aria-label={say(t, "detail.settings")}>
                     <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.settings")}</h2>
                     {installed.manifest.view ? <PluginView bridge={state.bridge} manifest={installed.manifest} view={installed.manifest.view} /> : null}
                     <PluginSettings bridge={state.bridge} manifest={installed.manifest} />

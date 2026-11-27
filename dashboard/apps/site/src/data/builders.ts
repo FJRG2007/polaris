@@ -184,6 +184,13 @@ export interface SitePlugin {
     readonly changelog: string;
     /** Its icon under `plugin-icons/`, or null for the package mark. */
     readonly icon: string | null;
+    /** A photograph of the hardware under `plugin-icons/`, or null for the placeholder. */
+    readonly picture: string | null;
+    /** What the photograph shows, in the dashboard's words. */
+    readonly pictureAlt: string;
+    /** The placeholder's colour and the ink that reads on it. */
+    readonly tint: string;
+    readonly ink: string;
 }
 
 /** The dashboard's own words for plugins in the marketplace. */

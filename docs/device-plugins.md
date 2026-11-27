@@ -47,9 +47,12 @@ That is why only packages from the signed catalog install.
 Nothing installed: one small file read 3 s after start (and one a minute later
 and every 6 hours, to see whether anything is installed), no process, no fetch.
 Installed with its device unplugged: no process (sleeping), woken by the plug
-event. The catalog is fetched when the store is opened (refreshed at most every
-6 hours behind the cached copy) or, where plugs can be heard, when a claimed
-device is plugged in.
+event. The catalog is looked at behind the cached copy whenever the store is opened
+(conditionally, with the held list's ETag; one look per 30 s burst of reads),
+every hour while the app runs, at once from the store's Check for updates
+(which answers whether the list was reached, so it never says "up to date"
+without having looked), or, where plugs can be heard, when a claimed device is
+plugged in.
 
 USB presence is heard on Linux (sysfs + inotify). On Windows and macOS the Rust
 core's Node binding lists vendor and product ids and sleeps on the operating

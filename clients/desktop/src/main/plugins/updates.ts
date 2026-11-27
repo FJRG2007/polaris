@@ -14,8 +14,8 @@ import { pluginFit, comparePluginVersions, type PluginEntry, type PluginPermissi
 
 /** The first look after the app starts, so starting is not slowed by it. */
 export const FIRST_CHECK_MS = 60_000;
-/** How often the catalog is looked at while the app runs. */
-export const CHECK_EVERY_MS = 6 * 60 * 60_000;
+/** How often the catalog is looked at while the app runs; the store screen also looks whenever it is opened. */
+export const CHECK_EVERY_MS = 60 * 60_000;
 /** The first wait after a failed look (offline, GitHub not answering); doubled each time, up to `CHECK_EVERY_MS`. */
 export const RETRY_FIRST_MS = 5 * 60_000;
 

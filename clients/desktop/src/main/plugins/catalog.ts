@@ -21,7 +21,7 @@ export const LEGACY_CATALOG_URL = LEGACY_PLUGIN_CATALOG_URL;
 const CATALOG_FILE = "catalog.json";
 const SIGNATURE_FILE = "catalog.json.sig";
 
-export type Fetcher = (url: string, init?: { signal?: AbortSignal; }) => Promise<Response>;
+export type Fetcher = (url: string, init?: { signal?: AbortSignal; headers?: Record<string, string>; }) => Promise<Response>;
 
 /** The catalog the bytes and signature make, or null when either does not check out. */
 export function openCatalog(bytes: Uint8Array, signatureText: string, keys: readonly TrustedKey[] = TRUSTED_KEYS): PluginCatalog | null {
@@ -97,7 +97,11 @@ export async function writeWhole(path: string, data: Uint8Array | string): Promi
     }
 }
 
-export type Refresh = { readonly kind: "updated"; readonly catalog: PluginCatalog; } | { readonly kind: "unchanged"; } | { readonly kind: "failed"; };
+/** `etag` is what the server called the list it answered, for the next look's `If-None-Match`. */
+export type Refresh =
+    | { readonly kind: "updated"; readonly catalog: PluginCatalog; readonly etag: string | null; }
+    | { readonly kind: "unchanged"; readonly etag: string | null; }
+    | { readonly kind: "failed"; };
 
 /**
  * Fetch the published catalog and keep it when it checks out and is newer than
@@ -108,24 +112,31 @@ export async function refreshCatalog(
     fetcher: Fetcher,
     held: PluginCatalog | null,
     url = CATALOG_URL,
-    keys: readonly TrustedKey[] = TRUSTED_KEYS
+    keys: readonly TrustedKey[] = TRUSTED_KEYS,
+    etag: string | null = null
 ): Promise<Refresh> {
     try {
         const signal = AbortSignal.timeout(20_000);
-        const [catalogResponse, signatureResponse] = await Promise.all([fetcher(url, { signal }), fetcher(`${url}.sig`, { signal })]);
+        // Asked conditionally only while the list it names is the one held, so a
+        // "not modified" can never stand for a list this device does not have.
+        const conditional = held && etag ? { "If-None-Match": etag } : null;
+        const catalogResponse = await fetcher(url, conditional ? { signal, headers: conditional } : { signal });
+        if (catalogResponse.status === 304 && conditional) return { kind: "unchanged", etag };
+        const answered = catalogResponse.headers.get("etag");
         const bytes = await body(catalogResponse, PLUGIN_CATALOG_MAX_BYTES);
-        const signatureBytes = await body(signatureResponse, 1_024);
-        if (!bytes || !signatureBytes) return { kind: "failed" };
+        if (!bytes) return { kind: "failed" };
+        const signatureBytes = await body(await fetcher(`${url}.sig`, { signal }), 1_024);
+        if (!signatureBytes) return { kind: "failed" };
         const signature = Buffer.from(signatureBytes).toString("utf8");
         const catalog = openCatalog(bytes, signature, keys);
         if (!catalog) return { kind: "failed" };
-        if (held && Date.parse(catalog.issued) <= Date.parse(held.issued)) return { kind: "unchanged" };
+        if (held && Date.parse(catalog.issued) <= Date.parse(held.issued)) return { kind: "unchanged", etag: answered };
         await mkdir(dir, { recursive: true });
         // The signature last: a catalog without its signature is read as none.
         await rm(join(dir, SIGNATURE_FILE), { force: true });
         await writeWhole(join(dir, CATALOG_FILE), bytes);
         await writeWhole(join(dir, SIGNATURE_FILE), signature);
-        return { kind: "updated", catalog };
+        return { kind: "updated", catalog, etag: answered };
     } catch {
         return { kind: "failed" };
     }

@@ -14,6 +14,9 @@ import type { ReactNode } from "react";
 import { Input } from "../components/input";
 import { Select } from "../components/select";
 import { Button } from "../components/button";
+import { Skeleton } from "../components/skeleton";
+import { cn } from "../lib/cn";
+import { PREVIEW_HEIGHT } from "./store-card";
 import { MoreHorizontal, Search } from "lucide-react";
 import {
     DropdownMenu,
@@ -96,8 +99,20 @@ export function StoreFilters<S extends string, C extends string>({
 }
 
 /**
+ * How many cards a row holds, by the width the grid itself has - not the
+ * viewport's - so a card is the same size wherever the store is drawn: the
+ * dashboard beside its sidebar, a narrower account page, or the public site's
+ * capped column. A shelf adds a column once each card keeps about 17.5rem; the
+ * featured row once each keeps about 20rem, and stops at three.
+ */
+export const STORE_GRID = {
+    shelf: "grid grid-cols-1 gap-4 [@container(min-width:36rem)]:grid-cols-2 [@container(min-width:54rem)]:grid-cols-3 [@container(min-width:73rem)]:grid-cols-4",
+    featured: "grid grid-cols-1 gap-4 [@container(min-width:41rem)]:grid-cols-2 [@container(min-width:62rem)]:grid-cols-3"
+} as const;
+
+/**
  * A titled run of cards. `featured` is the wider three-column row the store
- * opens with; a shelf fits four on a wide screen.
+ * opens with; a shelf fits four on a wide one.
  */
 export function StoreSection({
     label,
@@ -109,18 +124,46 @@ export function StoreSection({
     children: ReactNode;
 }) {
     return (
-        <section className="flex min-w-0 flex-col gap-3" aria-label={label}>
+        <section className="flex min-w-0 flex-col gap-3 [container-type:inline-size]" aria-label={label}>
             <h2 className="text-sm font-medium text-muted-foreground">{label}</h2>
-            <div
-                className={
-                    featured
-                        ? "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
-                        : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
-                }
-            >
-                {children}
-            </div>
+            <div className={featured ? STORE_GRID.featured : STORE_GRID.shelf}>{children}</div>
         </section>
+    );
+}
+
+/**
+ * Cards still loading, in the cards' own shape - the 16:10 preview, the mark
+ * and name, two lines of summary and the footer - so nothing moves once they
+ * arrive. Grid items, drawn inside a `StoreSection`.
+ */
+export function StoreCardSkeletons({ count = 3 }: { count?: number }) {
+    return (
+        <>
+            {Array.from({ length: count }, (_, index) => (
+                <div
+                    key={index}
+                    aria-hidden
+                    data-store-skeleton
+                    className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card"
+                >
+                    <div className="[container-type:inline-size]">
+                        <Skeleton className={cn("w-full rounded-none", PREVIEW_HEIGHT)} />
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-3 p-4">
+                        <div className="flex min-w-0 items-center gap-3">
+                            <Skeleton className="size-10 shrink-0 rounded-md" />
+                            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                                <Skeleton className="h-4 w-2/3" />
+                                <Skeleton className="h-3 w-1/3" />
+                            </div>
+                        </div>
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-4/5" />
+                        <Skeleton className="h-8 w-24" />
+                    </div>
+                </div>
+            ))}
+        </>
     );
 }
 

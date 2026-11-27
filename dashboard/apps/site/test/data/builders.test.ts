@@ -122,6 +122,10 @@ const plugin = (id: string, extra: Partial<site.SitePlugin> = {}): site.SitePlug
     permissions: [],
     changelog: "",
     icon: null,
+    picture: null,
+    pictureAlt: "Stream Deck, pictured",
+    tint: "hsl(200 36% 42%)",
+    ink: "#ffffff",
     ...extra
 });
 

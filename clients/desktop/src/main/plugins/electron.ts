@@ -255,9 +255,7 @@ export function registerPluginIpc(
         (id) => driverRunnerFor(id, pluginsDir())
     );
     handle(CHANNELS.pluginsGet, (event) => (allowed(event) ? ready().snapshot() : null));
-    handle(CHANNELS.pluginsRefresh, async (event) => {
-        if (allowed(event)) await ready().refresh();
-    });
+    handle(CHANNELS.pluginsRefresh, async (event) => (allowed(event) ? ready().refresh() : null));
     handle(CHANNELS.pluginsInstall, (event, id: unknown, accepted: unknown) => {
         const parsedId = idSchema.safeParse(id);
         const parsedAccepted = z.array(z.enum(PLUGIN_PERMISSIONS)).max(PLUGIN_PERMISSIONS.length).safeParse(accepted);

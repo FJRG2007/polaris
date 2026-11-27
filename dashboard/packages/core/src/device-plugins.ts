@@ -180,6 +180,8 @@ export type PluginPackage = z.infer<typeof pluginPackageSchema>;
 export const pluginEntrySchema = pluginManifestSchema.extend({
     packages: perPlatform(pluginPackageSchema),
     icon: releaseUrlSchema.optional(),
+    /** A photograph of the hardware, 16:10, on the store's card in place of the placeholder. */
+    picture: releaseUrlSchema.optional(),
     screenshots: z.array(releaseUrlSchema).max(8).default([]),
     changelog: z.string().max(4_000).default(""),
     published: z.string().datetime()

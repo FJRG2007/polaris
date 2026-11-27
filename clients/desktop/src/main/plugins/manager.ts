@@ -12,7 +12,7 @@ import { join } from "node:path";
 import type { Fetcher } from "./catalog";
 import type { PluginMethod } from "@/shared/plugin-protocol";
 import type { TrustedKey } from "./signature";
-import { cachedCatalog, refreshCatalog, CATALOG_URL, LEGACY_CATALOG_URL } from "./catalog";
+import { cachedCatalog, refreshCatalog, CATALOG_URL, LEGACY_CATALOG_URL, type Refresh } from "./catalog";
 import { addedPermissions, announced, autoUpdates, decideUpdate, FIRST_CHECK_MS, nextCheckDelay, type UpdateNews } from "./updates";
 import { createSupervisor, type PluginChild, type PluginRun, type WantedPlugin } from "./supervisor";
 import {
@@ -43,8 +43,14 @@ import {
     type InstallFailure
 } from "./packages";
 
-/** How long a catalog on the device is used before a read refreshes it in the background. */
+/** How long a catalog on the device is used before a plug of a claimed device looks again. */
 export const CATALOG_FRESH_MS = 6 * 60 * 60_000;
+/**
+ * The store screen looks at the published list behind every read, drawing the
+ * copy on the device at once (stale-while-revalidate); this only stops the burst
+ * of reads one install or one open makes from each asking GitHub again.
+ */
+export const STORE_REVALIDATE_MS = 30_000;
 
 export interface ManagerOptions {
     readonly dir: string;
@@ -123,7 +129,10 @@ export function createPluginManager(options: ManagerOptions) {
     let catalog: PluginCatalog | null = null;
     let catalogRead = false;
     let fetchedAt = 0;
-    let refreshing: Promise<void> | null = null;
+    /** When a store read last started a look, and the held list's ETag for a cheap conditional one. */
+    let lookedAt = Number.NEGATIVE_INFINITY;
+    let catalogEtag: string | null = null;
+    let refreshing: Promise<Refresh["kind"]> | null = null;
     const installing: Record<string, { received: number; total: number; }> = {};
     const manifests = new Map<string, PluginManifest | null>();
     const offered = new Set<string>();
@@ -150,20 +159,24 @@ export function createPluginManager(options: ManagerOptions) {
         }
     }
 
-    function revalidate(): Promise<void> {
+    function revalidate(): Promise<Refresh["kind"]> {
         if (refreshing) return refreshing;
         refreshing = (async () => {
             await loadCatalog();
-            let result = await refreshCatalog(options.dir, options.fetcher, catalog, options.catalogUrl ?? CATALOG_URL, options.keys);
+            let result = await refreshCatalog(options.dir, options.fetcher, catalog, options.catalogUrl ?? CATALOG_URL, options.keys, catalogEtag);
             // The address from before the rename, while CI still publishes there.
             if (result.kind === "failed" && !options.catalogUrl) result = await refreshCatalog(options.dir, options.fetcher, catalog, LEGACY_CATALOG_URL, options.keys);
             failures = result.kind === "failed" ? failures + 1 : 0;
-            if (result.kind !== "failed") fetchedAt = now();
+            if (result.kind !== "failed") {
+                fetchedAt = now();
+                catalogEtag = result.etag;
+            }
             if (result.kind === "updated") {
                 catalog = result.catalog;
                 changed();
                 void serial(applyUpdates).catch(() => undefined);
             }
+            return result.kind;
         })().finally(() => {
             refreshing = null;
         });
@@ -352,10 +365,17 @@ export function createPluginManager(options: ManagerOptions) {
             }
         },
 
-        /** Everything a store screen draws, at once from what is on the device; a stale catalog is refreshed behind it. */
+        /**
+         * Everything a store screen draws, at once from what is on the device, while
+         * the published list is looked at behind it; a newer one reaches the screen
+         * through `changed`, so an update shows without restarting the app.
+         */
         async snapshot(): Promise<PluginsSnapshot> {
             await loadCatalog();
-            if (now() - fetchedAt > CATALOG_FRESH_MS) void revalidate().catch(() => undefined);
+            if (now() - lookedAt >= STORE_REVALIDATE_MS) {
+                lookedAt = now();
+                void revalidate().catch(() => undefined);
+            }
             const installed = await readInstalled(options.dir);
             const devices = options.devices();
             const runs = supervisor.snapshot();
@@ -394,10 +414,15 @@ export function createPluginManager(options: ManagerOptions) {
             };
         },
 
-        /** Refresh the catalog now, as the store's "check for updates" does, and act on what it brings. */
-        async refresh(): Promise<void> {
-            await revalidate();
+        /**
+         * Refresh the catalog now, as the store's "check for updates" does, and act on
+         * what it brings. Answers whether the list was reached, so the store can say
+         * "up to date" only when it really looked.
+         */
+        async refresh(): Promise<Refresh["kind"]> {
+            const kind = await revalidate();
             await serial(applyUpdates).catch(() => undefined);
+            return kind;
         },
 
         /** Look for updates a minute after start, then on a schedule (`updates.ts`). */

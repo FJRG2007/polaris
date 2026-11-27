@@ -280,6 +280,7 @@ const pluginSources = (existsSync(pluginsDir) ? readdirSync(pluginsDir).sort() :
         const listingFile = join(pluginsDir, id, "listing.json");
         const listing = (existsSync(listingFile) ? JSON.parse(read(listingFile)) : {}) as {
             icon?: unknown;
+            picture?: unknown;
             changelog?: unknown;
         };
         let icon: string | null = null;
@@ -288,9 +289,16 @@ const pluginSources = (existsSync(pluginsDir) ? readdirSync(pluginsDir).sort() :
             icon = `${id}-${manifest.version}-${listing.icon}`;
             copyFileSync(join(pluginsDir, id, listing.icon), join(pluginIconsDir, icon));
         }
+        let picture: string | null = null;
+        if (typeof listing.picture === "string" && /^[\w.-]+\.(png|jpg|webp)$/.test(listing.picture)) {
+            mkdirSync(pluginIconsDir, { recursive: true });
+            picture = `${id}-${manifest.version}-${listing.picture}`;
+            copyFileSync(join(pluginsDir, id, listing.picture), join(pluginIconsDir, picture));
+        }
         return {
             manifest,
             icon,
+            picture,
             changelog: typeof listing.changelog === "string" ? listing.changelog : ""
         };
     });
@@ -306,24 +314,31 @@ const PERMISSION_WORDS: Record<string, string> = {
 function pluginList(webLocale: string, siteWords: typeof enWords): site.SitePlugin[] {
     const t = translator(messages(webLocale, "account"));
     const platforms = siteWords.market.plugin.platform as Record<string, string>;
-    return pluginSources.map(({ manifest, icon, changelog }) => ({
-        id: manifest.id,
-        name: manifest.name,
-        publisher: manifest.publisher,
-        byline: t("plugins.card.by", { publisher: manifest.publisher }),
-        summary: manifest.summary,
-        category: `${site.PLUGIN_CATEGORY_PREFIX}${manifest.category}`,
-        categoryLabel: t(`plugins.category.${manifest.category}`),
-        version: manifest.version,
-        minAppVersion: manifest.minAppVersion,
-        platforms: Object.keys(manifest.entries).map((platform) => platforms[platform] ?? platform),
-        devices: [...new Set(manifest.claims.map((claim) => claim.name))],
-        permissions: manifest.permissions.map((permission) =>
-            t(`plugins.permission.${PERMISSION_WORDS[permission] ?? permission}`)
-        ),
-        changelog,
-        icon
-    }));
+    return pluginSources.map(({ manifest, icon, picture, changelog }) => {
+        const tint = tintFor(manifest.id);
+        return {
+            id: manifest.id,
+            name: manifest.name,
+            publisher: manifest.publisher,
+            byline: t("plugins.card.by", { publisher: manifest.publisher }),
+            summary: manifest.summary,
+            category: `${site.PLUGIN_CATEGORY_PREFIX}${manifest.category}`,
+            categoryLabel: t(`plugins.category.${manifest.category}`),
+            version: manifest.version,
+            minAppVersion: manifest.minAppVersion,
+            platforms: Object.keys(manifest.entries).map((platform) => platforms[platform] ?? platform),
+            devices: [...new Set(manifest.claims.map((claim) => claim.name))],
+            permissions: manifest.permissions.map((permission) =>
+                t(`plugins.permission.${PERMISSION_WORDS[permission] ?? permission}`)
+            ),
+            changelog,
+            icon,
+            picture,
+            pictureAlt: t("plugins.card.picture", { name: manifest.name }),
+            tint,
+            ink: initialsInk(tint)
+        };
+    });
 }
 
 function pluginWords(webLocale: string): site.PluginWords {

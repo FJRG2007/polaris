@@ -37,12 +37,14 @@ afterEach(async () => {
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
 });
 
-async function setup() {
+async function setup(now?: () => number) {
     const dir = await tempDir();
     const bytes = fixturePackage();
     const catalogBytes = new TextEncoder().encode(JSON.stringify(catalogOf([entryFor(bytes)])));
     const fetched: string[] = [];
-    const fetcher = fakeFetch({ [CATALOG]: catalogBytes, [`${CATALOG}.sig`]: sign(catalogBytes), [PACKAGE_URL]: bytes }, fetched);
+    // Kept by reference, so a test can publish a newer catalog or take it away.
+    const table: Record<string, Uint8Array | string> = { [CATALOG]: catalogBytes, [`${CATALOG}.sig`]: sign(catalogBytes), [PACKAGE_URL]: bytes };
+    const fetcher = fakeFetch(table, fetched);
     let devices: UsbDevice[] | null = [];
     let deviceListBroken = false;
     const forks: string[] = [];
@@ -53,6 +55,7 @@ async function setup() {
         appVersion: "0.1.73",
         fetcher,
         keys: TEST_KEYS,
+        ...(now ? { now } : {}),
         fork: (wanted): PluginChild => {
             forks.push(wanted.entryPath);
             return { postMessage: () => undefined, kill: () => undefined, onMessage: () => undefined, onExit: () => undefined };
@@ -67,6 +70,8 @@ async function setup() {
     return {
         manager,
         dir,
+        bytes,
+        table,
         fetched,
         forks,
         offers,
@@ -80,6 +85,53 @@ async function setup() {
 }
 
 describe("plugin manager", () => {
+    it("checking for updates says whether the list was reached, and shows a newer version at once", async () => {
+        const { manager, bytes, table } = await setup();
+        expect(await manager.refresh()).toBe("updated");
+        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toMatchObject({ ok: true });
+        expect(await manager.setAutoUpdate(null, false)).toBe(true);
+        expect(await manager.refresh()).toBe("unchanged");
+        expect((await manager.snapshot()).installed[0]?.update).toBeNull();
+        // Settle the look that read started behind it.
+        await manager.refresh();
+
+        const newer = new TextEncoder().encode(JSON.stringify(catalogOf([entryFor(bytes, { version: "1.0.1" })], "2026-11-21T00:00:00.000Z")));
+        table[CATALOG] = newer;
+        table[`${CATALOG}.sig`] = sign(newer);
+        expect((await manager.snapshot()).installed[0]?.update).toBeNull();
+        expect(await manager.refresh()).toBe("updated");
+        expect((await manager.snapshot()).installed[0]?.update).toBe("1.0.1");
+
+        delete table[CATALOG];
+        expect(await manager.refresh()).toBe("failed");
+    });
+
+    it("opening the store draws the held list at once and brings a newer one behind it, without a restart", async () => {
+        let clock = 1_000_000;
+        const { manager, bytes, table, fetched } = await setup(() => clock);
+        expect(await manager.refresh()).toBe("updated");
+        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toMatchObject({ ok: true });
+        expect(await manager.setAutoUpdate(null, false)).toBe(true);
+
+        // Published a minute later: well inside the hours the old schedule kept the list for.
+        const newer = new TextEncoder().encode(JSON.stringify(catalogOf([entryFor(bytes, { version: "1.0.1" })], "2026-11-21T00:00:00.000Z")));
+        table[CATALOG] = newer;
+        table[`${CATALOG}.sig`] = sign(newer);
+        clock += 60_000;
+        expect((await manager.snapshot()).installed[0]?.update).toBeNull();
+        await vi.waitFor(async () => expect((await manager.snapshot()).installed[0]?.update).toBe("1.0.1"));
+
+        // A burst of reads (an install's progress, one screen) asks GitHub once.
+        const looks = () => fetched.filter((url) => url === CATALOG).length;
+        const before = looks();
+        await manager.snapshot();
+        await manager.snapshot();
+        expect(looks()).toBe(before);
+        clock += 30_000;
+        await manager.snapshot();
+        await vi.waitFor(() => expect(looks()).toBe(before + 1));
+    });
+
     it("with nothing installed starts nothing and fetches nothing", async () => {
         const { manager, fetched, forks } = await setup();
         await manager.start();

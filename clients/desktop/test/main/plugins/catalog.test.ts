@@ -66,6 +66,31 @@ describe("catalog refresh", () => {
         expect(forged.kind).toBe("failed");
         expect(await cachedCatalog(dir, TEST_KEYS)).toBeNull();
     });
+
+    it("asks with the held list's ETag, and a not-modified answer costs no download", async () => {
+        const dir = await tempDir();
+        const bytes = bytesOf(catalogOf([entryFor(fixturePackage())]));
+        const asked: Array<{ url: string; match: string | null }> = [];
+        const fetcher = async (url: string, init?: { headers?: Record<string, string> }) => {
+            const match = init?.headers?.["If-None-Match"] ?? null;
+            asked.push({ url, match });
+            if (url === URL && match === '"v1"') return new Response(null, { status: 304 });
+            const body = url === URL ? Buffer.from(bytes) : sign(bytes);
+            return new Response(body, { status: 200, headers: url === URL ? { etag: '"v1"' } : {} });
+        };
+        const first = await refreshCatalog(dir, fetcher, null, URL, TEST_KEYS);
+        expect(first).toMatchObject({ kind: "updated", etag: '"v1"' });
+        if (first.kind !== "updated") return;
+
+        asked.length = 0;
+        expect(await refreshCatalog(dir, fetcher, first.catalog, URL, TEST_KEYS, '"v1"')).toEqual({ kind: "unchanged", etag: '"v1"' });
+        expect(asked).toEqual([{ url: URL, match: '"v1"' }]);
+
+        // Without the list the ETag names, the answer is never taken on trust.
+        asked.length = 0;
+        expect((await refreshCatalog(dir, fetcher, null, URL, TEST_KEYS, '"v1"')).kind).toBe("updated");
+        expect(asked[0]).toEqual({ url: URL, match: null });
+    });
 });
 
 describe("writeWhole", () => {

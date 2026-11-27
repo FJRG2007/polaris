@@ -45,7 +45,11 @@ const THEME_CLASS = {
     light: "hidden [:root.light_&]:block [@media(prefers-color-scheme:light)]:[:root.system_&]:block"
 } as const;
 
-/** A 16:10 preview: the capture in the reader's theme, or the designed placeholder. */
+/**
+ * A 16:10 preview: the capture in the reader's theme, else a photograph of the
+ * thing itself (a device add-on's hardware, the same in either theme), else the
+ * designed placeholder.
+ */
 export function StorePreview({
     name,
     summary,
@@ -53,6 +57,7 @@ export function StorePreview({
     tint,
     ink,
     shot,
+    photo = null,
     alt,
     className,
     eager = false
@@ -65,6 +70,8 @@ export function StorePreview({
     tint: string;
     ink: string;
     shot: StoreShot | null;
+    /** A photograph's address, used when there is no capture. */
+    photo?: string | null;
     /** What the picture shows, already translated. */
     alt: string;
     className?: string;
@@ -88,6 +95,21 @@ export function StorePreview({
                             />
                         </picture>
                     ))}
+                </div>
+            </div>
+        );
+    }
+    if (photo) {
+        return (
+            <div className={box}>
+                <div className={frame} data-preview="photo">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a published webp, no optimizer needed */}
+                    <img
+                        src={photo}
+                        alt={alt}
+                        loading={eager ? "eager" : "lazy"}
+                        className="size-full object-cover"
+                    />
                 </div>
             </div>
         );

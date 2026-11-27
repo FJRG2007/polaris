@@ -87,12 +87,13 @@ import {
     type OverflowEntry
 } from "./store-card";
 import * as store from "@polaris/ui/store-card";
-import { StoreFilters, StoreNoMatch, StoreSection } from "@polaris/ui/store-layout";
+import { StoreFilters, StoreNoMatch, StoreSection, STORE_GRID } from "@polaris/ui/store-layout";
 import { PLUGIN_CATEGORIES, type PluginCategory } from "@polaris/core/device-plugins";
 import { PluginsShelf } from "@/app/(app)/account/plugins/plugins-view";
 import {
     Badge,
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -536,9 +537,9 @@ function InstalledSection({
     if (own.length === 0) return null;
 
     return (
-        <section className="flex min-w-0 flex-col gap-3" aria-label={t("view.installed")}>
+        <section className="flex min-w-0 flex-col gap-3 [container-type:inline-size]" aria-label={t("view.installed")}>
             <h2 className="text-sm font-medium text-muted-foreground">{t("view.installed")}</h2>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className={cn(STORE_GRID.shelf, "gap-2")}>
                 {own.map((item) => {
                     const manifest = findApp(item.catalogId);
                     const href = manifest?.opensAt ?? `/apps/installed/${item.id}`;

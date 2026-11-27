@@ -266,7 +266,7 @@ function BuiltInCard({
 }
 
 /** A device plugin's mark: its published icon, or the package the dashboard's store draws. */
-export function PluginMark({ plugin, size }: { plugin: SitePlugin; size: 40 | 56 | 72 }) {
+export function PluginMark({ plugin, size }: { plugin: SitePlugin; size: 40 | 44 | 56 | 72 }) {
     if (plugin.icon)
         return (
             <img
@@ -310,9 +310,16 @@ function PluginCard({
         <store.StoreCard
             preview={
                 <PreviewLink page={page}>
-                    <div className="grid aspect-[16/10] place-items-center bg-muted">
-                        <PluginMark plugin={plugin} size={56} />
-                    </div>
+                    <store.StorePreview
+                        name={plugin.name}
+                        summary={plugin.summary}
+                        mark={<PluginMark plugin={plugin} size={44} />}
+                        tint={plugin.tint}
+                        ink={plugin.ink}
+                        shot={null}
+                        photo={plugin.picture ? `${base()}/plugin-icons/${plugin.picture}` : null}
+                        alt={plugin.pictureAlt}
+                    />
                 </PreviewLink>
             }
             mark={<PluginMark plugin={plugin} size={40} />}

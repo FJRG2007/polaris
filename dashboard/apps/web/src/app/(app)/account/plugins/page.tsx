@@ -11,7 +11,7 @@ export default async function PluginsPage() {
     await requireUser();
     const t = await getTranslations("account");
     return (
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+        <div className="flex w-full min-w-0 flex-col gap-4">
             <div className="min-w-0">
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("plugins.page.title")}</h1>
                 <p className="text-sm text-muted-foreground">{t("plugins.page.intro")}</p>

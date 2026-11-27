@@ -2513,7 +2513,23 @@
             "by": "De {publisher}",
             "more": "Más de {name}",
             "details": "Detalles",
-            "icon": "Icono de {name}"
+            "icon": "Icono de {name}",
+            "picture": "{name}, en foto"
+        },
+        "menu": {
+            "busy": "Espera a que acabe la instalación",
+            "autoOn": "Actualizar solo",
+            "autoOff": "No actualizar solo",
+            "turnOn": "Activar",
+            "turnOff": "Desactivar",
+            "uninstallFailed": "No se pudo desinstalar."
+        },
+        "check": {
+            "action": "Buscar actualizaciones",
+            "running": "Buscando...",
+            "none": "Todo está al día",
+            "found": "{count, plural, one {# actualización} other {# actualizaciones}}",
+            "failed": "No se pudo leer la lista de plugins."
         },
         "status": {
             "connected": "Conectado",

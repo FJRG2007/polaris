@@ -5,7 +5,7 @@
  *   node clients/device-plugins/scripts/publish.mjs <source dir> <out dir>
  *
  * Every folder in <source dir> is one plugin: `manifest.json`, `listing.json`
- * (icon, screenshots, changelog: file names inside the folder) and the files:
+ * (icon, picture, screenshots, changelog: file names inside the folder) and the files:
  * those the same everywhere under `any/`, each platform's own under
  * `<platform>/` (a native module CI built for it), laid over `any/`. Writes into <out dir> one zip per plugin and platform, the
  * pictures, `catalog.json` and `catalog.json.sig`, all to be uploaded to the
@@ -77,6 +77,7 @@ for (const id of existsSync(source) ? readdirSync(source).sort() : []) {
         ...manifest,
         packages,
         ...(listing.icon ? { icon: picture(listing.icon) } : {}),
+        ...(listing.picture ? { picture: picture(listing.picture) } : {}),
         screenshots: (listing.screenshots ?? []).map(picture),
         changelog: listing.changelog ?? "",
         published: listing.published ?? new Date().toISOString()

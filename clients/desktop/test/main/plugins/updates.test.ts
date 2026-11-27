@@ -46,6 +46,7 @@ describe("version compare", () => {
 
 describe("when to look again", () => {
     it("waits six hours after a good look and backs off from five minutes after failed ones", () => {
+        expect(CHECK_EVERY_MS).toBe(60 * 60_000);
         expect(nextCheckDelay(0)).toBe(CHECK_EVERY_MS);
         expect(nextCheckDelay(1)).toBe(RETRY_FIRST_MS);
         expect(nextCheckDelay(2)).toBe(RETRY_FIRST_MS * 2);

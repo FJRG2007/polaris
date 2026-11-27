@@ -305,7 +305,8 @@ export interface PolarisDesktop {
      */
     plugins?: {
         get(): Promise<unknown>;
-        refresh(): Promise<void>;
+        /** Whether the list was reached; an app from before 0.1.125 answers nothing. */
+        refresh(): Promise<"updated" | "unchanged" | "failed" | null | undefined | void>;
         install(id: string, accepted: readonly string[]): Promise<unknown>;
         uninstall(id: string): Promise<boolean>;
         setEnabled(id: string, enabled: boolean): Promise<boolean>;

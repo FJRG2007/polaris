@@ -2513,7 +2513,23 @@
             "by": "By {publisher}",
             "more": "More for {name}",
             "details": "Details",
-            "icon": "{name} icon"
+            "icon": "{name} icon",
+            "picture": "{name}, pictured"
+        },
+        "menu": {
+            "busy": "Wait for the install to finish",
+            "autoOn": "Update automatically",
+            "autoOff": "Stop automatic updates",
+            "turnOn": "Turn on",
+            "turnOff": "Turn off",
+            "uninstallFailed": "It could not be uninstalled."
+        },
+        "check": {
+            "action": "Check for updates",
+            "running": "Checking...",
+            "none": "Everything is up to date",
+            "found": "{count, plural, one {# update available} other {# updates available}}",
+            "failed": "The plugin list could not be reached."
         },
         "status": {
             "connected": "Connected",
