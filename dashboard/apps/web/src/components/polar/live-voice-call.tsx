@@ -37,6 +37,8 @@ export interface LiveVoiceCallProps {
     threadId: string;
     /** A new chat is temporary: one the call starts stays that way. */
     temporary: boolean;
+    /** The project a new chat goes into. */
+    projectId: string | null;
     messages: UIMessage[];
     status: ChatStatus;
     /** Send a request as the next message of the thread. */
@@ -97,8 +99,15 @@ export function LiveVoiceCall(props: LiveVoiceCallProps) {
     /** The `ask_polar` call waiting on the thread's reply. */
     const asked = useRef<{ from: number; sent: boolean; resolve: (output: string) => void } | null>(null);
 
+    /** Exchanges heard while a delegated turn is under way, saved after it. */
+    const held = useRef<Array<{ user: string; assistant: string }>>([]);
+    const busyTurn = () => asked.current !== null || latest.current.status === "submitted" || latest.current.status === "streaming";
     const save = useCallback((user: string, assistant: string) => {
-        const { threadId, temporary, messages } = latest.current;
+        if (busyTurn()) {
+            held.current.push({ user, assistant });
+            return;
+        }
+        const { threadId, temporary, projectId, messages } = latest.current;
         const question: UIMessage = { id: newId(), role: "user", parts: [{ type: "text", text: user }] };
         const reply: UIMessage = { id: newId(), role: "assistant", parts: [{ type: "text", text: assistant }] };
         latest.current.onSaved([question, reply]);
@@ -108,6 +117,7 @@ export function LiveVoiceCall(props: LiveVoiceCallProps) {
             body: JSON.stringify({
                 threadId,
                 temporary,
+                projectId,
                 parentId: messages.at(-1)?.id ?? null,
                 user: { id: question.id, text: user },
                 assistant: { id: reply.id, text: assistant }
@@ -174,6 +184,13 @@ export function LiveVoiceCall(props: LiveVoiceCallProps) {
                 : JSON.stringify({ error: "Polar could not answer. Do not claim it did." })
         );
     }, [props.status, props.messages]);
+
+    // Exchanges held back during a turn are saved once it has ended, after it.
+    useEffect(() => {
+        if (busyTurn() || held.current.length === 0) return;
+        const queued = held.current.splice(0);
+        for (const exchange of queued) save(exchange.user, exchange.assistant);
+    });
 
     const open = useCallback(() => {
         setPermission("granted");

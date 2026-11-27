@@ -2670,6 +2670,7 @@ export function PolarChat({
                 <LiveVoiceCall
                     threadId={threadId}
                     temporary={temporary}
+                    projectId={newProject}
                     messages={chat.messages}
                     status={chat.status}
                     onSend={(text) => void sendSpoken(text)}
