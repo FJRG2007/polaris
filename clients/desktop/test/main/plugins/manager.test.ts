@@ -208,3 +208,78 @@ describe("USB presence on Linux", () => {
         expect(listLinuxUsb(join(root, "missing"))).toEqual([]);
     });
 });
+
+describe("an install the person asked for", () => {
+    /** A manager whose package download hangs until `release` is called. */
+    async function stuck() {
+        const dir = await tempDir();
+        const bytes = fixturePackage();
+        const catalogBytes = new TextEncoder().encode(JSON.stringify(catalogOf([entryFor(bytes)])));
+        const table: Record<string, Uint8Array | string> = { [CATALOG]: catalogBytes, [`${CATALOG}.sig`]: sign(catalogBytes), [PACKAGE_URL]: bytes };
+        const plain = fakeFetch(table);
+        let release: () => void = () => undefined;
+        const held = new Promise<void>((done) => {
+            release = done;
+        });
+        let downloads = 0;
+        const records: string[] = [];
+        const logged: string[] = [];
+        const manager = createPluginManager({
+            dir,
+            platform: "linux-x64",
+            appVersion: "0.1.73",
+            fetcher: async (url) => {
+                if (url === PACKAGE_URL) {
+                    downloads += 1;
+                    await held;
+                }
+                return plain(url);
+            },
+            keys: TEST_KEYS,
+            installLimitMs: 40,
+            fork: (): PluginChild => ({ postMessage: () => undefined, kill: () => undefined, onMessage: () => undefined, onExit: () => undefined }),
+            call: async () => null,
+            devices: () => [],
+            record: (event, fields) => records.push(`${event} ${Object.entries(fields).map(([key, value]) => `${key}=${String(value)}`).join(" ")}`),
+            log: (_id, level, text) => logged.push(`${level} ${text}`)
+        });
+        await manager.refresh();
+        return { manager, dir, release: () => release(), downloads: () => downloads, records, logged };
+    }
+
+    it("answers with a timeout when it is stuck, instead of never answering", async () => {
+        const { manager, release, records, logged } = await stuck();
+        const answer = manager.install("fixture-mixer", ["usb", "polaris-actions"]);
+        // The card shows it at once, while it runs.
+        expect((await manager.snapshot()).installing["fixture-mixer"]).toEqual({ received: 0, total: 0 });
+        expect(await answer).toEqual({ ok: false, reason: "timeout" });
+        expect(records[0]).toBe("plugin-install id=fixture-mixer step=start");
+        expect(records.at(-1)).toMatch(/^plugin-install id=fixture-mixer step=end ok=false ms=\d+ reason=timeout$/);
+        expect(logged.some((line) => line.startsWith("warn install did not end"))).toBe(true);
+        // The download already under way finishes on its own; let it, before the folder goes.
+        release();
+        for (let i = 0; i < 100 && Object.keys((await manager.snapshot()).installing).length > 0; i++) await new Promise((done) => setTimeout(done, 10));
+        expect((await manager.snapshot()).installing).toEqual({});
+    });
+
+    it("does nothing when its turn comes after it already answered with a timeout", async () => {
+        const { manager, dir, release, downloads } = await stuck();
+        const first = manager.install("fixture-mixer", ["usb", "polaris-actions"]);
+        const second = manager.install("fixture-mixer", ["usb", "polaris-actions"]);
+        expect(await first).toEqual({ ok: false, reason: "timeout" });
+        expect(await second).toEqual({ ok: false, reason: "timeout" });
+        release();
+        // The first was already downloading, so it finishes; the second never starts a download.
+        for (let i = 0; i < 50 && !(await readFile(join(dir, "installed.json"), "utf8").catch(() => "")).includes("fixture-mixer"); i++) await new Promise((done) => setTimeout(done, 10));
+        expect((await manager.snapshot()).installed.map((item) => item.version)).toEqual(["1.0.0"]);
+        expect(downloads()).toBe(1);
+        expect((await manager.snapshot()).installing).toEqual({});
+    });
+
+    it("answers and logs the end of a call for a plugin the catalog does not list", async () => {
+        const { manager, release, records } = await stuck();
+        release();
+        expect(await manager.install("not-listed", ["usb"])).toEqual({ ok: false, reason: "unknown" });
+        expect(records.at(-1)).toMatch(/step=end ok=false .*reason=unknown$/);
+    });
+});

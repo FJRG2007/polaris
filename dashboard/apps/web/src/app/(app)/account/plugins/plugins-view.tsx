@@ -119,7 +119,13 @@ function OfferButton({ offer, href, onInstall, size = "sm" }: { offer: PluginOff
             return (
                 <Button size={size} disabled aria-busy>
                     <Loader2 className="size-4 animate-spin" />
-                    {offer.percent === null ? say(t, "card.preparing") : say(t, "card.installing", { percent: offer.percent })}
+                    {offer.updating
+                        ? offer.percent === null
+                            ? say(t, "card.updating")
+                            : say(t, "card.updatingPercent", { percent: offer.percent })
+                        : offer.percent === null
+                          ? say(t, "card.preparing")
+                          : say(t, "card.installing", { percent: offer.percent })}
                 </Button>
             );
         case "update":

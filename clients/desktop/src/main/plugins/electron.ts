@@ -20,6 +20,8 @@ import { createRequirements, type EnsureReason, type Requirements } from "./requ
 import { answerOfficial, DRIVER_REQUIREMENT, driverRunnerFor, lookDriver, officialRequestSchema, officialRunnerFor, requirementRunnerFor, udevRunnerFor } from "./official";
 import { showNotice } from "../notices";
 import { newsWords } from "./updates";
+import { perfEvent } from "../perf-watch";
+import { answerInstall, pluginIdSchema, requirementKeySchema } from "./install-call";
 import { callPageAction, voiceStateNow, voiceWidgetAction } from "../voice-widget";
 import { PLUGIN_PERMISSIONS, pluginPlatform, pluginRequirements, pluginText, type PluginManifest, type UsbDevice } from "@polaris/core/device-plugins";
 import { app, ipcMain, net, Notification, protocol, utilityProcess, webContents, type IpcMainInvokeEvent } from "electron";
@@ -252,7 +254,9 @@ export function startDevicePlugins(showPolaris: (path?: string) => void): Plugin
             broadcast(CHANNELS.pluginsChanged);
             lookAtShortcuts(showPolaris);
         },
-        log: (id, level, text) => console[level === "info" ? "log" : level](`[plugin ${id}] ${text}`)
+        log: (id, level, text) => console[level === "info" ? "log" : level](`[plugin ${id}] ${text}`),
+        // Kept on disk (`logs/perf.log`): the console above is gone once the app closes.
+        record: perfEvent
     });
     manager = created;
     const keptAt = join(pluginsDir(), "requirements.json");
@@ -303,7 +307,7 @@ export function stopDevicePlugins(): void {
     manager?.stop();
 }
 
-const idSchema = z.string().regex(/^[a-z][a-z0-9-]{1,47}$/);
+const idSchema = pluginIdSchema;
 
 /** The bridge's channels; `allowed` is the host's check that the asking page is the Polaris one. */
 export function registerPluginIpc(
@@ -311,7 +315,7 @@ export function registerPluginIpc(
     showPolaris: (path?: string) => void
 ): void {
     const ready = () => startDevicePlugins(showPolaris);
-    const keySchema = z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/);
+    const keySchema = requirementKeySchema;
     /** After an install whose consent listed `requires`: keep the consent, then set them up (the permission prompt comes now). */
     const installedWith = async (id: string, requires: readonly string[]) => {
         const listed = new Set(pluginRequirements((await installedManifest(id)) ?? { requires: {} }, pluginPlatform(process.platform, process.arch)).map((item) => item.key));
@@ -320,16 +324,20 @@ export function registerPluginIpc(
     };
     handle(CHANNELS.pluginsGet, (event) => (allowed(event) ? snapshotWithActions(ready()) : null));
     handle(CHANNELS.pluginsRefresh, async (event) => (allowed(event) ? ready().refresh() : null));
-    handle(CHANNELS.pluginsInstall, async (event, id: unknown, accepted: unknown, requires: unknown) => {
-        const parsedId = idSchema.safeParse(id);
-        const parsedAccepted = z.array(z.enum(PLUGIN_PERMISSIONS)).max(PLUGIN_PERMISSIONS.length).safeParse(accepted);
-        // A page older than requirements sends none: nothing is consented to, and the plugin's page offers it instead.
-        const parsedRequires = z.array(keySchema).max(8).safeParse(requires ?? []);
-        if (!allowed(event) || !parsedId.success || !parsedAccepted.success || !parsedRequires.success) return { ok: false, reason: "refused" };
-        const result = await ready().install(parsedId.data, parsedAccepted.data);
-        if (result.ok) await installedWith(parsedId.data, parsedRequires.data);
-        return result;
-    });
+    // Every path answers (install-call.ts): a stuck or failed update comes back to the page as a reason it can say.
+    handle(CHANNELS.pluginsInstall, (event, id: unknown, accepted: unknown, requires: unknown) =>
+        answerInstall(
+            {
+                allowed: allowed(event),
+                install: (plugin, permissions) => ready().install(plugin, permissions),
+                installedWith,
+                log: (text) => console.warn(`[plugins] ${text}`)
+            },
+            id,
+            accepted,
+            requires
+        )
+    );
     // One of the actions the snapshot offers for an installed plugin (`InstalledPlugin.actions`).
     handle(CHANNELS.pluginsAction, async (event, id: unknown, action: unknown) => {
         const parsedId = idSchema.safeParse(id);

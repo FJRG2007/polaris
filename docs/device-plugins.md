@@ -76,7 +76,14 @@ failed look (offline, GitHub down) retried from 5 minutes, doubling up to the
 - A version asking for a permission not accepted before never goes in by
   itself: it waits, the notice and the plugin's page say what it asks for, and
   Update reads out only the new permissions.
-- A plugin whose status is `busy` is not updated until it says otherwise.
+- A plugin whose status is `busy` is not updated by itself until it says
+  otherwise, unless its status `code` says another program or driver holds the
+  device (`otherProgram`, `herculesApp`, `herculesDriver`): then the plugin is
+  not using it and the update goes in. Update pressed by the person never waits
+  on busy. An install the person asked for answers within 3 minutes
+  (`INSTALL_LIMIT_MS`, reason `timeout`), shows on the card at once, and its
+  start and end are written to `logs/perf.log` (`plugin-install`,
+  `plugin-update`, `plugin-update-wait`).
 - The version an update replaced stays on disk (`previous`); when the new one
   stops after crashing, the app goes back to it, removes the failed one and
   never puts that version in by itself again (`failed`). One earlier version is

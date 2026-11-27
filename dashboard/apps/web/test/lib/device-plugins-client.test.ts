@@ -18,8 +18,10 @@ const installed = { id: "fixture-mixer", version: "1.0.0", enabled: true, grante
 describe("device plugin offers", () => {
     it("offers an install, its progress, an update, and configure", () => {
         expect(pluginOffer(snapshot(), entry.id, entry)).toEqual({ kind: "install" });
-        expect(pluginOffer(snapshot({ installing: { [entry.id]: { received: 5, total: 10 } } }), entry.id, entry)).toEqual({ kind: "installing", percent: 50 });
-        expect(pluginOffer(snapshot({ installing: { [entry.id]: { received: 0, total: 0 } } }), entry.id, entry)).toEqual({ kind: "installing", percent: null });
+        expect(pluginOffer(snapshot({ installing: { [entry.id]: { received: 5, total: 10 } } }), entry.id, entry)).toEqual({ kind: "installing", percent: 50, updating: false });
+        expect(pluginOffer(snapshot({ installing: { [entry.id]: { received: 0, total: 0 } } }), entry.id, entry)).toEqual({ kind: "installing", percent: null, updating: false });
+        // An update of an installed plugin, queued or downloading, says so.
+        expect(pluginOffer(snapshot({ installed: [{ ...installed, update: "1.1.0" }], installing: { [entry.id]: { received: 0, total: 0 } } }), entry.id, entry)).toEqual({ kind: "installing", percent: null, updating: true });
         expect(pluginOffer(snapshot({ installed: [{ ...installed, update: "1.1.0" }] }), entry.id, entry)).toEqual({ kind: "update", version: "1.1.0" });
         expect(pluginOffer(snapshot({ installed: [installed] }), entry.id, entry)).toEqual({ kind: "installed" });
     });
@@ -62,6 +64,9 @@ describe("installing through desktop apps of every age", () => {
         expect(await installPlugin(bridgeOf({ before: "1.0.0", after: "1.1.0", install: async () => ({ ok: true }) }).bridge, update)).toEqual({ installed: true, started: true });
         expect(await installPlugin(bridgeOf({ before: "1.0.0", after: "1.1.0", install: async () => ({ ok: true, started: false }) }).bridge, update)).toEqual({ installed: true, started: false });
         expect(await installPlugin(bridgeOf({ before: "1.0.0", after: "1.0.0", install: async () => ({ ok: false, reason: "hash" }) }).bridge, update)).toEqual({ installed: false, problem: "integrity" });
+        // A desktop app that gave up on a stuck install (0.1.130) says so; "failed" and "unknown" read as the general sentence.
+        expect(await installPlugin(bridgeOf({ before: "1.0.0", after: "1.0.0", install: async () => ({ ok: false, reason: "timeout" }) }).bridge, update)).toEqual({ installed: false, problem: "timeout" });
+        expect(await installPlugin(bridgeOf({ before: "1.0.0", after: "1.0.0", install: async () => ({ ok: false, reason: "failed" }) }).bridge, update)).toEqual({ installed: false, problem: "other" });
     });
 
     it("reads an app up to 0.1.96 that threw after the update went in as installed, and starts the new version", async () => {

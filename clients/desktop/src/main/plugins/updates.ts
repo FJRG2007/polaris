@@ -6,8 +6,13 @@
  * Updates go in by themselves unless the person turned that off, the way the
  * app updates itself (`../updates.ts`), with three exceptions: a version that
  * asks for a permission the person has not accepted waits for them, a plugin
- * that says its device is busy is not swapped under them, and a version that
+ * that is using its device is not swapped under them, and a version that
  * already failed here and was rolled back from is left for them to choose.
+ *
+ * A plugin that says "busy" because another program or driver holds the device
+ * (Hercules Stream Control open, say) is not using it, so nothing is
+ * interrupted: that busy does not hold the update. 0.1.129 and earlier held it,
+ * and with the other program left open the update never went in.
  */
 
 import { pluginFit, comparePluginVersions, type PluginEntry, type PluginPermission, type PluginPlatform } from "@polaris/core/device-plugins";
@@ -43,7 +48,7 @@ export interface UpdateFacts {
     readonly appVersion: string;
     /** The setting for every plugin: absent in an `installed.json` from before it, which means on. */
     readonly autoUpdate: boolean | undefined;
-    /** It says its device is in use right now. */
+    /** It is using its device right now (`busyHoldsUpdate`): not when another program holds the device. */
     readonly busy: boolean;
 }
 
@@ -58,6 +63,18 @@ export type UpdateDecision =
     | { readonly kind: "consent"; readonly version: string; readonly added: readonly PluginPermission[]; }
     /** Newer and going in by itself, once the plugin is no longer busy. */
     | { readonly kind: "wait"; readonly version: string; };
+
+/**
+ * Status codes a plugin gives for a device another program or driver holds
+ * (the Stream 100's `otherProgram`, `herculesApp`, `herculesDriver`): the plugin
+ * cannot reach the device, so swapping it interrupts nothing.
+ */
+export const HELD_ELSEWHERE_CODES: readonly string[] = ["otherProgram", "herculesApp", "herculesDriver"];
+
+/** Whether a plugin's status holds back its automatic update: busy with its device, not locked out of it. */
+export function busyHoldsUpdate(status: { readonly state: string; readonly code?: string; } | null | undefined): boolean {
+    return status?.state === "busy" && !(status.code !== undefined && HELD_ELSEWHERE_CODES.includes(status.code));
+}
 
 /** Whether automatic updates apply to one plugin: its own choice, else the setting for all, else on. */
 export function autoUpdates(own: boolean | undefined, all: boolean | undefined): boolean {

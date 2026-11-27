@@ -2535,6 +2535,8 @@
             "open": "Configure",
             "installing": "Installing {percent}%",
             "preparing": "Installing",
+            "updating": "Updating",
+            "updatingPercent": "Updating {percent}%",
             "platform": "Not for this computer",
             "appVersion": "Needs app {version}",
             "by": "By {publisher}",
@@ -2590,6 +2592,7 @@
             "download": "The download failed. Try again.",
             "integrity": "The download did not match what was published, so nothing was installed.",
             "other": "It could not be installed. Try again.",
+            "timeout": "It took too long, so nothing changed. Try again.",
             "notStarted": "Installed, but it has not started. Its status says why."
         },
         "detail": {

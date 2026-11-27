@@ -13,7 +13,7 @@ import type { Fetcher } from "./catalog";
 import type { PluginMethod } from "@/shared/plugin-protocol";
 import type { TrustedKey } from "./signature";
 import { cachedCatalog, refreshCatalog, CATALOG_URL, LEGACY_CATALOG_URL, type Refresh } from "./catalog";
-import { addedPermissions, announced, autoUpdates, decideUpdate, FIRST_CHECK_MS, nextCheckDelay, type UpdateNews } from "./updates";
+import { addedPermissions, announced, autoUpdates, busyHoldsUpdate, decideUpdate, FIRST_CHECK_MS, nextCheckDelay, type UpdateNews } from "./updates";
 import { createSupervisor, type PluginChild, type PluginRun, type WantedPlugin } from "./supervisor";
 import {
     pluginDevicePresent,
@@ -51,6 +51,19 @@ export const CATALOG_FRESH_MS = 6 * 60 * 60_000;
  * of reads one install or one open makes from each asking GitHub again.
  */
 export const STORE_REVALIDATE_MS = 30_000;
+/**
+ * The longest an install or update the person asked for may take before the
+ * page is told it did not go in. A package is well under a megabyte, so this is
+ * only ever reached by something stuck (0.1.129 left the Update button with no
+ * answer at all).
+ */
+export const INSTALL_LIMIT_MS = 3 * 60_000;
+
+/** Why an install the person asked for did not go in. */
+export type InstallCallFailure = InstallFailure | "unknown" | "timeout" | "failed";
+export type InstallCallResult = { ok: true; started: boolean; } | { ok: false; reason: InstallCallFailure; };
+/** A line for the desktop's persistent log (`perf.log`): short tokens and numbers only. */
+export type PluginRecord = (event: string, fields: Readonly<Record<string, string | number | boolean>>) => void;
 
 export interface ManagerOptions {
     readonly dir: string;
@@ -71,6 +84,10 @@ export interface ManagerOptions {
     /** The timer a crashed plugin is restarted on (the supervisor's own by default). For the tests. */
     readonly restartTimer?: (run: () => void, ms: number) => unknown;
     readonly log?: (id: string, level: "info" | "warn" | "error", text: string) => void;
+    /** Installs and updates, started and ended, for the log kept on disk. */
+    readonly record?: PluginRecord;
+    /** `INSTALL_LIMIT_MS` by default; for the tests. */
+    readonly installLimitMs?: number;
     /** The app's language, handed to each plugin when it starts. */
     readonly locale?: () => string;
     readonly catalogUrl?: string;
@@ -115,6 +132,7 @@ function realTimer(work: () => void, ms: number): () => void {
 export function createPluginManager(options: ManagerOptions) {
     const now = options.now ?? Date.now;
     const later = options.later ?? realTimer;
+    const record: PluginRecord = (event, fields) => options.record?.(event, fields);
     const changed = () => options.onChange?.();
     /** A run changed: roll back a version that keeps failing, and put in an update that waited on a busy plugin. */
     const runChanged = () => {
@@ -147,6 +165,8 @@ export function createPluginManager(options: ManagerOptions) {
     const waiting = new Set<string>();
     /** Plugins being rolled back, so a burst of run changes rolls each back once. */
     const rolling = new Set<string>();
+    /** Installs the person asked for that have not ended, so the card shows them at once, even while queued. */
+    const asked = new Set<string>();
 
     /** One change to the installed set at a time, in order. */
     function serial<T>(work: () => Promise<T>): Promise<T> {
@@ -257,12 +277,13 @@ export function createPluginManager(options: ManagerOptions) {
                 platform: options.platform,
                 appVersion: options.appVersion,
                 autoUpdate: installed.autoUpdate,
-                busy: runs[id]?.status?.state === "busy"
+                busy: busyHoldsUpdate(runs[id]?.status)
             });
             if (decision.kind !== "wait") waiting.delete(id);
             if (!entry || decision.kind === "none") continue;
             const name = entry.name;
             if (decision.kind === "wait") {
+                if (!waiting.has(id)) record("plugin-update-wait", { id, version: decision.version, code: runs[id]?.status?.code ?? "-" });
                 waiting.add(id);
                 continue;
             }
@@ -275,7 +296,9 @@ export function createPluginManager(options: ManagerOptions) {
                 continue;
             }
             // Only what was accepted before: decideUpdate holds any version that asks for more.
+            record("plugin-update", { id, step: "start", from: plugin.version, to: decision.version });
             const result = await put(id, entry, plugin.granted);
+            record("plugin-update", { id, step: "end", to: decision.version, ok: result.ok, ...(result.ok ? {} : { reason: result.reason }) });
             if (result.ok) await tell(id, decision.version, { kind: "updated", name, version: decision.version, changelog: entry.changelog });
             else {
                 options.log?.(id, "warn", `update to ${decision.version} failed: ${result.reason}`);
@@ -305,7 +328,7 @@ export function createPluginManager(options: ManagerOptions) {
                 .catch(() => undefined)
                 .finally(() => rolling.delete(id));
         }
-        const freed = [...waiting].some((id) => runs[id]?.status?.state !== "busy");
+        const freed = [...waiting].some((id) => !busyHoldsUpdate(runs[id]?.status));
         if (freed) await serial(applyUpdates).catch(() => undefined);
     }
 
@@ -413,7 +436,8 @@ export function createPluginManager(options: ManagerOptions) {
                 catalog,
                 autoUpdate: autoUpdates(undefined, installed.autoUpdate),
                 installed: views,
-                installing: { ...installing }
+                // Asked for and queued behind other work: shown as starting, then as its download.
+                installing: { ...Object.fromEntries([...asked].map((id) => [id, { received: 0, total: 0 }])), ...installing }
             };
         },
 
@@ -459,8 +483,20 @@ export function createPluginManager(options: ManagerOptions) {
             });
         },
 
-        install(id: string, accepted: readonly PluginPermission[]): Promise<{ ok: true; started: boolean; } | { ok: false; reason: InstallFailure | "unknown"; }> {
-            return serial(async () => {
+        /**
+         * Install or update one plugin because the person asked. Never waits on a
+         * busy plugin (that only holds automatic updates), always answers within
+         * `INSTALL_LIMIT_MS`, and a call that timed out while still queued does
+         * nothing when its turn comes.
+         */
+        install(id: string, accepted: readonly PluginPermission[]): Promise<InstallCallResult> {
+            const began = now();
+            let late = false;
+            asked.add(id);
+            changed();
+            record("plugin-install", { id, step: "start" });
+            const work = serial(async (): Promise<InstallCallResult> => {
+                if (late) return { ok: false, reason: "timeout" };
                 await loadCatalog();
                 const entry = catalog?.plugins.find((item) => item.id === id);
                 if (!entry) return { ok: false as const, reason: "unknown" as const };
@@ -475,6 +511,24 @@ export function createPluginManager(options: ManagerOptions) {
                         return Boolean(plugin);
                     }).catch((error: unknown) => console.warn(`[plugins] ${id} ${entry.version} is installed; noting it as announced failed:`, error));
                 }
+                return result;
+            }).catch((error: unknown): InstallCallResult => {
+                options.log?.(id, "error", `install failed: ${error instanceof Error ? error.message : String(error)}`);
+                return { ok: false, reason: "failed" };
+            });
+            let cancel: () => void = () => undefined;
+            const limit = new Promise<InstallCallResult>((done) => {
+                cancel = later(() => {
+                    late = true;
+                    done({ ok: false, reason: "timeout" });
+                }, options.installLimitMs ?? INSTALL_LIMIT_MS);
+            });
+            return Promise.race([work, limit]).then((result) => {
+                cancel();
+                asked.delete(id);
+                changed();
+                if (!result.ok && result.reason === "timeout") options.log?.(id, "warn", `install did not end within ${Math.round((options.installLimitMs ?? INSTALL_LIMIT_MS) / 1000)} s`);
+                record("plugin-install", { id, step: "end", ok: result.ok, ms: now() - began, ...(result.ok ? { started: result.started } : { reason: result.reason }) });
                 return result;
             });
         },

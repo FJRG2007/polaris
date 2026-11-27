@@ -118,15 +118,16 @@ export function usePlugins(): PluginsState {
 /** What a card or a page offers first for one plugin. */
 export type PluginOffer =
     | { readonly kind: "install" }
-    | { readonly kind: "installing"; readonly percent: number | null }
+    /** `updating`: a version is already installed, so the card says "Updating". */
+    | { readonly kind: "installing"; readonly percent: number | null; readonly updating: boolean }
     | { readonly kind: "update"; readonly version: string }
     | { readonly kind: "installed" }
     | { readonly kind: "unavailable"; readonly reason: "platform" | "app-version"; readonly needs: string };
 
 export function pluginOffer(snapshot: PluginsSnapshot, id: string, entry: PluginEntry | null): PluginOffer {
     const progress = snapshot.installing[id];
-    if (progress) return { kind: "installing", percent: progress.total > 0 ? Math.round((progress.received / progress.total) * 100) : null };
     const installed = snapshot.installed.find((item) => item.id === id);
+    if (progress) return { kind: "installing", percent: progress.total > 0 ? Math.round((progress.received / progress.total) * 100) : null, updating: Boolean(installed) };
     if (installed?.update) return { kind: "update", version: installed.update };
     if (installed) return { kind: "installed" };
     if (!entry || !snapshot.platform || !entry.packages[snapshot.platform]) return { kind: "unavailable", reason: "platform", needs: "" };
@@ -154,7 +155,7 @@ export function pluginListings(snapshot: PluginsSnapshot): PluginListing[] {
 }
 
 /** Why an install did not happen, as the store words it. */
-export type InstallProblem = "platform" | "app-version" | "download" | "integrity" | "other";
+export type InstallProblem = "platform" | "app-version" | "download" | "integrity" | "timeout" | "other";
 
 /** The store's wording for why the app refused an install. */
 export function installProblem(reason: string): InstallProblem {
@@ -162,6 +163,7 @@ export function installProblem(reason: string): InstallProblem {
         case "platform":
         case "app-version":
         case "download":
+        case "timeout":
             return reason;
         case "size":
         case "hash":

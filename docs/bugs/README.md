@@ -74,3 +74,4 @@ Security findings are not kept here; they live in
 | BUG-0065 | The Stream 100's screen never shows what the plugin sets, even with Polaris' own driver | Device plugins | Fixed, watching | crates/polaris-stream100/src/screen.rs | 2026-11-27 |
 | BUG-0066 | A browser never builds a shared search segment, and trusts the ones it reads | Chat | Fixed, watching | dashboard/apps/web/src/lib/chat/e2ee/device-across-tabs.ts | 2026-11-27 |
 | BUG-0067 | No dashboard image was published for a day, so no install received an update | Updates | Fixed, watching | dashboard/apps/web/src/lib/polar/usage-report-shape.ts | 2026-11-27 |
+| BUG-0068 | A device plugin never updates while another program holds its device, and Update gives no answer | Device plugins | Fixed, watching | clients/desktop/src/main/plugins/updates.ts | 2026-11-27 |

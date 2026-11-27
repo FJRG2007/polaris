@@ -2535,6 +2535,8 @@
             "open": "Configurar",
             "installing": "Instalando {percent}%",
             "preparing": "Instalando",
+            "updating": "Actualizando",
+            "updatingPercent": "Actualizando {percent}%",
             "platform": "No para este equipo",
             "appVersion": "Requiere app {version}",
             "by": "De {publisher}",
@@ -2590,6 +2592,7 @@
             "download": "Falló la descarga. Inténtalo de nuevo.",
             "integrity": "La descarga no coincidía con lo publicado y no se instaló nada.",
             "other": "No se pudo instalar. Inténtalo de nuevo.",
+            "timeout": "Tardó demasiado y no cambió nada. Inténtalo de nuevo.",
             "notStarted": "Instalado, pero no ha arrancado. Su estado dice por qué."
         },
         "detail": {

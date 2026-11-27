@@ -8,7 +8,7 @@ import type { PluginChild } from "@/main/plugins/supervisor";
 import { installPlugin, packageDir, readInstalled, rollbackPlugin } from "@/main/plugins/packages";
 import { comparePluginVersions, type PluginEntry, type UsbDevice } from "@polaris/core/device-plugins";
 import { catalogOf, entryFor, fakeFetch, fixturePackage, PACKAGE_URL, sign, TEST_KEYS } from "./fixtures";
-import { addedPermissions, CHECK_EVERY_MS, decideUpdate, newsWords, nextCheckDelay, RETRY_FIRST_MS, type UpdateFacts, type UpdateNews } from "@/main/plugins/updates";
+import { addedPermissions, busyHoldsUpdate, CHECK_EVERY_MS, decideUpdate, newsWords, nextCheckDelay, RETRY_FIRST_MS, type UpdateFacts, type UpdateNews } from "@/main/plugins/updates";
 
 const CATALOG = "https://github.com/FJRG2007/polaris/releases/download/device-plugins/catalog.json";
 const DEVICE: UsbDevice = { vendorId: 0x06f8, productId: 0xe053 };
@@ -90,6 +90,16 @@ describe("update decision", () => {
     it("never puts back by itself a version that failed here and was rolled back from", () => {
         expect(decideUpdate(facts({ installed: { version: "1.0.0", granted: ["usb", "polaris-actions"], failed: "1.1.0" } }))).toEqual({ kind: "offer", version: "1.1.0", why: "failed" });
         expect(decideUpdate(facts({ installed: { version: "1.0.0", granted: ["usb", "polaris-actions"], failed: "1.1.0" } }, { version: "1.2.0" }))).toMatchObject({ kind: "apply" });
+    });
+
+    it("is held only by a plugin busy with its own device, not one another program locks out", () => {
+        expect(busyHoldsUpdate({ state: "busy" })).toBe(true);
+        expect(busyHoldsUpdate({ state: "busy", code: "someWork" })).toBe(true);
+        // The Stream 100 with Hercules Stream Control open: 0.1.129 waited on it forever.
+        for (const code of ["herculesApp", "herculesDriver", "otherProgram"]) expect(busyHoldsUpdate({ state: "busy", code })).toBe(false);
+        expect(busyHoldsUpdate({ state: "connected" })).toBe(false);
+        expect(busyHoldsUpdate(null)).toBe(false);
+        expect(busyHoldsUpdate(undefined)).toBe(false);
     });
 
     it("waits while the plugin says its device is busy", () => {
@@ -282,6 +292,28 @@ describe("updates in the manager", () => {
         // The update the free status sets off runs on its own: wait for it, not a fixed 20 ms.
         for (let i = 0; i < 50 && (await installedVersion(dir)) !== "1.1.0"; i++) await settle();
         await manager.snapshot();
+        expect(await installedVersion(dir)).toBe("1.1.0");
+    });
+
+    it("does not wait for a plugin that another program locks out of its device", async () => {
+        const { dir, manager, children, release } = await setup();
+        const child = children[0]!;
+        child.speak({ type: "ready" });
+        child.speak({ type: "status", state: "busy", code: "herculesApp", detail: "Close Hercules Stream Control to use the Stream 100 here." });
+        release("1.1.0");
+        await manager.checkUpdates();
+        expect(await installedVersion(dir)).toBe("1.1.0");
+    });
+
+    it("puts an Update the person pressed in at once, even while the plugin says it is busy", async () => {
+        const { dir, manager, children, release } = await setup();
+        const child = children[0]!;
+        child.speak({ type: "ready" });
+        child.speak({ type: "status", state: "busy" });
+        release("1.1.0");
+        await manager.checkUpdates();
+        expect(await installedVersion(dir)).toBe("1.0.0");
+        expect(await manager.install("fixture-mixer", ["usb", "polaris-actions"])).toEqual({ ok: true, started: true });
         expect(await installedVersion(dir)).toBe("1.1.0");
     });
 
