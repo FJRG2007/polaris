@@ -431,7 +431,8 @@ describe("a sealed message in a channel a game shows", () => {
                 authorId: AUTHOR,
                 conversation: "builders",
                 text: "meet at the portal",
-                files: "map.png",
+                // Named the way a plain message's files are: a picture is "Photo".
+                files: "Photo",
                 poll: ["north", "south"],
                 forwarded: false
             }

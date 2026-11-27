@@ -28,6 +28,8 @@ const fake = vi.hoisted(() => ({
     reading: { running: true, players: null as unknown },
     said: [] as { installedAppId: string; line: string }[],
     notices: [] as { channelId: string; body: string; actorId: string }[],
+    /** Conversations the game bridge was asked to follow. */
+    bridged: [] as string[],
     patched: [] as Record<string, unknown>[],
     audits: [] as { action: string }[],
     linkable: {
@@ -65,6 +67,9 @@ vi.mock("@polaris/app-host", () => ({
         },
         deployService: { readAppRuntimeLog: async () => "" },
         chatLinks: {
+            syncGameBridge: async (channelId: string) => {
+                fake.bridged.push(channelId);
+            },
             postAppNotice: async (channelId: string, body: string, actorId: string) => {
                 fake.notices.push({ channelId, body, actorId });
             },
@@ -139,6 +144,7 @@ beforeEach(() => {
     fake.reading = { running: true, players: { online: 1, max: 10, players: ["Ada"] } };
     fake.said = [];
     fake.notices = [];
+    fake.bridged = [];
     fake.patched = [];
     fake.audits = [];
     fake.linkable = { groups: [{ id: GROUP, name: "Builders" }], spaces: [] };
@@ -394,5 +400,7 @@ describe("linking a server", () => {
         expect(result.error).toBeUndefined();
         expect(fake.patched).toEqual([{ chatLink: null, callGroupId: null }]);
         expect(fake.audits.map((one) => one.action)).toEqual(["games.chat.unlink"]);
+        // The room it showed is left by the game bridge.
+        expect(fake.bridged).toEqual([TEXT]);
     });
 });
