@@ -14,7 +14,7 @@ import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, Input, settingType, Skeleton } from "@polaris/ui";
+import { Button, cn, Input, settingType, Skeleton } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
 import type { AcmeContactStatus } from "@/lib/tls/acme-edge";
 import { useLiveResource } from "@/components/use-live-resource";
@@ -110,7 +110,7 @@ export function CertificateContactCard() {
                         void save();
                     }}
                 >
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("domains.acme.label")}
                         <div className="flex gap-2">
                             <Input
@@ -130,7 +130,7 @@ export function CertificateContactCard() {
                     {problem ? (
                         <p className={settingType.error}>{t(`domains.acme.errors.${problem}`)}</p>
                     ) : (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {status.email === ""
                                 ? t("domains.acme.none")
                                 : status.source === "install"
@@ -165,17 +165,17 @@ function EdgeLine({
     const t = useTranslations("admin");
     if (restarting) {
         return (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <p className={cn(settingType.hint, "flex items-center gap-1.5")}>
                 <RefreshCw className="size-3.5 shrink-0 animate-spin" /> {t("domains.acme.edge.restarting")}
             </p>
         );
     }
     if (status.edge === "current") {
-        return <p className="text-xs text-success">{t("domains.acme.edge.current")}</p>;
+        return <p className={cn(settingType.small, "text-success")}>{t("domains.acme.edge.current")}</p>;
     }
     if (status.edge === "outdated") {
         return (
-            <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+            <p className={cn(settingType.small, "rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}>
                 {t.rich("domains.acme.edge.outdated", {
                     link: (chunks) => (
                         <Link key="link" href="/admin/updates" className="text-primary hover:underline">
@@ -188,7 +188,7 @@ function EdgeLine({
     }
     if (status.edge === "pending" && status.canRestart) {
         return (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+            <div className={cn(settingType.small, "flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}>
                 <span className="min-w-0 flex-1">{t("domains.acme.edge.pending")}</span>
                 <Button type="button" size="sm" variant="secondary" onClick={onRestart} disabled={busy}>
                     {t("domains.acme.edge.restart")}
@@ -197,5 +197,5 @@ function EdgeLine({
         );
     }
     // The daemon that could look at the edge, or restart it, is not on this machine.
-    return <p className="text-xs text-muted-foreground">{t("domains.acme.edge.unknown")}</p>;
+    return <p className={settingType.hint}>{t("domains.acme.edge.unknown")}</p>;
 }

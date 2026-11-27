@@ -17,7 +17,17 @@ import type { SpeedResult } from "@/lib/diagnostics/speed-test";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CheckId, CheckResult, CheckStatus } from "@/lib/diagnostics/checks";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    cn,
+    settingType,
+    Skeleton
+} from "@polaris/ui";
 
 type Translator = ReturnType<typeof useTranslations<"diagnostics">>;
 type Key = Parameters<Translator>[0];
@@ -74,9 +84,9 @@ function CheckRow({
     return (
         <li className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-sm font-medium">{t(`checks.${id}.title` as Key)}</span>
+                <span className={cn(settingType.body, "font-medium")}>{t(`checks.${id}.title` as Key)}</span>
                 {check ? (
-                    <span className="break-words text-xs text-muted-foreground">
+                    <span className={cn(settingType.hint, "break-words")}>
                         {sentence(t, check)}
                     </span>
                 ) : (
@@ -158,7 +168,7 @@ function ChecksCard({ ids }: { ids: CheckId[] }) {
                 <div className="flex min-w-0 flex-col gap-0.5">
                     <CardTitle>{t("checks.heading")}</CardTitle>
                     {done ? (
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("checks.summary", { fail: count("fail"), warn: count("warn") })}
                         </span>
                     ) : (
@@ -173,7 +183,7 @@ function ChecksCard({ ids }: { ids: CheckId[] }) {
             <CardBody className="p-0">
                 {note ? (
                     <p
-                        className={`px-4 pt-3 text-sm ${note.ok ? "text-success" : "text-danger"}`}
+                        className={cn(settingType.body, "px-4 pt-3", note.ok ? "text-success" : "text-danger")}
                         role="status"
                     >
                         {t(note.ok ? "fix.done" : "fix.failed")}
@@ -235,7 +245,7 @@ function SpeedCard({ initial }: { initial: SpeedResult | null }) {
             <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <CardTitle>{t("speed.heading")}</CardTitle>
-                    <span className="text-xs text-muted-foreground">{t("speed.description")}</span>
+                    <span className={settingType.hint}>{t("speed.description")}</span>
                 </div>
                 <Button size="sm" variant="outline" onClick={run} disabled={running}>
                     <Gauge />
@@ -247,23 +257,23 @@ function SpeedCard({ initial }: { initial: SpeedResult | null }) {
                     {stats.map((stat) => (
                         <div key={stat.label} className="flex min-w-0 flex-col gap-0.5">
                             <dt
-                                className="truncate text-xs text-muted-foreground"
+                                className={cn(settingType.hint, "truncate")}
                                 title={stat.label}
                             >
                                 {stat.label}
                             </dt>
-                            <dd className="truncate text-sm font-medium tabular-nums">
+                            <dd className={cn(settingType.body, "truncate font-medium tabular-nums")}>
                                 {running ? <Skeleton className="h-4 w-16" /> : stat.value}
                             </dd>
                         </div>
                     ))}
                 </dl>
                 {error ? (
-                    <p className="text-sm text-danger" role="status">
+                    <p className={settingType.error} role="status">
                         {error}
                     </p>
                 ) : null}
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {result ? (
                         <>
                             {t("speed.lastRun")} <RelativeTime iso={result.at} />
@@ -337,7 +347,7 @@ function BundleCard() {
             <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <CardTitle>{t("bundle.heading")}</CardTitle>
-                    <span className="text-xs text-muted-foreground">{t("bundle.description")}</span>
+                    <span className={settingType.hint}>{t("bundle.description")}</span>
                 </div>
                 <Button size="sm" onClick={download} disabled={downloading}>
                     <Download />
@@ -346,7 +356,7 @@ function BundleCard() {
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 {downloadError ? (
-                    <p className="text-sm text-danger" role="status">
+                    <p className={settingType.error} role="status">
                         {downloadError}
                     </p>
                 ) : null}
@@ -355,13 +365,13 @@ function BundleCard() {
                 </h3>
                 <ul className="flex flex-col gap-1">
                     {BUNDLE_FILES.map((file) => (
-                        <li key={file.name} className="flex min-w-0 flex-wrap gap-x-2 text-sm">
+                        <li key={file.name} className={cn(settingType.body, "flex min-w-0 flex-wrap gap-x-2")}>
                             <code className="text-xs">{file.name}</code>
                             <span className="min-w-0 text-muted-foreground">{t(file.key)}</span>
                         </li>
                     ))}
                 </ul>
-                {failed ? <p className="text-sm text-danger">{t("bundle.loadFailed")}</p> : null}
+                {failed ? <p className={settingType.error}>{t("bundle.loadFailed")}</p> : null}
                 {!preview && !failed ? (
                     <Skeleton className="h-16 w-full" aria-label={t("bundle.loading")} />
                 ) : null}
@@ -372,7 +382,7 @@ function BundleCard() {
                         </h3>
                         <ul className="flex flex-col gap-0.5">
                             {Object.entries(preview.config.values).map(([key, value]) => (
-                                <li key={key} className="flex min-w-0 gap-2 text-xs">
+                                <li key={key} className={cn(settingType.small, "flex min-w-0 gap-2")}>
                                     <code className="shrink-0">{key}</code>
                                     <span
                                         className="min-w-0 truncate text-muted-foreground"
@@ -388,7 +398,7 @@ function BundleCard() {
                                 <h3 className="text-xs font-medium text-muted-foreground">
                                     {t("bundle.withheld")}
                                 </h3>
-                                <p className="break-words text-xs">
+                                <p className={cn(settingType.small, "break-words")}>
                                     <code>{preview.config.withheld.join(", ")}</code>
                                 </p>
                             </>

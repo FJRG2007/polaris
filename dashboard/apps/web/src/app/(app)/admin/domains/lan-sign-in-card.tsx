@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { runAction } from "@/lib/run-action";
-import { settingType, Skeleton, Switch, useOptimisticToggle } from "@polaris/ui";
+import { cn, settingType, Skeleton, Switch, useOptimisticToggle } from "@polaris/ui";
 import { setLanSignInAction } from "./actions";
 import type { LanSignInView } from "@/lib/lan-sign-in";
 import { PageSection } from "@/components/page-section";
@@ -60,14 +60,14 @@ export function LanSignInCard({
             {!view ? (
                 <Skeleton className="h-4 w-64" />
             ) : (
-                <div className="flex flex-col gap-2 text-sm">
+                <div className={cn(settingType.body, "flex flex-col gap-2")}>
                     {view.addresses.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("domains.lanSignIn.noAddress")}
                         </p>
                     ) : (
                         <>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {enabled
                                     ? t("domains.lanSignIn.onHint")
                                     : t("domains.lanSignIn.offHint")}
@@ -90,7 +90,7 @@ export function LanSignInCard({
                                 its root installed they open with no warning at all. */}
                             <a
                                 href="/api/system/local-ca"
-                                className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                                className={cn(settingType.small, "inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-medium text-foreground transition-colors hover:bg-muted")}
                             >
                                 <Download className="size-3.5 shrink-0" aria-hidden />
                                 {t("domains.certificate.download")}

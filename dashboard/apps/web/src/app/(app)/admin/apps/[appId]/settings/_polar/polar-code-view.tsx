@@ -78,7 +78,7 @@ export function PolarCodeView({ initial }: { initial: PolarCodeAdmin }) {
             <section className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-base font-semibold">{t("admin.code.pool.title")}</h2>
-                    <p className="text-sm text-muted-foreground">{t("admin.code.pool.hint")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("admin.code.pool.hint")}</p>
                 </div>
                 <Card>
                     <CardBody className="flex flex-col gap-4 p-4">
@@ -145,7 +145,7 @@ export function PolarCodeView({ initial }: { initial: PolarCodeAdmin }) {
                                 });
                             }}
                         />
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {nowhere ? t("admin.code.pool.nowhere") : t("admin.code.pool.total", { count: total })}
                         </p>
                     </CardBody>
@@ -155,14 +155,14 @@ export function PolarCodeView({ initial }: { initial: PolarCodeAdmin }) {
             <section className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-base font-semibold">{t("admin.code.warm.title")}</h2>
-                    <p className="text-sm text-muted-foreground">{t("admin.code.warm.hint")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("admin.code.warm.hint")}</p>
                 </div>
                 <Card>
                     <CardBody className="flex flex-col gap-5 p-4">
                         <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0">
-                                <p className="text-sm font-medium">{t("admin.code.warm.enabled")}</p>
-                                <p className="text-xs text-muted-foreground">{t("admin.code.warm.cost")}</p>
+                                <p className={cn(settingType.body, "font-medium")}>{t("admin.code.warm.enabled")}</p>
+                                <p className={settingType.hint}>{t("admin.code.warm.cost")}</p>
                             </div>
                             <Switch
                                 checked={draft.warm.enabled}
@@ -255,7 +255,7 @@ function ReachLine({
         <div className="flex min-w-0 items-center gap-1">
             <p
                 role={bad ? "alert" : undefined}
-                className={cn("min-w-0 truncate text-xs", bad ? "text-warning" : "text-muted-foreground")}
+                className={cn(settingType.small, "min-w-0 truncate", bad ? "text-warning" : "text-muted-foreground")}
                 title={said}
             >
                 {said}
@@ -306,15 +306,15 @@ function MachineRow({
     return (
         <div className="flex min-w-0 flex-wrap items-center gap-3">
             <div className={cn("min-w-0 flex-1", off && "opacity-50")}>
-                <p className="truncate text-sm font-medium" title={name}>
+                <p className={cn(settingType.body, "truncate font-medium")} title={name}>
                     {name}
                 </p>
-                <p className={cn("truncate text-xs", warn ? "text-warning" : "text-muted-foreground")} title={detail}>
+                <p className={cn(settingType.small, "truncate", warn ? "text-warning" : "text-muted-foreground")} title={detail}>
                     {detail}
                 </p>
                 {reach}
             </div>
-            <span className="min-w-0 max-w-full shrink-0 truncate text-xs tabular-nums text-muted-foreground" title={t("admin.code.pool.live", { live, sessions })}>
+            <span className={cn(settingType.hint, "min-w-0 max-w-full shrink-0 truncate tabular-nums")} title={t("admin.code.pool.live", { live, sessions })}>
                 {t("admin.code.pool.live", { live, sessions })}
             </span>
             <SessionsInput value={sessions} disabled={off} label={name} onChange={onSessions} />
@@ -396,7 +396,7 @@ function NumberField({
     const valid = Number.isInteger(typed) && typed >= min && typed <= max;
     return (
         <label className={cn("flex flex-col gap-1.5", disabled && "opacity-50")}>
-            <span className="text-sm font-medium">{label}</span>
+            <span className={cn(settingType.body, "font-medium")}>{label}</span>
             <div className="flex items-center gap-2">
                 <Input
                     type="number"
@@ -413,9 +413,9 @@ function NumberField({
                         if (Number.isInteger(next) && next >= min && next <= max) onChange(next);
                     }}
                 />
-                <span className="text-sm text-muted-foreground">{suffix}</span>
+                <span className={cn(settingType.body, "text-muted-foreground")}>{suffix}</span>
             </div>
-            <span className="text-xs text-muted-foreground">{hint}</span>
+            <span className={settingType.hint}>{hint}</span>
         </label>
     );
 }

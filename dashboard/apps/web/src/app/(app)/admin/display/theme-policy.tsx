@@ -17,7 +17,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { setThemePolicyAction } from "./actions";
-import { Card, CardBody, Switch } from "@polaris/ui";
+import { Card, CardBody, cn, settingType, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function ThemePolicyCard({
@@ -37,10 +37,10 @@ export function ThemePolicyCard({
         <Card className="mt-4">
             <CardBody className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <p className="text-sm font-medium">{t("display.themePolicy.title")}</p>
-                    <p className="text-xs text-muted-foreground">{t("display.themePolicy.hint")}</p>
+                    <p className={cn(settingType.body, "font-medium")}>{t("display.themePolicy.title")}</p>
+                    <p className={settingType.hint}>{t("display.themePolicy.hint")}</p>
                     {error && (
-                        <p role="alert" className="mt-1 text-xs text-danger">
+                        <p role="alert" className={cn(settingType.error, "mt-1")}>
                             {error}
                         </p>
                     )}

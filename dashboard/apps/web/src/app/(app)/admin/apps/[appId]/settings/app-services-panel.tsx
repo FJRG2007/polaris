@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { LogViewer } from "@/components/log-viewer";
-import { Button, Card, CardBody, Skeleton, pollWhileVisible } from "@polaris/ui";
+import { Button, Card, CardBody, Skeleton, cn, pollWhileVisible, settingType } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { AppService } from "@/lib/apps/app-services";
 import { readAppServiceLogAction, restartAppServiceAction } from "./service-actions";
@@ -61,7 +61,7 @@ function ServicesHeading() {
             <h2 id="app-services-title" className="text-base font-semibold">
                 {t("services.title")}
             </h2>
-            <p className="text-sm text-muted-foreground">{t("services.description")}</p>
+            <p className={cn(settingType.body, "text-muted-foreground")}>{t("services.description")}</p>
         </div>
     );
 }
@@ -92,7 +92,7 @@ export function AppServicesPanel({ appId, services }: { appId: string; services:
         <section className="flex min-w-0 flex-col gap-2" aria-labelledby="app-services-title">
             <ServicesHeading />
             {services.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("services.empty")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("services.empty")}</p>
             ) : (
                 <div className="flex min-w-0 flex-col gap-2">
                     {services.map((service) => (
@@ -136,12 +136,12 @@ function ServiceRow({ appId, service }: { appId: string; service: AppService }) 
             <CardBody className="flex min-w-0 flex-col gap-3">
                 <div className="flex min-w-0 flex-wrap items-center gap-3">
                     <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium" title={title}>
+                        <p className={cn(settingType.body, "truncate font-medium")} title={title}>
                             {title}
                         </p>
                         {service.installName && service.installName !== service.name ? (
                             <p
-                                className="truncate text-xs text-muted-foreground"
+                                className={cn(settingType.hint, "truncate")}
                                 title={service.name}
                             >
                                 {service.name}
@@ -153,7 +153,7 @@ function ServiceRow({ appId, service }: { appId: string; service: AppService }) 
                         label={t(`services.state.${state}`)}
                         capitalize={false}
                     />
-                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    <span className={cn(settingType.hint, "shrink-0 tabular-nums")}>
                         {t("services.usage", {
                             cpu: service.cpuPercent === null ? "-" : `${service.cpuPercent}%`,
                             memory:
@@ -186,7 +186,7 @@ function ServiceRow({ appId, service }: { appId: string; service: AppService }) 
                     </div>
                 </div>
                 {error ? (
-                    <p role="alert" className="text-sm text-danger-ink">
+                    <p role="alert" className={cn(settingType.body, "text-danger-ink")}>
                         {error}
                     </p>
                 ) : null}
@@ -199,7 +199,7 @@ function ServiceRow({ appId, service }: { appId: string; service: AppService }) 
                             </Button>
                         </div>
                         {logError ? (
-                            <p role="alert" className="text-sm text-danger-ink">
+                            <p role="alert" className={cn(settingType.body, "text-danger-ink")}>
                                 {logError}
                             </p>
                         ) : null}

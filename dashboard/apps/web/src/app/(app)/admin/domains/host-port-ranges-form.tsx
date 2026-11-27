@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Button, Input, settingType } from "@polaris/ui";
+import { Button, cn, Input, settingType } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DeployTargetPicker } from "@/components/deploy-target-picker";
@@ -87,7 +87,7 @@ export function HostPortRangesForm() {
             }}
         >
             <div className="flex flex-wrap items-end gap-2">
-                <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-muted-foreground">
+                <label className={cn(settingType.hint, "flex min-w-48 flex-1 flex-col gap-1")}>
                     {t("domainsPorts.hosts.host")}
                     <DeployTargetPicker
                         scope="mine"
@@ -98,7 +98,7 @@ export function HostPortRangesForm() {
                         onValueChange={(id) => setTargetId(id)}
                     />
                 </label>
-                <label className="flex min-w-40 flex-1 flex-col gap-1 text-xs text-muted-foreground">
+                <label className={cn(settingType.hint, "flex min-w-40 flex-1 flex-col gap-1")}>
                     {t("domainsPorts.policy.tcp")}
                     <Input
                         value={tcp}
@@ -110,7 +110,7 @@ export function HostPortRangesForm() {
                         onChange={(event) => setTcp(event.target.value)}
                     />
                 </label>
-                <label className="flex min-w-40 flex-1 flex-col gap-1 text-xs text-muted-foreground">
+                <label className={cn(settingType.hint, "flex min-w-40 flex-1 flex-col gap-1")}>
                     {t("domainsPorts.policy.udp")}
                     <Input
                         value={udp}
@@ -131,7 +131,7 @@ export function HostPortRangesForm() {
                     </Button>
                 ) : null}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className={settingType.hint}>
                 {showTcp && showUdp
                     ? t(saved ? "domainsPorts.hosts.own" : "domainsPorts.hosts.shared", { max: PORT_RANGES_MAX })
                     : t("domainsPorts.hosts.invalidHint", { max: PORT_RANGES_MAX })}

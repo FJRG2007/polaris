@@ -25,6 +25,7 @@ import {
     DialogTitle,
     EmptyState,
     Input,
+    settingType,
     Skeleton,
     Textarea,
     useToast
@@ -83,7 +84,7 @@ export function BadgesAdmin() {
     return (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="min-w-0 flex-1 text-sm text-muted-foreground">{t("admin.intro")}</p>
+                <p className={cn(settingType.body, "min-w-0 flex-1 text-muted-foreground")}>{t("admin.intro")}</p>
                 <Button size="sm" onClick={() => setEditing("new")}>
                     <Plus className="size-4" />
                     {t("admin.create")}
@@ -113,12 +114,12 @@ export function BadgesAdmin() {
                                 />
                                 <span className="min-w-0 flex-1">
                                     <span
-                                        className="block truncate text-[0.8125rem]"
+                                        className={cn(settingType.body, "block truncate")}
                                         title={badge.name}
                                     >
                                         {badge.name}
                                     </span>
-                                    <span className="block truncate text-[0.6875rem] text-foreground-subtle">
+                                    <span className={cn(settingType.hint, "block truncate")}>
                                         {t("admin.holders", { count: badge.holders })}
                                     </span>
                                 </span>
@@ -246,7 +247,7 @@ function BadgeEditor({
                         if (ready) void save();
                     }}
                 >
-                    <label className="flex flex-col gap-1 text-[0.8125rem]">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span>{t("admin.name")} *</span>
                         <Input
                             value={draft.name}
@@ -254,7 +255,7 @@ function BadgeEditor({
                             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                         />
                     </label>
-                    <label className="flex flex-col gap-1 text-[0.8125rem]">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span>{t("admin.description")}</span>
                         <Textarea
                             value={draft.description}
@@ -265,7 +266,7 @@ function BadgeEditor({
                             }
                         />
                     </label>
-                    <fieldset className="flex flex-col gap-1 text-[0.8125rem]">
+                    <fieldset className={cn(settingType.body, "flex flex-col gap-1")}>
                         <legend className="mb-1">{t("admin.icon")}</legend>
                         <div role="radiogroup" className="flex flex-wrap gap-2">
                             {core.BADGE_ICONS.map((icon) => (
@@ -427,7 +428,7 @@ function HoldersDialog({
                 />
                 {holders === null && <Skeleton className="h-10 w-full" />}
                 {holders?.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {query.trim() ? t("admin.noMatch") : t("admin.noHolders")}
                     </p>
                 )}
@@ -438,14 +439,14 @@ function HoldersDialog({
                                 {holder.username ? (
                                     <Link
                                         href={`/u/${holder.username}`}
-                                        className="min-w-0 flex-1 truncate text-[0.8125rem] hover:underline"
+                                        className={cn(settingType.body, "min-w-0 flex-1 truncate hover:underline")}
                                         title={holder.name}
                                     >
                                         {holder.name}
                                     </Link>
                                 ) : (
                                     <span
-                                        className="min-w-0 flex-1 truncate text-[0.8125rem]"
+                                        className={cn(settingType.body, "min-w-0 flex-1 truncate")}
                                         title={holder.name}
                                     >
                                         {holder.name}

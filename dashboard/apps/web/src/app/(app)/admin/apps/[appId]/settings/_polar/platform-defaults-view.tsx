@@ -7,6 +7,7 @@
  * falls to the built-in defaults in @polaris/core, which is what the card names.
  */
 
+import { settingType } from "@polaris/ui";
 import { useState } from "react";
 import { DEFAULT_AGENT_POLICY, DEFAULT_REVIEW } from "@polaris/core";
 import { AgentDefaultsCard } from "@/components/agent-defaults-card";
@@ -29,7 +30,7 @@ export function PlatformDefaultsView({
 
     return (
         <div className="space-y-4">
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
             <AgentDefaultsCard
                 tier={tier}
                 title={t("agents.defaults.title")}

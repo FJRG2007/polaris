@@ -43,6 +43,7 @@ import { domainSuggestions, type DomainSuggestions } from "@/lib/domain-suggesti
 import {
     Badge,
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -202,7 +203,7 @@ export function DomainsView() {
                     type="button"
                     aria-expanded={advanced}
                     onClick={() => setAdvanced((value) => !value)}
-                    className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    className={cn(settingType.small, "inline-flex w-fit items-center gap-1 text-muted-foreground hover:text-foreground")}
                 >
                     {advanced ? (
                         <ChevronDown className="size-3.5" />
@@ -391,7 +392,7 @@ export function AppDomains({
 
     return (
         <PageSection title={t("domains.own.title")}>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                 {t("domains.own.appDomain")}
                 <Input
                     value={appDomain.value}
@@ -403,7 +404,7 @@ export function AppDomains({
                 {!appCheck.ok ? (
                     <span className={settingType.error}>{t("domains.own.invalidAddress")}</span>
                 ) : null}
-                <span className="text-xs text-muted-foreground">
+                <span className={settingType.hint}>
                     {t("domains.own.appDomainHint", { url: effectiveAppUrl })}
                 </span>
                 <Suggestion
@@ -413,7 +414,7 @@ export function AppDomains({
                 />
             </label>
 
-            <label className="flex flex-col gap-1 text-sm">
+            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                 <span className="flex items-center gap-1.5">
                     <Link2 className="size-3.5 text-muted-foreground" />
                     {t("domains.own.sharingDomain")}
@@ -428,7 +429,7 @@ export function AppDomains({
                 {!sharingCheck.ok ? (
                     <span className={settingType.error}>{t("domains.own.invalidAddress")}</span>
                 ) : null}
-                <span className="text-xs text-muted-foreground">
+                <span className={settingType.hint}>
                     {t("domains.own.sharingDomainHint")}
                 </span>
                 <Suggestion
@@ -442,7 +443,7 @@ export function AppDomains({
 
             <div className="flex items-center justify-end gap-3">
                 {saved && !changed ? (
-                    <span className="text-sm text-success">{t("domains.saved")}</span>
+                    <span className={cn(settingType.body, "text-success")}>{t("domains.saved")}</span>
                 ) : null}
                 <Button
                     onClick={save}
@@ -554,7 +555,7 @@ function DashboardDomains({
                             void add();
                         }}
                     >
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("domains.answers.domain")}
                             <Input
                                 autoFocus
@@ -571,7 +572,7 @@ function DashboardDomains({
                             <span className={settingType.error}>{t("domains.answers.notADomain")}</span>
                         ) : null}
                         {known ? (
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("domains.answers.known")}
                             </span>
                         ) : null}
@@ -623,7 +624,7 @@ function Suggestion({
         <button
             type="button"
             onClick={() => onUse(suggestion)}
-            className="w-fit text-xs text-primary underline-offset-2 hover:underline"
+            className={cn(settingType.small, "w-fit text-primary underline-offset-2 hover:underline")}
         >
             {t("domains.own.use", { suggestion })}
         </button>
@@ -637,7 +638,7 @@ function Suggestion({
  */
 function ErrorNote({ message }: { message: string }) {
     return (
-        <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
+        <p className={cn(settingType.small, "flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-danger-ink")}>
             <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {message}
         </p>
     );
@@ -649,12 +650,12 @@ export function LocalCertificate() {
     const t = useTranslations("admin");
     return (
         <PageSection title={t("domains.certificate.title")}>
-            <p className="text-xs text-muted-foreground">
+            <p className={settingType.hint}>
                 {t.rich("domains.certificate.body", { code })}
             </p>
             <a
                 href="/api/system/local-ca"
-                className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                className={cn(settingType.small, "inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-medium text-foreground transition-colors hover:bg-muted")}
             >
                 <Download className="size-3.5" /> {t("domains.certificate.download")}
             </a>
@@ -758,13 +759,13 @@ export function DuckDns({
                 </Button>
             }
         >
-            <p className="text-xs text-muted-foreground">
+            <p className={settingType.hint}>
                 {t.rich("domains.duckdns.description", {
                     base: <code key="base">{DUCKDNS_BASE}</code>,
                     wildcard: <code key="wildcard">*.{DUCKDNS_BASE}</code>
                 })}
             </p>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                 {t("domains.duckdns.subdomain")}
                 <Input
                     value={duckSub.value}
@@ -778,11 +779,11 @@ export function DuckDns({
                         {t("domainsSetup.errors.subdomainOnly")}
                     </span>
                 ) : null}
-                <span className="text-xs text-muted-foreground">
+                <span className={settingType.hint}>
                     {t.rich("domains.duckdns.subdomainHint", { code })}
                 </span>
             </label>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                 {t("domains.duckdns.token")}
                 <Input
                     type="password"
@@ -800,14 +801,14 @@ export function DuckDns({
                 <button
                     type="button"
                     onClick={clearToken}
-                    className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
+                    className={cn(settingType.small, "self-start text-muted-foreground underline-offset-2 hover:underline")}
                 >
                     {t("domains.duckdns.removeToken")}
                 </button>
             ) : null}
             {syncResult ? (
                 <p
-                    className={`flex items-center gap-1.5 text-sm ${syncResult.ok ? "text-success" : "text-danger"}`}
+                    className={cn(settingType.body, "flex items-center gap-1.5", syncResult.ok ? "text-success" : "text-danger")}
                 >
                     {syncResult.ok ? (
                         <CheckCircle2 className="size-4" />
@@ -821,7 +822,7 @@ export function DuckDns({
 
             <div className="flex items-center justify-end gap-3">
                 {saved && !changed ? (
-                    <span className="text-sm text-success">{t("domains.saved")}</span>
+                    <span className={cn(settingType.body, "text-success")}>{t("domains.saved")}</span>
                 ) : null}
                 <Button onClick={save} disabled={saving || !changed || !subCheck.ok}>
                     {saving ? tc("actions.saving") : tc("actions.save")}
@@ -989,7 +990,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 </Button>
             }
         >
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-md border border-border/60 p-3 text-xs">
+            <div className={cn(settingType.small, "grid grid-cols-2 gap-x-6 gap-y-2 rounded-md border border-border/60 p-3")}>
                 <StatusRow
                     label={t("domains.network.status.hosting")}
                     value={
@@ -1035,7 +1036,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
             </div>
 
             {status.natted && status.mode === "auto" && (
-                <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+                <p className={cn(settingType.small, "flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}>
                     <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                     {t("domains.network.natWarning", { ip: status.subdomainIp ?? "" })}
                 </p>
@@ -1044,7 +1045,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
             {status.placement === "home" &&
                 !status.duckdns &&
                 status.effectiveMode !== "wildcard" && (
-                    <p className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                    <p className={cn(settingType.small, "flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-muted-foreground")}>
                         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-primary" />
                         <span>
                             {t.rich("domains.network.homeAdvice", {
@@ -1056,7 +1057,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                     </p>
                 )}
 
-            <label className="flex flex-col gap-1 text-sm">
+            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                 {t("domains.network.exposureMode")}
                 <Select
                     value={mode}
@@ -1066,7 +1067,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
             </label>
 
             {mode === "wildcard" && (
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     {t("domains.network.wildcardBase")}
                     <Input
                         value={wildcard}
@@ -1082,12 +1083,12 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                         </span>
                     ) : null}
                     {status.wildcardManaged && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("domains.network.wildcardManaged")}
                         </span>
                     )}
                     {status.wildcardManaged && !status.wildcardReady && (
-                        <span className="text-xs text-warning">
+                        <span className={cn(settingType.small, "text-warning")}>
                             {t("domains.network.wildcardNotReady")}
                         </span>
                     )}
@@ -1100,7 +1101,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
 
             <div className="flex items-center justify-end gap-3">
                 {saved && !changed ? (
-                    <span className="text-sm text-success">{t("domains.saved")}</span>
+                    <span className={cn(settingType.body, "text-success")}>{t("domains.saved")}</span>
                 ) : null}
                 <Button onClick={save} disabled={busy || !changed || wildcardBad}>
                     {busy ? tc("actions.saving") : t("domains.network.saveExposure")}
@@ -1221,9 +1222,11 @@ function bold(chunks: ReactNode[]) {
 function GuidanceNote({ children, ok }: { children: ReactNode; ok?: boolean }) {
     return (
         <div
-            className={`rounded-md border px-3 py-2 text-xs text-muted-foreground ${
+            className={cn(
+                settingType.small,
+                "rounded-md border px-3 py-2 text-muted-foreground",
                 ok ? "border-success-edge bg-success-soft" : "border-border/60 bg-surface/40"
-            }`}
+            )}
         >
             {children}
         </div>

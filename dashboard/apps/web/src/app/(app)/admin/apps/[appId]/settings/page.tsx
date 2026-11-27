@@ -16,7 +16,7 @@ import { appSettingsPath, builtInHasSettings } from "@/lib/apps/app-settings";
 import { ChatSettingsPage } from "./_chat/chat-screen";
 import { PolarAdminSettings, PolarAgentSettings, PolarChatSettings } from "./_polar/polar-settings";
 import { Suspense } from "react";
-import { PageHeader, Skeleton } from "@polaris/ui";
+import { cn, PageHeader, settingType, Skeleton } from "@polaris/ui";
 import { VpnAdminSettings } from "@/app/(app)/vpn/vpn-admin-settings";
 import { requireAdmin } from "@/lib/session";
 import { AppSettingsLoader } from "./loader";
@@ -50,7 +50,7 @@ export default async function PolarisAppSettingsPage({
             <div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-4">
                 <Link data-swipe-back
                     href={`/admin/apps/${app.id}`}
-                    className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
+                    className={cn(settingType.body, "text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1")}
                 >
                     <ArrowLeft className="size-4" />
                     {app.name}
@@ -103,7 +103,7 @@ async function PolarSettings() {
             <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4">
                 <Link data-swipe-back
                     href="/admin/apps"
-                    className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
+                    className={cn(settingType.body, "text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1")}
                 >
                     <ArrowLeft className="size-4" />
                     {t("polaris.title")}
@@ -115,7 +115,7 @@ async function PolarSettings() {
                 {/* Who may use Polar is a permission, and the deployment's
                     provider keys are a screen of their own: each said once,
                     where it is edited. */}
-                <div className="text-muted-foreground space-y-1 text-xs">
+                <div className={cn(settingType.hint, "space-y-1")}>
                     <p>
                         {polar.rich("admin.links.access", {
                             link: (chunks) => (

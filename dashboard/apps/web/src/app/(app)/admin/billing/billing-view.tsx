@@ -16,7 +16,7 @@ import { RatesCard } from "./rates-card";
 import { paintRead } from "../paint-read";
 import { CardSkeleton } from "../region-skeletons";
 import { AfterPaint } from "@/components/after-paint";
-import { Button, PageHeader, Skeleton } from "@polaris/ui";
+import { Button, cn, PageHeader, settingType, Skeleton } from "@polaris/ui";
 import * as parts from "@/components/billing/statement-parts";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -67,9 +67,9 @@ export function BillingView({ revision }: { revision: number }) {
                         months={months}
                         exportEndpoint="/api/admin/billing/export"
                     />
-                    {error ? <p className="text-danger text-sm">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     {stale ? (
-                        <p className="text-warning-ink text-sm">
+                        <p className={cn(settingType.body, "text-warning-ink")}>
                             {t("billing.stale", { reason: stale })}
                         </p>
                     ) : null}
@@ -101,8 +101,8 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
         <div className="flex flex-col gap-2">
             <h2 className="text-sm font-medium">{t("billing.owners.title")}</h2>
             <div className="overflow-x-auto rounded-lg border border-border">
-                <table className="w-full min-w-[32rem] text-sm">
-                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                <table className={cn(settingType.body, "w-full min-w-[32rem]")}>
+                    <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">
                                 {t("billing.owners.owner")}
@@ -192,7 +192,7 @@ function OwnerName({ owner }: { owner: core.BillingOwner }) {
             <span className="truncate" title={owner.name}>
                 {owner.name}
             </span>
-            <span className="text-muted-foreground shrink-0 text-xs">
+            <span className={cn(settingType.hint, "shrink-0")}>
                 {owner.kind === "org"
                     ? t("billing.owners.organization")
                     : t("billing.owners.personal")}

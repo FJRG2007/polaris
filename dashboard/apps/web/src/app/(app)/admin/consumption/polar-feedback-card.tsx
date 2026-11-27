@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
-import { Card, CardBody, Skeleton } from "@polaris/ui";
+import { Card, CardBody, cn, settingType, Skeleton } from "@polaris/ui";
 import { useLiveResource } from "@/components/use-live-resource";
 import type { PolarFeedbackSummary } from "@/lib/polar/answer-feedback";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -31,15 +31,15 @@ export function PolarFeedbackCard() {
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <div className="flex min-w-0 flex-col">
-                        <span className="text-sm font-medium">
+                        <span className={cn(settingType.body, "font-medium")}>
                             {t("consumption.polarFeedback.title")}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("consumption.polarFeedback.description")}
                         </span>
                     </div>
                     {data ? (
-                        <span className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
+                        <span className={cn(settingType.hint, "flex items-center gap-3 tabular-nums")}>
                             <span
                                 className="flex items-center gap-1"
                                 title={t("consumption.polarFeedback.good")}
@@ -64,20 +64,20 @@ export function PolarFeedbackCard() {
                     ) : null}
                 </div>
                 {error ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t("consumption.polarFeedback.failed")}
                     </p>
                 ) : loading && !data ? (
                     <Skeleton className="h-16 w-full" />
                 ) : !data || data.recent.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t("consumption.polarFeedback.empty")}
                     </p>
                 ) : (
-                    <ul className="flex flex-col divide-y divide-border text-sm">
+                    <ul className={cn(settingType.body, "flex flex-col divide-y divide-border")}>
                         {data.recent.map((row) => (
                             <li key={row.id} className="flex min-w-0 flex-col gap-1 py-2">
-                                <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground">
+                                <div className={cn(settingType.hint, "flex min-w-0 flex-wrap items-baseline gap-x-2")}>
                                     <Link
                                         href={`/admin/users/${row.userId}`}
                                         className="min-w-0 max-w-full truncate font-medium text-foreground hover:underline"
@@ -102,7 +102,7 @@ export function PolarFeedbackCard() {
                                         {row.reasons.map((reason) => (
                                             <span
                                                 key={reason}
-                                                className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                                                className={cn(settingType.small, "rounded-full bg-muted px-2 py-0.5 text-muted-foreground")}
                                             >
                                                 {words(`feedback.reasons.${reason}`)}
                                             </span>
@@ -110,7 +110,7 @@ export function PolarFeedbackCard() {
                                     </div>
                                 ) : null}
                                 {row.note ? (
-                                    <p className="whitespace-pre-wrap break-words text-sm">
+                                    <p className={cn(settingType.body, "whitespace-pre-wrap break-words")}>
                                         {row.note}
                                     </p>
                                 ) : null}

@@ -32,7 +32,7 @@ import { PortsReadFailed } from "./ports-read-failed";
 import { PageSection } from "@/components/page-section";
 import { useEffect, useState, type ReactNode } from "react";
 import { HostPortRangesForm } from "./host-port-ranges-form";
-import { Button, Input, Select, Skeleton } from "@polaris/ui";
+import { Button, cn, Input, Select, settingType, Skeleton } from "@polaris/ui";
 import type { GamePortsReading } from "@/lib/apps/port-advice";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useLiveResource } from "@/components/use-live-resource";
@@ -201,7 +201,7 @@ export function GamePortsCard({ onKnown }: { onKnown?: (shown: boolean) => void 
 
             {reading ? (
                 reading.servers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("domainsPorts.list.noMatch")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("domainsPorts.list.noMatch")}</p>
                 ) : (
                     <GamePortsLive
                         reading={reading}
@@ -230,7 +230,7 @@ export function GamePortsCard({ onKnown }: { onKnown?: (shown: boolean) => void 
                         <ChevronLeft className="size-4 shrink-0" />
                         {t("domainsPorts.list.previous")}
                     </Button>
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("domainsPorts.list.page", { page: cursors.length })}
                     </span>
                     <Button

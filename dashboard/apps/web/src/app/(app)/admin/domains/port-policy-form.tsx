@@ -18,7 +18,7 @@
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { savePortPolicyAction } from "./actions";
-import { Button, Input, Select } from "@polaris/ui";
+import { Button, cn, Input, Select, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { describeBlock, parseBlockInput, type PortBlocks, type PortPolicy } from "@/lib/apps/port-block";
 
@@ -75,7 +75,7 @@ export function PortPolicyForm({
                 onSaved();
             }}
         >
-            <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-muted-foreground">
+            <label className={cn(settingType.hint, "flex min-w-48 flex-1 flex-col gap-1")}>
                 {t("domainsPorts.policy.how")}
                 <Select
                     value={mode}
@@ -85,7 +85,7 @@ export function PortPolicyForm({
                     onValueChange={(next) => setMode(next as PortPolicy)}
                 />
             </label>
-            <label className="flex w-36 flex-col gap-1 text-xs text-muted-foreground">
+            <label className={cn(settingType.hint, "flex w-36 flex-col gap-1")}>
                 {t("domainsPorts.policy.tcp")}
                 <Input
                     value={tcp}
@@ -96,7 +96,7 @@ export function PortPolicyForm({
                     onChange={(event) => setTcp(event.target.value)}
                 />
             </label>
-            <label className="flex w-36 flex-col gap-1 text-xs text-muted-foreground">
+            <label className={cn(settingType.hint, "flex w-36 flex-col gap-1")}>
                 {t("domainsPorts.policy.udp")}
                 <Input
                     value={udp}
@@ -110,11 +110,11 @@ export function PortPolicyForm({
             <Button type="submit" size="sm" disabled={busy || !changed || !valid}>
                 {tc("actions.save")}
             </Button>
-            <p className="w-full text-xs text-muted-foreground">
+            <p className={cn(settingType.hint, "w-full")}>
                 {valid ? t(`domainsPorts.policy.hints.${POLICY_KEYS[mode]}`) : t("domainsPorts.policy.invalid")}
             </p>
             {error && (
-                <p role="alert" className="w-full text-xs text-danger">
+                <p role="alert" className={cn(settingType.error, "w-full")}>
                     {error}
                 </p>
             )}

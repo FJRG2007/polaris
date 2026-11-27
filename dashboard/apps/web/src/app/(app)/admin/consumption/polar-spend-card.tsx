@@ -7,7 +7,7 @@
  */
 
 import Link from "next/link";
-import { Card, CardBody, Skeleton } from "@polaris/ui";
+import { Card, CardBody, cn, settingType, Skeleton } from "@polaris/ui";
 import type { SharedKeySpend } from "@/lib/polar/usage";
 import { useLiveResource } from "@/components/use-live-resource";
 import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
@@ -30,13 +30,13 @@ export function PolarSpendCard() {
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <div className="flex min-w-0 flex-col">
-                        <span className="text-sm font-medium">{t("consumption.polar.title")}</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className={cn(settingType.body, "font-medium")}>{t("consumption.polar.title")}</span>
+                        <span className={settingType.hint}>
                             {t("consumption.polar.description")}
                         </span>
                     </div>
                     {data ? (
-                        <span className="text-xs text-muted-foreground tabular-nums">
+                        <span className={cn(settingType.hint, "tabular-nums")}>
                             {t("consumption.polar.totals", {
                                 tokens: formatTokens(data.tokens, locale),
                                 cost: formatUsd(data.costUsd, locale),
@@ -46,14 +46,14 @@ export function PolarSpendCard() {
                     ) : null}
                 </div>
                 {error ? (
-                    <p className="text-sm text-muted-foreground">{t("consumption.polar.failed")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("consumption.polar.failed")}</p>
                 ) : loading && !data ? (
                     <Skeleton className="h-16 w-full" />
                 ) : !data || data.people.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("consumption.polar.empty")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("consumption.polar.empty")}</p>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[28rem] text-sm">
+                        <table className={cn(settingType.body, "w-full min-w-[28rem]")}>
                             <thead>
                                 <tr className="text-start">
                                     <th className="w-full max-w-0 py-1 pe-3">
@@ -98,7 +98,7 @@ export function PolarSpendCard() {
                     </div>
                 )}
                 {data && data.unpriced > 0 ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("consumption.polar.unpriced", { count: data.unpriced })}
                     </p>
                 ) : null}

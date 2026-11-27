@@ -19,7 +19,7 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RouterSteps } from "./router-steps";
-import { Badge, Button, cn } from "@polaris/ui";
+import { Badge, Button, cn, settingType } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
 import { repairCallAddressAction } from "./actions";
 import { useLiveResource } from "@/components/use-live-resource";
@@ -79,7 +79,7 @@ export function CallPortsCard({ onKnown }: { onKnown?: (shown: boolean) => void 
             description={t("domainsPorts.call.description")}
         >
             <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {live.stale ??
                         (reading.running
                             ? t("domainsPorts.call.checking")
@@ -105,7 +105,7 @@ export function CallPortsCard({ onKnown }: { onKnown?: (shown: boolean) => void 
                     >
                         <div className="min-w-0 flex-1">
                             <p
-                                className="truncate text-sm"
+                                className={cn(settingType.body, "truncate")}
                                 title={t(`domainsPorts.callLabel.${entry.protocol}`)}
                             >
                                 {t(`domainsPorts.callLabel.${entry.protocol}`)}
@@ -172,11 +172,11 @@ export function CallPortsCard({ onKnown }: { onKnown?: (shown: boolean) => void 
                 their router over that is an hour spent on a rule that was
                 already right. */}
             {!reading.running ? (
-                <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                <p className={cn(settingType.small, "rounded-md border border-border bg-muted/40 px-3 py-2 text-muted-foreground")}>
                     {t("domainsPorts.call.stoppedNote")}
                 </p>
             ) : reading.confirmed ? null : (
-                <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
+                <div className={cn(settingType.small, "flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2")}>
                     <p className="font-medium text-foreground">
                         {t("domainsPorts.call.onlyLocal")}
                     </p>
@@ -226,7 +226,7 @@ function AddressRow({ reading, onDone }: { reading: CallPortsReading; onDone: ()
     return (
         <div
             className={cn(
-                "flex flex-col gap-2 rounded-md border px-3 py-2 text-xs",
+                settingType.small, "flex flex-col gap-2 rounded-md border px-3 py-2",
                 reading.addressStale
                     ? "border-warning-edge bg-warning-soft"
                     : "border-border bg-muted/40"

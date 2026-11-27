@@ -27,13 +27,15 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    settingType
 } from "@polaris/ui";
 import { addCustomProviderAction, removeCustomProviderAction } from "./actions";
 
@@ -162,7 +164,7 @@ export function CustomProvidersCard({ initial }: { initial: CustomProviderView[]
                 <div className="flex min-w-0 items-start gap-3">
                     <div className="min-w-0 flex-1">
                         <h2 className="text-sm font-medium">{t("admin.providers.custom.title")}</h2>
-                        <p className="text-muted-foreground text-xs">
+                        <p className={settingType.hint}>
                             {t("admin.providers.custom.hint")}
                         </p>
                     </div>
@@ -179,7 +181,7 @@ export function CustomProvidersCard({ initial }: { initial: CustomProviderView[]
                     </Button>
                 </div>
                 {rows.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t("admin.providers.custom.empty")}
                     </p>
                 ) : (
@@ -192,11 +194,11 @@ export function CustomProvidersCard({ initial }: { initial: CustomProviderView[]
                                     className="size-4 shrink-0"
                                 />
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm" title={row.name}>
+                                    <p className={cn(settingType.body, "truncate")} title={row.name}>
                                         {row.name}
                                     </p>
                                     <p
-                                        className="text-muted-foreground truncate text-xs"
+                                        className={cn(settingType.hint, "truncate")}
                                         title={row.baseUrl}
                                     >
                                         {row.baseUrl} - {row.envVar}
@@ -220,7 +222,7 @@ export function CustomProvidersCard({ initial }: { initial: CustomProviderView[]
                         ))}
                     </ul>
                 )}
-                {error ? <p className="text-danger text-xs">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
             {open ? (
                 <AddProviderDialog
@@ -273,7 +275,7 @@ function AddProviderDialog({
     const field = (name: Field, required: boolean, placeholder: string) => {
         const message = shown(name);
         return (
-            <label className="flex min-w-0 flex-col gap-1 text-sm">
+            <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
                 <span>
                     {t(`admin.providers.custom.dialog.${name}`)}
                     {required ? (
@@ -294,7 +296,7 @@ function AddProviderDialog({
                     aria-invalid={message !== null}
                     onChange={(event) => set(name)(event.target.value)}
                 />
-                {message ? <span className="text-danger text-xs">{message}</span> : null}
+                {message ? <span className={settingType.error}>{message}</span> : null}
             </label>
         );
     };
@@ -318,7 +320,7 @@ function AddProviderDialog({
                 >
                     {field("name", true, "Acme AI")}
                     {field("baseUrl", true, "https://api.example.com/v1")}
-                    <label className="flex min-w-0 flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
                         <span>{t("admin.providers.custom.dialog.wire")}</span>
                         <Select
                             value={form.wire}
@@ -340,7 +342,7 @@ function AddProviderDialog({
                     {field("defaultModel", true, "acme-large")}
                     {field("probe", false, "https://api.example.com/v1/models")}
                     {field("docsUrl", false, "https://docs.example.com")}
-                    {refusal ? <p className="text-danger text-sm">{refusal}</p> : null}
+                    {refusal ? <p className={settingType.error}>{refusal}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
                             {t("admin.providers.custom.dialog.cancel")}

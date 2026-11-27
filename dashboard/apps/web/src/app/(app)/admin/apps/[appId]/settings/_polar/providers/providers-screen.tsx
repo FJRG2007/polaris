@@ -14,7 +14,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { prisma } from "@polaris/db";
 import { ArrowLeft } from "lucide-react";
-import { PageHeader } from "@polaris/ui";
+import { cn, PageHeader, settingType } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
 import { INSTANCE_ACTIONS } from "./instance-actions";
@@ -36,7 +36,7 @@ export async function PolarProvidersScreen() {
                 <Link
                     data-swipe-back
                     href={appSettingsPath("polar")}
-                    className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
+                    className={cn(settingType.body, "text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1")}
                 >
                     <ArrowLeft className="size-4" />
                     {marketplace("detail.settings")}

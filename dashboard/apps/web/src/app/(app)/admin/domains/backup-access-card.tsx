@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, Checkbox, settingType, Skeleton } from "@polaris/ui";
+import { Button, Checkbox, cn, settingType, Skeleton } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { holdersCanBeFreed, UNKNOWN_HOLDER } from "@/lib/backup-access/port-holders";
 import {
@@ -163,7 +163,7 @@ export function BackupAccessCard() {
                     <Skeleton className="h-4 w-48" />
                 </div>
             ) : (
-                <div className="flex flex-col gap-4 text-sm">
+                <div className={cn(settingType.body, "flex flex-col gap-4")}>
                     <LineReach view={view} />
                     <StateLine view={view} />
 
@@ -206,7 +206,7 @@ export function BackupAccessCard() {
                     <PathsCompared view={view} />
 
                     {!view.cloudflare ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t.rich("domains.backup.connectCloudflare", {
                                 link: (chunks: React.ReactNode) => (
                                     <Link
@@ -274,7 +274,7 @@ export function BackupAccessCard() {
                                 />
                                 <span className="min-w-0">
                                     {t("domains.backup.dataSaver")}
-                                    <span className="block text-xs text-muted-foreground">
+                                    <span className={cn(settingType.hint, "block")}>
                                         {t("domains.backup.dataSaverHint")}
                                     </span>
                                 </span>
@@ -299,16 +299,16 @@ export function BackupAccessCard() {
                         />
                     ) : null}
                     {view.config.path !== "relay" && view.relay && view.relay.tcp.length > 0 ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("domains.backup.tcpCarried", { ports: view.relay.tcp.join(", ") })}
                         </p>
                     ) : null}
                     {view.config.path !== "relay" && view.relay && view.relay.udp.length > 0 ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("domains.backup.udpCarried", { ports: view.relay.udp.join(", ") })}
                         </p>
                     ) : null}
-                    <p className="text-xs text-muted-foreground">{t("domains.backup.physics")}</p>
+                    <p className={settingType.hint}>{t("domains.backup.physics")}</p>
                     {error ? (
                         <p role="alert" className={settingType.error}>
                             {error}
@@ -324,7 +324,7 @@ export function BackupAccessCard() {
 function Choice({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">{label}</span>
+            <span className={settingType.hint}>{label}</span>
             <div role="group" aria-label={label} className="flex flex-wrap gap-2">
                 {children}
             </div>
@@ -409,7 +409,7 @@ function Latency({ view }: { view: BackupView }) {
     ] as const;
     return (
         <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">{t("domains.backup.latency")}</span>
+            <span className={settingType.hint}>{t("domains.backup.latency")}</span>
             <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1">
                 {rows.map(([key, ms, set]) => (
                     <div key={key} className="contents">
@@ -427,7 +427,7 @@ function Latency({ view }: { view: BackupView }) {
                 ))}
             </dl>
             {view.probe && !view.probe.from && !view.probe.calibrated ? (
-                <p className="text-xs text-muted-foreground">{t("domains.backup.insideOnly")}</p>
+                <p className={settingType.hint}>{t("domains.backup.insideOnly")}</p>
             ) : null}
         </div>
     );
@@ -456,7 +456,7 @@ function Problem({
         : t("domains.backup.portsHeldUnnamed");
     return (
         <div className="flex flex-col items-start gap-2">
-            <p className="break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+            <p className={cn(settingType.small, "break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}>
                 {held && !freeable
                     ? portsHeld
                     : probe.problem
@@ -499,7 +499,7 @@ function LineReach({ view }: { view: BackupView }) {
             {reach?.cgnat ? (
                 <p
                     role="status"
-                    className="break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground"
+                    className={cn(settingType.small, "break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}
                 >
                     {t(
                         reach.certain
@@ -516,14 +516,14 @@ function LineReach({ view }: { view: BackupView }) {
                 </p>
             ) : null}
             <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">
+                <span className={settingType.hint}>
                     {active
                         ? t("domains.backup.works.on", {
                               path: t(`domains.backup.paths.${active}`)
                           })
                         : t("domains.backup.works.none")}
                 </span>
-                <ul className="grid grid-cols-1 gap-x-4 gap-y-0.5 text-xs sm:grid-cols-2">
+                <ul className={cn(settingType.small, "grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2")}>
                     {INBOUND_FEATURES.filter((feature) => feature !== "everyone").map((feature) => {
                         const on = active !== null && carries(active, feature);
                         return (
@@ -541,7 +541,7 @@ function LineReach({ view }: { view: BackupView }) {
                     })}
                 </ul>
                 {view.calls === "local-only" ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("domains.backup.works.callsLocal")}
                     </p>
                 ) : null}
@@ -567,7 +567,7 @@ function Ipv6Line({ view }: { view: BackupView }) {
               ? "blocked"
               : "checking";
     return (
-        <p className="break-words text-xs text-muted-foreground">
+        <p className={cn(settingType.hint, "break-words")}>
             {t(`domains.backup.ipv6.${key}`, { address: published ?? address })}
         </p>
     );
@@ -595,10 +595,10 @@ function PathsCompared({ view }: { view: BackupView }) {
     if (!view.reach?.cgnat && view.config.path) return null;
     return (
         <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">
+            <span className={settingType.hint}>
                 {t("domains.backup.compare.title")}
             </span>
-            <ul className="flex flex-col gap-1.5 text-xs">
+            <ul className={cn(settingType.small, "flex flex-col gap-1.5")}>
                 {COMPARED.map((path) => (
                     <li key={path} className="min-w-0 break-words">
                         <span className="font-medium">{t(`domains.backup.paths.${path}`)}</span>

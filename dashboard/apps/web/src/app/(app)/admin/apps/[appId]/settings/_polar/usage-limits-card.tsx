@@ -13,7 +13,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
-import { Button, Card, CardBody, Input, Select, settingType } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Input, Select, settingType } from "@polaris/ui";
 import { deleteUsageLimitAction, saveUsageLimitAction } from "./agent-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { UsageLimitView } from "@/lib/agents/agent-usage-limits";
@@ -53,8 +53,8 @@ export function UsageLimitsCard({ limits }: { limits: UsageLimitView[] }) {
             <CardBody className="space-y-3">
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-medium">{t("agents.limits.title")}</p>
-                        <p className="text-muted-foreground text-xs">{t("agents.limits.intro")}</p>
+                        <p className={cn(settingType.body, "font-medium")}>{t("agents.limits.title")}</p>
+                        <p className={settingType.hint}>{t("agents.limits.intro")}</p>
                     </div>
                     <Button variant="secondary" size="sm" onClick={() => setAdding(true)} disabled={adding}>
                         <Plus className="size-4 shrink-0" />
@@ -65,13 +65,13 @@ export function UsageLimitsCard({ limits }: { limits: UsageLimitView[] }) {
                 {rows.map((row) => (
                     <div
                         key={row.id}
-                        className="border-border/60 flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm"
+                        className={cn(settingType.body, "border-border/60 flex items-center gap-2 rounded-md border px-2 py-1.5")}
                     >
                         <span className="min-w-0 flex-1 truncate">
                             {t(`agents.limits.subjects.${row.subjectType}.label`)}
                             {row.subjectId ? ` - ${row.subjectId}` : ""}
                         </span>
-                        <span className="text-muted-foreground min-w-0 max-w-full shrink-0 truncate text-xs" title={t("agents.limits.rule", {
+                        <span className={cn(settingType.hint, "min-w-0 max-w-full shrink-0 truncate")} title={t("agents.limits.rule", {
                                 amount: String(row.amount),
                                 metric: row.metric,
                                 period: row.period
@@ -195,7 +195,7 @@ function AddLimit({
             </div>
 
             {NOTED.has(subjectType) ? (
-                <p className="text-muted-foreground text-xs">
+                <p className={settingType.hint}>
                     {t(`agents.limits.subjects.${subjectType as "everyone" | "role" | "group" | "org"}.note`)}
                 </p>
             ) : null}

@@ -15,7 +15,16 @@ import { setPolarOptionsAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PolarConnectorPolicy, PolarPolicy } from "@/lib/polar/access";
 import { CONNECTOR_AUDIENCES, normalizeHostEntry } from "@/lib/polar/connectors/shared";
-import { Card, CardBody, Input, SegmentedControl, settingType, Switch, useOptimisticValue } from "@polaris/ui";
+import {
+    Card,
+    CardBody,
+    cn,
+    Input,
+    SegmentedControl,
+    settingType,
+    Switch,
+    useOptimisticValue
+} from "@polaris/ui";
 
 export function PolarOptionsCard({ options }: { options: PolarPolicy }) {
     const t = useTranslations("admin");
@@ -52,8 +61,8 @@ export function PolarOptionsCard({ options }: { options: PolarPolicy }) {
             <CardBody className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium">{t("agents.polarAccess.web.label")}</p>
-                        <p className="text-muted-foreground text-xs">
+                        <p className={cn(settingType.body, "font-medium")}>{t("agents.polarAccess.web.label")}</p>
+                        <p className={settingType.hint}>
                             {t("agents.polarAccess.web.hint")}
                         </p>
                     </div>
@@ -65,8 +74,8 @@ export function PolarOptionsCard({ options }: { options: PolarPolicy }) {
                 </div>
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium">{t("agents.polarAccess.freeModels.label")}</p>
-                        <p className="text-muted-foreground text-xs">
+                        <p className={cn(settingType.body, "font-medium")}>{t("agents.polarAccess.freeModels.label")}</p>
+                        <p className={settingType.hint}>
                             {t("agents.polarAccess.freeModels.hint")}
                         </p>
                     </div>
@@ -78,10 +87,10 @@ export function PolarOptionsCard({ options }: { options: PolarPolicy }) {
                 </div>
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium">
+                        <p className={cn(settingType.body, "font-medium")}>
                             {t("agents.polarAccess.zenStandInEveryone.label")}
                         </p>
-                        <p className="text-muted-foreground text-xs">
+                        <p className={settingType.hint}>
                             {t(
                                 current.freeModels
                                     ? "agents.polarAccess.zenStandInEveryone.hint"
@@ -100,10 +109,10 @@ export function PolarOptionsCard({ options }: { options: PolarPolicy }) {
                 </div>
                 <div className="space-y-2">
                     <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium">
+                        <p className={cn(settingType.body, "font-medium")}>
                             {t("agents.polarAccess.connectors.label")}
                         </p>
-                        <p className="text-muted-foreground text-xs">
+                        <p className={settingType.hint}>
                             {t("agents.polarAccess.connectors.hint")}
                         </p>
                     </div>
@@ -129,11 +138,11 @@ export function PolarOptionsCard({ options }: { options: PolarPolicy }) {
                                 placeholder={t("agents.polarAccess.connectors.hostsPlaceholder")}
                                 aria-label={t("agents.polarAccess.connectors.hosts")}
                             />
-                            <p className="text-muted-foreground text-xs">
+                            <p className={settingType.hint}>
                                 {t("agents.polarAccess.connectors.hostsHint")}
                             </p>
                             <div className="flex items-center justify-between gap-3">
-                                <p className="min-w-0 text-xs text-muted-foreground">
+                                <p className={cn(settingType.hint, "min-w-0")}>
                                     {t("agents.polarAccess.connectors.privateNetwork")}
                                 </p>
                                 <Switch

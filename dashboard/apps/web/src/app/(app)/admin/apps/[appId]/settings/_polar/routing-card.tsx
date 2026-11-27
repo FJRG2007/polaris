@@ -8,7 +8,7 @@
 
 import { useState, useTransition } from "react";
 import { runAction } from "@/lib/run-action";
-import { Card, CardBody } from "@polaris/ui";
+import { Card, CardBody, cn, settingType } from "@polaris/ui";
 import type { PolarRouting } from "@/lib/polar/routing";
 import type { RouteKeyOption } from "@/lib/polar/routing-keys";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -49,11 +49,11 @@ export function RoutingCard({
         <Card>
             <CardBody className="flex min-w-0 flex-col gap-4">
                 <div className="min-w-0 space-y-1">
-                    <p className="text-sm font-medium">{t("routing.admin.title")}</p>
-                    <p className="text-muted-foreground text-xs">{t("routing.admin.intro")}</p>
+                    <p className={cn(settingType.body, "font-medium")}>{t("routing.admin.title")}</p>
+                    <p className={settingType.hint}>{t("routing.admin.intro")}</p>
                 </div>
                 {error ? (
-                    <p className="text-danger text-xs" role="alert">
+                    <p className={settingType.error} role="alert">
                         {error}
                     </p>
                 ) : null}

@@ -7,7 +7,7 @@
  * have answered and neither has anything to show.
  */
 
-import { Skeleton } from "@polaris/ui";
+import { cn, settingType, Skeleton } from "@polaris/ui";
 import { useCallback, useState } from "react";
 import { CallPortsCard } from "./call-ports-card";
 import { GamePortsCard } from "./game-ports-card";
@@ -27,7 +27,7 @@ export function PortsView() {
             <CallPortsCard onKnown={onCall} />
             {call === null ? <CardSkeleton /> : null}
             {game === false && call === false ? (
-                <p className="text-sm text-muted-foreground">{t("domains.pages.ports.empty")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("domains.pages.ports.empty")}</p>
             ) : null}
         </div>
     );

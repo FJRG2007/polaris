@@ -29,7 +29,17 @@ import { PolarSpendCard } from "@/app/(app)/admin/consumption/polar-spend-card";
 import { PolarFeedbackCard } from "@/app/(app)/admin/consumption/polar-feedback-card";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Button, Card, CardBody, cn, EmptyState, PageHeader, Skeleton } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    cn,
+    EmptyState,
+    PageHeader,
+    settingType,
+    Skeleton
+} from "@polaris/ui";
 import {
     consumedMemBytes,
     type Consumption,
@@ -126,7 +136,7 @@ export function ConsumptionView() {
                 />
             ) : (
                 <div className="flex flex-col gap-4">
-                    {stale ? <p className="text-sm text-warning">{stale}</p> : null}
+                    {stale ? <p className={cn(settingType.body, "text-warning")}>{stale}</p> : null}
                     <ConsumptionSplit consumption={data} />
                     <PolarisFootprintCard />
                     <PolarSpendCard />
@@ -169,8 +179,8 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium">{consumption.machine.name}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className={cn(settingType.body, "font-medium")}>{consumption.machine.name}</span>
+                    <span className={settingType.hint}>
                         {total
                             ? t("consumption.split.inContainers", {
                                   used: formatBytes(used),
@@ -211,7 +221,7 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
                     {groups.map((group) => (
                         <div key={group.id} className="flex min-w-0 flex-col gap-0.5">
-                            <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <dt className={cn(settingType.hint, "flex items-center gap-1.5")}>
                                 <span
                                     className={cn("size-2 shrink-0 rounded-full", TONE[group.id])}
                                 />
@@ -219,13 +229,13 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                                     {groupLabel(t, group.id)}
                                 </span>
                             </dt>
-                            <dd className="text-sm font-medium tabular-nums">
+                            <dd className={cn(settingType.body, "font-medium tabular-nums")}>
                                 {formatBytes(group.memUsedBytes)}
-                                <span className="ms-1.5 text-xs font-normal text-muted-foreground tabular-nums">
+                                <span className={cn(settingType.hint, "ms-1.5 font-normal tabular-nums")}>
                                     {t("consumption.cpu", { percent: group.cpuPercent })}
                                 </span>
                             </dd>
-                            <dd className="text-xs text-foreground-subtle">
+                            <dd className={settingType.hint}>
                                 {group.running < group.containers
                                     ? t("consumption.running", {
                                           running: group.running,
@@ -237,7 +247,7 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                     ))}
                 </dl>
 
-                <p className="text-xs text-muted-foreground">{t("consumption.split.note")}</p>
+                <p className={settingType.hint}>{t("consumption.split.note")}</p>
             </CardBody>
         </Card>
     );
@@ -261,15 +271,15 @@ export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <div className="flex min-w-0 flex-col">
-                        <span className="flex items-center gap-2 text-sm font-medium">
+                        <span className={cn(settingType.body, "flex items-center gap-2 font-medium")}>
                             <span className={cn("size-2 shrink-0 rounded-full", TONE[group.id])} />
                             {groupLabel(t, group.id)}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t(`consumption.groups.${group.id}.description`)}
                         </span>
                     </div>
-                    <span className="text-xs text-muted-foreground tabular-nums">
+                    <span className={cn(settingType.hint, "tabular-nums")}>
                         {formatBytes(group.memUsedBytes)} -{" "}
                         {t("consumption.cpu", { percent: group.cpuPercent })}
                         {group.running < group.containers
@@ -279,12 +289,12 @@ export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
                 </div>
 
                 {group.rows.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t(`consumption.empty.${group.id === "polaris" ? "other" : group.id}`)}
                     </p>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[34rem] text-sm">
+                        <table className={cn(settingType.body, "w-full min-w-[34rem]")}>
                             <thead>
                                 <tr className="text-start">
                                     <th className="w-full max-w-0 py-1 pe-3">
@@ -368,7 +378,7 @@ function Row({
                             aria-expanded={open}
                             aria-label={t("consumption.parts", { name: row.name })}
                             title={t("consumption.parts", { name: row.name })}
-                            className="-my-1 flex shrink-0 items-center gap-1 rounded px-1 py-1 text-xs text-muted-foreground hover:text-foreground"
+                            className={cn(settingType.small, "-my-1 flex shrink-0 items-center gap-1 rounded px-1 py-1 text-muted-foreground hover:text-foreground")}
                         >
                             <ChevronRight
                                 className={cn("size-3.5 transition-transform", open && "rotate-90")}
@@ -383,14 +393,14 @@ function Row({
                         <Badge variant={badge(row.state)}>{stateLabel(t, row)}</Badge>
                     )}
                 </div>
-                <div className="truncate text-xs text-muted-foreground" title={row.detail}>
+                <div className={cn(settingType.hint, "truncate")} title={row.detail}>
                     {row.detail}
                     {row.containers > 1
                         ? `${row.detail ? " - " : ""}${t("consumption.containers", { count: row.containers })}`
                         : ""}
                 </div>
             </td>
-            <td className="py-2 pe-3 text-xs text-muted-foreground">{row.owner ?? "-"}</td>
+            <td className={cn(settingType.hint, "py-2 pe-3")}>{row.owner ?? "-"}</td>
             <td className="py-2 pe-3 text-end text-muted-foreground tabular-nums">
                 {row.cpuPercent === null ? "-" : `${row.cpuPercent}%`}
             </td>

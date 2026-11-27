@@ -19,7 +19,7 @@
  */
 
 import { RefreshCw } from "lucide-react";
-import { Badge, Button } from "@polaris/ui";
+import { Badge, Button, cn, settingType } from "@polaris/ui";
 import { RouterSteps } from "./router-steps";
 import { inBlock } from "@/lib/apps/port-block";
 import { gameForwardRules } from "@/lib/router-guide";
@@ -56,7 +56,7 @@ export function GamePortsLive({
     return (
         <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {stale ?? t("domainsPorts.game.checking")}
                 </p>
                 <Button
@@ -75,7 +75,7 @@ export function GamePortsLive({
                 {servers.map((server) => (
                     <li key={server.installedAppId} className="flex items-center gap-2 py-2">
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm" title={server.name}>
+                            <p className={cn(settingType.body, "truncate")} title={server.name}>
                                 {server.name}
                             </p>
                             <p className="font-mono text-xs text-muted-foreground">
@@ -115,8 +115,8 @@ export function GamePortsLive({
                 <div
                     className={
                         advice.actionable
-                            ? "flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs"
-                            : "flex flex-col gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs"
+                            ? cn(settingType.small, "flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2")
+                            : cn(settingType.small, "flex flex-col gap-2 rounded-md border border-border bg-muted/40 px-3 py-2")
                     }
                 >
                     <p className="font-medium text-foreground">{advice.title}</p>
@@ -141,7 +141,7 @@ export function GamePortsLive({
             )}
 
             {policy === "range" && outside.length > 0 && (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("domainsPorts.game.outside", {
                         count: outside.length,
                         names: outside.map((server) => server.name).join(", ")

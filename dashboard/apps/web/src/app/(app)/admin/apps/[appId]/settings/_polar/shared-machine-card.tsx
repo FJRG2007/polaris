@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Card, CardBody, settingType, Switch, useOptimisticToggle } from "@polaris/ui";
+import { Card, CardBody, cn, settingType, Switch, useOptimisticToggle } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setSharedWorkspaceAction } from "./actions";
 
@@ -44,8 +44,8 @@ export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
             <CardBody className="space-y-3">
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-medium">{t("agents.sharedMachine.label")}</p>
-                        <p className="text-muted-foreground text-xs">
+                        <p className={cn(settingType.body, "font-medium")}>{t("agents.sharedMachine.label")}</p>
+                        <p className={settingType.hint}>
                             {on
                                 ? t("agents.sharedMachine.on")
                                 : t("agents.sharedMachine.off")}
@@ -63,7 +63,7 @@ export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
                     account-sharing enforcement exists for - and it ends in a
                     suspension, not a warning. */}
                 {on ? (
-                    <p className="text-xs text-warning">{t("agents.sharedMachine.warning")}</p>
+                    <p className={cn(settingType.small, "text-warning")}>{t("agents.sharedMachine.warning")}</p>
                 ) : null}
                 {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>

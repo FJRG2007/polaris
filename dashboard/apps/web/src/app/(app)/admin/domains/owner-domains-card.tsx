@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { saveOwnerDomainPolicyAction } from "./actions";
-import { Button, Input, Select } from "@polaris/ui";
+import { Button, cn, Input, Select, settingType } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { OWNER_DOMAIN_MODES, type OwnerDomainMode, type OwnerDomainPolicy } from "@/lib/owner-domains-policy";
@@ -65,7 +65,7 @@ export function OwnerDomainsCard({
                     onSaved(result.policy);
                 }}
             >
-                <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">
+                <label className={cn(settingType.hint, "flex min-w-48 flex-1 flex-col gap-1")}>
                     {t("domains.owner.who")}
                     <Select
                         value={mode}
@@ -75,7 +75,7 @@ export function OwnerDomainsCard({
                         onValueChange={(next) => setMode(next as OwnerDomainMode)}
                     />
                 </label>
-                <label className="text-muted-foreground flex w-32 flex-col gap-1 text-xs">
+                <label className={cn(settingType.hint, "flex w-32 flex-col gap-1")}>
                     {t("domains.owner.limit")}
                     <Input
                         value={cap}
@@ -88,12 +88,12 @@ export function OwnerDomainsCard({
                 <Button type="submit" size="sm" disabled={busy || !changed || !capValid}>
                     {tc("actions.save")}
                 </Button>
-                <p className="text-muted-foreground w-full text-xs">
+                <p className={cn(settingType.hint, "w-full")}>
                     {!capValid ? t("domains.owner.invalidCap") : t(`domains.owner.hints.${mode}`)}
                     {capValid && parsedCap === 0 ? ` ${t("domains.owner.noLimit")}` : ""}
                 </p>
                 {error && (
-                    <p role="alert" className="text-danger w-full text-xs">
+                    <p role="alert" className={cn(settingType.error, "w-full")}>
                         {error}
                     </p>
                 )}

@@ -16,7 +16,7 @@ import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Loader2, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
-import { Button, Card, CardBody, Input, Select } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Input, Select, settingType } from "@polaris/ui";
 import { clearBillingRatesAction, saveBillingRatesAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -115,7 +115,7 @@ export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onC
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                         <h2 className="text-sm font-medium">{t("billing.rates.title")}</h2>
-                        <p className="text-muted-foreground text-xs">
+                        <p className={settingType.hint}>
                             {saved ? t("billing.rates.hint") : t("billing.rates.none")}
                         </p>
                     </div>
@@ -140,7 +140,7 @@ export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onC
                         const id = `rate-${key}`;
                         return (
                             <div key={key} className="flex min-w-0 flex-col gap-1">
-                                <label htmlFor={id} className="text-xs font-medium">
+                                <label htmlFor={id} className={cn(settingType.small, "font-medium")}>
                                     {t(`billing.rates.keys.${key}.label`)}{" "}
                                     <span className="text-muted-foreground font-normal">
                                         {t(`billing.rates.keys.${key}.unit`)}
@@ -157,7 +157,7 @@ export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onC
                                     onChange={(event) => setDraft({ ...draft, [key]: event.target.value })}
                                 />
                                 {message ? (
-                                    <p id={`${id}-error`} className="text-danger text-xs">
+                                    <p id={`${id}-error`} className={settingType.error}>
                                         {message}
                                     </p>
                                 ) : null}
@@ -166,7 +166,7 @@ export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onC
                     })}
                 </div>
 
-                {error ? <p className="text-danger text-sm">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
 
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
@@ -185,7 +185,7 @@ export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onC
                         </Button>
                     ) : null}
                     {blank ? (
-                        <p className="text-muted-foreground text-xs">{t("billing.rates.setOne")}</p>
+                        <p className={settingType.hint}>{t("billing.rates.setOne")}</p>
                     ) : null}
                 </div>
             </CardBody>

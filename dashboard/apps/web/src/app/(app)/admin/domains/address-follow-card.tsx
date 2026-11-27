@@ -12,7 +12,7 @@ import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, settingType, Skeleton } from "@polaris/ui";
+import { Button, cn, settingType, Skeleton } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
 import { RelativeTime } from "@/components/relative-time";
 import { useLiveResource } from "@/components/use-live-resource";
@@ -67,7 +67,7 @@ export function AddressFollowCard() {
                     <Skeleton className="h-4 w-72" />
                 </div>
             ) : (
-                <div className="flex flex-col gap-2 text-sm">
+                <div className={cn(settingType.body, "flex flex-col gap-2")}>
                     {view.status?.checkedAt ? <Facts status={view.status} /> : null}
                     <StatusLine status={view.status} />
                     {error ? (
@@ -114,12 +114,12 @@ function Facts({ status }: { status: FollowStatus }) {
 function StatusLine({ status }: { status: FollowStatus | null }) {
     const t = useTranslations("admin");
     if (!status?.checkedAt)
-        return <p className="text-xs text-muted-foreground">{t("domains.follow.never")}</p>;
+        return <p className={settingType.hint}>{t("domains.follow.never")}</p>;
     const detail = status.detail ?? "-";
     switch (status.problem) {
         case "no-token":
             return (
-                <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+                <p className={cn(settingType.small, "rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}>
                     {t.rich("domains.follow.problem.noToken", {
                         link: (chunks) => (
                             <Link
@@ -137,14 +137,14 @@ function StatusLine({ status }: { status: FollowStatus | null }) {
         case "conflict":
         case "failed":
             return (
-                <p className="break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+                <p className={cn(settingType.small, "break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}>
                     {t(`domains.follow.problem.${status.problem}`, { detail })}
                 </p>
             );
         case "cgnat":
         case "not-public":
             return (
-                <p className="break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+                <p className={cn(settingType.small, "break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}>
                     {t.rich(
                         status.problem === "cgnat"
                             ? "domains.follow.problem.cgnat"
@@ -166,15 +166,15 @@ function StatusLine({ status }: { status: FollowStatus | null }) {
             );
         case "unreached":
             return (
-                <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+                <p className={cn(settingType.small, "rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}>
                     {t("domains.follow.problem.unreached")}
                 </p>
             );
         default:
             return status.reachBy ? (
-                <p className="text-xs text-muted-foreground">{t("domains.follow.propagating")}</p>
+                <p className={settingType.hint}>{t("domains.follow.propagating")}</p>
             ) : (
-                <p className="text-xs text-success">{t("domains.follow.ok")}</p>
+                <p className={cn(settingType.small, "text-success")}>{t("domains.follow.ok")}</p>
             );
     }
 }
