@@ -14,7 +14,6 @@ use pterm_graphql::mutations::create_anonymous_user::{
 use pterm_server_auth::API_KEY_PREFIX;
 use pterm_server_auth::user::persistence::PersistedUser;
 use ptermui::r#async::Timer;
-use ptermui::clipboard::ClipboardContent;
 use ptermui::{Entity, ModelContext, SingletonEntity, UpdateModel};
 use settings::Setting as _;
 #[cfg(target_family = "wasm")]
@@ -823,61 +822,11 @@ impl AuthManager {
         );
     }
 
-    pub fn copy_anonymous_user_linking_url_to_clipboard(&self, ctx: &mut ModelContext<Self>) {
-        if !self.auth_state.is_user_anonymous().unwrap_or_default() {
-            return;
-        }
-        let auth_client = self.auth_client.clone();
-        let _ = ctx.spawn(
-            async move { auth_client.fetch_new_custom_token().await },
-            move |me, response, ctx| {
-                let custom_token = me.auth_client.on_custom_token_fetched(response);
-
-                match custom_token {
-                    Ok(custom_token) => {
-                        let login_options_url = me.login_options_url(&custom_token);
-                        ctx.clipboard().write(ClipboardContent {
-                            plain_text: login_options_url,
-                            paths: None,
-                            ..Default::default()
-                        });
-                    }
-                    Err(e) => {
-                        ctx.emit(AuthManagerEvent::MintCustomTokenFailed(e));
-                    }
-                };
-            },
-        );
-    }
-
     /// Generates a unique state parameter for the authentication flow.
     fn generate_auth_state(&mut self) -> String {
         let state = Uuid::new_v4().to_string();
         self.pending_auth_state = Some(state.clone());
         state
-    }
-
-    pub fn sign_up_url(&mut self) -> String {
-        let state = self.generate_auth_state();
-        format!(
-            // TODO: we should probably be able to remove the public_beta flag
-            "{}/signup/remote?scheme={}&state={}&public_beta=true",
-            ChannelState::server_root_url(),
-            ChannelState::url_scheme(),
-            state,
-        )
-    }
-
-    /// The upgrade confirmation page will kick the user back to the app with a refresh token
-    /// if we send a `state` query param to /upgrade
-    pub fn upgrade_url(&mut self) -> String {
-        let state = self.generate_auth_state();
-        format!(
-            "{}/upgrade?scheme={}&state={}",
-            ChannelState::server_root_url(),
-            ChannelState::url_scheme(),
-            state,
-        )
     }
 
     pub fn login_options_url(&mut self, custom_token: &str) -> String {
