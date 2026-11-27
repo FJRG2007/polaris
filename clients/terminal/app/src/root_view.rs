@@ -52,10 +52,9 @@ use crate::auth::auth_override_warning_modal::{
     AuthOverrideWarningModal, AuthOverrideWarningModalEvent, AuthOverrideWarningModalVariant,
 };
 use crate::auth::auth_state::AuthState;
-use crate::auth::auth_view_modal::{AuthRedirectPayload, AuthView, AuthViewVariant};
+use crate::auth::auth_view_modal::{AuthRedirectPayload, AuthView, AuthViewEvent, AuthViewVariant};
 use crate::auth::login_slide::{LoginSlideEvent, LoginSlideSource, LoginSlideView};
 use crate::auth::needs_sso_link_view::NeedsSsoLinkView;
-use crate::auth::paste_auth_token_modal::{PasteAuthTokenModalEvent, PasteAuthTokenModalView};
 #[cfg(target_family = "wasm")]
 use crate::auth::web_handoff::{WebHandoffEvent, WebHandoffView};
 use crate::auth::{AuthStateProvider, LoginFailureReason};
@@ -1867,7 +1866,9 @@ pub struct RootView {
     pending_account_first_tutorial_after_settings: bool,
     pending_account_first_sso_login: Option<AccountFirstLoginContext>,
     account_first_refresh_in_flight: bool,
-    paste_auth_token_modal: Option<ViewHandle<PasteAuthTokenModalView>>,
+    /// Set when someone asked to sign in before a workspace existed; Settings >
+    /// Account opens as soon as there is one.
+    pending_polaris_sign_in: bool,
 }
 
 impl RootView {
@@ -1899,6 +1900,11 @@ impl RootView {
 
         let auth_view =
             ctx.add_typed_action_view(|ctx| AuthView::new(AuthViewVariant::Initial, ctx));
+        ctx.subscribe_to_view(&auth_view, |me, _, event, ctx| {
+            if let AuthViewEvent::OpenPolarisSignIn = event {
+                me.request_polaris_sign_in(ctx);
+            }
+        });
 
         let auth_override_view: ViewHandle<_> = ctx.add_typed_action_view(|ctx| {
             AuthOverrideWarningModal::new(ctx, AuthOverrideWarningModalVariant::OnboardingView)
@@ -1978,7 +1984,7 @@ impl RootView {
             pending_account_first_tutorial_after_settings: false,
             pending_account_first_sso_login: None,
             account_first_refresh_in_flight: false,
-            paste_auth_token_modal: None,
+            pending_polaris_sign_in: false,
         };
 
         match &root_view.auth_onboarding_state {
@@ -2571,6 +2577,11 @@ impl RootView {
                 self.focus(ctx);
                 ctx.notify();
             }
+            LoginSlideEvent::PolarisSignInRequested => {
+                self.pending_polaris_sign_in = true;
+                self.handle_login_slide_event(&LoginSlideEvent::LoginLaterConfirmed, ctx);
+                self.open_pending_polaris_sign_in(ctx);
+            }
             LoginSlideEvent::LoginLaterConfirmed => {
                 if self.account_first_login_context(ctx).is_some() {
                     self.complete_account_first(AccountFirstCompletion::AccountSkipped, ctx);
@@ -2824,17 +2835,9 @@ impl RootView {
                 });
             }
             AgentOnboardingEvent::UpgradePasteTokenFromClipboardRequested => {
-                let modal = ctx.add_typed_action_view(PasteAuthTokenModalView::new);
-                ctx.subscribe_to_view(&modal, |me, _, event, ctx| match event {
-                    PasteAuthTokenModalEvent::Cancelled => {
-                        me.paste_auth_token_modal = None;
-                        me.focus(ctx);
-                        ctx.notify();
-                    }
-                });
-                ctx.focus(&modal);
-                self.paste_auth_token_modal = Some(modal);
-                ctx.notify();
+                // A plan bought on the instance reaches this app through the
+                // Polaris sign-in, not a pasted token.
+                self.open_polaris_sign_in_from_onboarding(ctx);
             }
             AgentOnboardingEvent::PrivacySettingsFromTerminalThemeSlideRequested => {
                 let AuthOnboardingState::Onboarding {
@@ -2893,57 +2896,7 @@ impl RootView {
                 ctx.notify();
             }
             AgentOnboardingEvent::LoginFromWelcomeRequested => {
-                let AuthOnboardingState::Onboarding {
-                    target,
-                    onboarding_view,
-                } = &self.auth_onboarding_state
-                else {
-                    return;
-                };
-                let target = target.clone();
-                let onboarding_view = onboarding_view.clone();
-
-                let ai_enabled = AISettings::as_ref(ctx).is_any_ai_enabled(ctx);
-                let appearance = Appearance::as_ref(ctx);
-                let theme_name = appearance
-                    .theme()
-                    .name()
-                    .unwrap_or_else(|| "Dark".to_string());
-                let use_vertical_tabs = *TabSettings::as_ref(ctx).use_vertical_tabs;
-
-                // Open the sign-in URL in the browser for existing users.
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    let sign_in_url = auth_manager.sign_in_url();
-                    ctx.open_url(&sign_in_url);
-                });
-
-                let login_slide_view = ctx.add_typed_action_view(|ctx| {
-                    LoginSlideView::new(
-                        ai_enabled,
-                        // No agent setup choice has been made yet; default to the
-                        // Polaris Terminal Agent login screen rather than the third-party copy.
-                        false,
-                        &theme_name,
-                        use_vertical_tabs,
-                        // Existing-user login from the welcome slide happens before the user
-                        // picks an intention; default the visual to the agent intention panel.
-                        OnboardingIntention::AgentDrivenDevelopment,
-                        LoginSlideSource::LoginExistingUserFromWelcome,
-                        ctx,
-                    )
-                });
-                ctx.subscribe_to_view(&login_slide_view, |me, _view, event, ctx| {
-                    me.handle_login_slide_event(event, ctx);
-                });
-
-                self.auth_onboarding_state = AuthOnboardingState::LoginSlide {
-                    login_slide_view,
-                    onboarding_view,
-                    target,
-                };
-                ctx.emit(RootViewEvent::AuthOnboardingStateChanged);
-                self.focus(ctx);
-                ctx.notify();
+                self.open_polaris_sign_in_from_onboarding(ctx);
             }
             AgentOnboardingEvent::OfferSetUpLaterSelected { variant } => match variant {
                 OfferVariant::HeadStart => {
@@ -3398,6 +3351,55 @@ impl RootView {
         true
     }
 
+    /// Sign-in to Polaris lives in Settings > Account. Opens it now when a
+    /// workspace exists, or as soon as one does.
+    fn request_polaris_sign_in(&mut self, ctx: &mut ViewContext<Self>) {
+        self.pending_polaris_sign_in = true;
+        self.open_pending_polaris_sign_in(ctx);
+    }
+
+    fn open_pending_polaris_sign_in(&mut self, ctx: &mut ViewContext<Self>) {
+        if !self.pending_polaris_sign_in {
+            return;
+        }
+        let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state else {
+            return;
+        };
+        self.pending_polaris_sign_in = false;
+        let window_id = ctx.window_id();
+        ctx.dispatch_typed_action_for_view(
+            window_id,
+            handle.id(),
+            &WorkspaceAction::ShowSettingsPage(SettingsSection::Account),
+        );
+    }
+
+    /// Leaves onboarding for the terminal without a cloud account and opens
+    /// Settings > Account, where the Polaris sign-in is.
+    fn open_polaris_sign_in_from_onboarding(&mut self, ctx: &mut ViewContext<Self>) {
+        let AuthOnboardingState::Onboarding { target, .. } = &self.auth_onboarding_state else {
+            return;
+        };
+        let target = target.clone();
+        self.pending_polaris_sign_in = true;
+        if FeatureFlag::SkipFirebaseAnonymousUser.is_enabled() {
+            AuthManager::handle(ctx).update(ctx, |_, ctx| {
+                ctx.emit(AuthManagerEvent::SkippedLogin);
+            });
+        } else {
+            AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
+                auth_manager.create_anonymous_user(None, ctx);
+            });
+        }
+        let workspace = target.to_workspace(ctx);
+        self.auth_onboarding_state = AuthOnboardingState::Terminal(workspace);
+        ctx.emit(RootViewEvent::AuthOnboardingStateChanged);
+        self.start_autoupdate_polling(ctx);
+        self.open_pending_polaris_sign_in(ctx);
+        self.focus(ctx);
+        ctx.notify();
+    }
+
     pub fn open_team_settings_page(&mut self, _: &(), ctx: &mut ViewContext<Self>) -> bool {
         let window_id = ctx.window_id();
         if let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state {
@@ -3543,7 +3545,6 @@ impl RootView {
 
         match event {
             AuthManagerEvent::AuthComplete => {
-                self.paste_auth_token_modal = None;
                 let login_context = self.account_first_login_context(ctx);
                 let resumed_sso_context = if matches!(
                     self.auth_onboarding_state,
@@ -3681,6 +3682,7 @@ impl RootView {
                     self.start_pending_tutorial(ctx);
                 }
                 self.start_autoupdate_polling(ctx);
+                self.open_pending_polaris_sign_in(ctx);
                 self.focus(ctx);
             }
             AuthManagerEvent::LoginOverrideDetected(interrupted_auth_payload) => {
@@ -3780,11 +3782,6 @@ impl RootView {
     }
 
     pub fn focus(&mut self, ctx: &mut ViewContext<Self>) -> bool {
-        if let Some(modal) = &self.paste_auth_token_modal {
-            ctx.focus(modal);
-            ctx.notify();
-            return true;
-        }
         match &self.auth_onboarding_state {
             AuthOnboardingState::Auth(_) => {
                 ctx.focus(&self.auth_view);
@@ -3971,8 +3968,6 @@ impl View for RootView {
     fn on_focus(&mut self, focus_ctx: &FocusContext, ctx: &mut ViewContext<Self>) {
         if focus_ctx.is_self_focused() {
             self.focus(ctx);
-        } else if self.paste_auth_token_modal.is_some() {
-            // Modal is open — focus belongs to the editor inside it.
         } else if matches!(
             self.auth_onboarding_state,
             AuthOnboardingState::Onboarding { .. } | AuthOnboardingState::PostAuthOnboarding { .. }
@@ -3981,15 +3976,11 @@ impl View for RootView {
             // This ensures keystrokes (Enter) are handled by the correct view rather
             // than something hidden like the input editor.
             self.focus(ctx);
-        } else if let AuthOnboardingState::LoginSlide {
-            login_slide_view, ..
-        } = &self.auth_onboarding_state
-        {
-            // Redirect focus unless the auth token editor is visible and should
-            // accept user input.
-            if !login_slide_view.as_ref(ctx).is_auth_token_input_visible() {
-                self.focus(ctx);
-            }
+        } else if matches!(
+            self.auth_onboarding_state,
+            AuthOnboardingState::LoginSlide { .. }
+        ) {
+            self.focus(ctx);
         }
     }
 
@@ -4018,10 +4009,6 @@ impl View for RootView {
 
         let mut stack = Stack::new();
         stack.add_child(child);
-
-        if let Some(modal) = &self.paste_auth_token_modal {
-            stack.add_child(ChildView::new(modal).finish());
-        }
 
         if let Some(traffic_light_data) = self.traffic_light_data(app) {
             let theme = Appearance::as_ref(app).theme();

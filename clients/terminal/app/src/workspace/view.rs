@@ -6739,10 +6739,7 @@ impl Workspace {
                 );
             }
             LeftPanelEvent::SignInRequested => {
-                self.open_require_login_modal(AuthViewVariant::RequireLoginCloseable, ctx);
-                self.require_login_modal.update(ctx, |modal, ctx| {
-                    modal.start_sign_in(ctx);
-                });
+                self.show_settings_with_section(Some(SettingsSection::Account), ctx);
             }
         }
     }
@@ -11538,6 +11535,10 @@ impl Workspace {
             AuthViewEvent::Close => {
                 self.current_workspace_state.is_require_login_modal_open = false;
                 ctx.notify();
+            }
+            AuthViewEvent::OpenPolarisSignIn => {
+                self.current_workspace_state.is_require_login_modal_open = false;
+                self.show_settings_with_section(Some(SettingsSection::Account), ctx);
             }
         }
     }
@@ -23844,27 +23845,13 @@ impl Workspace {
             .map(|team| team.uid)
     }
 
+    /// Sign-in to Polaris lives in Settings > Account.
     fn initiate_user_signup(
         &mut self,
-        entrypoint: AnonymousUserSignupEntrypoint,
+        _entrypoint: AnonymousUserSignupEntrypoint,
         ctx: &mut ViewContext<Self>,
     ) {
-        if self.auth_state.is_user_anonymous().unwrap_or_default() {
-            // User has a Firebase anonymous account — use the linking flow.
-            AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                auth_manager.initiate_anonymous_user_linking(entrypoint, ctx);
-            });
-        } else {
-            // User is fully logged out (no Firebase user) — open the regular sign-up page.
-            AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                let sign_up_url = auth_manager.sign_up_url();
-                ctx.open_url(&sign_up_url);
-            });
-        }
-        self.require_login_modal.update(ctx, |auth_modal, ctx| {
-            auth_modal.skip_to_browser_open_step(ctx);
-        });
-        self.open_require_login_modal(AuthViewVariant::RequireLoginCloseable, ctx);
+        self.show_settings_with_section(Some(SettingsSection::Account), ctx);
     }
 
     fn redirect_to_sign_in(&mut self) {
@@ -25428,10 +25415,7 @@ impl TypedActionView for Workspace {
                 send_telemetry_from_ctx!(TelemetryEvent::DisableInputSync, ctx);
             }
             Reauth => {
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    let sign_in_url = auth_manager.sign_in_url();
-                    ctx.open_url(&sign_in_url);
-                });
+                self.show_settings_with_section(Some(SettingsSection::Account), ctx);
                 send_telemetry_from_ctx!(TelemetryEvent::InitiateReauth, ctx);
             }
             SignupAnonymousUser => {

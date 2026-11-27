@@ -868,16 +868,6 @@ impl AuthManager {
         )
     }
 
-    pub fn sign_in_url(&mut self) -> String {
-        let state = self.generate_auth_state();
-        format!(
-            "{}/login/remote?scheme={}&state={}",
-            ChannelState::server_root_url(),
-            ChannelState::url_scheme(),
-            state,
-        )
-    }
-
     /// The upgrade confirmation page will kick the user back to the app with a refresh token
     /// if we send a `state` query param to /upgrade
     pub fn upgrade_url(&mut self) -> String {
