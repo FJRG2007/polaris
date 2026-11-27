@@ -16,7 +16,7 @@ import {
     reachability,
     resetReachability
 } from "@/lib/reachability";
-import { runAction } from "@/lib/run-action";
+import { OUTAGE_WAIT_MS, runAction } from "@/lib/run-action";
 
 vi.mock("@/lib/new-build", () => ({ checkForNewBuild: async () => false }));
 
@@ -115,11 +115,16 @@ describe("asking whether Polaris answers", () => {
         reply = async () => Promise.reject(new TypeError("Failed to fetch"));
         const failures: string[] = [];
         vi.spyOn(console, "error").mockImplementation(() => undefined);
-        await runAction(() => Promise.reject(new TypeError("Failed to fetch")), (message) => failures.push(message));
+        const done = runAction(() => Promise.reject(new TypeError("Failed to fetch")), (message) => failures.push(message));
         await settle();
-        expect(failures).toHaveLength(1);
         expect(fetchMock).toHaveBeenCalledWith("/api/version", expect.objectContaining({ cache: "no-store" }));
         expect(reachability().reachable).toBe(false);
+        // Polaris stays silent, so the call waits for it and is reported only
+        // once the outage outlasts the wait.
+        expect(failures).toHaveLength(0);
+        await vi.advanceTimersByTimeAsync(OUTAGE_WAIT_MS);
+        await done;
+        expect(failures).toHaveLength(1);
     });
 
     it("answers a direct question at once", async () => {

@@ -64,8 +64,9 @@ export function newestVersion(a: string, b: string | null): string {
     return b && Date.parse(b) > Date.parse(a) ? b : a;
 }
 
-/** A note's text is sent by any page: it is never held. */
-type NoteTextAnswer = Exclude<QueueSendResult, "held">;
+/** A note's text is sent by any page. It is held only when a newer build
+ *  answered: then the page loaded after the reload sends it. */
+type NoteTextAnswer = QueueSendResult;
 
 async function deliverNoteText(entry: Pick<AppWrite, "key" | "payload">): Promise<NoteTextAnswer> {
     const payload = entry.payload as NoteTextPayload;

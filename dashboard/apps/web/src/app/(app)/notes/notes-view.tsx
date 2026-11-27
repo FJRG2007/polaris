@@ -224,7 +224,7 @@ export function NotesView({
             if ("now" in outcome) {
                 // This device keeps nothing (a private window): sent at once, as before.
                 const answer = outcome.now;
-                if (answer !== "unreachable" && "sent" in answer) {
+                if (typeof answer !== "string" && "sent" in answer) {
                     const sent = readNoteSent(answer.sent);
                     if ("copyId" in sent) setKeptCopy(sent.copyId);
                     router.refresh();
@@ -232,7 +232,7 @@ export function NotesView({
                 }
                 stored.current = before;
                 setError(
-                    answer === "unreachable" || answer.refused === NOTE_CONFLICT || !answer.refused
+                    typeof answer === "string" || answer.refused === NOTE_CONFLICT || !answer.refused
                         ? t("offline.notSaved")
                         : answer.refused
                 );

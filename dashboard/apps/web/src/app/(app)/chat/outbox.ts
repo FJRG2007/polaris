@@ -19,7 +19,7 @@ import { actionFailureText, runAction } from "@/lib/run-action";
 import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import * as sealedReactions from "./sealed-reactions";
 import { chatStore } from "@/lib/chat/offline/chat-cache";
-import { isNetworkFailure, noteRequestFailure } from "@/lib/reachability";
+import { isNetworkFailure } from "@/lib/reachability";
 import { canKeepForLater, undelivered } from "@/lib/offline/try-now";
 import { newClientKey, type QueueSendResult } from "@/lib/offline/outbox";
 import { openAtRest, restKey, sealAtRest, type SealedAtRest } from "@/lib/offline/at-rest";

@@ -11,6 +11,7 @@
 import { checkForNewBuild } from "@/lib/new-build";
 import { isStaleBuildError } from "@/lib/stale-build";
 import { isNetworkFailure, noteRequestFailure, probeNow, reachability, subscribeReachability } from "@/lib/reachability";
+import { noteWriteAccepted, noteWriteRefused } from "@/lib/work-in-progress";
 
 /** What the caller sees instead of a crash. Next hides the server's real message in
  *  production, so there is nothing specific to say - and the one cause a reader can
@@ -109,7 +110,9 @@ export async function runAction<T>(call: () => Promise<T>, onFailure: (message: 
     const deadline = Date.now() + OUTAGE_WAIT_MS;
     for (;;) {
         try {
-            return await call();
+            const answer = await call();
+            noteWriteAccepted();
+            return answer;
         } catch (caught) {
             console.error(caught);
             const stale = isStaleBuildError(caught as { name?: string; message?: string } | null);
@@ -121,6 +124,8 @@ export async function runAction<T>(call: () => Promise<T>, onFailure: (message: 
             // Or Polaris is not answering at all, which the connection banner says.
             noteRequestFailure(caught);
             if (!stale && isNetworkFailure(caught) && Date.now() < deadline && (await waitForPolaris(deadline))) continue;
+            // What the reader sent is not saved: a reload or an update must keep it.
+            noteWriteRefused();
             onFailure(stale ? updated : failed);
             return null;
         }

@@ -42,7 +42,7 @@ describe("trying a refused mailbox now", () => {
         sync.mockRejectedValue(new Error("Failed to find Server Action"));
         const button = press();
         expect(
-            await screen.findByText("The request could not be completed. Try again.")
+            await screen.findByText("Polaris was just updated. Reload the page, then try again.")
         ).toBeTruthy();
         expect((button as HTMLButtonElement).disabled).toBe(false);
     });

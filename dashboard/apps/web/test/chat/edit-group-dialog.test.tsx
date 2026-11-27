@@ -61,7 +61,7 @@ describe("editing a group", () => {
         const field = open(onOpenChange);
         fireEvent.keyDown(field, { key: "Enter" });
         expect(
-            await screen.findByText("The request could not be completed. Try again.")
+            await screen.findByText("Polaris was just updated. Reload the page, then try again.")
         ).toBeTruthy();
         expect(onOpenChange).not.toHaveBeenCalled();
     });

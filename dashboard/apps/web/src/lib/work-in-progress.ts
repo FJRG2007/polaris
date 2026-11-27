@@ -102,12 +102,37 @@ function noteChange(event: Event): void {
     touched.add(new WeakRef(field));
 }
 
-/** A form that was sent has nothing unsaved left in it. */
+/** What each field of a form just sent held before, kept until the save is
+ *  answered: a refused save puts it back, so the text counts as unsaved again. */
+let sent = new Map<WeakRef<Element>, string | null>();
+
+/** A form that was sent has nothing unsaved left in it - unless the save is
+ *  refused (`noteWriteRefused`). */
 function noteSubmit(event: Event): void {
     if (!(event.target instanceof HTMLFormElement)) return;
     for (const element of event.target.elements) {
-        if (initial.has(element)) initial.set(element, valueOf(element as Field));
+        if (!initial.has(element)) continue;
+        sent.set(new WeakRef(element), initial.get(element) ?? null);
+        initial.set(element, valueOf(element as Field));
     }
+}
+
+/** A save was answered: what was sent is saved. */
+export function noteWriteAccepted(): void {
+    sent = new Map();
+}
+
+/**
+ * A save was refused, or never reached the server (a newer build answering,
+ * Polaris gone): whatever was sent with it is unsaved again, so an update
+ * waits for it and a reload writes it down instead of dropping it.
+ */
+export function noteWriteRefused(): void {
+    for (const [ref, before] of sent) {
+        const field = ref.deref();
+        if (field?.isConnected) initial.set(field, before);
+    }
+    sent = new Map();
 }
 
 function isDirty(field: Element): boolean {
@@ -173,8 +198,17 @@ function keyOf(field: Element): string | null {
         if (complete.startsWith("cc-") || complete === "one-time-code" || complete.includes("password")) return null;
     }
     if (field.id) return `#${CSS.escape(field.id)}`;
-    const name = field.getAttribute("name");
-    return name ? `${field.tagName.toLowerCase()}[name="${CSS.escape(name)}"]` : null;
+    const tag = field.tagName.toLowerCase();
+    // A field with neither id nor name - a dialog's own box - is found again by
+    // its label or placeholder, but only when nothing else on the page shares
+    // it: a guess could fill the wrong box.
+    for (const attribute of ["name", "aria-label", "placeholder"]) {
+        const value = field.getAttribute(attribute);
+        if (!value) continue;
+        const selector = `${tag}[${attribute}="${CSS.escape(value)}"]`;
+        if (attribute === "name" || document.querySelectorAll(selector).length === 1) return selector;
+    }
+    return null;
 }
 
 interface WrittenField {
@@ -301,5 +335,6 @@ export function watchWorkInProgress(): void {
 /** For tests: forget everything this page has seen. */
 export function resetWorkInProgress(): void {
     touched = new Set();
+    sent = new Map();
     pendingWrites = 0;
 }

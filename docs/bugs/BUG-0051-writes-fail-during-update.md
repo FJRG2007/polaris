@@ -58,6 +58,12 @@ is restarting and nothing answers.
   blind could repeat something the server took. A newer build answering a
   non-queued save says "Polaris was just updated. Reload the page, then try
   again." instead of the generic sentence.
+- The text of that save survives the reload. A refused `runAction` call puts
+  back what a submitted form held (`noteWriteRefused`), so it counts as unsaved
+  again. An update then waits for it, and the Reload button on the update card
+  writes it down and puts it back on the new page. A box with no id or name,
+  such as a dialog's own input, is found again by its label or placeholder,
+  but only when no other box on the page shares it.
 
 This follows the Linear, Replicache and Slack approach: the edit stays applied
 locally, it is queued under a client-made id that the server deduplicates, and
@@ -75,6 +81,12 @@ it is retried until the server accepts or rejects it.
   the outage limit.
 - Not exercised against a real container restart: Docker is not available on
   the development machine.
-- A save that is not queued and lands on the new build still cannot be sent
-  from the old tab. The reader is told to reload. Settings forms do not
-  survive that reload unless the shared form layer restored them.
+- `test/lib/work-in-progress.test.ts`: a form that was sent and refused is unsaved
+  again, and one that was accepted stays saved. A box is found by a unique
+  placeholder, never by one that two boxes share.
+  `test/components/new-build-auto-reload.test.tsx`: after a click failed for
+  the update, the card's Reload button reloads.
+- A save that is not queued and lands on the new build is still not sent by
+  itself. Its text is kept across the reload, but the reader presses Save
+  again on the new page. A box with no id, name, label or placeholder, or one
+  that shares them with another box, is not restored.

@@ -10,7 +10,7 @@
  */
 
 import { withMessages } from "../setup/i18n";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let ready = true;
@@ -155,6 +155,10 @@ describe("taking an update by itself", () => {
         const { container } = render(withMessages(<NewBuildBanner served="b1" />));
         expect(reloadNow).not.toHaveBeenCalled();
         expect(container.querySelector('[role="status"]')).not.toBeNull();
+        // The card is the way out, not only the reason: one press takes the
+        // update, and the reload writes down what was typed (reloadNow).
+        fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+        expect(reloadNow).toHaveBeenCalledTimes(1);
     });
 });
 

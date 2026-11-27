@@ -81,6 +81,19 @@ describe("unfinished work keeps the update waiting", () => {
         expect(safeToReload()).toBe(true);
     });
 
+    it("a form sent and refused is unsaved again, and one accepted stays saved", () => {
+        const { form, name } = providerForm();
+        type(name, "My provider");
+        form.dispatchEvent(new Event("submit", { bubbles: true }));
+        work.noteWriteRefused();
+        expect(safeToReload()).toBe(false);
+
+        form.dispatchEvent(new Event("submit", { bubbles: true }));
+        work.noteWriteAccepted();
+        work.noteWriteRefused();
+        expect(safeToReload()).toBe(true);
+    });
+
     it("a task dialog open, even with nothing typed yet", () => {
         const dialog = document.createElement("div");
         dialog.setAttribute("role", "dialog");
@@ -146,6 +159,35 @@ describe("nothing is lost across a reload", () => {
                 expect(heard).toHaveBeenCalled();
                 expect(again.key.value).toBe("");
                 expect(window.sessionStorage.getItem("polaris.unsavedFields")).toBeNull();
+                stop();
+                resolve();
+            }, 0);
+        });
+    });
+
+    it("finds a box with no id or name again by its placeholder, never by one two boxes share", () => {
+        const box = (placeholder: string): HTMLInputElement => {
+            const field = document.createElement("input");
+            field.placeholder = placeholder;
+            document.body.append(field);
+            return field;
+        };
+        type(box("Group name"), "Weekend plans");
+        const first = box("Search");
+        box("Search");
+        type(first, "lost on purpose");
+        work.saveUnsavedFields();
+        const written = window.sessionStorage.getItem("polaris.unsavedFields") ?? "";
+        expect(written).toContain("Weekend plans");
+        expect(written).not.toContain("lost on purpose");
+
+        document.body.innerHTML = "";
+        work.resetWorkInProgress();
+        const stop = work.restoreUnsavedFields();
+        const again = box("Group name");
+        return new Promise<void>((resolve) => {
+            setTimeout(() => {
+                expect(again.value).toBe("Weekend plans");
                 stop();
                 resolve();
             }, 0);
