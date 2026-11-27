@@ -817,6 +817,7 @@
             "notFound": "The UPS is no longer on that machine's USB. Check the cable, or edit the connection.",
             "noAnswer": "The UPS did not answer. Check that it is on and that the address and name are right."
         },
+        "lastHeard": "Silent since",
         "found": {
             "title": "Removed, still plugged in",
             "add": "Add",

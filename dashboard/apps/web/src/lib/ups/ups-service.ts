@@ -68,6 +68,8 @@ export interface UpsView {
     hasSecret: boolean;
     shutdown: upsReading.UpsShutdownInput;
     shutdownSentAt: string | null;
+    /** When it stopped answering: its last reading came just before. Null while it answers. */
+    commLostAt: string | null;
     settings: upsSettings.UpsSettingsInput;
     variableMap: upsSettings.VariableMap;
     reportLastAt: string | null;
@@ -96,6 +98,7 @@ export function toView(row: UpsRow): UpsView {
             protectedMachineIds: row.protectedMachineIds
         },
         shutdownSentAt: row.shutdownSentAt?.toISOString() ?? null,
+        commLostAt: row.commLostAt?.toISOString() ?? null,
         settings: {
             currency: row.currency,
             pricePerKwh: row.pricePerKwh,

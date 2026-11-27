@@ -246,9 +246,17 @@ export function UpsDetailView({
                             )}
                         </div>
                         {result && !result.ok ? (
-                            <p role="status" className="text-sm text-muted-foreground">
-                                {t(`ups.unreachable.${result.reason}`)}
-                            </p>
+                            <div role="status" className="flex flex-col gap-1 text-sm text-muted-foreground">
+                                <p>{t(`ups.unreachable.${result.reason}`)}</p>
+                                {ups.commLostAt ? (
+                                    <p>
+                                        {t("ups.lastHeard")}{" "}
+                                        <time dateTime={ups.commLostAt} className="tabular-nums">
+                                            {new Date(ups.commLostAt).toLocaleString()}
+                                        </time>
+                                    </p>
+                                ) : null}
+                            </div>
                         ) : (
                             <UpsNow reading={reading} overrideW={ups.settings.nominalPowerW} />
                         )}
