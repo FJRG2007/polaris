@@ -991,3 +991,24 @@ fn single_entry(value: Option<&Value>, action: ActionKind) -> Result<Value, Cont
         )),
     }
 }
+
+/// The terminal view of the pane with this id, in any window: what the Polaris
+/// relay's `attach` streams.
+pub(in crate::local_control) fn pane_terminal_view(
+    pane: &str,
+    ctx: &mut ModelContext<LocalControlBridge>,
+) -> Option<ViewHandle<crate::terminal::view::TerminalView>> {
+    let target = TargetSelector {
+        pane: Some(PaneTarget::Id {
+            id: ::local_control::protocol::PaneSelector(pane.to_owned()),
+        }),
+        ..Default::default()
+    };
+    let entry = select_pane_entries(&target, ActionKind::PaneInspect, ctx)
+        .ok()?
+        .into_iter()
+        .next()?;
+    entry.pane_group.read(ctx, |pane_group, ctx| {
+        pane_group.terminal_view_from_pane_id(entry.pane_id, ctx)
+    })
+}

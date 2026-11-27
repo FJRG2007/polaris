@@ -44,6 +44,8 @@ mod interval_timer;
 mod linear;
 #[cfg(feature = "local_fs")]
 mod local_control;
+#[cfg(feature = "local_fs")]
+mod polaris_account;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod login_item;
 mod menu;
@@ -2652,6 +2654,7 @@ pub(crate) fn initialize_app(
     {
         ctx.add_singleton_model(local_control::LocalControlBridge::new);
         ctx.add_singleton_model(local_control::LocalControlServer::new);
+        ctx.add_singleton_model(local_control::PolarisRelay::new);
     }
 
     app_state

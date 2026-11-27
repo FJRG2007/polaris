@@ -3060,6 +3060,35 @@ pub(crate) fn file_attach_allowed_for_shared_session(
 }
 
 impl TerminalView {
+    /// A live receiver of this pane's PTY bytes, for the Polaris relay.
+    pub fn relay_pty_reads(
+        &self,
+        ctx: &AppContext,
+    ) -> Option<async_broadcast::Receiver<Arc<Vec<u8>>>> {
+        self.pty_recorder.as_ref(ctx).activate_pty_reads()
+    }
+
+    /// What the pane shows now, as text a terminal emulator can draw, so a new
+    /// Polaris relay watcher does not start on a blank pane: the full-screen
+    /// program's grid when one is running, else the last command and its output.
+    /// Plain text: colors and cursor position arrive with the bytes that follow.
+    pub fn relay_screen_text(&self) -> String {
+        let model = self.model.lock();
+        let text = if model.is_alt_screen_active() {
+            model.alt_screen().output_to_string()
+        } else {
+            let blocks = model.block_list().blocks();
+            let start = blocks.len().saturating_sub(2);
+            blocks[start..]
+                .iter()
+                .map(|block| block.contents_to_string())
+                .filter(|text| !text.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        format!("\u{1b}[2J\u{1b}[H{}", text.replace('\n', "\r\n"))
+    }
+
     /// Returns the path to the current repository, if any.
     pub fn current_repo_path(&self) -> Option<&LocalOrRemotePath> {
         self.current_repo_path.as_ref()
