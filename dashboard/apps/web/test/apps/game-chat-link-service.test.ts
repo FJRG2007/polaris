@@ -163,6 +163,18 @@ describe("the badge on a linked conversation", () => {
         });
     });
 
+    it("says which room it shows to everybody playing, as the relay decides it", async () => {
+        const links = await service.chatGameLinks([VOICE, TEXT]);
+        expect(links.map((link) => [link.channelId, link.shows])).toEqual([
+            [VOICE, false],
+            [TEXT, true]
+        ]);
+        installed(server({ chatLink: { ...spaceLink, relay: false } }));
+        expect((await service.chatGameLinks([TEXT]))[0]?.shows).toBe(false);
+        installed(server({ chatLink: spaceLink }, "minecraft-bedrock"));
+        expect((await service.chatGameLinks([TEXT]))[0]?.shows).toBe(false);
+    });
+
     it("marks a group chosen for {call.*} before the link existed, without answering in it", async () => {
         installed(server({ callGroupId: GROUP }));
         const links = await service.chatGameLinks([GROUP]);
