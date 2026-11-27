@@ -69,3 +69,4 @@ Security findings are not kept here; they live in
 | BUG-0060 | Opening the vault fires a passkey prompt in the browser while handing the page to the desktop app | Vault | Fixed, watching | dashboard/apps/web/src/components/open-in-app.tsx | 2026-11-26 |
 | BUG-0061 | Security and system notifications open a page that says nothing about them | Notifications | Fixed, watching | dashboard/packages/core/src/schemas/notifications.ts | 2026-11-26 |
 | BUG-0062 | A device plugin's new version stays invisible until the desktop app is restarted | Device plugins | Fixed, watching | clients/desktop/src/main/plugins/manager.ts | 2026-11-26 |
+| BUG-0063 | An action the host service is too old for says "update" with no way to do it | Security | Fixed, watching | dashboard/apps/security-scans/src/screens/error-line.tsx | 2026-11-27 |
