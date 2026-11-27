@@ -8,7 +8,7 @@
  * going. The same figure the hourly pass announces from, at 80% and at 100%.
  */
 
-import { Button } from "@polaris/ui";
+import { Button, cn, settingType } from "@polaris/ui";
 import { RefreshCw } from "lucide-react";
 import { BudgetCard } from "./budget-card";
 import type { CurrencyCode } from "@polaris/core";
@@ -55,8 +55,8 @@ export function BillingView({
                     <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} aria-hidden />
                 </Button>
             </parts.StatementToolbar>
-            {error ? <p className="text-danger text-sm">{error}</p> : null}
-            {stale ? <p className="text-warning-ink text-sm">{t("billing.stale", { reason: stale })}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
+            {stale ? <p className={cn(settingType.body, "text-warning-ink")}>{t("billing.stale", { reason: stale })}</p> : null}
             <parts.StatementTotals view={data} />
             <parts.StatementTable
                 view={data}

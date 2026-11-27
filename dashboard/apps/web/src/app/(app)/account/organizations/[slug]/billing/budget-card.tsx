@@ -20,7 +20,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { orgValidationMessage } from "@/app/(app)/account/organizations/org-validation";
-import { Button, Card, CardBody, Input, cn, ProgressBar } from "@polaris/ui";
+import { Button, Card, CardBody, Input, cn, ProgressBar, settingType } from "@polaris/ui";
 import { clearOrgBudgetAction, saveOrgBudgetAction } from "./actions";
 import { useStatementFormat } from "@/components/billing/statement-parts";
 import { budgetLevel, BUDGET_THRESHOLDS, orgBudgetInputSchema, type CurrencyCode } from "@polaris/core";
@@ -112,7 +112,7 @@ export function BudgetCard({
             <Card>
                 <CardBody className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("budget.title")}</h2>
-                    <p className="text-muted-foreground text-xs">
+                    <p className={settingType.hint}>
                         {t("budget.noPrices")}{" "}
                         {canSetPrices ? (
                             <Link href="/admin/billing" className="text-foreground underline underline-offset-2">
@@ -136,12 +136,12 @@ export function BudgetCard({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                         <h2 className="text-sm font-medium">{t("budget.title")}</h2>
-                        <p className="text-muted-foreground text-xs">{t("budget.whoIsTold", { thresholds })}</p>
+                        <p className={settingType.hint}>{t("budget.whoIsTold", { thresholds })}</p>
                     </div>
                     {matches && share !== null ? (
                         <p
                             className={cn(
-                                "shrink-0 text-sm font-medium tabular-nums",
+                                settingType.body, "shrink-0 font-medium tabular-nums",
                                 level >= 100 ? "text-danger" : level >= 80 ? "text-warning-ink" : "text-foreground"
                             )}
                         >
@@ -154,7 +154,7 @@ export function BudgetCard({
                 </div>
 
                 {saved && !matches ? (
-                    <p className="border-warning-edge bg-warning-soft text-warning-ink rounded-md border px-3 py-2 text-xs">
+                    <p className={cn(settingType.small, "border-warning-edge bg-warning-soft text-warning-ink rounded-md border px-3 py-2")}>
                         {t("budget.otherCurrency", { was: saved.currency, now: currency })}
                     </p>
                 ) : null}
@@ -171,7 +171,7 @@ export function BudgetCard({
                             tone={level >= 100 ? "danger" : level >= 80 ? "warning" : "primary"}
                             animated={false}
                         />
-                        <p className="text-muted-foreground text-xs">
+                        <p className={settingType.hint}>
                             {monthLabel
                                 ? t("budget.usedShareIn", { share: Math.round(share), month: monthLabel })
                                 : t("budget.usedShare", { share: Math.round(share) })}
@@ -199,10 +199,10 @@ export function BudgetCard({
                                     if (event.key === "Enter") void save();
                                 }}
                             />
-                            <span className="text-muted-foreground text-xs">{t("budget.perMonth", { currency })}</span>
+                            <span className={settingType.hint}>{t("budget.perMonth", { currency })}</span>
                         </div>
                         {problem ? (
-                            <p id="org-budget-error" className="text-danger text-xs">
+                            <p id="org-budget-error" className={settingType.error}>
                                 {problem}
                             </p>
                         ) : null}
@@ -230,7 +230,7 @@ export function BudgetCard({
                     ) : null}
                 </div>
 
-                {error ? <p className="text-danger text-sm">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
             {confirmDialog}
         </Card>

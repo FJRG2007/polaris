@@ -8,6 +8,7 @@
  * answered, so the dialog and the desktop window say the same thing.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import type { DesktopTvWaiting } from "@/lib/desktop-bridge";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -30,7 +31,7 @@ export function TvWaitingNote({
     const t = useTranslations("account");
     if (step === "prompt") {
         return (
-            <p role="status" className="text-sm">
+            <p role="status" className={settingType.body}>
                 {t("downloads.tv.dialog.waiting.prompt")}
             </p>
         );
@@ -44,7 +45,7 @@ export function TvWaitingNote({
             : (menus.switches[0] ?? "");
     return (
         <div role="status" className="flex min-w-0 flex-col gap-1">
-            <p className="text-sm break-words">
+            <p className={cn(settingType.body, "break-words")}>
                 {t(
                     waiting
                         ? "downloads.tv.dialog.waiting.debugging"
@@ -59,12 +60,12 @@ export function TvWaitingNote({
                 )}
             </p>
             {waiting ? (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("downloads.tv.dialog.waiting.carriesOn")}
                 </p>
             ) : null}
             {menus.switches.some((name) => PAIRING_SWITCHES.has(name)) ? (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("downloads.tv.dialog.waiting.pairing")}
                 </p>
             ) : null}

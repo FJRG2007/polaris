@@ -21,7 +21,7 @@
 import { PhoneCard } from "../phone-card";
 import { useRouter } from "next/navigation";
 import { EmailsView } from "../emails-view";
-import { Button, Input } from "@polaris/ui";
+import { Button, cn, Input, settingType } from "@polaris/ui";
 import { SectionCard } from "../section-card";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { updateProfileAction } from "../actions";
@@ -121,7 +121,7 @@ export function AccountView({
             >
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+                        <label className={cn(settingType.body, "flex flex-col gap-1 sm:col-span-2")}>
                             {t("details.name.first")}
                             <Input
                                 value={named.firstName}
@@ -148,7 +148,7 @@ export function AccountView({
                                 }
                             />
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("details.name.last")}
                             <Input
                                 value={named.lastName}
@@ -168,7 +168,7 @@ export function AccountView({
                                 }
                             />
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("details.name.secondLast")}
                             <Input
                                 value={named.secondLastName}
@@ -189,8 +189,8 @@ export function AccountView({
                         </label>
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                        {result?.error ? <p className="text-sm text-danger">{result.error}</p> : null}
-                        {result?.ok ? <p className="text-sm text-success">{result.ok}</p> : null}
+                        {result?.error ? <p className={settingType.error}>{result.error}</p> : null}
+                        {result?.ok ? <p className={cn(settingType.body, "text-success")}>{result.ok}</p> : null}
                         <Button type="submit" disabled={busy || !changed} className="ms-auto">
                             {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>

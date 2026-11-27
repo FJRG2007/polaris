@@ -9,7 +9,7 @@
 import type { AppHoldId, NotificationHolds, QuietHours } from "@polaris/core";
 import { useState } from "react";
 import { Bell, SlidersHorizontal } from "lucide-react";
-import { cn, ScrollRow } from "@polaris/ui";
+import { cn, ScrollRow, settingType } from "@polaris/ui";
 import type { NotificationRule } from "@polaris/core";
 import type { DeliveryView } from "@/lib/notification-service";
 import type { DestinationView } from "@/lib/notifications/destinations";
@@ -73,13 +73,13 @@ export function NotificationsPageView({
     return (
         <div className="flex flex-col gap-4">
             {paused?.on ? (
-                <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+                <div className={cn(settingType.body, "rounded-md border border-border bg-muted/40 px-3 py-2")}>
                     <p className="font-medium">
                         {paused.until
                             ? t("dnd.pausedUntil", { time: untilLabel(paused.until) })
                             : t("dnd.paused")}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {paused.reason ? `${t(`dnd.${paused.reason}`)} ` : ""}
                         {t("dnd.critical")}
                     </p>
@@ -93,7 +93,7 @@ export function NotificationsPageView({
                         onClick={() => setTab(entry.id)}
                         aria-current={tab === entry.id ? "page" : undefined}
                         className={cn(
-                            "-mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors",
+                            settingType.body, "-mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 transition-colors",
                             tab === entry.id
                                 ? "border-primary text-foreground"
                                 : "border-transparent text-muted-foreground hover:text-foreground"

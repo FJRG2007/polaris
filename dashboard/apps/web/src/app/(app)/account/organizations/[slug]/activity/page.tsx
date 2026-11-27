@@ -8,6 +8,7 @@
  * read it.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { ActivityView } from "./activity-view";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireOrgPage } from "@/lib/orgs/page-access";
@@ -25,7 +26,7 @@ export default async function OrganizationActivityPage({ params }: { params: Pro
         <div className="flex flex-col gap-4">
             <div>
                 <h2 className="text-base font-semibold">{t("activity.title")}</h2>
-                <p className="text-muted-foreground text-sm">{t("activity.intro", { org: org.name })}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("activity.intro", { org: org.name })}</p>
             </div>
             <ActivityView slug={org.slug} />
         </div>

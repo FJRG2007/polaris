@@ -2,6 +2,7 @@
  * Friends (/account/friends): who counts as one, and who is waiting.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { FriendsView } from "./friends-view";
@@ -23,7 +24,7 @@ export default async function FriendsPage() {
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("friends.page.title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("friends.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("friends.page.intro")}</p>
             </div>
             <FriendsView friends={friends.items} requests={requests} more={friends.cursor} />
         </div>

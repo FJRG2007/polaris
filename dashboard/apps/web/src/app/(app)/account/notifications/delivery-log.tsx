@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { Badge, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, cn, settingType } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { eventLabel } from "./event-names";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -39,7 +39,7 @@ export function DeliveryLog({ deliveries }: { deliveries: DeliveryView[] }) {
                     )}
                     <div className="flex-1">
                         <CardTitle>{t("deliveries.title")}</CardTitle>
-                        <p className="text-xs text-muted-foreground">{t("deliveries.description")}</p>
+                        <p className={settingType.hint}>{t("deliveries.description")}</p>
                     </div>
                     {failures > 0 ? <Badge variant="danger">{t("deliveries.failedCount", { count: failures })}</Badge> : null}
                 </button>
@@ -47,14 +47,14 @@ export function DeliveryLog({ deliveries }: { deliveries: DeliveryView[] }) {
             {open ? (
                 <CardBody className="p-0">
                     {deliveries.length === 0 ? (
-                        <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                        <p className={cn(settingType.body, "px-4 py-6 text-center text-muted-foreground")}>
                             {t("deliveries.empty")}
                         </p>
                     ) : (
                         <ul className="divide-y divide-border">
                             {deliveries.map((row) => (
                                 <li key={row.id} className="flex flex-col gap-0.5 px-4 py-2">
-                                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                    <div className={cn(settingType.small, "flex flex-wrap items-center gap-1.5")}>
                                         <StatusBadge status={row.status} />
                                         <span className="font-medium">
                                             {eventLabel(t, row.event) ?? row.event}
@@ -68,7 +68,7 @@ export function DeliveryLog({ deliveries }: { deliveries: DeliveryView[] }) {
                                         </span>
                                     </div>
                                     {row.detail ? (
-                                        <p className="text-xs text-muted-foreground">{row.detail}</p>
+                                        <p className={settingType.hint}>{row.detail}</p>
                                     ) : null}
                                 </li>
                             ))}

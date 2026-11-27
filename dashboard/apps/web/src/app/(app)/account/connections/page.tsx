@@ -8,6 +8,7 @@
  * alone.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import Link from "next/link";
 import { getTranslations } from "@/lib/i18n/request";
 import { hubCoreSections } from "./core-sections";
@@ -107,7 +108,7 @@ export default async function ConnectionsPage({
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("connections.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("connections.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("connections.page.intro")}</p>
             </div>
             <ConnectionsView
                 providers={providers}
@@ -128,7 +129,7 @@ export default async function ConnectionsPage({
                     <h2 id="org-connections" className="text-sm font-medium text-muted-foreground">
                         {t("connections.orgHub.title")}
                     </h2>
-                    <p className="text-sm text-muted-foreground">{t("connections.orgHub.intro")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("connections.orgHub.intro")}</p>
                     <ul className="flex flex-wrap gap-2">
                         {orgs.map((org) => (
                             <li key={org.id} className="min-w-0">
@@ -138,7 +139,7 @@ export default async function ConnectionsPage({
                                         new URLSearchParams(search).get("provider"),
                                         new URLSearchParams(search).get(RETURN_PARAM)
                                     )}
-                                    className="block max-w-64 truncate rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
+                                    className={cn(settingType.body, "block max-w-64 truncate rounded-md border border-border px-3 py-1.5 hover:bg-muted")}
                                     title={org.name}
                                 >
                                     {org.name}

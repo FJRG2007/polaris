@@ -20,7 +20,7 @@ import { Link2, Plus, X } from "lucide-react";
 import { saveProfileDetailsAction } from "./actions";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, Input, Select } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Input, Select, settingType } from "@polaris/ui";
 import {
     linkProblem,
     MAX_HEADLINE,
@@ -103,10 +103,10 @@ export function DetailsCard({
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("details.title")}</h2>
-                    <p className="text-muted-foreground text-xs">{t("details.description")}</p>
+                    <p className={settingType.hint}>{t("details.description")}</p>
                 </div>
 
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     {t("details.headline")}
                     <Input
                         value={line}
@@ -117,10 +117,10 @@ export function DetailsCard({
                             setLine(event.target.value);
                         }}
                     />
-                    <span className="text-muted-foreground text-xs">{t("details.headlineHint")}</span>
+                    <span className={settingType.hint}>{t("details.headlineHint")}</span>
                 </label>
 
-                <div className="flex flex-col gap-1 text-sm">
+                <div className={cn(settingType.body, "flex flex-col gap-1")}>
                     <span>{t("details.pronouns")}</span>
                     <Select
                         value={choice}
@@ -152,10 +152,10 @@ export function DetailsCard({
                             }}
                         />
                     ) : null}
-                    <span className="text-muted-foreground text-xs">{t("details.pronounsHint")}</span>
+                    <span className={settingType.hint}>{t("details.pronounsHint")}</span>
                 </div>
 
-                <div className="flex flex-col gap-2 text-sm">
+                <div className={cn(settingType.body, "flex flex-col gap-2")}>
                     <span>{t("details.links.title")}</span>
                     {rows.map((row, index) => (
                         // Keyed by position: these are the same few fields being
@@ -199,7 +199,7 @@ export function DetailsCard({
                                 <X className="size-4 shrink-0" />
                             </Button>
                             {problems[index] ? (
-                                <p id={`link-${index}-problem`} className="text-danger w-full text-xs">
+                                <p id={`link-${index}-problem`} className={cn(settingType.error, "w-full")}>
                                     {linkProblemText(problems[index] ?? "", t)}
                                 </p>
                             ) : null}
@@ -217,15 +217,15 @@ export function DetailsCard({
                             {t("details.links.add")}
                         </Button>
                     ) : null}
-                    <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                    <span className={cn(settingType.hint, "flex items-center gap-1.5")}>
                         <Link2 className="size-3 shrink-0" />
                         {t("details.links.hint")}
                     </span>
                 </div>
 
                 <div className="flex items-center justify-between gap-2">
-                    {error ? <p className="text-danger text-sm">{error}</p> : null}
-                    {done && !error ? <p className="text-success text-sm">{t("appearance.saved")}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
+                    {done && !error ? <p className={cn(settingType.body, "text-success")}>{t("appearance.saved")}</p> : null}
                     <Button
                         type="button"
                         className="ms-auto"

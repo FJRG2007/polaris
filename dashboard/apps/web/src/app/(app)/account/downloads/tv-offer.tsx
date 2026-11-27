@@ -33,7 +33,8 @@ import {
     DialogTitle,
     Input,
     SegmentedControl,
-    cn
+    cn,
+    settingType
 } from "@polaris/ui";
 import { TvChecker } from "@polaris/ui/tv-checker";
 import { debuggingById, debuggingFor, type TvPlatform } from "@polaris/core/tv-compat";
@@ -132,7 +133,7 @@ function TvLoader({ label }: { label: string }) {
                 <span className="absolute inset-1 animate-pulse rounded-full bg-sky-500/15 motion-reduce:animate-none" />
                 <Tv className="relative size-4 shrink-0 text-sky-600 dark:text-sky-400" />
             </span>
-            <p className="min-w-0 text-sm text-muted-foreground">{label}</p>
+            <p className={cn(settingType.body, "min-w-0 text-muted-foreground")}>{label}</p>
         </div>
     );
 }
@@ -186,7 +187,7 @@ function InstallSteps({
     if (!state && refused) {
         return (
             <>
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className={settingType.error}>
                     {t("downloads.tv.dialog.refused")}
                 </p>
                 <DialogFooter>
@@ -224,7 +225,7 @@ function InstallSteps({
         <>
             <div className="flex min-w-0 flex-col gap-4">
                 <div className="flex min-w-0 flex-col gap-1.5">
-                    <label htmlFor="tv-address" className="text-sm font-medium">
+                    <label htmlFor="tv-address" className={cn(settingType.body, "font-medium")}>
                         {t("downloads.tv.dialog.address")}
                     </label>
                     <div className="flex min-w-0 gap-2">
@@ -262,7 +263,7 @@ function InstallSteps({
                         </Button>
                     </div>
                     {addressError || notStarted ? (
-                        <p role="alert" className="text-xs text-destructive">
+                        <p role="alert" className={settingType.error}>
                             {addressError ?? t("downloads.tv.dialog.notStarted")}
                         </p>
                     ) : null}
@@ -291,7 +292,7 @@ function InstallSteps({
                             ))}
                         </div>
                     ) : searched && idle ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("downloads.tv.dialog.noneFound")}
                         </p>
                     ) : null}
@@ -299,8 +300,8 @@ function InstallSteps({
 
                 {findUsb ? (
                     <div className="flex min-w-0 flex-col gap-1.5">
-                        <span className="text-sm font-medium">{t("downloads.tv.dialog.usb")}</span>
-                        <p className="text-xs text-muted-foreground">
+                        <span className={cn(settingType.body, "font-medium")}>{t("downloads.tv.dialog.usb")}</span>
+                        <p className={settingType.hint}>
                             {t("downloads.tv.dialog.usbHint")}
                         </p>
                         <div className="flex min-w-0 flex-wrap gap-2">
@@ -332,7 +333,7 @@ function InstallSteps({
                             ))}
                         </div>
                         {state.usb && state.usb.length === 0 && idle ? (
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {t("downloads.tv.dialog.usbNone")}
                             </p>
                         ) : null}
@@ -358,13 +359,13 @@ function InstallSteps({
                         ]}
                         className="self-start"
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {mode === "system"
                             ? t("downloads.tv.dialog.mode.systemHint")
                             : t("downloads.tv.dialog.mode.appHint")}
                     </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("downloads.tv.dialog.backupNote")}
                 </p>
 
@@ -390,7 +391,7 @@ function InstallSteps({
                     <p
                         role="status"
                         className={cn(
-                            "text-sm",
+                            settingType.body,
                             state.phase === "done" ? "text-foreground" : "text-destructive"
                         )}
                     >
@@ -401,11 +402,11 @@ function InstallSteps({
                     <TvControlReport control={state.control} />
                 ) : null}
                 {state.phase === "done" && state.linking ? (
-                    <p className="text-sm text-foreground">{t("downloads.tv.dialog.linking")}</p>
+                    <p className={cn(settingType.body, "text-foreground")}>{t("downloads.tv.dialog.linking")}</p>
                 ) : null}
                 {asksCode ? (
                     <div className="flex min-w-0 flex-col gap-1.5">
-                        <label htmlFor="tv-code" className="text-sm font-medium">
+                        <label htmlFor="tv-code" className={cn(settingType.body, "font-medium")}>
                             {t("downloads.tv.dialog.code")}
                         </label>
                         <CodeInput
@@ -422,19 +423,19 @@ function InstallSteps({
                     <TvWaitingNote menus={menus} step="debugging" waiting={false} />
                 ) : null}
                 {state.closed !== null ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {state.closed
                             ? t("downloads.tv.dialog.debugClosed")
                             : t("downloads.tv.dialog.debugOpen")}
                     </p>
                 ) : null}
                 {state.backup ? (
-                    <p className="text-xs break-all text-muted-foreground">
+                    <p className={cn(settingType.hint, "break-all")}>
                         {t("downloads.tv.dialog.backupKept", { path: state.backup })}
                     </p>
                 ) : null}
                 {!idle && !searching && !waiting ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("downloads.tv.dialog.keepsGoing")}
                     </p>
                 ) : null}
@@ -480,15 +481,15 @@ function TvControlReport({ control }: { control: readonly DesktopTvControl[] }) 
     const known = knownControl(control);
     if (control.length === 0)
         return (
-            <p className="text-xs text-muted-foreground">
+            <p className={settingType.hint}>
                 {t("downloads.tv.dialog.control.appOnly")}
             </p>
         );
     if (known.length === 0) return null;
     return (
         <div className="flex min-w-0 flex-col gap-1">
-            <p className="text-sm font-medium">{t("downloads.tv.dialog.control.title")}</p>
-            <ul className="flex min-w-0 flex-col gap-0.5 text-xs">
+            <p className={cn(settingType.body, "font-medium")}>{t("downloads.tv.dialog.control.title")}</p>
+            <ul className={cn(settingType.small, "flex min-w-0 flex-col gap-0.5")}>
                 {known.map((one) => (
                     <li key={one.rung} className="flex min-w-0 justify-between gap-3">
                         <span
@@ -566,7 +567,7 @@ function OpenInApp({ download, onClose }: { download: ReactNode; onClose: () => 
     if (phone) {
         return (
             <>
-                <p className="text-sm text-muted-foreground">{t("downloads.tv.dialog.phone")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("downloads.tv.dialog.phone")}</p>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
                         {t("downloads.tv.dialog.close")}
@@ -581,13 +582,13 @@ function OpenInApp({ download, onClose }: { download: ReactNode; onClose: () => 
             <div className="flex min-w-0 flex-col gap-3">
                 {step === "opening" ? <TvLoader label={t("downloads.tv.dialog.opening")} /> : null}
                 {step === "opened" ? (
-                    <p role="status" className="text-sm">
+                    <p role="status" className={settingType.body}>
                         {t("downloads.tv.dialog.opened")}
                     </p>
                 ) : null}
                 {step === "missing" ? (
                     <div className="flex min-w-0 flex-col gap-2">
-                        <p role="status" className="text-sm">
+                        <p role="status" className={settingType.body}>
                             {t("downloads.tv.dialog.notOpened")}
                         </p>
                         {download}
@@ -672,16 +673,16 @@ export function TvOffer({
             preview={<TvPreview />}
         >
             {available === false ? (
-                <p className="text-sm text-muted-foreground">{t("downloads.tv.notReleased")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("downloads.tv.notReleased")}</p>
             ) : (
                 <div>
                     <Button onClick={press}>{t("downloads.tv.install")}</Button>
                 </div>
             )}
             {reach === "old-app" ? (
-                <p className="text-sm text-muted-foreground">{t("downloads.tv.updateApp")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("downloads.tv.updateApp")}</p>
             ) : null}
-            <p className="text-xs text-muted-foreground">{t("downloads.tv.supported")}</p>
+            <p className={settingType.hint}>{t("downloads.tv.supported")}</p>
 
             <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
                 <DialogContent

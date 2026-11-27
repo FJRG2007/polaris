@@ -8,6 +8,7 @@
  * a month of metrics and is read after the screen has painted.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { BillingView } from "./billing-view";
 import { getTranslations } from "@/lib/i18n/request";
 import { getOrgBudget } from "@/lib/billing/budgets";
@@ -26,7 +27,7 @@ export default async function OrganizationBillingPage({ params }: { params: Prom
         <div className="flex flex-col gap-4">
             <div>
                 <h2 className="text-base font-semibold">{t("billing.title")}</h2>
-                <p className="text-muted-foreground text-sm">{t("billing.intro", { org: org.name })}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("billing.intro", { org: org.name })}</p>
             </div>
             <BillingView
                 orgId={org.id}

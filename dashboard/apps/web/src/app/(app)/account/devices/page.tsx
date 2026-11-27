@@ -15,6 +15,7 @@
  * goes wrong.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { DevicesView } from "./devices-view";
@@ -30,7 +31,7 @@ export default async function DevicesPage() {
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("devices.page.title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("devices.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("devices.page.intro")}</p>
             </div>
             {/* The call settings' own words live with the call, in `chat`. */}
             <Messages namespaces={["chat"]}>

@@ -18,7 +18,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { revokeApiKeyAction } from "../api-keys/actions";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, settingType } from "@polaris/ui";
+import { Button, cn, settingType } from "@polaris/ui";
 import { DeckCard, DeckFile } from "@polaris/ui/account-downloads/deck-card";
 
 /** One connected deck, in the fields the list draws. */
@@ -84,7 +84,7 @@ export function StreamDeckSection({
             moduleFile={moduleFile}
         >
             <div className="flex min-w-0 flex-col gap-1">
-                <p className="text-xs font-medium text-muted-foreground">
+                <p className={cn(settingType.hint, "font-medium")}>
                     {t("downloads.streamdeck.connected")}
                 </p>
                 {list.length === 0 ? (
@@ -103,7 +103,7 @@ export function StreamDeckSection({
                                     >
                                         {deck.name}
                                     </Link>
-                                    <p className="truncate text-xs text-muted-foreground">
+                                    <p className={cn(settingType.hint, "truncate")}>
                                         {deck.lastUsedAt
                                             ? t.rich("downloads.streamdeck.lastUsed", {
                                                   time: () => (

@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { settingType, useOptimisticToggle } from "@polaris/ui";
+import { cn, settingType, useOptimisticToggle } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Plus, Send, Smartphone, Trash2, Webhook } from "lucide-react";
@@ -96,7 +96,7 @@ export function DestinationsCard({
             <CardHeader className="flex-row items-center justify-between gap-3">
                 <div>
                     <CardTitle>{t("destinations.title")}</CardTitle>
-                    <p className="text-xs text-muted-foreground">{t("destinations.description")}</p>
+                    <p className={settingType.hint}>{t("destinations.description")}</p>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
                     <Plus className="size-4" />
@@ -105,7 +105,7 @@ export function DestinationsCard({
             </CardHeader>
             <CardBody className="p-0">
                 {destinations.length === 0 ? (
-                    <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "px-4 py-6 text-center text-muted-foreground")}>
                         {t("destinations.empty")}
                     </p>
                 ) : (
@@ -120,10 +120,10 @@ export function DestinationsCard({
                                             <Webhook className="size-4 shrink-0 text-muted-foreground" />
                                         )}
                                         <div className="min-w-0">
-                                            <p className="truncate text-sm font-medium">
+                                            <p className={cn(settingType.body, "truncate font-medium")}>
                                                 {destination.name}
                                             </p>
-                                            <p className="truncate text-xs text-muted-foreground">
+                                            <p className={cn(settingType.hint, "truncate")}>
                                                 {destination.targetHint}
                                                 {destination.format
                                                     ? ` - ${destination.format}`
@@ -133,7 +133,7 @@ export function DestinationsCard({
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1.5">
                                         <Select
-                                            className="h-8 w-36 text-xs"
+                                            className={cn(settingType.body, "h-8 w-36")}
                                             aria-label={t("destinations.levelLabel")}
                                             value={floors[destination.id] ?? destination.minLevel}
                                             onValueChange={(value) =>
@@ -185,7 +185,7 @@ export function DestinationsCard({
                                     </div>
                                 </div>
                                 {destination.kind === "sms" && !smsReady ? (
-                                    <p className="text-xs text-warning">
+                                    <p className={cn(settingType.small, "text-warning")}>
                                         {t.rich("destinations.smsNotReady", {
                                             link: (chunks) => (
                                                 <Link
@@ -206,8 +206,8 @@ export function DestinationsCard({
                                     <p
                                         className={
                                             testResult.error
-                                                ? "text-xs text-danger"
-                                                : "text-xs text-success"
+                                                ? settingType.error
+                                                : cn(settingType.small, "text-success")
                                         }
                                     >
                                         {testResult.error ?? t("destinations.testSent")}
@@ -215,7 +215,7 @@ export function DestinationsCard({
                                 ) : destination.lastError ? (
                                     <p className={settingType.error}>{destination.lastError}</p>
                                 ) : destination.lastUsedAt ? (
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className={settingType.hint}>
                                         {t.rich("destinations.lastUsed", {
                                             time: (
                                                 <RelativeTime
@@ -306,7 +306,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                     <DialogDescription>{t("destinations.dialog.description")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">{t("destinations.dialog.kind")}</span>
                         <Select
                             value={kind}
@@ -317,7 +317,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                             ]}
                         />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">{t("destinations.dialog.name")}</span>
                         <Input
                             value={label}
@@ -333,7 +333,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                         <>
                             {telegram ? (
                                 <>
-                                    <label className="flex flex-col gap-1 text-sm">
+                                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                         <span className="font-medium">
                                             {t("destinations.dialog.botToken")}
                                         </span>
@@ -344,7 +344,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                             onChange={(event) => setBotToken(event.target.value)}
                                         />
                                     </label>
-                                    <label className="flex flex-col gap-1 text-sm">
+                                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                         <span className="font-medium">
                                             {t("destinations.dialog.chatId")}
                                         </span>
@@ -353,13 +353,13 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                             onChange={(event) => setChatId(event.target.value)}
                                             placeholder="-1001234567890"
                                         />
-                                        <span className="text-xs text-muted-foreground">
+                                        <span className={settingType.hint}>
                                             {t("destinations.dialog.chatIdHint")}
                                         </span>
                                     </label>
                                 </>
                             ) : (
-                                <label className="flex flex-col gap-1 text-sm">
+                                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                     <span className="font-medium">
                                         {t("destinations.dialog.url")}
                                     </span>
@@ -368,7 +368,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                         onChange={(event) => setUrl(event.target.value)}
                                         placeholder="https://discord.com/api/webhooks/..."
                                     />
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className={settingType.hint}>
                                         {t("destinations.dialog.urlHint", {
                                             example:
                                                 "https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat id>"
@@ -376,7 +376,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                     </span>
                                 </label>
                             )}
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                 <span className="font-medium">
                                     {t("destinations.dialog.format")}
                                 </span>
@@ -397,7 +397,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                             </label>
                         </>
                     ) : (
-                        <div className="flex flex-col gap-1 text-sm">
+                        <div className={cn(settingType.body, "flex flex-col gap-1")}>
                             <label htmlFor="destination-phone" className="font-medium">
                                 {t("destinations.dialog.number")}
                             </label>
@@ -410,7 +410,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                             />
                         </div>
                     )}
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">{t("destinations.levelLabel")}</span>
                         <Select
                             value={minLevel}
@@ -421,7 +421,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                             }))}
                         />
                     </label>
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
                             {tc("actions.cancel")}

@@ -10,6 +10,7 @@
  * letting it into one is still the vault's own screen and its own approval.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { ExtensionConnectView } from "./extension-connect-view";
@@ -25,7 +26,7 @@ export default async function ExtensionPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("extension.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("extension.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("extension.page.intro")}</p>
             </div>
             <ExtensionConnectView
                 account={t("extension.signedInAs", { name: user.name || user.email })}

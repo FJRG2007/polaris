@@ -7,7 +7,7 @@
  * cards, which list what the host's releases hold, are sketched.
  */
 
-import { Skeleton } from "@polaris/ui";
+import { cn, settingType, Skeleton } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ThisDeviceApp } from "@/components/this-app/this-device-app";
 
@@ -17,7 +17,7 @@ export default function Loading() {
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
             <div className="flex flex-col items-center gap-1 text-center">
                 <h1 className="text-[17px] font-semibold tracking-tight">{t("downloads.page.title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("downloads.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("downloads.page.intro")}</p>
             </div>
             <ThisDeviceApp desktop={false} />
             <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2" aria-busy="true">

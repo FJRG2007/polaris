@@ -201,7 +201,7 @@ export function NotificationSettingsView({
     return (
         <div className="flex flex-col gap-4">
             {error ? (
-                <p className="flex items-center gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p className={cn(settingType.body, "flex items-center gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-danger-ink")}>
                     <AlertTriangle className="size-4 shrink-0" />
                     {error}
                 </p>
@@ -289,8 +289,8 @@ function InGameRow({ initial, ready }: { initial: inGame.InGameChoice; ready: bo
                 description would be a column of single words. */}
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                 <div className="min-w-[min(100%,16rem)] flex-1">
-                    <p className="text-sm font-medium">{t("inGame.title")}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={cn(settingType.body, "font-medium")}>{t("inGame.title")}</p>
+                    <p className={settingType.hint}>
                         {ready
                             ? t("inGame.descriptionWith", { hint: hint(choice) })
                             : t("inGame.description")}
@@ -311,7 +311,7 @@ function InGameRow({ initial, ready }: { initial: inGame.InGameChoice; ready: bo
             </div>
             {ready ? null : (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
-                    <p className="min-w-0 text-xs text-muted-foreground">{t("inGame.notReady")}</p>
+                    <p className={cn(settingType.hint, "min-w-0")}>{t("inGame.notReady")}</p>
                     <Button asChild size="sm" variant="outline" className="shrink-0">
                         <Link href={connectionsLink}>{t("inGame.connectedAccounts")}</Link>
                     </Button>
@@ -410,7 +410,7 @@ function BrowserNoticesCard() {
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 text-xs text-muted-foreground">{said[standing]}</p>
+                    <p className={cn(settingType.hint, "min-w-0")}>{said[standing]}</p>
                     <div className="flex shrink-0 items-center gap-2">
                         {standing === "granted" ? (
                             <Badge variant="success">{t("browser.allowed")}</Badge>
@@ -442,7 +442,7 @@ function BrowserNoticesCard() {
                     </div>
                 </div>
 
-                {shown ? <p className="text-xs text-muted-foreground">{shown}</p> : null}
+                {shown ? <p className={settingType.hint}>{shown}</p> : null}
 
                 {phoneApp ? null : (
                     <div className="flex flex-col divide-y divide-border rounded-md border border-border">
@@ -454,13 +454,13 @@ function BrowserNoticesCard() {
                                 <div className="min-w-0">
                                     <p
                                         className={cn(
-                                            "text-sm",
+                                            settingType.body,
                                             !working && "text-muted-foreground"
                                         )}
                                     >
                                         {t(`browser.kinds.${kind}.title` as const)}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className={settingType.hint}>
                                         {t(`browser.kinds.${kind}.hint` as const)}
                                     </p>
                                 </div>
@@ -481,7 +481,7 @@ function BrowserNoticesCard() {
                 )}
 
                 {phoneApp ? null : (
-                    <p className="text-xs text-muted-foreground">{t("browser.keptHere")}</p>
+                    <p className={settingType.hint}>{t("browser.keptHere")}</p>
                 )}
             </CardBody>
         </Card>
@@ -513,8 +513,8 @@ function SoundCard() {
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("sound.title")}</p>
-                        <p className="text-xs text-muted-foreground">{t("sound.description")}</p>
+                        <p className={cn(settingType.body, "font-medium")}>{t("sound.title")}</p>
+                        <p className={settingType.hint}>{t("sound.description")}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
                         <button
@@ -570,8 +570,8 @@ function BadgesCard({ initial }: { initial: boolean }) {
             <CardBody className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("badges.title")}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={cn(settingType.body, "font-medium")}>{t("badges.title")}</p>
+                        <p className={settingType.hint}>
                             {enabled ? t("badges.onHint") : t("badges.offHint")}
                         </p>
                     </div>
@@ -654,7 +654,7 @@ function VolumeSlider() {
 
     return (
         <div className="flex flex-col gap-1">
-            <span className="flex items-center justify-between gap-2 text-sm">
+            <span className={cn(settingType.body, "flex items-center justify-between gap-2")}>
                 {t("sound.volume")}
                 <span className="tabular-nums text-muted-foreground">{volume}%</span>
             </span>
@@ -668,7 +668,7 @@ function VolumeSlider() {
                 onChange={(event) => change(Number(event.target.value))}
                 className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
             />
-            <span className="text-xs text-muted-foreground">{t("sound.volumeHint")}</span>
+            <span className={settingType.hint}>{t("sound.volumeHint")}</span>
             {error ? <p className={settingType.error}>{error}</p> : null}
         </div>
     );
@@ -719,8 +719,8 @@ function TabIconCard() {
                         {preview ? <img src={preview} alt="" width={20} height={20} /> : null}
                     </span>
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("tabIcon.title")}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={cn(settingType.body, "font-medium")}>{t("tabIcon.title")}</p>
+                        <p className={settingType.hint}>
                             {t(`tabIcon.styles.${style}.hint` as const)}
                         </p>
                     </div>

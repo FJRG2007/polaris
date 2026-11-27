@@ -173,10 +173,10 @@ function AppHoldCard({ app, hold }: { app: core.AppHoldId; hold: HoldControls })
             <div className="flex items-center gap-1 pe-2">
                 <div className="flex min-w-0 flex-1 items-center gap-2 py-2.5 ps-9 pe-3">
                     <ProductMark app={app} />
-                    <span className="truncate text-sm font-semibold" title={label}>
+                    <span className={cn(settingType.body, "truncate font-semibold")} title={label}>
                         {label}
                     </span>
-                    <span className="hidden truncate text-xs text-muted-foreground sm:inline" title={hint}>
+                    <span className={cn(settingType.hint, "hidden truncate sm:inline")} title={hint}>
                         {hint}
                     </span>
                 </div>
@@ -229,10 +229,10 @@ export function EventGroup({
                         aria-hidden
                     />
                     <NotificationGroupMark group={group} label={label} />
-                    <span className="truncate text-sm font-semibold" title={label}>
+                    <span className={cn(settingType.body, "truncate font-semibold")} title={label}>
                         {label}
                     </span>
-                    <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("holds.summary", { on, total })}>
+                    <span className={cn(settingType.hint, "min-w-0 max-w-full shrink-0 truncate")} title={t("holds.summary", { on, total })}>
                         {t("holds.summary", { on, total })}
                     </span>
                 </button>
@@ -253,7 +253,7 @@ export function EventGroup({
                             >
                                 <div className="min-w-0 sm:flex-1">
                                     <div className="flex min-w-0 items-center gap-2">
-                                        <p className="truncate text-sm font-medium" title={name}>
+                                        <p className={cn(settingType.body, "truncate font-medium")} title={name}>
                                             {name}
                                         </p>
                                         {core.isMuted(rule) ? (
@@ -261,7 +261,7 @@ export function EventGroup({
                                         ) : null}
                                     </div>
                                     <p
-                                        className="truncate text-xs text-muted-foreground"
+                                        className={cn(settingType.hint, "truncate")}
                                         title={eventDescription(t, entry.id)}
                                     >
                                         {eventDescription(t, entry.id)}
@@ -327,7 +327,7 @@ function HoldState({
         const text = muted ? muteText : scheduleText;
         const Icon = muted ? BellOff : CalendarClock;
         return (
-            <span className="flex min-w-0 shrink items-center gap-1.5 text-xs text-muted-foreground">
+            <span className={cn(settingType.hint, "flex min-w-0 shrink items-center gap-1.5")}>
                 <span className="flex min-w-0 items-center gap-1" title={text}>
                     <Icon className="size-3.5 shrink-0" aria-hidden />
                     <span className="hidden truncate sm:inline">{text}</span>
@@ -347,7 +347,7 @@ function HoldState({
     }
 
     return (
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+        <div className={cn(settingType.hint, "mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5")}>
             {muted ? (
                 <span className="flex min-w-0 items-center gap-1">
                     <BellOff className="size-3.5 shrink-0" aria-hidden />
@@ -557,7 +557,7 @@ function ScheduleDialog({
                 <div className="flex flex-col gap-3">
                     <WeekdayPicker legend={t("holds.days")} days={days} onChange={setDays} />
                     <div className="grid grid-cols-2 gap-3">
-                        <label className="flex flex-col gap-1 text-[12px] text-muted-foreground">
+                        <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                             {t("quiet.from")}
                             <DateInput
                                 mode="time"
@@ -565,7 +565,7 @@ function ScheduleDialog({
                                 onChange={(e) => setFrom(e.target.value)}
                             />
                         </label>
-                        <label className="flex flex-col gap-1 text-[12px] text-muted-foreground">
+                        <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                             {t("quiet.until")}
                             <DateInput
                                 mode="time"
@@ -692,7 +692,7 @@ function Chip({
             title={title ?? label}
             aria-pressed={on}
             className={cn(
-                "inline-flex max-w-48 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors",
+                settingType.small, "inline-flex max-w-48 items-center gap-1 rounded-full border px-2 py-0.5 font-medium transition-colors",
                 on
                     ? "border-transparent bg-primary/15 text-primary"
                     : "border-border bg-muted text-muted-foreground hover:text-foreground",

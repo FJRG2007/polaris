@@ -29,6 +29,7 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -199,20 +200,20 @@ function FriendsCard({
                             >
                                 <Avatar openable person={request.person} size={24} />
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-sm">
+                                    <span className={cn(settingType.body, "block truncate")}>
                                         <PersonName
                                             id={request.person.id}
                                             name={request.person.name}
                                         />
                                     </span>
-                                    <span className="block text-xs text-muted-foreground">
+                                    <span className={cn(settingType.hint, "block")}>
                                         {request.outgoing
                                             ? t("friends.youAsked")
                                             : t("friends.wantsAdding")}
                                     </span>
                                     {request.note ? (
                                         <span
-                                            className="mt-1 block whitespace-pre-wrap break-words rounded bg-muted px-2 py-1 text-xs"
+                                            className={cn(settingType.small, "mt-1 block whitespace-pre-wrap break-words rounded bg-muted px-2 py-1")}
                                             aria-label={t("friends.noteLabel")}
                                         >
                                             {request.note}
@@ -252,7 +253,7 @@ function FriendsCard({
                 )}
 
                 {people.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">{t("friends.empty")}</p>
+                    <p className={settingType.hint}>{t("friends.empty")}</p>
                 ) : (
                     <>
                         <ul className="flex flex-col gap-1">
@@ -266,12 +267,12 @@ function FriendsCard({
                                     <Avatar openable person={friend} size={24} />
                                     <span className="min-w-0 flex-1">
                                         <span
-                                            className="block truncate text-sm"
+                                            className={cn(settingType.body, "block truncate")}
                                             title={friend.name}
                                         >
                                             <PersonName id={friend.id} name={friend.name} />
                                         </span>
-                                        <span className="block truncate text-xs text-muted-foreground">
+                                        <span className={cn(settingType.hint, "block truncate")}>
                                             {friend.contact}
                                         </span>
                                     </span>
@@ -507,7 +508,7 @@ function AddFriend({
                                     placeholder={t("friends.notePlaceholder")}
                                 />
                                 <span
-                                    className={`self-end text-xs tabular-nums ${noteTooLong ? "text-danger" : "text-muted-foreground"}`}
+                                    className={cn(settingType.small, "self-end tabular-nums", noteTooLong ? "text-danger" : "text-muted-foreground")}
                                     aria-live="polite"
                                 >
                                     {noteTooLong
@@ -533,7 +534,7 @@ function AddFriend({
                                                 if (await onAsk(() => requestFriendAction(person.id, words)))
                                                     sent();
                                             }}
-                                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm transition-colors hover:bg-muted"
+                                            className={cn(settingType.body, "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start transition-colors hover:bg-muted")}
                                         >
                                             <Avatar person={person} size={20} />
                                             <span className="min-w-0 flex-1 truncate">
@@ -546,7 +547,7 @@ function AddFriend({
                             </ul>
                         )}
 
-                        <span className="text-xs text-muted-foreground">{said || t("friends.hint")}</span>
+                        <span className={settingType.hint}>{said || t("friends.hint")}</span>
                     </div>
                 </DialogContent>
             </Dialog>

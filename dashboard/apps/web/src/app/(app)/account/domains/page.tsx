@@ -7,6 +7,7 @@
  * it when it deploys something.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { Messages } from "@/components/i18n/messages";
@@ -37,7 +38,7 @@ export default async function AccountDomainsPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("domains.page.title")}
                 </h1>
-                <p className="text-muted-foreground text-sm">{t("domains.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("domains.page.intro")}</p>
             </div>
             <Messages namespaces={["dns", "domainSecurity"]}>
                 <OwnerDomainsView

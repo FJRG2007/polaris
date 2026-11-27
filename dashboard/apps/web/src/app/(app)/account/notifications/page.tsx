@@ -5,6 +5,7 @@
  * older on demand.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { doNotDisturbOf } from "@/lib/presence-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { accessFor, requireUser, sessionCan } from "@/lib/session";
@@ -82,7 +83,7 @@ export default async function NotificationsPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("settings.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("settings.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.page.intro")}</p>
             </div>
             <NotificationsPageView
                 rules={shownRules}

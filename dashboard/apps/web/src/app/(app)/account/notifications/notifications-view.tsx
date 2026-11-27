@@ -32,7 +32,17 @@ import { NotificationFace } from "@/components/notifications/notification-face";
 import { describeAudience } from "@/components/notifications/notification-visuals";
 import { NotificationGroupMark } from "@/components/notification-group-mark";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
-import { Badge, Button, Card, CardBody, Checkbox, Input, Select, cn } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Checkbox,
+    Input,
+    Select,
+    cn,
+    settingType
+} from "@polaris/ui";
 import { Bell, Check, CheckCheck, ChevronDown, Loader2, Search, Trash2, X } from "lucide-react";
 
 /**
@@ -228,7 +238,7 @@ export function NotificationsView() {
                 the wrong thing from. */}
             {selected.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface/40 px-3 py-2">
-                    <span className="text-sm">
+                    <span className={settingType.body}>
                         {t("history.selected", { count: selected.length })}
                     </span>
                     <span className="flex-1" />
@@ -263,7 +273,7 @@ export function NotificationsView() {
 
             {rows.length === 0 ? (
                 <Card>
-                    <CardBody className="flex flex-col items-center gap-2 p-10 text-center text-sm text-muted-foreground">
+                    <CardBody className={cn(settingType.body, "flex flex-col items-center gap-2 p-10 text-center text-muted-foreground")}>
                         <Bell className="size-6" />
                         {narrowing ? t("history.noMatch") : t("history.empty")}
                     </CardBody>
@@ -285,7 +295,7 @@ export function NotificationsView() {
                                     : t("history.selectAll")
                             }
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("history.count", { count: rows.length })}
                         </span>
                     </div>
@@ -356,7 +366,7 @@ function NotificationRow({
             />
             <NotificationFace row={row} className="mt-0.5" />
             <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1.5 text-[0.8125rem] font-medium leading-5">
+                <p className={cn(settingType.body, "flex items-center gap-1.5 font-medium leading-5")}>
                     {!row.read ? (
                         <span className="size-1.5 shrink-0 rounded-full bg-primary" />
                     ) : null}
@@ -369,9 +379,9 @@ function NotificationRow({
                     )}
                 </p>
                 {row.body ? (
-                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{row.body}</p>
+                    <p className={cn(settingType.hint, "mt-0.5 line-clamp-2")}>{row.body}</p>
                 ) : null}
-                <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-muted-foreground/70">
+                <p className={cn(settingType.small, "mt-1 flex flex-wrap items-center gap-1.5 text-muted-foreground/70")}>
                     <RelativeTime iso={row.createdAt} />
                     <NotificationRepeats row={row} />
                     <span aria-hidden="true">-</span>
@@ -383,7 +393,7 @@ function NotificationRow({
                         </>
                     ) : null}
                     {row.actionRequired ? (
-                        <Badge variant="warning" className="px-1.5 py-0 text-[0.625rem]">
+                        <Badge variant="warning" className="px-1.5 py-0">
                             {t("history.states.action")}
                         </Badge>
                     ) : null}

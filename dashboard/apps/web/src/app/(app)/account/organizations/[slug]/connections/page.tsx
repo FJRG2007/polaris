@@ -8,6 +8,7 @@
  * the same check the actions behind them make.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
 import { requireOrgPage } from "@/lib/orgs/page-access";
@@ -41,7 +42,7 @@ export default async function OrganizationConnectionsPage({
         <div className="flex flex-col gap-4">
             <div>
                 <h2 className="text-base font-semibold">{t("connections.title")}</h2>
-                <p className="text-sm text-muted-foreground">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {canManage ? t("connections.intro") : t("connections.readOnly")}
                 </p>
             </div>
@@ -55,7 +56,7 @@ export default async function OrganizationConnectionsPage({
                     />
                 </Messages>
             ) : (
-                <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                <p className={cn(settingType.body, "rounded-lg border border-dashed border-border px-4 py-6 text-center text-muted-foreground")}>
                     {t("connections.empty")}
                 </p>
             )}

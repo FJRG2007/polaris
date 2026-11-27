@@ -7,6 +7,7 @@
  * Polaris itself is reached on.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { getPublicIp } from "@/lib/domain-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
@@ -40,7 +41,7 @@ export default async function OrganizationDomainsPage({
         <div className="flex flex-col gap-4">
             <div>
                 <h2 className="text-base font-semibold">{t("domains.title")}</h2>
-                <p className="text-muted-foreground text-sm">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {t("domains.intro", { org: org.name })}
                 </p>
             </div>

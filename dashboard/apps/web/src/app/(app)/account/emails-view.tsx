@@ -24,6 +24,7 @@ import { emailField } from "@polaris/core";
 import {
     Badge,
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -110,8 +111,8 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
             }
         >
             <div className="overflow-x-auto rounded-lg border border-border">
-                <table className="w-full text-sm">
-                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                <table className={cn(settingType.body, "w-full")}>
+                    <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                         <tr>
                             <th scope="col" className="w-full max-w-0 px-3 py-2 text-start font-medium">
                                 {t("emails.columns.address")}
@@ -143,8 +144,8 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                 </table>
             </div>
 
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
-            {notice ? <p className="text-sm text-success">{notice}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
+            {notice ? <p className={cn(settingType.body, "text-success")}>{notice}</p> : null}
 
             <AddEmailDialog
                 open={adding}
@@ -245,7 +246,7 @@ function EmailRow({
                                         <span className="flex min-w-0 flex-col">
                                             {t("emails.verify")}
                                             {mailReady ? null : (
-                                                <span className="text-xs text-muted-foreground">{t("emails.noChannel")}</span>
+                                                <span className={settingType.hint}>{t("emails.noChannel")}</span>
                                             )}
                                         </span>
                                     </DropdownMenuItem>
@@ -335,7 +336,7 @@ function AddEmailDialog({
                     <DialogDescription>{t("emails.recoveryHint")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("emails.columns.address")} *
                         <Input
                             type="email"
@@ -353,7 +354,7 @@ function AddEmailDialog({
                             <span className={settingType.error}>{t("emails.invalid")}</span>
                         ) : null}
                     </label>
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" disabled={busy} onClick={() => onOpenChange(false)}>
                             {tc("actions.cancel")}
@@ -421,11 +422,11 @@ function PromoteEmailDialog({
                     <DialogDescription>{t("emails.promoteDescription", { email: entry?.email ?? "" })}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("emails.currentPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             {tc("actions.cancel")}

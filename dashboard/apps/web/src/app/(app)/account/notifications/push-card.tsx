@@ -119,7 +119,7 @@ export function PushCard() {
             <CardHeader className="flex-row items-center justify-between gap-3">
                 <div className="min-w-0">
                     <CardTitle>{t("push.title")}</CardTitle>
-                    <p className="text-xs text-muted-foreground">{t("push.description")}</p>
+                    <p className={settingType.hint}>{t("push.description")}</p>
                 </div>
                 {standing === "on" ? (
                     <Button size="sm" variant="outline" onClick={turnOff} disabled={pending}>
@@ -132,7 +132,7 @@ export function PushCard() {
                 ) : null}
             </CardHeader>
             <CardBody className="space-y-1">
-                <p className="text-sm">
+                <p className={settingType.body}>
                     {standing === "desktop"
                         ? t("push.standing.desktop")
                         : t(`push.standing.${standing}`, { clientKind: inPhoneApp() ? "phone" : "other" })}

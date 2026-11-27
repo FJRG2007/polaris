@@ -11,7 +11,17 @@ import { useState, useTransition } from "react";
 import { quietHoursSchema, type QuietHours } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { saveQuietHoursAction } from "./actions";
-import { Button, Card, CardBody, CardHeader, CardTitle, Switch, DateInput, settingType } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Switch,
+    DateInput,
+    settingType,
+    cn
+} from "@polaris/ui";
 
 export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; timeZone: string }) {
     const t = useTranslations("accountNotifications");
@@ -43,7 +53,7 @@ export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; tim
             <CardHeader className="flex-row items-center justify-between gap-3">
                 <div className="min-w-0">
                     <CardTitle>{t("quiet.title")}</CardTitle>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("quiet.description", { zone: timeZone })}
                     </p>
                 </div>
@@ -55,7 +65,7 @@ export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; tim
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">{t("quiet.from")}</span>
                         <DateInput
                             mode="time"
@@ -64,7 +74,7 @@ export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; tim
                             onChange={(event) => setDraft({ ...draft, start: event.target.value })}
                         />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">{t("quiet.until")}</span>
                         <DateInput
                             mode="time"
@@ -74,7 +84,7 @@ export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; tim
                         />
                     </label>
                 </div>
-                <label className="flex items-center justify-between gap-3 text-sm">
+                <label className={cn(settingType.body, "flex items-center justify-between gap-3")}>
                     <span className="min-w-0">{t("quiet.critical")}</span>
                     <Switch
                         checked={draft.criticalBypass}

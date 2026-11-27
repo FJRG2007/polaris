@@ -48,7 +48,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { useSoundboardVolume } from "@/app/(app)/chat/soundboard-prefs";
 import { MicLevelMeter } from "@/app/(app)/chat/mic-level-meter";
-import { Button, Card, CardBody, Select, Switch, cn } from "@polaris/ui";
+import { Button, Card, CardBody, Select, Switch, cn, settingType } from "@polaris/ui";
 import { useMicGain, GAIN_MAX, GAIN_MIN } from "@/app/(app)/chat/mic-gain";
 import { NOISE_LEVELS, micConstraints, useMicCleanup } from "@/app/(app)/chat/mic-cleanup";
 import {
@@ -263,7 +263,7 @@ function MicrophoneCard({
                     </Button>
                 </div>
 
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     {t("devices.whichOne")}
                     <Select
                         value={chosenId ?? ""}
@@ -280,13 +280,13 @@ function MicrophoneCard({
                                 : [{ value: "", label: t("devices.mic.pressTest") }]
                         }
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("devices.mic.namesHint")}
                     </span>
                 </label>
 
                 <div className="flex flex-col gap-1.5">
-                    <span className="text-sm">{t("devices.mic.level")}</span>
+                    <span className={settingType.body}>{t("devices.mic.level")}</span>
                     {/* Drawn whether or not anything is being measured: an empty
                         row is what says the test is the thing that fills it. */}
                     <MicLevelMeter
@@ -300,7 +300,7 @@ function MicrophoneCard({
                         deviceId={chosenId}
                         threshold={showThreshold ? threshold : undefined}
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {call
                             ? t("devices.mic.inCall")
                             : testing
@@ -309,7 +309,7 @@ function MicrophoneCard({
                     </span>
                 </div>
 
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     {t("devices.mic.noise")}
                     <Select
                         value={cleanup}
@@ -324,7 +324,7 @@ function MicrophoneCard({
                             label: tChat(`callSettings.noise.${entry.value}.label` as const)
                         }))}
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {tChat(`callSettings.noise.${cleanup}.help` as const)}
                     </span>
                     {/* What the model DID, once it has been asked to. A setting
@@ -332,18 +332,18 @@ function MicrophoneCard({
                         the state that took a call's sound away and left nothing
                         anywhere to read; this is where it is readable. */}
                     {filterState?.problem ? (
-                        <span className="text-xs text-warning">
+                        <span className={cn(settingType.small, "text-warning")}>
                             {t("devices.mic.unfiltered", { problem: filterState.problem })}
                         </span>
                     ) : filterState ? (
-                        <span className="text-xs text-success">
+                        <span className={cn(settingType.small, "text-success")}>
                             {filterState.using === "gain"
                                 ? t("devices.mic.runningNoModel")
                                 : t("devices.mic.running", { model: filterState.using })}
                         </span>
                     ) : call?.micFilter ? (
                         // In a call, what the call's own filter is running.
-                        <span className="text-xs text-success">
+                        <span className={cn(settingType.small, "text-success")}>
                             {call.micFilter === "gain"
                                 ? t("devices.mic.runningNoModel")
                                 : t("devices.mic.running", { model: call.micFilter })}
@@ -352,7 +352,7 @@ function MicrophoneCard({
                 </label>
 
                 <div className="flex flex-col gap-1">
-                    <span className="flex items-center justify-between gap-2 text-sm">
+                    <span className={cn(settingType.body, "flex items-center justify-between gap-2")}>
                         {t("devices.mic.volume")}
                         <span className="tabular-nums text-muted-foreground">{percent(gain)}</span>
                     </span>
@@ -366,12 +366,12 @@ function MicrophoneCard({
                         onChange={(event) => setGain(Number(event.target.value) / 100)}
                         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("devices.mic.volumeHint")}
                     </span>
                 </div>
 
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );
@@ -554,7 +554,7 @@ function CameraCard() {
                     </Button>
                 </div>
 
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     {t("devices.whichOne")}
                     <Select
                         value={chosenId ?? ""}
@@ -589,12 +589,12 @@ function CameraCard() {
                     )}
                 />
                 {!showing ? (
-                    <p className="text-xs text-muted-foreground">{t("devices.camera.closed")}</p>
+                    <p className={settingType.hint}>{t("devices.camera.closed")}</p>
                 ) : inCall ? (
-                    <p className="text-xs text-muted-foreground">{t("devices.camera.inCall")}</p>
+                    <p className={settingType.hint}>{t("devices.camera.inCall")}</p>
                 ) : null}
 
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     {t("devices.camera.background")}
                     <Select
                         value={background}
@@ -615,7 +615,7 @@ function CameraCard() {
                             label: tChat(`callSettings.backgrounds.${entry.value}.label` as const)
                         }))}
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {tChat(`callSettings.backgrounds.${background}.help` as const)}
                     </span>
                 </label>
@@ -642,12 +642,12 @@ function CameraCard() {
                         onPick={(frame) => changeLook({ frame })}
                     />
                 </div>
-                <span className="-mt-2 text-xs text-muted-foreground">
+                <span className={cn(settingType.hint, "-mt-2")}>
                     {tChat("callSettings.look.help")}
                 </span>
 
                 <div className="flex flex-col gap-2">
-                    <span className="text-sm">{t("devices.camera.pictures")}</span>
+                    <span className={settingType.body}>{t("devices.camera.pictures")}</span>
                     <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                         {BACKGROUND_SCENES.map((scene) => (
                             <button
@@ -689,7 +689,7 @@ function CameraCard() {
                             aria-pressed={own}
                             onClick={askPicture}
                             className={cn(
-                                "flex aspect-video items-center justify-center overflow-hidden rounded-md border-2 text-xs text-muted-foreground transition-colors",
+                                settingType.small, "flex aspect-video items-center justify-center overflow-hidden rounded-md border-2 text-muted-foreground transition-colors",
                                 own
                                     ? "border-primary"
                                     : "border-dashed border-border-strong hover:border-primary"
@@ -702,7 +702,7 @@ function CameraCard() {
                             )}
                         </button>
                     </div>
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("devices.camera.pictureStays")}
                     </span>
                 </div>
@@ -711,21 +711,21 @@ function CameraCard() {
                 {/* What the model DID, once it has been asked to - the same
                     answer the microphone gives about its filter, and given for
                     the same reason. */}
-                {pickProblem ? <p className="text-sm text-danger">{pickProblem}</p> : null}
+                {pickProblem ? <p className={settingType.error}>{pickProblem}</p> : null}
                 {showing && !inCall && building ? (
-                    <p className="text-xs text-muted-foreground">{t("devices.camera.starting")}</p>
+                    <p className={settingType.hint}>{t("devices.camera.starting")}</p>
                 ) : null}
                 {showing && !inCall && maskState?.problem ? (
-                    <p className="text-xs text-warning">
+                    <p className={cn(settingType.small, "text-warning")}>
                         {t("devices.camera.failed", {
                             problem: cameraProblemText(maskState.problem, tChat)
                         })}
                     </p>
                 ) : showing && !inCall && maskState?.track ? (
-                    <p className="text-xs text-success">{t("devices.camera.running")}</p>
+                    <p className={cn(settingType.small, "text-success")}>{t("devices.camera.running")}</p>
                 ) : null}
 
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );
@@ -758,7 +758,7 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
             <CardBody className="flex flex-col gap-4">
                 <h2 className="text-sm font-medium">{t("devices.input.title")}</h2>
 
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     {t("devices.input.when")}
                     <Select
                         value={voice.inputMode}
@@ -769,14 +769,14 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                             label: tChat(`callSettings.inputModes.${mode}.label` as const)
                         }))}
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {tChat(`callSettings.inputModes.${voice.inputMode}.note` as const)}
                     </span>
                 </label>
 
                 {voice.inputMode === "ptt" ? (
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm">{t("devices.input.key")}</span>
+                        <span className={settingType.body}>{t("devices.input.key")}</span>
                         <Button
                             size="sm"
                             variant={listening ? "secondary" : "outline"}
@@ -784,7 +784,7 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                         >
                             {listening ? t("devices.input.pressKey") : keyName(voice.pttKey, t)}
                         </Button>
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("devices.input.keyHint")}
                         </span>
                     </div>
@@ -792,7 +792,7 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
 
                 {voice.inputMode === "activity" ? (
                     <div className="flex flex-col gap-1">
-                        <span className="flex items-center justify-between gap-2 text-sm">
+                        <span className={cn(settingType.body, "flex items-center justify-between gap-2")}>
                             {t("devices.input.threshold")}
                             <span className="tabular-nums text-muted-foreground">
                                 {voice.activityThreshold}
@@ -810,7 +810,7 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                             }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("devices.input.thresholdHint")}
                         </span>
                     </div>
@@ -818,7 +818,7 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
 
                 {voice.inputMode !== "open" ? (
                     <div className="flex flex-col gap-1">
-                        <span className="flex items-center justify-between gap-2 text-sm">
+                        <span className={cn(settingType.body, "flex items-center justify-between gap-2")}>
                             {t("devices.input.release")}
                             <span className="tabular-nums text-muted-foreground">
                                 {voice.pttReleaseMs} ms
@@ -836,7 +836,7 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                             }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("devices.input.releaseHint")}
                         </span>
                     </div>
@@ -859,10 +859,10 @@ function SoundboardCard() {
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("devices.soundboard.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("devices.soundboard.intro")}</p>
+                    <p className={settingType.hint}>{t("devices.soundboard.intro")}</p>
                 </div>
                 <div className="flex flex-col gap-1">
-                    <span className="flex items-center justify-between gap-2 text-sm">
+                    <span className={cn(settingType.body, "flex items-center justify-between gap-2")}>
                         {t("devices.soundboard.volume")}
                         <span className="tabular-nums text-muted-foreground">
                             {percent(volume)}
@@ -892,7 +892,7 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("devices.advanced.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("devices.advanced.intro")}</p>
+                    <p className={settingType.hint}>{t("devices.advanced.intro")}</p>
                 </div>
 
                 <Toggle
@@ -933,7 +933,7 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                 />
                 {voice.attenuate ? (
                     <div className="flex flex-col gap-1">
-                        <span className="flex items-center justify-between gap-2 text-sm">
+                        <span className={cn(settingType.body, "flex items-center justify-between gap-2")}>
                             {t("devices.advanced.howFar")}
                             <span className="tabular-nums text-muted-foreground">
                                 {voice.attenuation}%
@@ -951,13 +951,13 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                             }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("devices.advanced.howFarHint")}
                         </span>
                     </div>
                 ) : null}
                 <div className="flex flex-col gap-1">
-                    <span className="flex items-center justify-between gap-2 text-sm">
+                    <span className={cn(settingType.body, "flex items-center justify-between gap-2")}>
                         {t("devices.advanced.stream")}
                         <span className="tabular-nums text-muted-foreground">
                             {voice.streamAttenuation}%
@@ -975,7 +975,7 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                         }
                         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("devices.advanced.streamHint")}
                     </span>
                 </div>
@@ -1002,8 +1002,8 @@ function Toggle({
     return (
         <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-sm">{label}</span>
-                <span className="text-xs text-muted-foreground">{note}</span>
+                <span className={settingType.body}>{label}</span>
+                <span className={settingType.hint}>{note}</span>
             </div>
             <Switch checked={checked} onChange={onChange} aria-label={label} />
         </div>
@@ -1034,7 +1034,7 @@ function LookSelect<T extends string>({
 }) {
     const tChat = useTranslations("chat");
     return (
-        <label className="flex min-w-0 flex-col gap-1 text-sm">
+        <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
             {label}
             <Select
                 value={value}
