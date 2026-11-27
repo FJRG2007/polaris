@@ -39,9 +39,9 @@ export async function POST(request: Request): Promise<Response> {
     }
     const body = liveTurnBodySchema.safeParse(raw);
     if (!body.success) return refuse("invalid", 400);
-    const { threadId, parentId, temporary, user: said, assistant } = body.data;
+    const { threadId, parentId, temporary, projectId, user: said, assistant } = body.data;
 
-    const owned = await ensurePolarThread(user.id, threadId, said.text, null, null, temporary);
+    const owned = await ensurePolarThread(user.id, threadId, said.text, null, projectId, temporary);
     if (!owned) return refuse("not_found", 404);
     const messages: UIMessage[] = [
         { id: said.id, role: "user", parts: [{ type: "text", text: said.text }] },

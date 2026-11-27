@@ -76,6 +76,8 @@ export const liveTurnBodySchema = z
         parentId: z.string().trim().min(1).max(64).nullable().default(null),
         /** A new chat made temporary: kept that way when the call starts it. */
         temporary: z.boolean().default(false),
+        /** The project a new chat is filed under; ignored for one that exists. */
+        projectId: z.string().uuid().nullable().default(null),
         user: liveLine,
         assistant: liveLine
     })

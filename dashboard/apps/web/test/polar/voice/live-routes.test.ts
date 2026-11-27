@@ -158,6 +158,12 @@ describe("POST /api/polar/voice/live/turn", () => {
         ]);
         expect(state.ensured[0]).toEqual([OWNER, THREAD, "Hi", null, null, false]);
     });
+    it("files a new chat under the current project", async () => {
+        const project = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+        await save({ ...exchange, projectId: project });
+        expect(state.ensured[0]?.[4]).toBe(project);
+        expect((await save({ ...exchange, projectId: "not-a-uuid" })).status).toBe(400);
+    });
     it("keeps a new chat temporary", async () => {
         await save({ ...exchange, temporary: true });
         expect(state.ensured[0]?.[5]).toBe(true);
