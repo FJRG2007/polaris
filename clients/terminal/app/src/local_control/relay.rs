@@ -11,10 +11,11 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use ::local_control::{ControlError, ErrorCode, ErrorResponseEnvelope, RequestEnvelope};
 use futures::{SinkExt as _, StreamExt as _};
+use instant::Instant;
 use polaris_relay::{Incoming, Outgoing, PaneOutput, parse_incoming};
 use pterm_core::channel::ChannelState;
 use ptermui::{Entity, ModelContext, ModelSpawner, SingletonEntity};
