@@ -16,7 +16,7 @@
 
 import { messageToasts } from "@/lib/chat/toasts";
 import { readerWords } from "@/lib/i18n/reader-words";
-import { subscribeChatChanges } from "@/lib/chat/live";
+import { subscribeChatChanges, type ChatSubscription } from "@/lib/chat/live";
 import { holdStreamScope } from "@/lib/chat/stream-scope";
 import { backgroundUser, sessionCan } from "@/lib/session";
 import { pendingApprovals, subscribeSignInApprovals } from "@/lib/mobile/sign-in-approval";
@@ -28,8 +28,9 @@ export const dynamic = "force-dynamic";
 const HEARTBEAT_MS = 25_000;
 /** Messages in one conversation inside this window are one look-up. */
 const COALESCE_MS = 400;
-/** How old the answer to "which conversations is this person in" may be when a
- *  frame arrives for one outside it: being added to a conversation is that case. */
+/** How often "which conversations is this person in" is asked again, so a
+ *  conversation they were just added to starts ringing the phone. Shared with
+ *  their open chat tabs (`stream-scope.ts`), and never per message. */
 const SCOPE_TTL_MS = 10_000;
 
 export interface MobileNotice {
@@ -71,7 +72,8 @@ export async function GET(request: Request): Promise<Response> {
      *  another device (which names only the call) stops this phone ringing. */
     const rang = new Map<string, string>();
     let heartbeat: ReturnType<typeof setInterval> | null = null;
-    let unsubscribe: (() => void) | null = null;
+    let unsubscribe: ChatSubscription | null = null;
+    let rescope: ReturnType<typeof setInterval> | null = null;
     let unsubscribeApprovals: (() => void) | null = null;
     let closed = false;
     // Which phone, by its app version and an account prefix, never more: enough to
@@ -90,6 +92,8 @@ export async function GET(request: Request): Promise<Response> {
         waiting.clear();
         unsubscribe?.();
         unsubscribe = null;
+        if (rescope) clearInterval(rescope);
+        rescope = null;
         unsubscribeApprovals?.();
         unsubscribeApprovals = null;
     }
@@ -174,6 +178,15 @@ export async function GET(request: Request): Promise<Response> {
 
             if (chatAllowed) await scope.refresh();
             if (closed) return;
+            if (chatAllowed) {
+                // Indexed under the rooms this phone's account reaches, and
+                // moved with every new answer - the chat stream's way.
+                scope.onResolved(() => unsubscribe?.retarget(scope.reachable()));
+                rescope = setInterval(() => {
+                    if (Date.now() - scope.resolvedAt() >= SCOPE_TTL_MS) void scope.refresh();
+                }, SCOPE_TTL_MS);
+                rescope.unref?.();
+            }
 
             if (chatAllowed) unsubscribe = subscribeChatChanges((change) => {
                 if (closed) return;
@@ -219,14 +232,8 @@ export async function GET(request: Request): Promise<Response> {
                         });
                     }
                 };
-                if (scope.reachable().has(channelId) || Date.now() - scope.resolvedAt() < SCOPE_TTL_MS) {
-                    handle();
-                    return;
-                }
-                void scope.refresh().then(() => {
-                    if (!closed) handle();
-                });
-            });
+                handle();
+            }, { userId: actor.id, channels: scope.reachable() });
 
             unsubscribeApprovals = subscribeSignInApprovals((change) => {
                 if (closed || change.userId !== actor.id) return;

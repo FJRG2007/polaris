@@ -19,7 +19,7 @@
 
 import type { DeckCaller, DeckState } from "./types";
 import { reachableChannelIds } from "@/lib/chat/access";
-import { subscribeChatChanges, type ChatChange } from "@/lib/chat/live";
+import { subscribeChatChanges, type ChatChange, type ChatSubscription } from "@/lib/chat/live";
 import { onControlsChanged } from "@/lib/chat/call-remote-service";
 import { onDeckChanged } from "./live";
 import { readDeckStates, type DeckWatch, type DeckWords } from "./deck-service";
@@ -87,7 +87,7 @@ export function deckStateStream(
     let pending: ReturnType<typeof setTimeout> | null = null;
     let pendingAt = 0;
     const resends = new Set<ReturnType<typeof setTimeout>>();
-    let unsubscribe: (() => void) | null = null;
+    let unsubscribe: ChatSubscription | null = null;
     let offCalls: (() => void) | null = null;
     let offDeck: (() => void) | null = null;
 
@@ -171,9 +171,12 @@ export function deckStateStream(
                     }
                     if (chat && !unsubscribe) {
                         reachable = await reachableChannelIds({ id: caller.userId });
-                        unsubscribe = subscribeChatChanges((change) => {
-                            if (chatChangeConcerns(change, caller.userId, reachable)) wake();
-                        });
+                        unsubscribe = subscribeChatChanges(
+                            (change) => {
+                                if (chatChangeConcerns(change, caller.userId, reachable)) wake();
+                            },
+                            { userId: caller.userId, channels: reachable }
+                        );
                     }
                 } catch (caught) {
                     console.error("deck: state read failed", caught);
@@ -204,6 +207,7 @@ export function deckStateStream(
                     if (unsubscribe) {
                         void reachableChannelIds({ id: caller.userId }).then((found) => {
                             reachable = found;
+                            unsubscribe?.retarget(found);
                         });
                     }
                 }, DECK_STREAM.clockMs),

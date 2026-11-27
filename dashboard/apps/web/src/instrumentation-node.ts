@@ -201,6 +201,12 @@ export async function registerNode(): Promise<void> {
         console.error("polaris: could not prepare the call server key:", error)
     );
 
+    // Chat's live changes reach the other dashboard replicas, and theirs reach
+    // this one, from boot: a replica that has no stream open yet still has
+    // writers whose messages the others' readers are waiting for.
+    const { joinChatReplicas } = await import("./lib/chat/live-transport");
+    joinChatReplicas();
+
     // Analytics and Telemetry are apps to install; the installs an earlier
     // release made on its own are taken back (see `optional-app-carry`).
     const { undoFormerlyBuiltInCarry } = await import("./lib/apps/optional-app-carry");
