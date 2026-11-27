@@ -45,8 +45,8 @@ import {
 import { CodeModelPicker } from "@/components/polar/code-model-picker";
 import { neighbourSession, useCodeKeys, useStopTwice } from "@/components/polar/polar-code-keys";
 import { useCodeSteps, useCodeTheme } from "@/components/polar/polar-display";
-import { CodeStepCard, StepsOffer, StepsToggle, stepLine, stepsSummary } from "@/components/polar/code-steps-view";
-import { DEFAULT_CODE_STEP_VIEW } from "@/lib/polar/code-steps";
+import { CodeStepCard, CodeStepGroup, StepsOffer, StepsToggle, stepLine, stepsSummary } from "@/components/polar/code-steps-view";
+import { DEFAULT_CODE_STEP_VIEW, groupSteps } from "@/lib/polar/code-steps";
 import { CodeAccountSwitch } from "@/components/polar/code-account-switch";
 import { CodeAgentSwitch, canSwitchAgent } from "@/components/polar/code-agent-switch";
 import { KNOWN_ENGINES } from "@/components/polar/session-engine";
@@ -2016,7 +2016,7 @@ function CodeThread({
     const currentStep = (entries: readonly PolarCodeEntry[]): string | null => {
         const last = entries.at(-1);
         if (!last) return null;
-        return last.step ? stepLine(t, last.step, stepView) : last.text;
+        return last.step ? stepLine(t, last.step) : last.text;
     };
     // The places a stopped session can be continued on, read once it stopped.
     const places = useCodeComputers(!live && !!thread?.canManage && canPrompt);
@@ -2464,27 +2464,34 @@ function CodeThread({
                                     follow={{ open: stepView === "detailed" }}
                                 >
                                     <ol className="flex min-w-0 flex-col gap-1">
-                                        {block.entries.map((entry, line) =>
-                                            entry.step ? (
+                                        {groupSteps(block.entries).map((run, line) =>
+                                            run.kind === "group" ? (
+                                                <CodeStepGroup
+                                                    key={run.entries[0]!.id || `${run.entries[0]!.at}-${line}`}
+                                                    verb={run.verb}
+                                                    group={run.entries.map((entry) => entry.step!)}
+                                                    view={stepView}
+                                                />
+                                            ) : run.entry.step ? (
                                                 <CodeStepCard
-                                                    key={entry.id || `${entry.at}-${line}`}
-                                                    step={entry.step}
+                                                    key={run.entry.id || `${run.entry.at}-${line}`}
+                                                    step={run.entry.step}
                                                     view={stepView}
                                                 />
                                             ) : (
                                             <li
-                                                key={`${entry.at}-${line}`}
+                                                key={`${run.entry.at}-${line}`}
                                                 className="flex min-w-0 gap-1.5"
                                             >
                                                 <span className="shrink-0 font-medium">
-                                                    {entry.text}
+                                                    {run.entry.text}
                                                 </span>
-                                                {entry.detail ? (
+                                                {run.entry.detail ? (
                                                     <span
                                                         className="min-w-0 truncate"
-                                                        title={entry.detail}
+                                                        title={run.entry.detail}
                                                     >
-                                                        {entry.detail}
+                                                        {run.entry.detail}
                                                     </span>
                                                 ) : null}
                                             </li>

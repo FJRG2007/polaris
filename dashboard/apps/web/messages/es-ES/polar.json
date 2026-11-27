@@ -1225,8 +1225,8 @@
             "label": "Ver pasos",
             "failed": "No se pudo guardar cómo se ven los pasos. Inténtalo de nuevo.",
             "names": {
-                "compact": "En palabras",
-                "detailed": "Con código y salida"
+                "compact": "Una línea por paso",
+                "detailed": "Abiertos, con salida"
             }
         },
         "codeSuggestions": {
@@ -1253,7 +1253,6 @@
         "untitled": "Conversación",
         "file": "Archivo: {name}",
         "attachment": "adjunto",
-        "used": "Usó {name}",
         "truncated": "Solo se incluyen los {most} mensajes más recientes de este chat.",
         "title": "Exportar",
         "text": "Texto",
@@ -1421,7 +1420,6 @@
     "web": {
         "browserClose": "Cerrando pestaña",
         "toggle": "Buscar en la web",
-        "searching": "Buscando: {query}",
         "searched": "Buscó en la web",
         "reading": "Leyendo {site}",
         "sources": "Fuentes",
@@ -1442,7 +1440,10 @@
             "forward": "Avanzando en {site}",
             "reload": "Recargando {site}",
             "wait": "Esperando a la página"
-        }
+        },
+        "searchingFor": "Buscando en la web: {query}",
+        "searchedFor": "Buscó en la web: {query}",
+        "read": "Leyó {site}"
     },
     "repo": {
         "overview": "Viendo {repo}",
@@ -2050,26 +2051,6 @@
             "ended": "Sin salida"
         },
         "step": {
-            "runningCommand": "Ejecutando {command}",
-            "ranCommand": "Ejecutó {command}",
-            "runningAny": "Ejecutando un comando",
-            "ranAny": "Lanzó comando",
-            "editing": "Editando {file}",
-            "edited": "Editó {file}",
-            "editingAny": "Editando archivo",
-            "editedAny": "Editó un archivo",
-            "reading": "Leyendo {file}",
-            "read": "Leyó {file}",
-            "readingAny": "Leyendo un archivo",
-            "readAny": "Leyó archivo",
-            "searching": "Buscando en el código",
-            "searched": "Buscó en el código",
-            "browsing": "Consultando en la web",
-            "browsed": "Consultó en la web",
-            "delegating": "Pasando una parte a un ayudante",
-            "delegated": "Pasó una parte a un ayudante",
-            "using": "Usando {tool}",
-            "used": "Usó {tool}",
             "command": "Comando",
             "noOutput": "No devolvió nada",
             "took": "{seconds} s",
@@ -2078,15 +2059,115 @@
             "expandAll": "Abrir pasos",
             "collapseAll": "Plegar pasos",
             "offer": "¿Cómo quieres ver los pasos del agente? Puedes cambiarlo cuando quieras.",
-            "ranVerb": "Lanzó",
-            "runningVerb": "Ejecutando",
-            "readVerb": "Leyó",
-            "readingVerb": "Leyendo",
-            "editedVerb": "Editó",
-            "editingVerb": "Editando",
             "output": "Salida"
         },
-        "menu": "Más acciones"
+        "menu": "Más acciones",
+        "verb": {
+            "command": {
+                "running": "Ejecutando",
+                "done": "Lanzó",
+                "runningAny": "Ejecutando un comando",
+                "doneAny": "Lanzó un comando"
+            },
+            "shellOutput": {
+                "running": "Revisando un comando",
+                "done": "Revisó un comando"
+            },
+            "killShell": {
+                "running": "Deteniendo un comando",
+                "done": "Detuvo un comando"
+            },
+            "edit": {
+                "running": "Editando",
+                "done": "Editó",
+                "runningAny": "Editando archivo",
+                "doneAny": "Editó un archivo"
+            },
+            "write": {
+                "running": "Creando",
+                "done": "Creó",
+                "runningAny": "Creando un archivo",
+                "doneAny": "Creó un archivo"
+            },
+            "delete": {
+                "running": "Borrando",
+                "done": "Borró",
+                "runningAny": "Borrando un archivo",
+                "doneAny": "Borró un archivo"
+            },
+            "read": {
+                "running": "Leyendo",
+                "done": "Leyó",
+                "runningAny": "Leyendo un archivo",
+                "doneAny": "Leyó archivo"
+            },
+            "list": {
+                "running": "Listando",
+                "done": "Listó",
+                "runningAny": "Listando una carpeta",
+                "doneAny": "Listó una carpeta"
+            },
+            "grep": {
+                "running": "Buscando en el código",
+                "done": "Buscó en el código"
+            },
+            "glob": {
+                "running": "Buscando archivos",
+                "done": "Buscó archivos"
+            },
+            "webSearch": {
+                "running": "Buscando en la web",
+                "done": "Buscó en la web"
+            },
+            "webFetch": {
+                "running": "Leyendo",
+                "done": "Leyó",
+                "runningAny": "Leyendo una página",
+                "doneAny": "Leyó página"
+            },
+            "task": {
+                "running": "Pidiendo ayuda",
+                "done": "Pidió ayuda"
+            },
+            "todo": {
+                "running": "Actualizando el plan",
+                "done": "Actualizó el plan"
+            },
+            "ask": {
+                "running": "Preguntándote",
+                "done": "Te preguntó"
+            },
+            "plan": {
+                "running": "Proponiendo un plan",
+                "done": "Propuso un plan"
+            },
+            "skill": {
+                "running": "Cargando habilidad",
+                "done": "Cargó habilidad"
+            },
+            "memory": {
+                "running": "Guardando en memoria",
+                "done": "Guardó en memoria"
+            }
+        },
+        "group": {
+            "read": "{count, plural, one {Leyó # archivo} other {Leyó # archivos}}",
+            "list": "{count, plural, one {Listó # carpeta} other {Listó # carpetas}}",
+            "grep": "{count, plural, one {Buscó en el código una vez} other {Buscó en el código # veces}}",
+            "glob": "{count, plural, one {Buscó archivos una vez} other {Buscó archivos # veces}}",
+            "webSearch": "{count, plural, one {Buscó en la web una vez} other {Buscó en la web # veces}}",
+            "webFetch": "{count, plural, one {Leyó # página} other {Leyó # páginas}}",
+            "edit": "{count, plural, one {Editó # archivo} other {Editó # archivos}}",
+            "write": "{count, plural, one {Creó # archivo} other {Creó # archivos}}"
+        },
+        "result": {
+            "lines": "{count, plural, one {# línea} other {# líneas}}",
+            "matches": "{count, plural, one {# coincidencia} other {# coincidencias}}",
+            "files": "{count, plural, one {# archivo} other {# archivos}}",
+            "entries": "{count, plural, one {# elemento} other {# elementos}}",
+            "sources": "{count, plural, one {# fuente} other {# fuentes}}",
+            "none": "Sin resultado"
+        }
     },
     "compare": {
         "open": "Preguntar a varios",
@@ -2470,7 +2551,6 @@
         "you": "Tú",
         "report": "Informe",
         "noReport": "Aún sin informe.",
-        "usedTool": "Usó {tool}",
         "loadFailed": "No se pudo cargar la transcripción.",
         "retry": "Reintentar",
         "stopFailed": "Ya había terminado.",
@@ -2647,7 +2727,9 @@
         "bound": "Comandos en {server}",
         "boundRoot": "Comandos como root en {server}",
         "unbind": "Dejar de usar este servidor",
-        "step": "Ejecutar {command}"
+        "step": "Ejecutar {command}",
+        "stepRunning": "Ejecutando {command}",
+        "stepDone": "Ejecutó {command}"
     },
     "greetings": {
         "any": {
@@ -2805,5 +2887,12 @@
         "codeStop": "Usa /stop para parar el turno actual del agente",
         "codeNew": "Usa /new para empezar otra tarea mientras esta sigue",
         "codeExport": "Usa /export para descargar la transcripción de la sesión"
+    },
+    "repoDone": {
+        "overview": "Vio {repo}",
+        "list": "Vio {path}",
+        "read": "Leyó {path}",
+        "search": "Buscó {query} en {repo}",
+        "commits": "Vio commits de {repo}"
     }
 }

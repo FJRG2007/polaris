@@ -17,6 +17,8 @@ import type { SubagentTranscriptAnswer } from "@/lib/agents/session-files";
 import { readPoll } from "@/lib/poll-fetch";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { durationOf, StatusMark, useNow } from "@/components/polar/polar-subagents";
+import { toolLine } from "@/components/polar/code-steps-view";
+import { isHiddenStep } from "@/lib/polar/code-steps";
 
 const CARD = "flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card p-3";
 
@@ -153,20 +155,23 @@ function SubagentRow({
                     <p className="ms-7 py-1 text-xs text-muted-foreground">{t("code.subagents.noSteps")}</p>
                 ) : (
                     <ol className="ms-7 flex min-w-0 flex-col gap-0.5 border-s border-border ps-2 text-xs">
-                        {node.steps.map((step, index) => (
-                            <li key={step.id ?? index} className="flex min-w-0 items-center gap-2">
-                                <StatusMark status={step.status} />
-                                <span className="sr-only">{t(`subagents.status.${step.status}`)}</span>
-                                <span className="min-w-0 truncate" title={step.tool}>
-                                    {step.tool}
-                                </span>
-                                {step.startedAt !== null && step.endedAt !== null ? (
-                                    <span className="ms-auto shrink-0 tabular-nums text-muted-foreground">
-                                        {durationOf(t, step.startedAt, step.endedAt, now)}
+                        {node.steps.filter((step) => !isHiddenStep({ name: step.tool })).map((step, index) => {
+                            const line = toolLine(t, step.tool, step.status);
+                            // How long it took is on the hover, as on a thread's row.
+                            const took =
+                                step.startedAt !== null && step.endedAt !== null
+                                    ? durationOf(t, step.startedAt, step.endedAt, now)
+                                    : null;
+                            return (
+                                <li key={step.id ?? index} className="flex min-w-0 items-center gap-2">
+                                    <StatusMark status={step.status} />
+                                    <span className="sr-only">{t(`subagents.status.${step.status}`)}</span>
+                                    <span className="min-w-0 truncate" title={took ? `${line} - ${took}` : line}>
+                                        {line}
                                     </span>
-                                ) : null}
-                            </li>
-                        ))}
+                                </li>
+                            );
+                        })}
                     </ol>
                 )
             ) : null}
@@ -255,10 +260,10 @@ function SubagentTranscript({
                                 row.kind === "tool" ? (
                                     <p
                                         key={row.vendorId}
-                                        className="min-w-0 truncate font-mono text-xs text-foreground-muted"
+                                        className="min-w-0 truncate text-xs text-foreground-muted"
                                         title={row.body || row.subject}
                                     >
-                                        {t("subagents.usedTool", { tool: row.subject || "?" })}
+                                        {toolLine(t, row.subject || "tool", "done", row.body)}
                                     </p>
                                 ) : (
                                     <div key={row.vendorId} className="flex min-w-0 flex-col gap-1">

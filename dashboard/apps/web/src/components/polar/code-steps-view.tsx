@@ -3,10 +3,12 @@
 /**
  * The agent's work in a Polar Code thread, the way Claude Code on the web,
  * Cursor and Codex show theirs: one line per step that says what it is doing,
- * and each step opening into what it ran and what came back. "compact" keeps
- * the lines and hides the code until a step is opened; "detailed" opens every
- * card. Both are the person's pick (`code-steps.ts`), changed here or in
- * Polar's settings, and remembered on their account.
+ * and each step opening into what it ran and what came back. Every row says
+ * its verb in the tense of its state, the thing it acted on and what it found,
+ * from the one table in `code-steps.ts`; same-verb rows in a row fold into one.
+ * "compact" keeps the rows closed; "detailed" opens every card. Both are the
+ * person's pick (`code-steps.ts`), changed here or in Polar's settings, and
+ * remembered on their account.
  */
 
 import { cn } from "@polaris/ui";
@@ -25,6 +27,7 @@ import {
     XCircle
 } from "lucide-react";
 import * as steps from "@/lib/polar/code-steps";
+import { groupWords, stepTime, stepWords, type StepWords } from "@/lib/polar/step-words";
 import { CopyButton } from "@/components/copy-button";
 import type { PolarCodeEntry } from "@/lib/polar/code";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -32,6 +35,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { changeCodeSteps } from "@/components/polar/polar-display";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { CodeLine, JsonView, isValidJson } from "@/components/json-view";
+
+export { stepLine, toolLine } from "@/lib/polar/step-words";
 
 type Translate = NamespaceTranslator<"polar">;
 
@@ -48,90 +53,9 @@ const ICONS: Record<steps.CodeStepKind, ReactNode> = {
 /** Output longer than this many lines is clipped until "Show all". */
 const OUTPUT_LINES = 12;
 
-/** What a step is doing, in plain words: "Editing plan.ts", "Running a
- *  command". A developer's view names the command itself. */
-export function stepLine(t: Translate, step: steps.CodeToolStep, view: steps.CodeStepView): string {
-    const input = step.input.trim();
-    const path = input && !input.startsWith("{") && !/\s/.test(input) ? steps.baseName(input) : "";
-    const running = step.state === "running";
-    switch (step.kind) {
-        case "command": {
-            const shown = steps.stepCommand(step).split("\n", 1)[0]!.slice(0, 80);
-            if (view === "detailed" && shown)
-                return t(running ? "code.step.runningCommand" : "code.step.ranCommand", { command: shown });
-            return t(running ? "code.step.runningAny" : "code.step.ranAny");
-        }
-        case "edit":
-            return path
-                ? t(running ? "code.step.editing" : "code.step.edited", { file: path })
-                : t(running ? "code.step.editingAny" : "code.step.editedAny");
-        case "read":
-            return path
-                ? t(running ? "code.step.reading" : "code.step.read", { file: path })
-                : t(running ? "code.step.readingAny" : "code.step.readAny");
-        case "search":
-            return t(running ? "code.step.searching" : "code.step.searched");
-        case "web":
-            return t(running ? "code.step.browsing" : "code.step.browsed");
-        case "task":
-            return t(running ? "code.step.delegating" : "code.step.delegated");
-        default:
-            return t(running ? "code.step.using" : "code.step.used", { tool: step.name || "tool" });
-    }
-}
-
-/** What a step card's line shows beside its words: the command it ran, or the
- *  file it touched. */
-export type StepDetail = { readonly code: string } | { readonly file: string; readonly path: string } | null;
-
-/** A path a step was called with, when its input is one. */
-function pathOf(step: steps.CodeToolStep): string {
-    const input = step.input.trim();
-    return (step.kind === "read" || step.kind === "edit") && input && !input.startsWith("{") && !/\s/.test(input)
-        ? input
-        : "";
-}
-
-/**
- * A step card's line: a short verb with the command or the file beside it.
- * The command shows there only while the card is closed in the developer's
- * view - opened, the card shows it whole, so it is never said twice. Pure.
- */
-export function stepHead(
-    t: Translate,
-    step: steps.CodeToolStep,
-    view: steps.CodeStepView,
-    open: boolean
-): { label: string; detail: StepDetail } {
-    const running = step.state === "running";
-    if (step.kind === "command") {
-        const command = steps.stepCommand(step);
-        if (view === "detailed" && !open && command) {
-            return {
-                label: t(running ? "code.step.runningVerb" : "code.step.ranVerb"),
-                detail: { code: command.split("\n", 1)[0]! }
-            };
-        }
-        return { label: stepLine(t, step, "compact"), detail: null };
-    }
-    const path = pathOf(step);
-    if (path) {
-        const verb =
-            step.kind === "read"
-                ? running
-                    ? "code.step.readingVerb"
-                    : "code.step.readVerb"
-                : running
-                  ? "code.step.editingVerb"
-                  : "code.step.editedVerb";
-        return { label: t(verb), detail: { file: steps.baseName(path), path } };
-    }
-    return { label: stepLine(t, step, view), detail: null };
-}
-
 /** "12 steps: 4 commands, 3 edits" for a finished turn's folded line. */
 export function stepsSummary(t: Translate, entries: readonly PolarCodeEntry[]): string {
-    const tools = entries.flatMap((entry) => (entry.step ? [entry.step] : []));
+    const tools = entries.flatMap((entry) => (entry.step && !steps.isHiddenStep(entry.step) ? [entry.step] : []));
     if (tools.length === 0) return t("code.steps", { count: entries.length });
     const parts = steps
         .stepCounts(tools)
@@ -196,8 +120,8 @@ function StepInput({ step }: { step: steps.CodeToolStep }) {
         return <JsonView value={input} className="max-h-40" label={t("elements.parameters")} />;
     // The file's name is on the step's line; its whole path is said here only
     // when there is more of it than the name.
-    const path = pathOf(step);
-    if (path && steps.baseName(path) === path) return null;
+    const target = steps.stepTarget(step);
+    if (target && "file" in target && target.file === target.whole) return null;
     return (
         <p className="min-w-0 break-all rounded bg-muted/50 px-2 py-1.5">
             <CodeLine value={input} language="plaintext" className="text-[11px]" />
@@ -241,59 +165,108 @@ function StepOutput({ step }: { step: steps.CodeToolStep }) {
     );
 }
 
+/** The thing a row acted on, beside its words: a command or pattern painted
+ *  as code, a file as a chip, a query or a site as text. Cut by the width. */
+function TargetMark({ target }: { target: steps.StepTarget; }) {
+    if ("code" in target) {
+        return (
+            <span className="min-w-0 flex-1 truncate text-[11px]">
+                <CodeLine value={target.code} language="bash" />
+            </span>
+        );
+    }
+    if ("file" in target) {
+        return (
+            <span className="flex min-w-0 flex-1">
+                <span className="min-w-0 truncate rounded bg-muted px-1.5 font-mono text-[11px] text-foreground">
+                    {target.file}
+                </span>
+            </span>
+        );
+    }
+    return <span className="min-w-0 flex-1 truncate text-foreground-subtle">{target.text}</span>;
+}
+
+/** A row's hover: every word of it, whole, and how long it took. */
+function rowTitle(words: StepWords, time: string | null): string {
+    return [words.label, words.target?.whole, words.result, time].filter(Boolean).join(" - ");
+}
+
+/** The line a step or a fold opens from: its icon, its words, what it acted
+ *  on and what it found. */
+function StepRow({
+    icon,
+    words,
+    title,
+    open,
+    controls,
+    onToggle,
+    state
+}: {
+    icon: ReactNode;
+    words: StepWords;
+    title: string;
+    open: boolean;
+    controls: string;
+    onToggle: () => void;
+    state: steps.CodeStepState;
+}) {
+    return (
+        <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={controls}
+            onClick={onToggle}
+            title={title}
+            className={cn(
+                "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-start hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:min-h-11",
+                open && "text-foreground"
+            )}
+        >
+            {icon}
+            <span className={cn("min-w-0 truncate", words.target === null ? "flex-1" : "max-w-[45%] shrink-0")}>
+                {words.label}
+            </span>
+            {words.target === null ? null : <TargetMark target={words.target} />}
+            {words.result ? (
+                <span className="shrink-0 text-[11px] tabular-nums text-foreground-subtle">{words.result}</span>
+            ) : null}
+            <StateMark state={state} />
+            <ChevronDown
+                className={cn(
+                    "h-3.5 w-3.5 shrink-0 text-foreground-subtle transition-transform duration-fast",
+                    open && "rotate-180"
+                )}
+                aria-hidden
+            />
+        </button>
+    );
+}
+
 /** One step: its line, and under it what went in and what came back. */
-export function CodeStepCard({ step, view }: { step: steps.CodeToolStep; view: steps.CodeStepView }) {
+export function CodeStepCard({ step, view }: { step: steps.CodeToolStep; view: steps.CodeStepView; }) {
     const t = useTranslations("polar");
     const id = useId();
     const [open, setOpen] = useState(view === "detailed");
     // Expand all / collapse all wins over a click made before it.
     useEffect(() => setOpen(view === "detailed"), [view]);
-    const { label, detail } = stepHead(t, step, view, open);
-    // A line cut short by the width says itself whole on hover.
-    const whole = detail === null ? label : "code" in detail ? `${label} ${detail.code}` : `${label} ${detail.path}`;
+    const words = stepWords(t, step);
+    // Opened, the card shows the command whole, so the line does not say it twice.
+    const shown = open && words.target && "code" in words.target && steps.verbOfStep(step) === "command"
+        ? { ...words, target: null }
+        : words;
     return (
         <li className="min-w-0 list-none">
             <div className={cn("min-w-0 rounded-md border", open ? "border-border bg-background" : "border-transparent")}>
-                <button
-                    type="button"
-                    aria-expanded={open}
-                    aria-controls={id}
-                    onClick={() => setOpen(!open)}
-                    title={whole}
-                    className={cn(
-                        "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-start hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:min-h-11",
-                        open && "text-foreground"
-                    )}
-                >
-                    {ICONS[step.kind]}
-                    <span className={cn("min-w-0 truncate", detail === null ? "flex-1" : "max-w-[45%] shrink-0")}>
-                        {label}
-                    </span>
-                    {detail === null ? null : "code" in detail ? (
-                        <span className="min-w-0 flex-1 truncate text-[11px]">
-                            <CodeLine value={detail.code} language="bash" />
-                        </span>
-                    ) : (
-                        <span className="flex min-w-0 flex-1">
-                            <span className="min-w-0 truncate rounded bg-muted px-1.5 font-mono text-[11px] text-foreground">
-                                {detail.file}
-                            </span>
-                        </span>
-                    )}
-                    {step.ms !== null && step.state !== "running" ? (
-                        <span className="shrink-0 text-[11px] tabular-nums text-foreground-subtle">
-                            {t("code.step.took", { seconds: Math.max(0.1, Math.round(step.ms / 100) / 10) })}
-                        </span>
-                    ) : null}
-                    <StateMark state={step.state} />
-                    <ChevronDown
-                        className={cn(
-                            "h-3.5 w-3.5 shrink-0 text-foreground-subtle transition-transform duration-fast",
-                            open && "rotate-180"
-                        )}
-                        aria-hidden
-                    />
-                </button>
+                <StepRow
+                    icon={ICONS[step.kind]}
+                    words={shown}
+                    title={rowTitle(words, step.state === "running" ? null : stepTime(t, step.ms))}
+                    open={open}
+                    controls={id}
+                    onToggle={() => setOpen(!open)}
+                    state={step.state}
+                />
                 {open ? (
                     <div id={id} className="flex min-w-0 flex-col gap-2 border-t border-border p-2">
                         <StepInput step={step} />
@@ -301,6 +274,46 @@ export function CodeStepCard({ step, view }: { step: steps.CodeToolStep; view: s
                     </div>
                 ) : null}
             </div>
+        </li>
+    );
+}
+
+/** Several steps of one verb in a row, folded into one line ("Read 3 files")
+ *  that opens into each of them. */
+export function CodeStepGroup({
+    verb,
+    group,
+    view
+}: {
+    verb: steps.CodeStepVerb;
+    group: readonly steps.CodeToolStep[];
+    view: steps.CodeStepView;
+}) {
+    const t = useTranslations("polar");
+    const id = useId();
+    const [open, setOpen] = useState(view === "detailed");
+    useEffect(() => setOpen(view === "detailed"), [view]);
+    const words = groupWords(t, verb, group);
+    const timed = group.flatMap((step) => (step.ms === null ? [] : [step.ms]));
+    const total = timed.length > 0 ? timed.reduce((sum, ms) => sum + ms, 0) : null;
+    return (
+        <li className="min-w-0 list-none">
+            <StepRow
+                icon={ICONS[group[0]!.kind]}
+                words={words}
+                title={rowTitle(words, stepTime(t, total))}
+                open={open}
+                controls={id}
+                onToggle={() => setOpen(!open)}
+                state="done"
+            />
+            {open ? (
+                <ol id={id} className="ms-4 flex min-w-0 flex-col gap-1 border-s border-border ps-2">
+                    {group.map((step, index) => (
+                        <CodeStepCard key={index} step={step} view={view} />
+                    ))}
+                </ol>
+            ) : null}
         </li>
     );
 }

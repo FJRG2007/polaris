@@ -14,6 +14,7 @@
  */
 
 import * as serverCommand from "@/lib/polar/server-command";
+import * as codeSteps from "@/lib/polar/code-steps";
 import Link from "next/link";
 import { PolarAllowedContext } from "./polar-allowed";
 import { PolarFailureNotice } from "./polar-failure";
@@ -3575,16 +3576,23 @@ function MessageView({
                 ? t("visual.tool")
                 : name === "polar_weather"
                   ? t("visual.weather.tool")
-                  : name);
-    // A web step names what it searched for or which site it read.
-    const stepTitle = (name: string, input: unknown) => {
+                  : // A tool with no title of its own is said in words, never by its id.
+                    codeSteps.humanToolName(name).label);
+    // A step says what it is doing while it runs and what it did once done,
+    // with what it searched for or which site it read (`step-words.ts`).
+    const stepTitle = (name: string, input: unknown, state?: string) => {
+        const done = state === "output-available" || state === "output-error";
         const run = serverCommand.serverCommandOf(name, input);
-        if (run) return t("server.step", { command: run.command.split("\n")[0]!.slice(0, 80) });
+        if (run)
+            return t(done ? "server.stepDone" : "server.stepRunning", {
+                command: run.command.split("\n")[0]!.slice(0, 80)
+            });
         const repo = repoStepOf(name, input);
         if (repo) {
+            const group = done ? "repoDone" : "repo";
             return repo.kind === "search"
-                ? t("repo.search", { repo: repo.repo, query: repo.detail })
-                : t(`repo.${repo.kind}`, { repo: repo.repo, path: repo.detail });
+                ? t(`${group}.search`, { repo: repo.repo, query: repo.detail })
+                : t(`${group}.${repo.kind}`, { repo: repo.repo, path: repo.detail });
         }
         const browser = browserStepOf(name, input);
         if (browser) {
@@ -3594,8 +3602,9 @@ function MessageView({
         }
         const step = webStepOf(name, input);
         if (!step) return toolName(name);
-        if (step.kind === "read") return t("web.reading", { site: step.detail });
-        return step.detail ? t("web.searching", { query: step.detail }) : t("web.searched");
+        if (step.kind === "read") return t(done ? "web.read" : "web.reading", { site: step.detail });
+        if (!step.detail) return t(done ? "web.searched" : "code.verb.webSearch.running");
+        return t(done ? "web.searchedFor" : "web.searchingFor", { query: step.detail });
     };
     const sources = mine ? [] : sourcesOf(message.parts as never);
     // A repository read refused over the GitHub App carries the step that fixes
@@ -3627,6 +3636,8 @@ function MessageView({
         if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") return null;
         const tool = part as unknown as ToolPart;
         const name = part.type === "dynamic-tool" ? (tool.toolName ?? "tool") : part.type.slice(5);
+        // Finding which tool to load is Polar's housekeeping, not a step.
+        if (codeSteps.isHiddenStep({ name })) return null;
         return { tool, name };
     };
     // Thinking and tool calls fold into one line above the answer. A call
@@ -3661,7 +3672,7 @@ function MessageView({
     const current =
         lastTool &&
         (lastTool.tool.state === "input-streaming" || lastTool.tool.state === "input-available")
-            ? stepTitle(lastTool.name, lastTool.tool.input)
+            ? stepTitle(lastTool.name, lastTool.tool.input, lastTool.tool.state)
             : null;
     const workIndex = message.parts.findIndex(folded);
     const renderTool = (part: UIMessage["parts"][number], index: number, opened = false) => {
@@ -3671,7 +3682,7 @@ function MessageView({
         return (
             <Tool
                 key={index}
-                title={stepTitle(name, tool.input)}
+                title={stepTitle(name, tool.input, tool.state)}
                 state={tool.state}
                 orb={orbForTool(part)}
                 defaultOpen={opened}

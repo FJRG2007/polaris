@@ -27,6 +27,7 @@ import {
 import * as shared from "@/lib/polar/subagents/shared";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { enterBreaksLine } from "@/lib/enter-key";
+import { toolLine } from "@/components/polar/code-steps-view";
 
 /** How often a running subagent is read again. */
 const POLL_MS = 2_500;
@@ -186,7 +187,7 @@ export function SubagentCard({
                                                   : "failed"
                                         }
                                     />
-                                    <span className="min-w-0 truncate font-mono" title={step.tool}>{step.tool}</span>
+                                    <span className="min-w-0 truncate" title={step.tool}>{toolLine(t, step.tool, step.state)}</span>
                                 </li>
                             ))}
                         </ol>
@@ -353,8 +354,8 @@ export function SubagentDialog({
                                 : [{ role: "task" as const, text: detail.prompt }]
                             ).map((line, index) =>
                                 line.role === "tool" ? (
-                                    <p key={index} className="min-w-0 truncate font-mono text-xs text-foreground-muted">
-                                        {t("subagents.usedTool", { tool: line.tool ?? "?" })}
+                                    <p key={index} className="min-w-0 truncate text-xs text-foreground-muted">
+                                        {toolLine(t, line.tool ?? "tool", "done")}
                                     </p>
                                 ) : (
                                     <div key={index} className="flex min-w-0 flex-col gap-1">

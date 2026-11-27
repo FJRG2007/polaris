@@ -16,6 +16,8 @@ import { prisma } from "@polaris/db";
 import { escapeHtml } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { shownParts } from "@/lib/polar/control-tags";
+import { toolLine } from "@/lib/polar/step-words";
+import { isHiddenStep } from "@/lib/polar/code-steps";
 import { compactionOf } from "@/lib/polar/compaction";
 import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 import { isVisualPart, visualPartMarkdown } from "@/lib/polar/visuals";
@@ -69,7 +71,8 @@ export async function exportNames(): Promise<ExportNames> {
         untitled: t("export.untitled"),
         attachment: t("export.attachment"),
         file: (name) => t("export.file", { name }),
-        used: (name) => t("export.used", { name }),
+        // A tool in the words its step says, never its id (`step-words.ts`).
+        used: (name) => toolLine(t, name, "done"),
         truncated: t("export.truncated", { most: EXPORT_MESSAGES_MOST }),
         compacted: (auto) => t(auto ? "compact.dividerAuto" : "compact.divider"),
         columns: [t("export.columnTime"), t("export.columnAuthor"), t("export.columnMessage")]
@@ -124,7 +127,7 @@ function partsMarkdown(parts: readonly unknown[], names: ExportNames): string {
             if (visual) lines.push(visual);
         } else if (type.startsWith("tool-") || type === "dynamic-tool") {
             const name = type === "dynamic-tool" ? String(part.toolName ?? "tool") : type.slice(5);
-            lines.push(`> ${names.used(name)}`);
+            if (!isHiddenStep({ name })) lines.push(`> ${names.used(name)}`);
         }
     }
     return lines.join("\n\n");

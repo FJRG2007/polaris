@@ -54,11 +54,43 @@ describe("CodeStepCard", () => {
         expect(times(view.container.textContent ?? "", COMMAND)).toBe(1);
     });
 
-    it("keeps the compact line to words", () => {
+    it("names the command on the closed line in either view, like Claude Code's Bash(npm test)", () => {
         const view = card(command, "compact");
-        expect(view.container.textContent).not.toContain("chromium");
-        fireEvent.click(screen.getByRole("button", { expanded: false }));
+        const button = screen.getByRole("button", { expanded: false });
+        expect(button.textContent).toContain("Ran");
+        expect(button.textContent).toContain(COMMAND);
+        fireEvent.click(button);
         expect(times(view.container.textContent ?? "", COMMAND)).toBe(1);
+    });
+
+    it("keeps the time on the hover, not on the line", () => {
+        card(command, "compact");
+        const button = screen.getByRole("button", { expanded: false });
+        expect(button.textContent).not.toContain("1.3 s");
+        expect(button.getAttribute("title")).toContain("1.3 s");
+    });
+
+    it("says a finished search, its pattern and what it found", () => {
+        const grep: CodeToolStep = { name: "Grep", kind: "search", input: "useSteps", output: "Found 12 files\na.ts", state: "done", ms: 80 };
+        card(grep, "compact");
+        const line = screen.getByRole("button", { expanded: false }).textContent ?? "";
+        expect(line).toContain("Searched the code");
+        expect(line).toContain("useSteps");
+        expect(line).toContain("12 matches");
+    });
+
+    it("says a running search in the present", () => {
+        const web: CodeToolStep = { name: "WebSearch", kind: "web", input: "polaris distance", output: "", state: "running", ms: null };
+        card(web, "compact");
+        expect(screen.getByRole("button", { expanded: false }).textContent).toContain("Searching the web");
+    });
+
+    it("never names a tool by its id", () => {
+        const mcp: CodeToolStep = { name: "mcp__github__create_issue", kind: "other", input: "{}", output: "", state: "done", ms: null };
+        card(mcp, "compact");
+        const line = screen.getByRole("button", { expanded: false }).textContent ?? "";
+        expect(line).toContain("Create issue");
+        expect(line).not.toMatch(/Used|mcp__/);
     });
 
     it("never shows the fence an agent wraps output in", () => {

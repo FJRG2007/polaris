@@ -65,8 +65,8 @@ describe("CodeSubagents", () => {
 
         expect(screen.queryByText("Grep")).toBeNull();
         await userEvent.click(screen.getByText("Find the API routes"));
-        expect(screen.getByText("Grep")).toBeTruthy();
-        expect(screen.getByText("Read")).toBeTruthy();
+        expect(screen.getByText("Searched the code")).toBeTruthy();
+        expect(screen.getByText("Read a file")).toBeTruthy();
         expect(screen.getByText("Failed")).toBeTruthy();
 
         await userEvent.click(screen.getByText("No description"));
@@ -107,7 +107,7 @@ describe("CodeSubagents", () => {
             await userEvent.click(open[0]!);
             expect(await screen.findByText("There are two.")).toBeTruthy();
             expect(screen.getByText("Task")).toBeTruthy();
-            expect(screen.getByText("Used Grep")).toBeTruthy();
+            expect(screen.getByText("Searched the code route")).toBeTruthy();
             expect(screen.getByText("Only the start of a long transcript is shown.")).toBeTruthy();
             const url = String(fetchMock.mock.calls[0]?.[0]);
             expect(url).toBe("/api/polar/code/subagent?sessionId=s1&agentId=a1");

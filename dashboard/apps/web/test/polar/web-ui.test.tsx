@@ -140,12 +140,12 @@ describe("Polar on the web", () => {
         expect(kept.get("polar.toolsOff")).toBe(JSON.stringify(["read_tasks"]));
     });
 
-    it("names what each step searched for and which site it read", async () => {
+    it("names in the past what each step searched for and which site it read", async () => {
         answer([searched, read, { type: "text", text: "About 433 light-years." }]);
         mount();
         fireEvent.click(await screen.findByRole("button", { name: /Worked for 4 s/ }));
-        expect(screen.getAllByText("Searching: Polaris distance").length).toBeGreaterThan(0);
-        expect(screen.getAllByText("Reading nasa.gov").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("Searched the web for Polaris distance").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("Read nasa.gov").length).toBeGreaterThan(0);
     });
 
     it("lists the sources under the answer and cites them by number", async () => {
