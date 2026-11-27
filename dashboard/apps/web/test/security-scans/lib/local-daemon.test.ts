@@ -2,7 +2,9 @@
  * A scan on this machine goes through the host daemon. A Polaris without one
  * (the limited edition) is told so for good; a daemon that is only down for now
  * is a scan to try again, and the hourly export sweep leaves a missing daemon
- * alone instead of dialling it.
+ * alone instead of dialling it. A daemon older than the action it is asked for
+ * (Restart now on an install not updated since) is a Polaris update to offer,
+ * never a generic failure.
  */
 
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -13,7 +15,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const daemon = vi.hoisted(() => ({
     healthy: false,
     configured: false,
-    listed: 0
+    listed: 0,
+    outdated: false
 }));
 
 vi.mock("@polaris/hostd-client", async (original) => {
@@ -32,7 +35,7 @@ vi.mock("@polaris/hostd-client", async (original) => {
                 return [];
             }
             async hostSecurity() {
-                return { exitCode: 0, output: "" };
+                return daemon.outdated ? null : { exitCode: 0, output: "" };
             }
         },
         RealHostdClient: actual.HostdClient
@@ -74,6 +77,7 @@ describe("security scans on this machine", () => {
         daemon.healthy = false;
         daemon.configured = false;
         daemon.listed = 0;
+        daemon.outdated = false;
     });
 
     it("says there is no host service when this Polaris has none", async () => {
@@ -89,6 +93,13 @@ describe("security scans on this machine", () => {
         daemon.healthy = true;
         daemon.configured = true;
         expect(await failure()).toBeNull();
+    });
+
+    it("names the update when the host service predates the action", async () => {
+        daemon.healthy = true;
+        daemon.configured = true;
+        daemon.outdated = true;
+        expect(await failure()).toBe("daemonOutdated");
     });
 
     it("does not sweep exports on a Polaris with no host service", async () => {
@@ -123,5 +134,25 @@ describe("HostdClient.configured", async () => {
             tokenFile: join(dir, "absent.token")
         });
         expect(await client.configured()).toBe(true);
+    });
+});
+
+describe("HostdClient.hostSecurity on an older daemon", async () => {
+    const { RealHostdClient } = (await import("@polaris/hostd-client")) as unknown as {
+        RealHostdClient: typeof import("@polaris/hostd-client").HostdClient;
+    };
+    // A daemon that predates an action refuses its name as a bad request.
+    const answering = (status: number) => {
+        const client = new RealHostdClient({ tcpUrl: "http://127.0.0.1:1" });
+        Object.assign(client, { call: async () => ({ status, body: "invalid host security request" }) });
+        return client;
+    };
+
+    it("reads a refused reboot-now as a daemon to update", async () => {
+        expect(await answering(400).hostSecurity("reboot-now")).toBeNull();
+    });
+
+    it("keeps any other refusal a failure", async () => {
+        await expect(answering(500).hostSecurity("reboot-now")).rejects.toThrow(/500/);
     });
 });

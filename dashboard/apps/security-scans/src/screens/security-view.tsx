@@ -16,6 +16,7 @@ import { ImagesPanel } from "./images-panel";
 import { FirewallPanel } from "./firewall-panel";
 import { SshPanel } from "./ssh-panel";
 import { FocusCard, verdictLine } from "./focus-card";
+import { CanUpdateContext, ErrorLine } from "./error-line";
 import * as schemas from "../model/schemas";
 import * as subjects from "../model/subjects";
 import { NO_LANDING, SECURITY_PATH, type HostFocus, type Landing } from "../model/landing";
@@ -124,7 +125,14 @@ function serverLabel(server: Server, t: SecurityTranslator): string {
     return server.local ? `${server.name} (${t("thisServer")})` : server.name;
 }
 
-export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
+export function SecurityView({
+    landing = NO_LANDING,
+    canUpdate = false
+}: {
+    landing?: Landing;
+    /** Whether the viewer may run the Polaris update. */
+    canUpdate?: boolean;
+}) {
     const t = useSecurityT();
     const [servers, setServers] = useState<Servers | null>(() => cacheRead("security:servers"));
     const [serversFailed, setServersFailed] = useState(false);
@@ -136,11 +144,16 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
     );
     const [busy, setBusy] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
+    // A failed action keeps its code, for the way out it may offer.
+    const [noticeError, setNoticeError] = useState<string | null>(null);
     const [focusOpen, setFocusOpen] = useState(true);
 
     const error = useCallback(
-        (code: string) => setNotice(t(`errors.${code}` as never) || t("errors.failed")),
-        [t]
+        (code: string) => {
+            setNotice(null);
+            setNoticeError(code);
+        },
+        []
     );
 
     // Never the whole list: the server chosen (or linked), read back by id, and
@@ -208,6 +221,7 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
     const submit = useCallback(
         async (work: () => Promise<{ ok: boolean; error?: string }>, done?: string) => {
             setNotice(null);
+            setNoticeError(null);
             const result = await work();
             if (!result.ok) return error(result.error ?? "failed");
             if (done) setNotice(done);
@@ -223,135 +237,142 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
     );
 
     return (
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
-            <header className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                    <h1 className="flex items-center gap-2 text-xl font-semibold">
-                        <ShieldCheck className="size-5 shrink-0" aria-hidden /> {t("title")}
-                    </h1>
-                    <p className="text-sm text-muted-foreground">{t("intro")}</p>
-                </div>
-                {servers && servers.length > 0 ? (
-                    <div className="flex min-w-0 items-center gap-2 text-sm">
-                        <span className="min-w-0 max-w-full shrink-0 truncate" title={t("server")}>{t("server")}</span>
-                        <PagedPicker<Server>
-                            className="h-8 min-w-0 max-w-[16rem]"
-                            read={actions.serverOptionsAction}
-                            scope={{}}
-                            cache="security:server-options"
-                            value={current}
-                            onValueChange={choose}
-                            selectedLabel={server ? serverLabel(server, t) : undefined}
-                            itemLabel={(s) => serverLabel(s, t)}
-                            aria-label={t("server")}
-                            placeholder={t("server")}
-                            searchPlaceholder={t("serverSearch")}
-                            emptyText={t("serverEmpty")}
-                        />
+        <CanUpdateContext.Provider value={canUpdate}>
+            <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
+                <header className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                        <h1 className="flex items-center gap-2 text-xl font-semibold">
+                            <ShieldCheck className="size-5 shrink-0" aria-hidden /> {t("title")}
+                        </h1>
+                        <p className="text-sm text-muted-foreground">{t("intro")}</p>
+                    </div>
+                    {servers && servers.length > 0 ? (
+                        <div className="flex min-w-0 items-center gap-2 text-sm">
+                            <span className="min-w-0 max-w-full shrink-0 truncate" title={t("server")}>{t("server")}</span>
+                            <PagedPicker<Server>
+                                className="h-8 min-w-0 max-w-[16rem]"
+                                read={actions.serverOptionsAction}
+                                scope={{}}
+                                cache="security:server-options"
+                                value={current}
+                                onValueChange={choose}
+                                selectedLabel={server ? serverLabel(server, t) : undefined}
+                                itemLabel={(s) => serverLabel(s, t)}
+                                aria-label={t("server")}
+                                placeholder={t("server")}
+                                searchPlaceholder={t("serverSearch")}
+                                emptyText={t("serverEmpty")}
+                            />
+                        </div>
+                    ) : null}
+                </header>
+
+                {focusOpen ? (
+                    <FocusCard
+                        t={t}
+                        landing={landing}
+                        onTarget={(id) => setServerId((chosen) => chosen ?? id)}
+                        onClose={() => {
+                            setFocusOpen(false);
+                            // The link has been read: a reload opens the plain page.
+                            try {
+                                if (window.location.search)
+                                    window.history.replaceState(null, "", SECURITY_PATH);
+                            } catch {
+                                /* the address bar is a convenience */
+                            }
+                        }}
+                        submit={submit}
+                    />
+                ) : null}
+
+                <nav className="flex gap-1 overflow-x-auto border-b border-border" role="tablist">
+                    {TABS.map(({ id, icon: Icon }) => (
+                        <button
+                            key={id}
+                            role="tab"
+                            aria-selected={tab === id}
+                            onClick={() => setTab(id)}
+                            className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm ${
+                                tab === id
+                                    ? "border-primary text-foreground"
+                                    : "border-transparent text-muted-foreground"
+                            }`}
+                        >
+                            <Icon className="size-4" aria-hidden /> {t(`tabs.${id}`)}
+                        </button>
+                    ))}
+                </nav>
+
+                {failed && overview ? (
+                    // With results already on screen, a failed refresh is said, not hidden.
+                    <p role="status" className="rounded-md bg-muted px-3 py-2 text-sm">
+                        {t("refreshFailed")}
+                    </p>
+                ) : null}
+                {notice ? (
+                    <p role="status" className="rounded-md bg-muted px-3 py-2 text-sm">
+                        {notice}
+                    </p>
+                ) : null}
+                {noticeError ? (
+                    <div role="status" className="rounded-md bg-muted px-3 py-2 text-sm">
+                        <ErrorLine t={t} code={noticeError} className="" />
                     </div>
                 ) : null}
-            </header>
 
-            {focusOpen ? (
-                <FocusCard
-                    t={t}
-                    landing={landing}
-                    onTarget={(id) => setServerId((chosen) => chosen ?? id)}
-                    onClose={() => {
-                        setFocusOpen(false);
-                        // The link has been read: a reload opens the plain page.
-                        try {
-                            if (window.location.search)
-                                window.history.replaceState(null, "", SECURITY_PATH);
-                        } catch {
-                            /* the address bar is a convenience */
+                {servers && servers.length === 0 ? (
+                    <EmptyState icon={<ShieldCheck />} title={t("noServers")} />
+                ) : (serversFailed && !servers) || (failed && !overview) ? (
+                    // The retry reads whatever failed: the server list, or this server.
+                    <EmptyState
+                        icon={<ShieldCheck />}
+                        title={t("loadFailed")}
+                        action={
+                            <Button
+                                onClick={() => {
+                                    if (!servers) void loadServers();
+                                    void load();
+                                }}
+                            >
+                                {t("tryAgain")}
+                            </Button>
                         }
-                    }}
-                    submit={submit}
-                />
-            ) : null}
-
-            <nav className="flex gap-1 overflow-x-auto border-b border-border" role="tablist">
-                {TABS.map(({ id, icon: Icon }) => (
-                    <button
-                        key={id}
-                        role="tab"
-                        aria-selected={tab === id}
-                        onClick={() => setTab(id)}
-                        className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm ${
-                            tab === id
-                                ? "border-primary text-foreground"
-                                : "border-transparent text-muted-foreground"
-                        }`}
-                    >
-                        <Icon className="size-4" aria-hidden /> {t(`tabs.${id}`)}
-                    </button>
-                ))}
-            </nav>
-
-            {failed && overview ? (
-                // With results already on screen, a failed refresh is said, not hidden.
-                <p role="status" className="rounded-md bg-muted px-3 py-2 text-sm">
-                    {t("refreshFailed")}
-                </p>
-            ) : null}
-            {notice ? (
-                <p role="status" className="rounded-md bg-muted px-3 py-2 text-sm">
-                    {notice}
-                </p>
-            ) : null}
-
-            {servers && servers.length === 0 ? (
-                <EmptyState icon={<ShieldCheck />} title={t("noServers")} />
-            ) : (serversFailed && !servers) || (failed && !overview) ? (
-                // The retry reads whatever failed: the server list, or this server.
-                <EmptyState
-                    icon={<ShieldCheck />}
-                    title={t("loadFailed")}
-                    action={
-                        <Button
-                            onClick={() => {
-                                if (!servers) void loadServers();
-                                void load();
-                            }}
-                        >
-                            {t("tryAgain")}
-                        </Button>
-                    }
-                />
-            ) : !overview || !current ? (
-                <Skeleton className="h-48 w-full" />
-            ) : (
-                <>
-                    {tab === "malware" ? (
-                        <MalwarePanel
-                            t={t}
-                            overview={overview}
-                            targetId={current}
-                            submit={submit}
-                        />
-                    ) : tab === "files" ? (
-                        <FilesPanel t={t} overview={overview} targetId={current} submit={submit} />
-                    ) : tab === "host" ? (
-                        <HostPanel
-                            t={t}
-                            targetId={current}
-                            server={server}
-                            submit={submit}
-                            focus={current === landing.target ? landing.focus : null}
-                        />
-                    ) : (
-                        <ImagesPanel
-                            t={t}
-                            apps={overview.apps}
-                            targetId={current}
-                            submit={submit}
-                        />
-                    )}
-                    <History t={t} scans={scans} submit={submit} />
-                </>
-            )}
-        </div>
+                    />
+                ) : !overview || !current ? (
+                    <Skeleton className="h-48 w-full" />
+                ) : (
+                    <>
+                        {tab === "malware" ? (
+                            <MalwarePanel
+                                t={t}
+                                overview={overview}
+                                targetId={current}
+                                submit={submit}
+                            />
+                        ) : tab === "files" ? (
+                            <FilesPanel t={t} overview={overview} targetId={current} submit={submit} />
+                        ) : tab === "host" ? (
+                            <HostPanel
+                                t={t}
+                                targetId={current}
+                                server={server}
+                                submit={submit}
+                                focus={current === landing.target ? landing.focus : null}
+                            />
+                        ) : (
+                            <ImagesPanel
+                                t={t}
+                                apps={overview.apps}
+                                targetId={current}
+                                submit={submit}
+                            />
+                        )}
+                        <History t={t} scans={scans} submit={submit} />
+                    </>
+                )}
+            </div>
+        </CanUpdateContext.Provider>
     );
 }
 
@@ -710,7 +731,7 @@ function PackageDialog({
         setBusy(false);
         if (!result.ok) {
             setFound(null);
-            return setFailure(t(`errors.${result.error}` as never) || t("errors.failed"));
+            return setFailure(result.error);
         }
         setFound({ name: checked.data, versions: result.data });
     };
@@ -766,7 +787,7 @@ function PackageDialog({
                         </div>
                         {invalid ? <p className="text-danger">{t("held.nameInvalid")}</p> : null}
                     </form>
-                    {failure ? <p className="text-danger">{failure}</p> : null}
+                    {failure ? <ErrorLine t={t} code={failure} /> : null}
                     {busy && !found ? <Skeleton className="h-16 w-full" /> : null}
                     {found ? (
                         <div className="flex flex-col gap-2">

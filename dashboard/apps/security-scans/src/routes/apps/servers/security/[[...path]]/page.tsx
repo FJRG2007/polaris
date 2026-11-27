@@ -19,9 +19,10 @@ export default async function SecurityPage({
     params: Promise<Record<string, string | string[]>>;
     searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    await requireSecurityUser();
+    const user = await requireSecurityUser();
     const raw = (await params).path;
     if (raw && (Array.isArray(raw) ? raw.length > 0 : true)) notFound();
     const landing = parseLanding(searchParams ? await searchParams : null);
-    return <SecurityView landing={landing} />;
+    // The update itself is an administrator's; anybody else is told to ask one.
+    return <SecurityView landing={landing} canUpdate={user.isAdmin} />;
 }

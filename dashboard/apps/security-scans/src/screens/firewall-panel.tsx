@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { ErrorLine } from "./error-line";
 import * as actions from "../actions/security";
 import type { SecurityTranslator } from "../lib/i18n";
 import {
@@ -168,7 +169,7 @@ function ReviewDialog({
         void actions.firewallAction({ targetId }).then((result) => {
             if (!live) return;
             if (!result.ok) {
-                setFailure(t(`errors.${result.error}` as never) || t("errors.failed"));
+                setFailure(result.error);
                 return;
             }
             setView(result.data);
@@ -215,7 +216,7 @@ function ReviewDialog({
                     <DialogDescription>{t("firewall.dialogHint")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-4 text-sm">
-                    {failure ? <p className="text-danger">{failure}</p> : null}
+                    {failure ? <ErrorLine t={t} code={failure} /> : null}
                     {!view && !failure ? <Skeleton className="h-40 w-full" /> : null}
                     {view?.plan.blocked === "router" ? (
                         <p className="text-muted-foreground">{t("firewall.hint.router")}</p>
