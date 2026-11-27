@@ -25,7 +25,7 @@ import { KeyRound, Trash2 } from "lucide-react";
 import { removeSealedDeviceAction } from "./actions";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
-import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export interface SealedDeviceRow {
@@ -96,7 +96,7 @@ export function SealedDevicesCard({ userId, devices }: { userId: string; devices
                 </div>
 
                 {error ? (
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 ) : null}

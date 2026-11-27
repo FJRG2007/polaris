@@ -35,6 +35,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    settingType,
     Textarea
 } from "@polaris/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -306,7 +307,7 @@ function FriendsCard({
                 )}
 
                 {error && (
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 )}

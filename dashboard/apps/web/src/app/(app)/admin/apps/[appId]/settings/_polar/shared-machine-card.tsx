@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
+import { Card, CardBody, settingType, Switch, useOptimisticToggle } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setSharedWorkspaceAction } from "./actions";
 
@@ -65,7 +65,7 @@ export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
                 {on ? (
                     <p className="text-xs text-warning">{t("agents.sharedMachine.warning")}</p>
                 ) : null}
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

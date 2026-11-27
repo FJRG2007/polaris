@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
+import { Button, Card, CardBody, settingType, Skeleton } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 interface SitesView {
@@ -59,7 +59,7 @@ export function PolarBrowserSites() {
         <Card>
             <CardBody className="flex flex-col gap-2">
                 {failed ? (
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {failed}
                     </p>
                 ) : null}

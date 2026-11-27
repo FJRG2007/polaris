@@ -11,7 +11,7 @@
  * and nothing to name it. They are a list of keys now, on their own screen.
  */
 
-import { useOptimisticToggle } from "@polaris/ui";
+import { settingType, useOptimisticToggle } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import * as integrationActions from "./actions";
@@ -499,7 +499,7 @@ function GoogleApisHealth() {
                     {t("integrations.googleApis.check")}
                 </Button>
             </div>
-            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
             {apis === null ? (
                 <div className="flex flex-col gap-2" aria-hidden>
                     <Skeleton className="h-9 w-full" />
@@ -629,7 +629,7 @@ function AccountLimitField({ slug, current }: { slug: string; current: number })
             <span className="text-xs text-muted-foreground">
                 {t("integrations.accountLimit.hint")}
             </span>
-            {error ? <span className="text-xs text-danger">{error}</span> : null}
+            {error ? <span className={settingType.error}>{error}</span> : null}
         </label>
     );
 }
@@ -928,7 +928,7 @@ function SignInSwitch({
                     {warning}
                 </p>
             ) : null}
-            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
         </div>
     );
 }
@@ -988,7 +988,7 @@ function EmailTrustSwitch({
                 <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                 {t("integrations.emailTrust.warning")}
             </p>
-            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
         </div>
     );
 }
@@ -2084,7 +2084,7 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                             autoComplete="off"
                         />
                         {entered && !valid ? (
-                            <span className="text-xs text-danger">
+                            <span className={settingType.error}>
                                 {t(`integrations.tunnelHint.${provider}`)}
                             </span>
                         ) : card.apiKeyHelp ? (

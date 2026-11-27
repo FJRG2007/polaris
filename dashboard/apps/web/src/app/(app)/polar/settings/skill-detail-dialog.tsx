@@ -21,6 +21,7 @@ import {
     DialogTitle,
     Input,
     SegmentedControl,
+    settingType,
     Skeleton
 } from "@polaris/ui";
 import * as layers from "@/lib/polar/skills/overrides";
@@ -324,7 +325,7 @@ export function SkillDetailDialog({
                                 </div>
                             ) : null}
                             {error ? (
-                                <p role="alert" className="text-sm text-danger">
+                                <p role="alert" className={settingType.error}>
                                     {error}
                                 </p>
                             ) : null}

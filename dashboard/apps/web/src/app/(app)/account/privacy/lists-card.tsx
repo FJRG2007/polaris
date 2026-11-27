@@ -39,7 +39,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    isDirty
+    isDirty,
+    settingType
 } from "@polaris/ui";
 
 /** The list being edited, or the empty one being made. */
@@ -161,7 +162,7 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                 )}
 
                 {error && (
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 )}

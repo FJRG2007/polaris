@@ -18,7 +18,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { revokeApiKeyAction } from "../api-keys/actions";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button } from "@polaris/ui";
+import { Button, settingType } from "@polaris/ui";
 import { DeckCard, DeckFile } from "@polaris/ui/account-downloads/deck-card";
 
 /** One connected deck, in the fields the list draws. */
@@ -129,7 +129,7 @@ export function StreamDeckSection({
                         ))}
                     </ul>
                 )}
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </div>
             {confirmElement}
         </DeckCard>

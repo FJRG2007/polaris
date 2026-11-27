@@ -22,6 +22,7 @@ import {
     CopyButton,
     Input,
     SegmentedControl,
+    settingType,
     Switch,
     Textarea
 } from "@polaris/ui";
@@ -120,7 +121,7 @@ function Field({
         <label className="flex min-w-0 flex-col gap-1 text-sm">
             <span className="font-medium">{label}</span>
             {children}
-            {error ? <span className="text-xs text-danger">{error}</span> : null}
+            {error ? <span className={settingType.error}>{error}</span> : null}
         </label>
     );
 }

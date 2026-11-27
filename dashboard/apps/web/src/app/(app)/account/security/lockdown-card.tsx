@@ -37,6 +37,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    settingType,
     Textarea
 } from "@polaris/ui";
 
@@ -276,7 +277,7 @@ function LockdownDialog({
                         onChange={setProof}
                     />
                     {error ? (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

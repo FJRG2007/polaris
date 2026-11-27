@@ -14,7 +14,7 @@
 import { ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { DateInput, Select, Skeleton } from "@polaris/ui";
+import { DateInput, Select, settingType, Skeleton } from "@polaris/ui";
 import { RiskAcceptanceDialog } from "@/components/risk-acceptance-dialog";
 import {
     DEFAULT_SECURITY_DAILY_AT,
@@ -166,7 +166,7 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
                     {t("settings.security.riskStanding")}
                 </p>
             ) : null}
-            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
 
             <RiskAcceptanceDialog
                 open={pendingRisk !== null}

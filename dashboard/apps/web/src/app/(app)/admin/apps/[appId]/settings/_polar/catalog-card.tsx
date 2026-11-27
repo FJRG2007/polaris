@@ -13,7 +13,7 @@
 import { RefreshCw } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
-import { Button, Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
+import { Button, Card, CardBody, settingType, Switch, useOptimisticToggle } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { refreshModelCatalogAction, setInstanceKeySharingAction } from "./agent-actions";
@@ -62,7 +62,7 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
                         aria-label={t("agents.keySharing.switch")}
                     />
                 </div>
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );
@@ -154,7 +154,7 @@ export function CatalogCard({
                         {t("agents.catalog.indexFailed", { error: indexState.lastError })}
                     </p>
                 ) : null}
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

@@ -44,7 +44,8 @@ import {
     SheetContent,
     Skeleton,
     Switch,
-    cn
+    cn,
+    settingType
 } from "@polaris/ui";
 import { StoreFilters } from "@polaris/ui/store-layout";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -446,7 +447,7 @@ export function PolarConnectors({
                 </p>
             ) : null}
             {error ? (
-                <p role="alert" className="text-sm text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             ) : null}
@@ -820,7 +821,7 @@ function ConnectionSection({
                 />
             </div>
             {row.status === "error" ? (
-                <p role="status" className="text-xs text-danger">
+                <p role="status" className={settingType.error}>
                     {t(`polarConnectors.errors.${isErrorCode(row.lastError) ? row.lastError : "failed"}`)}
                 </p>
             ) : null}
@@ -1031,7 +1032,7 @@ function AddConnector({
                             placeholder={t("polarConnectors.urlPlaceholder")}
                         />
                         {urlBad ? (
-                            <span className="text-xs text-danger">
+                            <span className={settingType.error}>
                                 {t("polarConnectors.urlInvalid")}
                             </span>
                         ) : null}
@@ -1121,7 +1122,7 @@ function AddConnector({
                         </div>
                     ) : null}
                     {error ? (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

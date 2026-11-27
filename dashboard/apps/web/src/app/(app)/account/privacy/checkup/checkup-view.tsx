@@ -13,7 +13,7 @@ import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { savePrivacyAction } from "../actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, Select, useToast } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Select, settingType, useToast } from "@polaris/ui";
 import { ArrowLeft, KeyRound, MonitorSmartphone, ShieldCheck } from "lucide-react";
 
 const SECURITY_STEP = core.PRIVACY_SECTIONS.length;
@@ -107,10 +107,10 @@ export function CheckupView({
                                         className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
                                     >
                                         <span className="min-w-[12rem] flex-1">
-                                            <span className="block text-[0.8125rem]">
+                                            <span className={cn("block", settingType.title)}>
                                                 {t(`fields.${field}.label` as const)}
                                             </span>
-                                            <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                                            <span className={cn("block", settingType.hint)}>
                                                 {locked.includes(field)
                                                     ? t("lockedByAdmin")
                                                     : t("checkup.recommended", {
@@ -164,10 +164,10 @@ export function CheckupView({
                                     >
                                         <Icon className="size-4 shrink-0 text-muted-foreground" />
                                         <span className="min-w-[12rem] flex-1">
-                                            <span className="block text-[0.8125rem]">
+                                            <span className={cn("block", settingType.title)}>
                                                 {t(`checkup.security.${key}.label` as const)}
                                             </span>
-                                            <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                                            <span className={cn("block", settingType.hint)}>
                                                 {t(`checkup.security.${key}.hint` as const)}
                                             </span>
                                         </span>
@@ -180,7 +180,7 @@ export function CheckupView({
                         </>
                     )}
                     {error && (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     )}

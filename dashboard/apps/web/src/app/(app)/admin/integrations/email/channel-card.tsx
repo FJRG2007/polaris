@@ -4,7 +4,7 @@
 
 import type { ComponentType } from "react";
 import { CheckCircle2, Settings2 } from "lucide-react";
-import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CHANNEL_STATUS_TONE } from "./email-mark";
 
@@ -52,7 +52,7 @@ export function ChannelCard({
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">{detail}</p>
                     </div>
                 </div>
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 <div className="flex items-center justify-end gap-2">
                     {ready ? (
                         <span className="me-auto inline-flex items-center gap-1 text-xs text-success">

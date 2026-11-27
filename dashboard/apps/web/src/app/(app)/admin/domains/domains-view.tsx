@@ -51,6 +51,7 @@ import {
     DnsRecordTable,
     Input,
     Select,
+    settingType,
     Skeleton
 } from "@polaris/ui";
 import {
@@ -400,7 +401,7 @@ export function AppDomains({
                     aria-invalid={!appCheck.ok}
                 />
                 {!appCheck.ok ? (
-                    <span className="text-xs text-danger">{t("domains.own.invalidAddress")}</span>
+                    <span className={settingType.error}>{t("domains.own.invalidAddress")}</span>
                 ) : null}
                 <span className="text-xs text-muted-foreground">
                     {t("domains.own.appDomainHint", { url: effectiveAppUrl })}
@@ -425,7 +426,7 @@ export function AppDomains({
                     aria-invalid={!sharingCheck.ok}
                 />
                 {!sharingCheck.ok ? (
-                    <span className="text-xs text-danger">{t("domains.own.invalidAddress")}</span>
+                    <span className={settingType.error}>{t("domains.own.invalidAddress")}</span>
                 ) : null}
                 <span className="text-xs text-muted-foreground">
                     {t("domains.own.sharingDomainHint")}
@@ -567,7 +568,7 @@ function DashboardDomains({
                             />
                         </label>
                         {draft.trim() !== "" && !valid ? (
-                            <span className="text-xs text-danger">{t("domains.answers.notADomain")}</span>
+                            <span className={settingType.error}>{t("domains.answers.notADomain")}</span>
                         ) : null}
                         {known ? (
                             <span className="text-xs text-muted-foreground">
@@ -773,7 +774,7 @@ export function DuckDns({
                     aria-invalid={!subCheck.ok}
                 />
                 {!subCheck.ok ? (
-                    <span className="text-xs text-danger">
+                    <span className={settingType.error}>
                         {t("domainsSetup.errors.subdomainOnly")}
                     </span>
                 ) : null}
@@ -1076,7 +1077,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                         aria-invalid={wildcardBad}
                     />
                     {wildcardBad ? (
-                        <span className="text-xs text-danger">
+                        <span className={settingType.error}>
                             {t("domains.network.invalidWildcard")}
                         </span>
                     ) : null}

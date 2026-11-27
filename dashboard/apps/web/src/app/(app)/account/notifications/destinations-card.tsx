@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { useOptimisticToggle } from "@polaris/ui";
+import { settingType, useOptimisticToggle } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Plus, Send, Smartphone, Trash2, Webhook } from "lucide-react";
@@ -200,7 +200,7 @@ export function DestinationsCard({
                                     </p>
                                 ) : null}
                                 {floorError?.id === destination.id ? (
-                                    <p className="text-xs text-danger">{floorError.error}</p>
+                                    <p className={settingType.error}>{floorError.error}</p>
                                 ) : null}
                                 {testResult?.id === destination.id ? (
                                     <p
@@ -213,7 +213,7 @@ export function DestinationsCard({
                                         {testResult.error ?? t("destinations.testSent")}
                                     </p>
                                 ) : destination.lastError ? (
-                                    <p className="text-xs text-danger">{destination.lastError}</p>
+                                    <p className={settingType.error}>{destination.lastError}</p>
                                 ) : destination.lastUsedAt ? (
                                     <p className="text-xs text-muted-foreground">
                                         {t.rich("destinations.lastUsed", {

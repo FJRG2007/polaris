@@ -17,7 +17,7 @@ import { Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { isLocalAddress } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
-import { Button, Card, CardBody, Input, cn } from "@polaris/ui";
+import { Button, Card, CardBody, Input, cn, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 import { findStorageAgainAction, setStorageAddressAction } from "./actions";
@@ -58,7 +58,7 @@ function Outcome({
             );
         case "impostor":
             return (
-                <p className="text-xs text-danger">
+                <p className={settingType.error}>
                     {t("uploads.network.impostor", {
                         address: outcome.address,
                         device: outcome.label ?? outcome.address
@@ -67,12 +67,12 @@ function Outcome({
             );
         case "gone":
             return (
-                <p className="text-xs text-danger">
+                <p className={settingType.error}>
                     {t("uploads.network.gone", { address: outcome.address })}
                 </p>
             );
         case "unsupported":
-            return <p className="text-xs text-danger">{t("uploads.network.unsupported")}</p>;
+            return <p className={settingType.error}>{t("uploads.network.unsupported")}</p>;
         case "candidates":
             return (
                 <div className="flex flex-col gap-1.5">
@@ -264,7 +264,7 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
                     </Button>
                 </div>
                 {typed.length > 0 && !valid ? (
-                    <span className="text-xs text-danger">
+                    <span className={settingType.error}>
                         {t("uploads.network.addressFormat")}
                     </span>
                 ) : (

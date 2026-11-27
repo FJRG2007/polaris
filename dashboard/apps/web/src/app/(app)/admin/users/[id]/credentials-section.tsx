@@ -17,7 +17,7 @@ import type { DirectoryUser } from "@/lib/user-admin-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CredentialOptions } from "@/lib/admin-credentials-service";
-import { Button, Card, CardBody, Checkbox, CopyButton, Input } from "@polaris/ui";
+import { Button, Card, CardBody, Checkbox, CopyButton, Input, settingType } from "@polaris/ui";
 import { accountEmailSchema, temporaryPasswordSchema } from "./credential-schemas";
 import {
     changeAccountEmailAction,
@@ -288,7 +288,7 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                         </Button>
                     </div>
                     {email.trim() && !emailCheck.success ? (
-                        <p className="text-xs text-danger">
+                        <p className={settingType.error}>
                             {t("usersDetail.credentials.email.invalid")}
                         </p>
                     ) : null}

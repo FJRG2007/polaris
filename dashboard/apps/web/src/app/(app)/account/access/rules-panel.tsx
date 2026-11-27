@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, CountryFlag, Input, Select, isDirty } from "@polaris/ui";
+import { Button, CountryFlag, Input, Select, isDirty, settingType } from "@polaris/ui";
 import { FlaskConical, Globe, ShieldAlert, Smartphone, TriangleAlert } from "lucide-react";
 import {
     ACCOUNT_RULE_BROWSERS,
@@ -331,7 +331,7 @@ function TestSession({ rules, disabled }: { rules: readonly AccountRule[]; disab
                 <FlaskConical className="size-4 shrink-0" aria-hidden="true" />
                 {busy ? t("access.rules.preview.testing") : t("access.rules.preview.test")}
             </Button>
-            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
             {preview ? <PreviewResult preview={preview} /> : null}
         </div>
     );

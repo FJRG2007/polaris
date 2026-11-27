@@ -47,7 +47,8 @@ import {
     EmptyState,
     Select,
     Switch,
-    DateInput
+    DateInput,
+    settingType
 } from "@polaris/ui";
 
 /** What a new window starts as: hidden overnight, every day. The most common
@@ -183,7 +184,7 @@ export function ScheduleView({
             <Card>
                 <CardBody className="flex flex-col gap-3 p-3">
                     <div className="flex items-center justify-between gap-3">
-                        <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+                        <p className={settingType.hint}>
                             {core.scheduleZoneIsAssumed(timeZone)
                                 ? t("schedule.zone.assumed")
                                 : pinned
@@ -232,7 +233,7 @@ export function ScheduleView({
                                                 !enabled && "opacity-60"
                                             )}
                                         >
-                                            <span className="block text-[0.8125rem]">
+                                            <span className={cn("block", settingType.title)}>
                                                 {t(
                                                     rule.endMinute <= rule.startMinute
                                                         ? "schedule.rowOvernight"
@@ -244,14 +245,14 @@ export function ScheduleView({
                                                     }
                                                 )}
                                             </span>
-                                            <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                                            <span className={cn("block", settingType.hint)}>
                                                 {words.days(rule.days, weekOrder)}
                                                 {rule.marginMinutes > 0
                                                     ? ` - ${t("schedule.margin.row", { minutes: rule.marginMinutes })}`
                                                     : null}
                                             </span>
                                             {enabled && edges[rule.id] ? (
-                                                <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                                                <span className={cn("block", settingType.hint)}>
                                                     {t("schedule.margin.next", {
                                                         time: format.dateTime(edges[rule.id]!)
                                                     })}
@@ -298,7 +299,7 @@ export function ScheduleView({
                         </ul>
                     )}
 
-                    {error ? <p className="text-xs text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                 </CardBody>
             </Card>
 
@@ -484,7 +485,7 @@ function ScheduleDialog({
                         </div>
                     </div>
 
-                    <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+                    <p className={settingType.hint}>
                         {problem || summarize(draft, weekOrder, t, words)}
                     </p>
                 </div>

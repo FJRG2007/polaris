@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, Checkbox, Skeleton } from "@polaris/ui";
+import { Button, Checkbox, settingType, Skeleton } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { holdersCanBeFreed, UNKNOWN_HOLDER } from "@/lib/backup-access/port-holders";
 import {
@@ -310,7 +310,7 @@ export function BackupAccessCard() {
                     ) : null}
                     <p className="text-xs text-muted-foreground">{t("domains.backup.physics")}</p>
                     {error ? (
-                        <p role="alert" className="text-xs text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

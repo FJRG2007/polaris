@@ -12,7 +12,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { CodeInput } from "@/components/code-input";
 import { PIN_MAX, PIN_MIN } from "@/components/quick-pin-input";
 import { setPinSchema } from "@polaris/core";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, settingType } from "@polaris/ui";
 import { clearPinAction, setPinAction } from "./actions";
 import { passwordToSend } from "@/lib/password-proof-client";
 import { SlowSubmitLabel } from "@/components/slow-submit-label";
@@ -110,7 +110,7 @@ export function SetPinDialog({
                             required
                         />
                         {confirmPin.length >= pin.length && confirmPin !== "" && confirmPin !== pin ? (
-                            <span className="text-xs text-danger">{t("known.pinsDiffer")}</span>
+                            <span className={settingType.error}>{t("known.pinsDiffer")}</span>
                         ) : null}
                     </label>
                     <label className="flex flex-col gap-1 text-sm">

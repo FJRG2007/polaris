@@ -46,7 +46,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     cn,
-    DateInput
+    DateInput,
+    settingType
 } from "@polaris/ui";
 import { WeekdayPicker } from "@/components/weekday-picker";
 import { NotificationGroupMark } from "@/components/notification-group-mark";
@@ -573,7 +574,7 @@ function ScheduleDialog({
                             />
                         </label>
                     </div>
-                    {problem ? <p className="text-xs text-danger">{problem}</p> : null}
+                    {problem ? <p className={settingType.error}>{problem}</p> : null}
                     <div className="flex flex-wrap justify-end gap-2">
                         {initial ? (
                             <Button

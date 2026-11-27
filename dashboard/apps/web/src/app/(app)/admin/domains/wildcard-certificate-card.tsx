@@ -15,7 +15,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, Skeleton } from "@polaris/ui";
+import { Button, settingType, Skeleton } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
 import { issueWildcardCertificateAction } from "./actions";
 import { useDisplayFormat } from "@/components/display-format";
@@ -89,7 +89,7 @@ export function WildcardCertificateCard() {
                 </div>
             )}
             {error ? (
-                <p role="alert" className="text-xs text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             ) : null}

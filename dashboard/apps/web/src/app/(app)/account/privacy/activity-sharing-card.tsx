@@ -33,12 +33,14 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
     Input,
+    settingType,
     Switch
 } from "@polaris/ui";
 
@@ -128,7 +130,7 @@ export function ActivitySharingCard({
                 <CardBody className="flex flex-col gap-3 p-3">
                     <div>
                         <h2 className="text-sm font-medium">{t("activity.status.title")}</h2>
-                        <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+                        <p className={settingType.hint}>
                             {t.rich("activity.status.who", {
                                 link: (chunks) => (
                                     <Link
@@ -145,8 +147,8 @@ export function ActivitySharingCard({
 
                     <label className="flex items-center gap-3 rounded-md border border-border px-3 py-2">
                         <span className="min-w-0 flex-1">
-                            <span className="block text-[0.8125rem]">{t("activity.share")}</span>
-                            <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                            <span className={cn("block", settingType.title)}>{t("activity.share")}</span>
+                            <span className={cn("block", settingType.hint)}>
                                 {t("activity.shareHint")}
                             </span>
                         </span>
@@ -162,8 +164,8 @@ export function ActivitySharingCard({
                             <IntegrationLogo slug="spotify" className="size-5 shrink-0" />
                             <span className="min-w-0 flex-1">
                                 {/* i18n-ignore: a service's own name */}
-                                <span className="block text-[0.8125rem]">Spotify</span>
-                                <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                                <span className={cn("block", settingType.title)}>Spotify</span>
+                                <span className={cn("block", settingType.hint)}>
                                     {spotify === "linked"
                                         ? t("activity.spotify.linked")
                                         : spotify === "unlinked"
@@ -200,10 +202,10 @@ export function ActivitySharingCard({
                                     />
                                 )}
                                 <span className="min-w-0 flex-1">
-                                    <span className="block text-[0.8125rem]">
+                                    <span className={cn("block", settingType.title)}>
                                         {t(`activity.sources.${source}.label` as const)}
                                     </span>
-                                    <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                                    <span className={cn("block", settingType.hint)}>
                                         {t(`activity.sources.${source}.hint` as const)}
                                     </span>
                                 </span>
@@ -225,7 +227,7 @@ export function ActivitySharingCard({
                 <CardBody className="flex flex-col gap-3 p-3">
                     <div>
                         <h2 className="text-sm font-medium">{t("activity.registered.title")}</h2>
-                        <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+                        <p className={settingType.hint}>
                             {t("activity.registered.description")}
                         </p>
                     </div>
@@ -362,7 +364,7 @@ export function ActivitySharingCard({
                     />
 
                     {error && (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     )}
@@ -454,7 +456,7 @@ function OwnGames({
                     <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                         {t("ownGames.title")}
                     </h3>
-                    <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+                    <p className={settingType.hint}>
                         {t("ownGames.description")}
                     </p>
                 </div>
@@ -527,7 +529,7 @@ function OwnGames({
                                 placeholder={t("ownGames.namePlaceholder")}
                             />
                         </label>
-                        {problem ? <p className="text-xs text-danger">{problem}</p> : null}
+                        {problem ? <p className={settingType.error}>{problem}</p> : null}
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
                                 {t("ownGames.cancel")}

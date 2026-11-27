@@ -12,7 +12,7 @@ import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, Skeleton } from "@polaris/ui";
+import { Button, settingType, Skeleton } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
 import { RelativeTime } from "@/components/relative-time";
 import { useLiveResource } from "@/components/use-live-resource";
@@ -71,7 +71,7 @@ export function AddressFollowCard() {
                     {view.status?.checkedAt ? <Facts status={view.status} /> : null}
                     <StatusLine status={view.status} />
                     {error ? (
-                        <p role="alert" className="text-xs text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

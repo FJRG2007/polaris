@@ -19,7 +19,7 @@ import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { grouped } from "@/app/(app)/apps/firewall/grouped";
 import { Loader2, Trash2 } from "lucide-react";
-import { Button, Card, CardBody, Select, Skeleton } from "@polaris/ui";
+import { Button, Card, CardBody, Select, settingType, Skeleton } from "@polaris/ui";
 import { useLiveResource } from "@/components/use-live-resource";
 import { saveRetentionAction, sweepRetentionAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -95,7 +95,7 @@ export function RetentionView({ policy }: { policy: RetentionPolicy }) {
         <div className="flex flex-col gap-4">
             {unread !== null ? (
                 <div className="flex flex-wrap items-center gap-3">
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {t(
                             live.error !== null
                                 ? "retention.counts.loadFailed"

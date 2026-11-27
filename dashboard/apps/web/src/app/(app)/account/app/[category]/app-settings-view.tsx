@@ -30,7 +30,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PolarisDesktop } from "@/lib/desktop-bridge";
 import { MaxUsersRow, OverlayGames, ResetOverlay, VoiceWidgetPreview } from "./voice-widget-preview";
 import { useAppSettingsValues } from "@/components/this-app/app-settings-values";
-import { Button, buttonVariants, Card, CardBody, ConfirmDeleteDialog, Select, Skeleton, Switch, useToast } from "@polaris/ui";
+import { Button, buttonVariants, Card, CardBody, ConfirmDeleteDialog, Select, settingType, Skeleton, Switch, useToast } from "@polaris/ui";
 
 export { forgetAppSettingsSnapshot } from "@/components/this-app/app-settings-values";
 
@@ -188,8 +188,8 @@ function Row({ label, hint, children }: { label: string; hint?: string | null; c
     return (
         <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-sm">{label}</span>
-                {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+                <span className={settingType.title}>{label}</span>
+                {hint && <span className={settingType.hint}>{hint}</span>}
             </div>
             <div className="flex shrink-0 items-center gap-2">{children}</div>
         </div>
@@ -407,7 +407,7 @@ function ShortcutRow({
                 </Button>
             </Row>
             {problem && (
-                <p role="status" className="text-xs text-danger">
+                <p role="status" className={settingType.error}>
                     {problem}
                 </p>
             )}

@@ -10,7 +10,7 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import { CalendarClock, Gamepad2, ListChecks } from "lucide-react";
 import { listBlocked } from "@/lib/blocks";
-import { Button, Card, CardBody } from "@polaris/ui";
+import { Button, Card, CardBody, cn, settingType } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { PrivacyView } from "./privacy-view";
@@ -43,8 +43,8 @@ export default async function PrivacyPage() {
                 <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
                     <ListChecks className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-[14rem] flex-1">
-                        <span className="block text-[0.8125rem]">{t("checkup.title")}</span>
-                        <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                        <span className={cn("block", settingType.title)}>{t("checkup.title")}</span>
+                        <span className={cn("block", settingType.hint)}>
                             {t("checkup.summary")}
                         </span>
                     </span>
@@ -60,8 +60,8 @@ export default async function PrivacyPage() {
                 <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
                     <Gamepad2 className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-[14rem] flex-1">
-                        <span className="block text-[0.8125rem]">{t("activity.page.title")}</span>
-                        <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                        <span className={cn("block", settingType.title)}>{t("activity.page.title")}</span>
+                        <span className={cn("block", settingType.hint)}>
                             {t("activity.page.summary")}
                         </span>
                     </span>
@@ -79,8 +79,8 @@ export default async function PrivacyPage() {
                 <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
                     <CalendarClock className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-[14rem] flex-1">
-                        <span className="block text-[0.8125rem]">{t("schedule.page.title")}</span>
-                        <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                        <span className={cn("block", settingType.title)}>{t("schedule.page.title")}</span>
+                        <span className={cn("block", settingType.hint)}>
                             {t("schedule.summary")}
                         </span>
                     </span>

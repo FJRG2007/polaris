@@ -11,7 +11,7 @@
 
 import * as core from "@polaris/core";
 import { useState, useTransition } from "react";
-import { Card, CardBody, Select, Switch } from "@polaris/ui";
+import { Card, CardBody, Select, settingType, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setPrivacyDefaultAction, setPrivacyLockAction } from "./actions";
 
@@ -124,7 +124,7 @@ export function PrivacyDefaultsForm({
                     </section>
                 ))}
                 {error ? (
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 ) : null}

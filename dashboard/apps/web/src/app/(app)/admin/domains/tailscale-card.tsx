@@ -17,7 +17,7 @@ import { FUNNEL_APP_PORTS } from "@/lib/tailscale/tailscale-model";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TailnetAppView, TailscaleView } from "@/lib/tailscale/tailscale-service";
-import { Button, ConfirmDeleteDialog, CopyButton, Skeleton, Switch } from "@polaris/ui";
+import { Button, ConfirmDeleteDialog, CopyButton, settingType, Skeleton, Switch } from "@polaris/ui";
 import {
     connectTailscaleAction,
     disconnectTailscaleAction,
@@ -221,7 +221,7 @@ export function TailscaleCard() {
                         </>
                     )}
                     {error ? (
-                        <p role="alert" className="text-xs text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

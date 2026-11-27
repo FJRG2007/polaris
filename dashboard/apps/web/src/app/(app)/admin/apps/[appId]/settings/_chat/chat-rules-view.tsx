@@ -25,7 +25,8 @@ import {
     SegmentedControl,
     SizeField,
     Switch,
-    cn
+    cn,
+    settingType
 } from "@polaris/ui";
 
 type Rules = core.ChatRules;
@@ -234,7 +235,7 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                     />
 
                     {error && (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     )}

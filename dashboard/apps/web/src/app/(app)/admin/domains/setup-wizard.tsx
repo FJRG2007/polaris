@@ -28,7 +28,7 @@ import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
 import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
 import { connectCloudflareAccountAction } from "@/app/(app)/admin/integrations/actions";
 import { FORWARD_RULES, gameForwardRules, type RouterForwardRule } from "@/lib/router-guide";
-import { Badge, Button, Checkbox, DnsRecordTable, Input, Select, Skeleton } from "@polaris/ui";
+import { Badge, Button, Checkbox, DnsRecordTable, Input, Select, settingType, Skeleton } from "@polaris/ui";
 import { ENVIRONMENT_CHOICES, environmentWords } from "@/app/(app)/apps/servers/environment-meta";
 import {
     clearSetupDraft,
@@ -882,7 +882,7 @@ function DomainStep({
                             aria-invalid={!duckSubdomainField(duckSub).ok}
                         />
                         {!duckSubdomainField(duckSub).ok ? (
-                            <span className="text-xs text-danger">
+                            <span className={settingType.error}>
                                 {t("domainsSetup.errors.subdomainOnly")}
                             </span>
                         ) : null}
@@ -913,7 +913,7 @@ function DomainStep({
                         aria-invalid={!baseDomainField(baseDomain).ok}
                     />
                     {!baseDomainField(baseDomain).ok ? (
-                        <span className="text-xs text-danger">
+                        <span className={settingType.error}>
                             {t("domainsSetup.domain.invalidBaseDomain")}
                         </span>
                     ) : null}

@@ -27,7 +27,7 @@ import { Loader2, Users } from "lucide-react";
 import { savePrivacyAction } from "./actions";
 import { AudienceDialog } from "./audience-dialog";
 import type { PrivacyListView } from "@/lib/privacy-service";
-import { Button, Card, CardBody, Select } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Select, settingType } from "@polaris/ui";
 
 export interface NamedPerson {
     readonly id: string;
@@ -117,10 +117,10 @@ export function PrivacyView({
                                         className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
                                     >
                                         <span className="min-w-[12rem] flex-1">
-                                            <span className="block text-[0.8125rem]">
+                                            <span className={cn("block", settingType.title)}>
                                                 {t(`fields.${field}.label` as const)}
                                             </span>
-                                            <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                                            <span className={cn("block", settingType.hint)}>
                                                 {t(`fields.${field}.note` as const)}
                                             </span>
                                             {locked.includes(field) && (
@@ -188,7 +188,7 @@ export function PrivacyView({
                     </p>
 
                     {error && (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     )}

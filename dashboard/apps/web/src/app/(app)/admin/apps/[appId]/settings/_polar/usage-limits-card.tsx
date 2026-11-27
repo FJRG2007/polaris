@@ -13,7 +13,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
-import { Button, Card, CardBody, Input, Select } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Select, settingType } from "@polaris/ui";
 import { deleteUsageLimitAction, saveUsageLimitAction } from "./agent-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { UsageLimitView } from "@/lib/agents/agent-usage-limits";
@@ -120,7 +120,7 @@ export function UsageLimitsCard({ limits }: { limits: UsageLimitView[] }) {
                     />
                 ) : null}
 
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

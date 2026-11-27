@@ -29,7 +29,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    settingType
 } from "@polaris/ui";
 
 export function SuspendDialog({
@@ -97,7 +98,7 @@ export function SuspendDialog({
                         />
                     </label>
                     {error && (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     )}

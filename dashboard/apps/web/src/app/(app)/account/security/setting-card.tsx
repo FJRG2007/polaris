@@ -7,7 +7,7 @@
  */
 
 import type { ReactNode } from "react";
-import { Badge, Card, CardBody } from "@polaris/ui";
+import { Badge, Card, CardBody, cn, settingType } from "@polaris/ui";
 
 export function SettingCard({
     title,
@@ -27,12 +27,12 @@ export function SettingCard({
             <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                        <h2 className="text-sm font-medium">{title}</h2>
+                        <h2 className={cn("font-medium", settingType.title)}>{title}</h2>
                         {status ? (
                             <Badge variant={statusTone === "on" ? "success" : "neutral"}>{status}</Badge>
                         ) : null}
                     </div>
-                    <p className="text-xs text-muted-foreground">{description}</p>
+                    <p className={settingType.hint}>{description}</p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>
             </CardBody>

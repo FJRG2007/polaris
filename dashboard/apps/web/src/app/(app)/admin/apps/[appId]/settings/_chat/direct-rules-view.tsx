@@ -18,7 +18,7 @@ import {
     setDmRuleModeAction,
     setStartingRulesAction
 } from "./actions";
-import { Select, SegmentedControl, Switch, useOptimisticToggle } from "@polaris/ui";
+import { Select, SegmentedControl, Switch, useOptimisticToggle, settingType } from "@polaris/ui";
 
 export function DirectRulesView({
     mode,
@@ -179,7 +179,7 @@ export function DirectRulesView({
                 </ul>
             </div>
             {error && (
-                <p role="alert" className="text-xs text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             )}

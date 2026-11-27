@@ -26,6 +26,7 @@ import {
     CardTitle,
     Checkbox,
     Select,
+    settingType,
     Switch
 } from "@polaris/ui";
 
@@ -269,7 +270,7 @@ export function AutoStatusCard({
                     )}
                 </div>
 
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 {done && !changed ? (
                     <p className="text-xs text-muted-foreground">{t("auto.saved")}</p>
                 ) : null}

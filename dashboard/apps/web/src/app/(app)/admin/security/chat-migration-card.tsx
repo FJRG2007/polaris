@@ -10,7 +10,7 @@
 import { useState, useTransition } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
-import { Button, Card, CardBody, useToast } from "@polaris/ui";
+import { Button, Card, CardBody, settingType, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { MigratedConversation } from "@/lib/chat/e2ee/legacy-migration";
 import { migrateChatAgainAction, rollBackChatMigrationAction } from "./chat-migration-actions";
@@ -70,7 +70,7 @@ export function ChatMigrationCard({ progress, conversations }: { progress: Progr
                         <p className="text-xs text-warning">{t("security.chatMigration.waitingOnBackup")}</p>
                     ) : null}
                     {progress.failed > 0 ? (
-                        <p className="text-xs text-danger">{t("security.chatMigration.failed", { count: progress.failed, shown: progress.failed.toLocaleString() })}</p>
+                        <p className={settingType.error}>{t("security.chatMigration.failed", { count: progress.failed, shown: progress.failed.toLocaleString() })}</p>
                     ) : null}
                 </div>
                 {rows.length ? (

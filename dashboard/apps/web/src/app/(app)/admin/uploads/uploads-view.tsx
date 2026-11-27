@@ -23,7 +23,7 @@ import type { ChatStorageSettings } from "@/lib/chat/attachments";
 import type { PersonalDriveSettings } from "@/lib/personal-drive";
 import type { OrganizationDriveSettings } from "@/lib/organization-drive";
 import type { UploadSettings } from "@/lib/tasks/attachment-service";
-import { Button, Card, CardBody, ConfirmDeleteDialog, SizeField, Switch, cn } from "@polaris/ui";
+import { Button, Card, CardBody, ConfirmDeleteDialog, SizeField, Switch, cn, settingType } from "@polaris/ui";
 import {
     checkStorageAction,
     setAvatarSettingsAction,
@@ -283,7 +283,7 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
                         }}
                     />
                     {!limitValid && (
-                        <span className="text-xs text-danger">
+                        <span className={settingType.error}>
                             {t("uploads.attachments.range")}
                         </span>
                     )}

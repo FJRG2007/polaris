@@ -13,7 +13,7 @@ import type { PublicUrls } from "@/lib/legal/service";
 import { AddressList } from "@/components/address-list";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, useTransition } from "react";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, Skeleton } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Input, settingType, Skeleton } from "@polaris/ui";
 
 /** The facts that come from the environment, which the server already has when
  *  it renders the page. */
@@ -180,7 +180,7 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
                     <span className="text-xs text-muted-foreground">
                         {t("settings.publicPages.contactHint")}
                     </span>
-                    {error ? <span className="text-xs text-danger">{error}</span> : null}
+                    {error ? <span className={settingType.error}>{error}</span> : null}
                 </label>
             </CardBody>
         </Card>

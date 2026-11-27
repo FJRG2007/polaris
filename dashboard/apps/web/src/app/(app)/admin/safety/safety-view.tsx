@@ -25,7 +25,7 @@ import { ShieldAlert, Flag, Check, X } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { ReportContextList } from "@/components/report-context-list";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Button, Card, CardBody, Input, Select } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, Input, Select, settingType } from "@polaris/ui";
 import { navigateInApp } from "@/lib/keep-call";
 
 const FILTERS = ["open", "resolved", "dismissed", "all"] as const;
@@ -221,7 +221,7 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                 ) : null}
 
                 {error ? (
-                    <p role="alert" className="text-xs text-danger">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 ) : null}

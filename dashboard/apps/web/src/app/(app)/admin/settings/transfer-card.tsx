@@ -18,7 +18,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { validationMessage } from "@/components/i18n/validation-message";
 import type { TransferSummary } from "@/lib/instance-transfer/transfer";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Input, settingType } from "@polaris/ui";
 import { applyImportAction, exportInstanceAction, previewImportAction } from "./transfer-actions";
 import type { KeptPick } from "@/components/file-picker/as-files";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
@@ -187,7 +187,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                             {t("settings.transfer.export")}
                         </Button>
                     </div>
-                    {exportProblem && <p className="text-xs text-danger">{exportProblem}</p>}
+                    {exportProblem && <p className={settingType.error}>{exportProblem}</p>}
                     {exported && (
                         <p className="text-xs text-muted-foreground">
                             {t("settings.transfer.exported", {

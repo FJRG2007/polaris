@@ -34,7 +34,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Input,
-    PhoneInput
+    PhoneInput,
+    settingType
 } from "@polaris/ui";
 import {
     addPhoneAction,
@@ -281,7 +282,7 @@ export function PhoneCard({
                                 disabled={full}
                                 className="min-w-0"
                             />
-                            {duplicate ? <p className="text-xs text-danger">{t("phone.duplicate")}</p> : null}
+                            {duplicate ? <p className={settingType.error}>{t("phone.duplicate")}</p> : null}
                         </div>
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="ghost" onClick={() => setAdding(null)}>

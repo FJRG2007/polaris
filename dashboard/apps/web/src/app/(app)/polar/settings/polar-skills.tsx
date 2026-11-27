@@ -26,6 +26,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    settingType,
     Switch
 } from "@polaris/ui";
 import { MarkdownDocumentField } from "@/components/rich-text/markdown-document-field";
@@ -195,7 +196,7 @@ export function PolarSkills({
                     </div>
                 </div>
                 {error ? (
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 ) : null}
@@ -589,7 +590,7 @@ function SkillEditor({
                         );
                     })}
                     {error ? (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

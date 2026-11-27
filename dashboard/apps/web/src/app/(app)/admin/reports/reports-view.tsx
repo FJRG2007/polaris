@@ -30,7 +30,7 @@ import { ReportContextList } from "@/components/report-context-list";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import type { ChatReportFileView } from "@/lib/chat/report-files";
 import { placeholderUrl } from "@/lib/chat/media-shape";
-import { Badge, Button, Card, CardBody, Select } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, Select, settingType } from "@polaris/ui";
 import { Check, Download, MessageSquare, Paperclip, Trash2 } from "lucide-react";
 
 /** Which reports the queue can show. Each is named by `reports.filters.<value>`. */
@@ -75,7 +75,7 @@ export function ReportsView({
             </div>
 
             {error && (
-                <p role="alert" className="text-sm text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             )}

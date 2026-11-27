@@ -28,6 +28,7 @@ import {
     DialogTitle,
     Input,
     Select,
+    settingType,
     Switch
 } from "@polaris/ui";
 import { MarkdownDocumentField } from "@/components/rich-text/markdown-document-field";
@@ -304,7 +305,7 @@ export function PolarAgents({
                     ) : null}
                 </div>
                 {error ? (
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 ) : null}
@@ -525,7 +526,7 @@ function WorkEditor({
                         />
                     ) : null}
                     {error ? (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}
@@ -841,7 +842,7 @@ function AgentEditor({
                         </label>
                     ) : null}
                     {error ? (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

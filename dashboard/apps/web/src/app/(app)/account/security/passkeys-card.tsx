@@ -48,7 +48,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    settingType
 } from "@polaris/ui";
 
 /** The address this browser is on: the name a new passkey would be bound to, and
@@ -310,7 +311,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                 autoComplete="off"
                                 onChange={(event) => setName(event.target.value)}
                             />
-                            {problem ? <span className="text-xs text-danger">{problem}</span> : null}
+                            {problem ? <span className={settingType.error}>{problem}</span> : null}
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
                             {t("dialog.currentPassword")}

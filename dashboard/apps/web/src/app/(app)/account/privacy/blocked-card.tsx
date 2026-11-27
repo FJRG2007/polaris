@@ -25,7 +25,7 @@ import { unblockPersonAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { BlockedPerson } from "@/lib/blocks";
 import { PersonName, PersonRow, RealNames } from "@/components/person-name";
-import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, settingType } from "@polaris/ui";
 
 export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
     const router = useRouter();
@@ -93,7 +93,7 @@ export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
                     )}
 
                     {error && (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     )}

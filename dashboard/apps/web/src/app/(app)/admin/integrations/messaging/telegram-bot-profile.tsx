@@ -12,7 +12,7 @@
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Check, ExternalLink, Loader2, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { Button, Input, Skeleton, Textarea, isDirty } from "@polaris/ui";
+import { Button, Input, Skeleton, Textarea, isDirty, settingType } from "@polaris/ui";
 import type { BotProfile, BotProfileField } from "@/lib/messaging/telegram-bot-profile";
 import { applyTelegramBotProfileAction, telegramBotProfileAction, type BotProfileFieldOutcome } from "./actions";
 
@@ -96,7 +96,7 @@ export function TelegramBotProfile({ channelId }: { channelId: string }) {
                 {t("messaging.botProfile.updated")}
             </p>
         ) : (
-            <p className="text-xs text-danger">{outcome.error}</p>
+            <p className={settingType.error}>{outcome.error}</p>
         );
     }
 

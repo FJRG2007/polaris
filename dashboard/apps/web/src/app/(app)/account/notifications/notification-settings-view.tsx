@@ -66,7 +66,8 @@ import {
     CardTitle,
     SegmentedControl,
     Switch,
-    cn
+    cn,
+    settingType
 } from "@polaris/ui";
 import {
     adoptSoundVolume,
@@ -316,7 +317,7 @@ function InGameRow({ initial, ready }: { initial: inGame.InGameChoice; ready: bo
                     </Button>
                 </div>
             )}
-            {problem ? <p className="text-xs text-danger">{problem}</p> : null}
+            {problem ? <p className={settingType.error}>{problem}</p> : null}
         </div>
     );
 }
@@ -576,7 +577,7 @@ function BadgesCard({ initial }: { initial: boolean }) {
                     </div>
                     <Switch checked={enabled} onChange={toggle} aria-label={t("badges.label")} />
                 </div>
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );
@@ -668,7 +669,7 @@ function VolumeSlider() {
                 className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
             />
             <span className="text-xs text-muted-foreground">{t("sound.volumeHint")}</span>
-            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
         </div>
     );
 }

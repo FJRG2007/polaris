@@ -34,7 +34,8 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    Input
+    Input,
+    settingType
 } from "@polaris/ui";
 import { SectionCard } from "./section-card";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -347,9 +348,9 @@ function AddEmailDialog({
                             onBlur={() => draft && setTouched(true)}
                         />
                         {duplicate ? (
-                            <span className="text-xs text-danger">{t("emails.duplicate")}</span>
+                            <span className={settingType.error}>{t("emails.duplicate")}</span>
                         ) : invalid ? (
-                            <span className="text-xs text-danger">{t("emails.invalid")}</span>
+                            <span className={settingType.error}>{t("emails.invalid")}</span>
                         ) : null}
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}

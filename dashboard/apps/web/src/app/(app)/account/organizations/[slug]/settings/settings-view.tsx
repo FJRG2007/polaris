@@ -16,7 +16,7 @@
  */
 
 import { useState } from "react";
-import { useOptimisticToggle, useOptimisticValue } from "@polaris/ui";
+import { settingType, useOptimisticToggle, useOptimisticValue } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -268,7 +268,7 @@ function SealedDevicesCard({ orgId, days, instance }: { orgId: string; days: num
                         }}
                     />
                 </div>
-                {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
+                {error ? <p role="alert" className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

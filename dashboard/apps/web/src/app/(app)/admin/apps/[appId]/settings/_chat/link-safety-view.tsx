@@ -11,7 +11,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Checkbox, Switch, useOptimisticValue } from "@polaris/ui";
+import { Checkbox, settingType, Switch, useOptimisticValue } from "@polaris/ui";
 import { setLinkSafetyAction } from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -119,7 +119,7 @@ export function LinkSafetyView({ initial }: { initial: Overview }) {
                 </p>
             )}
             {error && (
-                <p role="alert" className="text-xs text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             )}

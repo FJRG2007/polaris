@@ -19,7 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageSection } from "@/components/page-section";
 import { PagedPicker } from "@/components/paged-picker";
 import { DnsZoneEditor } from "@/components/dns/dns-zone-editor";
-import { Button, EmptyState } from "@polaris/ui";
+import { Button, EmptyState, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { dnsZoneOptionsAction } from "@/app/(app)/account/domains/dns-actions";
 
@@ -127,7 +127,7 @@ export function DnsRecordsCard() {
         >
             {error && reach === null && !zone ? (
                 <div className="flex flex-col items-start gap-2">
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                     <Button

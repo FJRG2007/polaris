@@ -11,7 +11,7 @@ import { useState, useTransition } from "react";
 import { quietHoursSchema, type QuietHours } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { saveQuietHoursAction } from "./actions";
-import { Button, Card, CardBody, CardHeader, CardTitle, Switch, DateInput } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Switch, DateInput, settingType } from "@polaris/ui";
 
 export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; timeZone: string }) {
     const t = useTranslations("accountNotifications");
@@ -84,9 +84,9 @@ export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; tim
                     />
                 </label>
                 {!checked.success ? (
-                    <p className="text-xs text-danger">{t("quiet.invalid")}</p>
+                    <p className={settingType.error}>{t("quiet.invalid")}</p>
                 ) : null}
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 <div className="flex justify-end">
                     <Button
                         size="sm"

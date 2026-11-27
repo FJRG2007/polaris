@@ -19,7 +19,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    SegmentedControl
+    SegmentedControl,
+    settingType
 } from "@polaris/ui";
 import { hostAllowed } from "@/lib/polar/connectors/shared";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -215,7 +216,7 @@ export function ConnectDialog({
                                 }
                             />
                             {headerBad(header.name) ? (
-                                <span className="text-xs text-danger">
+                                <span className={settingType.error}>
                                     {t(`settings.connectorCatalog.fields.${header.label}Invalid` as never)}
                                 </span>
                             ) : null}
@@ -227,7 +228,7 @@ export function ConnectDialog({
                         </p>
                     ) : null}
                     {error ? (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

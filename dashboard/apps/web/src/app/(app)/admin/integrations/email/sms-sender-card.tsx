@@ -34,7 +34,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    isDirty
+    isDirty,
+    settingType
 } from "@polaris/ui";
 
 /** Only one provider exists today; the catalogue keeps the form data-driven. */
@@ -128,7 +129,7 @@ export function SmsSenderCard({
                                     </div>
                                 </div>
                                 {sender.error ? (
-                                    <p className="text-xs text-danger">{sender.error}</p>
+                                    <p className={settingType.error}>{sender.error}</p>
                                 ) : null}
                             </li>
                         ))}

@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { runAction } from "@/lib/run-action";
-import { Skeleton, Switch, useOptimisticToggle } from "@polaris/ui";
+import { settingType, Skeleton, Switch, useOptimisticToggle } from "@polaris/ui";
 import { setLanSignInAction } from "./actions";
 import type { LanSignInView } from "@/lib/lan-sign-in";
 import { PageSection } from "@/components/page-section";
@@ -98,7 +98,7 @@ export function LanSignInCard({
                         </>
                     )}
                     {error ? (
-                        <p role="alert" className="text-xs text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

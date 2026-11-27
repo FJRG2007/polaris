@@ -50,7 +50,8 @@ import {
     CardTitle,
     Select,
     Skeleton,
-    DateInput
+    DateInput,
+    settingType
 } from "@polaris/ui";
 import {
     Bug,
@@ -842,7 +843,7 @@ export function UpdatesView({
                     </div>
                     {timed && run ? <UpdateProgress run={run} now={clock} /> : null}
                     {checkFailed ? (
-                        <p className="text-xs text-danger">{t("settings.updates.checkFailed")}</p>
+                        <p className={settingType.error}>{t("settings.updates.checkFailed")}</p>
                     ) : null}
 
                     <dl className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm sm:grid-cols-[max-content_minmax(0,1fr)] sm:gap-x-8">
@@ -919,7 +920,7 @@ export function UpdatesView({
                             ) : null}
                         </div>
                         <p className="text-xs text-muted-foreground">{scheduleHint(policy, t, quietHour, canInstall)}</p>
-                        {policyError ? <p className="text-xs text-danger">{policyError}</p> : null}
+                        {policyError ? <p className={settingType.error}>{policyError}</p> : null}
                     </div>
 
                     <SecurityUpdates disabled={updating} />

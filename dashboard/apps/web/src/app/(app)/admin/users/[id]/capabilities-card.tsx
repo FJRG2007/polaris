@@ -32,7 +32,8 @@ import {
     Checkbox,
     SegmentedControl,
     Skeleton,
-    cn
+    cn,
+    settingType
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -144,7 +145,7 @@ export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved:
                 )}
 
                 {error && (
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 )}

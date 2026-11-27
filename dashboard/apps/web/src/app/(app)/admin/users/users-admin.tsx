@@ -77,7 +77,8 @@ import {
     ShortcutHint,
     cn,
     shortcutPressed,
-    TagList
+    TagList,
+    settingType
 } from "@polaris/ui";
 
 /** How long typing settles before the search asks the server. */
@@ -267,7 +268,7 @@ export function UsersAdmin({
         <div className="flex flex-col gap-4">
             <RecoveryRequests requests={recoveries} />
             {error && (
-                <p role="alert" className="text-sm text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             )}

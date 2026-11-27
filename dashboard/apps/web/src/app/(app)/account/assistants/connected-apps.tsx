@@ -77,7 +77,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    cn
+    cn,
+    settingType
 } from "@polaris/ui";
 
 /** An app as the list draws it: what it holds, what it could be given, and
@@ -761,7 +762,7 @@ function EditScopes({
                         )
                     }
                 />
-                {empty ? <p className="text-xs text-danger">{t("connectedApps.pickOne")}</p> : null}
+                {empty ? <p className={settingType.error}>{t("connectedApps.pickOne")}</p> : null}
                 {showDatabases ? (
                     <DatabaseReachPicker databases={databases} reach={reach} onChange={setReach} />
                 ) : null}

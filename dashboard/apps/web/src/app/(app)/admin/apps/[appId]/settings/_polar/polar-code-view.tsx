@@ -16,7 +16,7 @@ import type { Reach } from "@/lib/agents/pool-reach-state";
 import { ServerPicker } from "@/components/server-picker";
 import type { PolarCodeAdmin, PoolServerRow } from "./data";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, Input, Switch, cn } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Switch, cn, settingType } from "@polaris/ui";
 
 /** What a new server in the pool may hold until the administrator says. */
 const NEW_SERVER_SESSIONS = 12;
@@ -200,7 +200,7 @@ export function PolarCodeView({ initial }: { initial: PolarCodeAdmin }) {
                     {t("admin.code.save")}
                 </Button>
                 {error ? (
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 ) : null}

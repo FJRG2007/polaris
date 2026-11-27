@@ -11,7 +11,7 @@
 import { useState } from "react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { Eye, Pencil } from "lucide-react";
-import { Button, Card, CardBody, Select, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, Select, settingType, Switch } from "@polaris/ui";
 import { skillKey } from "@/lib/polar/skills/overrides";
 import type { OverrideSummary } from "@/lib/polar/skills/override-store";
 import { EditedBadges, SkillDetailDialog, type SkillTarget } from "./skill-detail-dialog";
@@ -105,7 +105,7 @@ export function EnigmaSettings({
                 <p className="text-sm text-muted-foreground">{t("settings.enigma.intro")}</p>
             </div>
             {error ? (
-                <p role="alert" className="text-sm text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             ) : null}

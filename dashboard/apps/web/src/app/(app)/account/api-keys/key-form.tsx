@@ -28,7 +28,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowLeft, Copy, KeyRound } from "lucide-react";
 import type { AccessGroupView, ApiKeyView } from "@polaris/auth";
 import { createApiKeyAction, updateApiKeyAction } from "./actions";
-import { Button, Card, CardBody, Input, Select, Textarea, isDirty, DateInput } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Select, Textarea, isDirty, DateInput, settingType } from "@polaris/ui";
 import { ClientRulesEditor, EMPTY_CLIENT_RULES } from "@/components/client-rules-editor";
 import {
     AccessRulesEditor,
@@ -361,7 +361,7 @@ export function KeyForm({
             </Section>
 
             {error ? (
-                <p role="alert" className="text-sm text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             ) : null}

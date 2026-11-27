@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
-import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { pushKeyAction, subscribePushAction, unsubscribePushAction } from "./actions";
 import { desktopBridge } from "@/lib/desktop-bridge";
@@ -137,7 +137,7 @@ export function PushCard() {
                         ? t("push.standing.desktop")
                         : t(`push.standing.${standing}`, { clientKind: inPhoneApp() ? "phone" : "other" })}
                 </p>
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

@@ -6,7 +6,7 @@
  * can be moved; each is checked against the server's schema as it is typed.
  */
 
-import { Button, Input, Select } from "@polaris/ui";
+import { Button, Input, Select, settingType } from "@polaris/ui";
 import { useMemo } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -136,7 +136,7 @@ export function PermissionRulesEditor({
                                     </div>
                                 </div>
                                 {invalid ? (
-                                    <span className="text-xs text-danger">{t("settings.agents.rules.invalid")}</span>
+                                    <span className={settingType.error}>{t("settings.agents.rules.invalid")}</span>
                                 ) : null}
                                 {(["stricter", "unenforced"] as const).map((kind) => {
                                     const tools = gaps

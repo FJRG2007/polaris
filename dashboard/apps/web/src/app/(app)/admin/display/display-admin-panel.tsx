@@ -11,7 +11,7 @@
 import { ThemePolicyCard } from "./theme-policy";
 import { useEffect, useRef, useState } from "react";
 import { savePlatformDisplayAction } from "./actions";
-import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
+import { Button, Card, CardBody, settingType, Skeleton } from "@polaris/ui";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DisplayAdminReading } from "@/app/api/admin/display/route";
@@ -72,7 +72,7 @@ export function DisplayAdminPanel() {
         return (
             <Card>
                 <CardBody className="flex flex-col items-start gap-3">
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {t("display.loadFailed")}
                     </p>
                     <Button size="sm" variant="secondary" onClick={live.refresh}>

@@ -18,7 +18,8 @@ import {
     DialogHeader,
     DialogTitle,
     AsyncSelect,
-    type AsyncLoad
+    type AsyncLoad,
+    settingType
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
@@ -128,7 +129,7 @@ export function AgentImportDialog({
                     </div>
                     <RepoAgentsSource show={show} />
                     {error ? (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

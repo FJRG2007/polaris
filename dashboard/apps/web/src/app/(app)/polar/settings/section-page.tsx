@@ -21,7 +21,7 @@ import { listGrants } from "@/lib/polar/tool-grants";
 import { PolarToolGrants } from "./polar-tool-grants";
 import { Messages } from "@/components/i18n/messages";
 import { PolarRoutingSettings } from "./polar-routing";
-import { Card, CardBody, Skeleton } from "@polaris/ui";
+import { Card, CardBody, settingType, Skeleton } from "@polaris/ui";
 import { PolarBrowserSites } from "./polar-browser-sites";
 import { PolarSkills } from "./polar-skills";
 import { EnigmaSettings } from "./enigma-settings";
@@ -246,10 +246,10 @@ export async function SettingsSectionPage({
                         <h2 className="text-sm font-medium text-foreground">
                             {account("polarTools.title")}
                         </h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {account("polarTools.intro")}
                         </p>
-                        <p className="text-xs text-foreground-subtle">
+                        <p className={settingType.hint}>
                             {account("polarTools.stillChecked")}
                         </p>
                     </div>
@@ -271,7 +271,7 @@ export async function SettingsSectionPage({
                         <h2 className="text-sm font-medium text-foreground">
                             {t("settings.browserSites.title")}
                         </h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("settings.browserSites.intro")}
                         </p>
                     </div>
@@ -353,7 +353,7 @@ async function ProvidersSection({ userId }: { userId: string }) {
         <section className="flex flex-col gap-2">
             <div className="min-w-0">
                 <h2 className="text-sm font-medium text-foreground">{t("aiKeys.page.title")}</h2>
-                <p className="text-xs text-muted-foreground">{t("aiKeys.page.intro")}</p>
+                <p className={settingType.hint}>{t("aiKeys.page.intro")}</p>
             </div>
             <Suspense fallback={<ListSkeleton />}>
                 <AccountProvidersPanel userId={userId} narrow />

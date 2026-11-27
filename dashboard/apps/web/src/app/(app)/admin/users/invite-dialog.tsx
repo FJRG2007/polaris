@@ -30,7 +30,8 @@ import {
     Input,
     Select,
     Switch,
-    cn
+    cn,
+    settingType
 } from "@polaris/ui";
 import {
     AccessRulesEditor,
@@ -132,7 +133,7 @@ export function InviteDialog({
                                     aria-invalid={Boolean(form.error("email"))}
                                 />
                                 {form.error("email") ? (
-                                    <p className="text-xs text-danger">{form.error("email")}</p>
+                                    <p className={settingType.error}>{form.error("email")}</p>
                                 ) : null}
                             </div>
                             <div className="flex flex-col gap-1">

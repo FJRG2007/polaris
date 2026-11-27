@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { Button, Card, CardBody } from "@polaris/ui";
+import { Button, Card, CardBody, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 
@@ -45,7 +45,7 @@ export function PolarToolGrants({ grants }: { grants: PolarToolGrantView[] }) {
         <Card>
             <CardBody className="flex flex-col gap-2">
                 {failed ? (
-                    <p role="alert" className="text-sm text-danger">
+                    <p role="alert" className={settingType.error}>
                         {t("polarTools.revokeFailed")}
                     </p>
                 ) : null}

@@ -14,7 +14,7 @@ import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, Input, Skeleton } from "@polaris/ui";
+import { Button, Input, settingType, Skeleton } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
 import type { AcmeContactStatus } from "@/lib/tls/acme-edge";
 import { useLiveResource } from "@/components/use-live-resource";
@@ -128,7 +128,7 @@ export function CertificateContactCard() {
                         </div>
                     </label>
                     {problem ? (
-                        <p className="text-xs text-danger">{t(`domains.acme.errors.${problem}`)}</p>
+                        <p className={settingType.error}>{t(`domains.acme.errors.${problem}`)}</p>
                     ) : (
                         <p className="text-xs text-muted-foreground">
                             {status.email === ""
@@ -140,7 +140,7 @@ export function CertificateContactCard() {
                     )}
                     <EdgeLine status={status} restarting={restarting} busy={busy} onRestart={() => void restart()} />
                     {error ? (
-                        <p role="alert" className="text-xs text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

@@ -13,7 +13,7 @@
  * what is already stored, and a card saved says so where the reader is looking.
  */
 
-import { Button, Card, cn, Input, Skeleton } from "@polaris/ui";
+import { Button, Card, cn, Input, settingType, Skeleton } from "@polaris/ui";
 import { activeSection, sameSettings, withFields } from "./settings-form";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { filterSettings, type SettingsIndex } from "./settings-search";
@@ -337,10 +337,10 @@ export function SettingsLayout({
                                 role="status"
                                 className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border px-4 py-8 text-center"
                             >
-                                <p className="min-w-0 break-words text-sm font-medium">
+                                <p className={cn("min-w-0 break-words font-medium", settingType.title)}>
                                     {t("kit.filterEmpty", { query: query.trim() })}
                                 </p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className={settingType.hint}>
                                     {t("kit.filterEmptyHint")}
                                 </p>
                                 <Button
@@ -418,7 +418,7 @@ export function SettingsSection({
                     >
                         {title}
                     </h2>
-                    <p className="text-xs text-muted-foreground">{intro}</p>
+                    <p className={settingType.hint}>{intro}</p>
                 </div>
             </header>
             <div className="flex flex-col gap-3">{children}</div>
@@ -479,7 +479,7 @@ export function SettingsCard({
                             {badge}
                         </h3>
                         {description && (
-                            <p className="text-xs text-muted-foreground">{description}</p>
+                            <p className={settingType.hint}>{description}</p>
                         )}
                     </div>
                     {actions && (

@@ -15,7 +15,7 @@ import { setPolarOptionsAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PolarConnectorPolicy, PolarPolicy } from "@/lib/polar/access";
 import { CONNECTOR_AUDIENCES, normalizeHostEntry } from "@/lib/polar/connectors/shared";
-import { Card, CardBody, Input, SegmentedControl, Switch, useOptimisticValue } from "@polaris/ui";
+import { Card, CardBody, Input, SegmentedControl, settingType, Switch, useOptimisticValue } from "@polaris/ui";
 
 export function PolarOptionsCard({ options }: { options: PolarPolicy }) {
     const t = useTranslations("admin");
@@ -147,7 +147,7 @@ export function PolarOptionsCard({ options }: { options: PolarPolicy }) {
                         </>
                     ) : null}
                 </div>
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

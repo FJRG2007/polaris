@@ -16,7 +16,7 @@ import * as flow from "@polaris/ui/automation";
 import type { MailLabelView } from "@/lib/mailbox/labels";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import { Plus, X } from "lucide-react";
-import { Checkbox, Input, Select, SizeField } from "@polaris/ui";
+import { Checkbox, Input, Select, settingType, SizeField } from "@polaris/ui";
 import { swap, type Path } from "@polaris/ui/automation-graph";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -120,7 +120,7 @@ export function GroupCard({
                 )}
             </flow.SortableList>
             {group.items.length === 0 && attempted && (
-                <p className="text-xs text-danger">{t("rules.editor.emptyGroup")}</p>
+                <p className={settingType.error}>{t("rules.editor.emptyGroup")}</p>
             )}
             {!disabled && group.items.length < core.MAIL_FILTER_LIMITS.conditionsPerGroup && (
                 <flow.AddMenu

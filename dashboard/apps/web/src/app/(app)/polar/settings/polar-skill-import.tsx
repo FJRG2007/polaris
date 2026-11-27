@@ -25,6 +25,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    settingType,
     Skeleton
 } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
@@ -348,7 +349,7 @@ export function SkillImportDialog({
                         </div>
                     )}
                     {error ? (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}
@@ -527,7 +528,7 @@ export function SkillDirectory({
                 />
             </div>
             {error ? (
-                <p role="alert" className="text-sm text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             ) : null}

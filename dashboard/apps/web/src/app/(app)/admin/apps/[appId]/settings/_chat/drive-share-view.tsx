@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { ProductMark, SegmentedControl } from "@polaris/ui";
+import { ProductMark, SegmentedControl, settingType } from "@polaris/ui";
 import { setDriveShareAction } from "./actions";
 import type { DriveShare } from "@/lib/chat/drive-share";
 
@@ -67,7 +67,7 @@ export function DriveShareView({ how }: { how: DriveShare }) {
                 ]}
             />
             {error && (
-                <p role="alert" className="text-xs text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             )}

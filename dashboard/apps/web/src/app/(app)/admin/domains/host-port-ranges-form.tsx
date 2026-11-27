@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Button, Input } from "@polaris/ui";
+import { Button, Input, settingType } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DeployTargetPicker } from "@/components/deploy-target-picker";
@@ -137,7 +137,7 @@ export function HostPortRangesForm() {
                     : t("domainsPorts.hosts.invalidHint", { max: PORT_RANGES_MAX })}
             </p>
             {error ? (
-                <p role="alert" className="text-xs text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             ) : null}

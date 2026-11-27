@@ -12,7 +12,7 @@
 
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { Button, Card, CardBody } from "@polaris/ui";
+import { Button, Card, CardBody, settingType } from "@polaris/ui";
 import { useEffect, useState, useTransition } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
@@ -108,7 +108,7 @@ export function TelegramLinkCard({ status, locked }: { status: TwoFactorMethodSt
                         </a>
                     </p>
                 ) : null}
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

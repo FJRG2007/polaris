@@ -30,7 +30,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    settingType
 } from "@polaris/ui";
 
 /** One-line summary of what a saved list holds. */
@@ -130,7 +131,7 @@ export function AccessView({
             />
 
             {error ? (
-                <p role="alert" className="text-sm text-danger">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             ) : null}

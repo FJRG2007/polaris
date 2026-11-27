@@ -14,7 +14,7 @@ import { ChannelCard } from "../email/channel-card";
 import { IntegrationLogo } from "@/components/logos";
 import { providerRowFor } from "./messaging-providers";
 import { MessagingChannelDialog } from "./channel-dialog";
-import { Button, buttonVariants, Card, CardBody, Select, Switch } from "@polaris/ui";
+import { Button, buttonVariants, Card, CardBody, Select, settingType, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { MessagingChannelView } from "@/lib/messaging/channel-admin";
 import type { SmsCodeSenderOption } from "@/lib/messaging/code-senders";
@@ -179,7 +179,7 @@ function CodeSenderRow({
                     </Button>
                 </div>
             )}
-            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
         </div>
     );
 }
@@ -256,7 +256,7 @@ function SmsCodesRow({ senders, saved: initial }: { senders: SmsCodeSenderOption
                     />
                 </div>
             ) : null}
-            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
         </div>
     );
 }

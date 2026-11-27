@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { SEASON_ICONS, usePreviewSeason } from "@/components/seasonal/seasonal-frame";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Select, Switch } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Select, settingType, Switch } from "@polaris/ui";
 import { useOptimisticToggle } from "@polaris/ui";
 import {
     previewSeasonAction,
@@ -98,7 +98,7 @@ export function SeasonalAdminCard({
                     />
                 </div>
                 {error ? (
-                    <p role="alert" className="text-xs text-danger">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 ) : null}
@@ -341,7 +341,7 @@ function SeasonRow({
                 {endPicker("to")}
             </div>
             {shown ? (
-                <p role="alert" className="text-xs text-danger">
+                <p role="alert" className={settingType.error}>
                     {shown.text}
                 </p>
             ) : null}

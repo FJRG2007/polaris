@@ -49,7 +49,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    cn
+    cn,
+    settingType
 } from "@polaris/ui";
 
 export interface UserOption {
@@ -317,7 +318,7 @@ function NewGroupDialog({ onClose }: { onClose: () => void }) {
                         onChange={(event) => setDescription(event.target.value)}
                     />
                     {error ? (
-                        <p role="alert" className="text-sm text-danger">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}
