@@ -18,7 +18,6 @@ use pterm_core::context_flag::ContextFlag;
 use pterm_core::safe_error;
 use pterm_core::user_preferences::GetUserPreferences as _;
 use pterm_errors::{report_error, report_if_error};
-use ptermui::clipboard::ClipboardContent;
 use ptermui::elements::{
     Border, ChildAnchor, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
 };
@@ -101,7 +100,6 @@ use crate::util::traffic_lights::{TrafficLightData, TrafficLightMouseStates, tra
 use crate::view_components::DismissibleToast;
 use crate::window_settings::WindowSettings;
 use crate::workspace::hoa_onboarding::mark_hoa_onboarding_completed;
-use crate::workspace::tab_settings::TabSettings;
 use crate::workspace::view::OnboardingTutorial;
 use crate::workspace::{PaneViewLocator, Workspace, WorkspaceAction, WorkspaceRegistry};
 use crate::workspaces::team_tester::TeamTesterStatus;
@@ -2825,15 +2823,6 @@ impl RootView {
                     .update(ctx, |auth_manager, _| auth_manager.upgrade_url());
                 ctx.open_url(&upgrade_url);
             }
-            AgentOnboardingEvent::UpgradeCopyUrlRequested => {
-                let upgrade_url = AuthManager::handle(ctx)
-                    .update(ctx, |auth_manager, _| auth_manager.upgrade_url());
-                ctx.clipboard().write(ClipboardContent {
-                    plain_text: upgrade_url.clone(),
-                    paths: Some(vec![upgrade_url]),
-                    ..Default::default()
-                });
-            }
             AgentOnboardingEvent::UpgradePasteTokenFromClipboardRequested => {
                 // A plan bought on the instance reaches this app through the
                 // Polaris sign-in, not a pasted token.
@@ -3375,12 +3364,26 @@ impl RootView {
     }
 
     /// Leaves onboarding for the terminal without a cloud account and opens
-    /// Settings > Account, where the Polaris sign-in is.
+    /// Settings > Account, where the Polaris sign-in is. Whatever was chosen
+    /// on the slides so far is applied first, and onboarding counts as done,
+    /// so it neither loses those choices nor comes back on the next launch.
     fn open_polaris_sign_in_from_onboarding(&mut self, ctx: &mut ViewContext<Self>) {
-        let AuthOnboardingState::Onboarding { target, .. } = &self.auth_onboarding_state else {
+        if let AuthOnboardingState::PostAuthOnboarding { .. } = &self.auth_onboarding_state {
+            self.pending_polaris_sign_in = true;
+            self.complete_account_first(AccountFirstCompletion::AccountSkipped, ctx);
+            self.open_pending_polaris_sign_in(ctx);
+            return;
+        }
+        let AuthOnboardingState::Onboarding {
+            target,
+            onboarding_view,
+        } = &self.auth_onboarding_state
+        else {
             return;
         };
         let target = target.clone();
+        let choices = onboarding_view.as_ref(ctx).choices_so_far(ctx);
+        Self::finish_onboarding_before_polaris_sign_in(choices.as_ref(), ctx);
         self.pending_polaris_sign_in = true;
         if FeatureFlag::SkipFirebaseAnonymousUser.is_enabled() {
             AuthManager::handle(ctx).update(ctx, |_, ctx| {
@@ -3398,6 +3401,23 @@ impl RootView {
         self.open_pending_polaris_sign_in(ctx);
         self.focus(ctx);
         ctx.notify();
+    }
+
+    /// Applies the onboarding choices made so far (none on the welcome slide)
+    /// and marks onboarding done. There is no account yet, so AI stays off
+    /// until one exists, as when the login slide is skipped.
+    fn finish_onboarding_before_polaris_sign_in(
+        choices: Option<&SelectedSettings>,
+        ctx: &mut AppContext,
+    ) {
+        mark_local_onboarding_completed(ctx);
+        if FeatureFlag::HOAOnboardingFlow.is_enabled() {
+            mark_hoa_onboarding_completed(ctx);
+        }
+        if let Some(selected_settings) = choices {
+            let team_context = UserWorkspaces::as_ref(ctx).team_context_for_operation(ctx);
+            apply_onboarding_settings(selected_settings, false, team_context, ctx);
+        }
     }
 
     pub fn open_team_settings_page(&mut self, _: &(), ctx: &mut ViewContext<Self>) -> bool {

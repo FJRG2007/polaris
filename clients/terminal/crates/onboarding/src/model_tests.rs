@@ -58,6 +58,32 @@ fn step(app: &App, model: &ModelHandle<OnboardingStateModel>) -> OnboardingStep 
 }
 
 #[test]
+fn choices_so_far_are_empty_on_the_welcome_slide_then_follow_the_selection() {
+    App::test((), |mut app| async move {
+        let model = add_test_model(&mut app);
+        model.read(&app, |model, _| {
+            assert!(model.choices_so_far().is_none());
+        });
+
+        model.update(&mut app, |model, ctx| model.next(ctx));
+        assert_ne!(step(&app, &model), OnboardingStep::Intro);
+        model.update(&mut app, |model, ctx| {
+            model.set_intention_terminal(ctx);
+            model.set_use_vertical_tabs(true, ctx);
+        });
+
+        let Some(SelectedSettings::Terminal {
+            ui_customization: Some(ui),
+            ..
+        }) = model.read(&app, |model, _| model.choices_so_far())
+        else {
+            panic!("a terminal choice made past the welcome slide is kept");
+        };
+        assert!(ui.use_vertical_tabs);
+    });
+}
+
+#[test]
 fn account_first_path_is_linear_and_reversible() {
     let _account_first = FeatureFlag::AccountFirstOnboarding.override_enabled(true);
     App::test((), |mut app| async move {

@@ -107,9 +107,6 @@ impl AuthView {
         let auth_screen_view = ctx.add_typed_action_view(|ctx| AuthViewBody::new(variant, ctx));
         ctx.subscribe_to_view(&auth_screen_view, |me, _, event, ctx| match event {
             AuthViewBodyEvent::Close => me.close(ctx),
-            AuthViewBodyEvent::SignUpButtonClicked => {
-                me.dismiss_error_notification(ctx);
-            }
             AuthViewBodyEvent::PolarisSignInRequested => {
                 me.open_polaris_sign_in(ctx);
             }

@@ -1,7 +1,7 @@
 use ai::LLMId;
 use onboarding::{
-    AgentOnboardingView, OfferVariant, OnboardingAuthState, OnboardingIntention, SelectedSettings,
-    UICustomizationSettings,
+    AgentOnboardingEvent, AgentOnboardingView, OfferVariant, OnboardingAuthState,
+    OnboardingIntention, SelectedSettings, UICustomizationSettings,
 };
 use pterm_core::features::FeatureFlag;
 use pterm_core::user_preferences::GetUserPreferences as _;
@@ -11,6 +11,7 @@ use ptermui::{
     App, AppContext, Element, Entity, EntityId, SingletonEntity, TypedActionView, View, ViewHandle,
 };
 use session_sharing_protocol::common::SessionId;
+use settings::Setting as _;
 
 use super::{
     AccountFirstCompletion, AuthOnboardingState, AuthOnboardingTarget,
@@ -27,6 +28,7 @@ use crate::server::server_api::ServerApiProvider;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::themes::onboarding_theme_picker_themes;
+use crate::workspace::tab_settings::TabSettings;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::workspaces::workspace::FtueAccountClass;
 
@@ -598,6 +600,81 @@ fn join_shared_session_in_existing_window_retargets_pending_onboarding_workspace
             session_id,
             "Onboarding",
         );
+    });
+}
+
+#[test]
+fn log_in_from_the_welcome_slide_finishes_onboarding_before_the_terminal() {
+    let _skip_anonymous = FeatureFlag::SkipFirebaseAnonymousUser.override_enabled(true);
+    App::test((), |mut app| async move {
+        let root_view = root_view_for_join_test(&mut app);
+        set_local_onboarding_completed(&mut app, false);
+
+        let target = AuthOnboardingTarget::Workspace(pending_workspace_args(&mut app));
+        root_view.update(&mut app, |root_view, ctx| {
+            let onboarding_view = RootView::create_agent_onboarding_view(ctx);
+            root_view.auth_onboarding_state = AuthOnboardingState::Onboarding {
+                onboarding_view,
+                target,
+            };
+            root_view.handle_agent_onboarding_event(
+                &AgentOnboardingEvent::LoginFromWelcomeRequested,
+                ctx,
+            );
+        });
+
+        app.read(|ctx| {
+            let root_view = root_view.as_ref(ctx);
+            assert!(
+                matches!(
+                    root_view.auth_onboarding_state,
+                    AuthOnboardingState::Terminal(_)
+                ),
+                "Log in leaves onboarding for the terminal"
+            );
+            assert!(
+                !root_view.pending_polaris_sign_in,
+                "Settings > Account opens at once"
+            );
+            assert!(
+                has_completed_local_onboarding(ctx),
+                "onboarding must not come back on the next launch"
+            );
+        });
+    });
+}
+
+#[test]
+fn onboarding_choices_made_before_the_polaris_sign_in_are_applied() {
+    App::test((), |mut app| async move {
+        crate::workspace::view::tests::initialize_app(&mut app);
+        set_local_onboarding_completed(&mut app, false);
+        app.update(|ctx| {
+            TabSettings::handle(ctx).update(ctx, |settings, ctx| {
+                settings.use_vertical_tabs.set_value(false, ctx).unwrap();
+            });
+        });
+        let choices = SelectedSettings::Terminal {
+            ui_customization: Some(UICustomizationSettings {
+                use_vertical_tabs: true,
+                show_conversation_history: false,
+                show_project_explorer: true,
+                show_global_search: false,
+                show_pterm_drive: false,
+                show_code_review_button: true,
+            }),
+            cli_agent_toolbar_enabled: true,
+            show_agent_notifications: false,
+        };
+
+        app.update(|ctx| {
+            RootView::finish_onboarding_before_polaris_sign_in(Some(&choices), ctx);
+        });
+
+        app.read(|ctx| {
+            assert!(*TabSettings::as_ref(ctx).use_vertical_tabs);
+            assert!(has_completed_local_onboarding(ctx));
+        });
     });
 }
 
