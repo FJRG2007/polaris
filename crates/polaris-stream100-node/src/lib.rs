@@ -16,7 +16,7 @@ use polaris_stream100::native::input::Input;
 use polaris_stream100::report::KnobMap;
 use polaris_stream100::settings::{schema, Settings};
 use polaris_stream100::transport::TransportError;
-use polaris_stream100::{plugin, manifest, native, ownership};
+use polaris_stream100::{manifest, native, ownership, plugin};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

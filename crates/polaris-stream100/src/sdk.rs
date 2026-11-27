@@ -241,6 +241,42 @@ mod tests {
     }
 
     #[test]
+    fn the_sdk_and_the_usb_report_count_a_turn_alike() {
+        // Both carry the firmware's own accumulator, so the same movement is
+        // the same counts whichever route read it (`encoder::COUNTS_PER_TURN`).
+        let usb = |positions: [i16; 4]| {
+            let mut bytes = [0u8; 64];
+            for (index, position) in positions.iter().enumerate() {
+                bytes[3 + index * 2..5 + index * 2].copy_from_slice(&position.to_le_bytes());
+            }
+            Report::parse(&bytes).unwrap()
+        };
+        let moves = [[-4992, -246, -1320, -124], [-4480, -246, -1320, -636]];
+        let mut by_sdk = Decoder::new(KnobMap::default());
+        let mut by_usb = Decoder::new(KnobMap::default());
+        let mut sdk_events = Vec::new();
+        let mut usb_events = Vec::new();
+        for positions in moves {
+            sdk_events.extend(by_sdk.feed(decode_state(&state(0, positions)).unwrap()));
+            usb_events.extend(by_usb.feed(usb(positions)));
+        }
+        assert_eq!(sdk_events, usb_events);
+        assert_eq!(
+            sdk_events,
+            vec![
+                Event::Turn {
+                    knob: 0,
+                    counts: crate::encoder::COUNTS_PER_TURN
+                },
+                Event::Turn {
+                    knob: 3,
+                    counts: -crate::encoder::COUNTS_PER_TURN
+                }
+            ]
+        );
+    }
+
+    #[test]
     fn the_device_info_names_the_stream100() {
         let mut info = info_buffer();
         assert_eq!(u32_at(&info, 0), 0x640);

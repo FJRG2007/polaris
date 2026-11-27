@@ -182,8 +182,33 @@ const SLOW: u64 = 200;
 fn one_detent_moves_the_configured_amount() {
     let tuning = Tuning::default();
     let mut knob = Encoder::default();
-    assert_eq!(knob.turn(48, 0, &tuning), 2);
-    assert_eq!(knob.turn(-48, SLOW, &tuning), -2);
+    let detent = encoder::DETENT_COUNTS;
+    assert_eq!(knob.turn(detent, 0, &tuning), 2);
+    assert_eq!(knob.turn(-detent, SLOW, &tuning), -2);
+}
+
+#[test]
+fn one_slow_full_turn_moves_about_half_the_range() {
+    // A turn in a second, as the SDK delivers it: a callback every 16 ms, each
+    // carrying the counts since the last one. Under five full turns from
+    // silent to full is what BUG-0064 asked for; half the range is the aim.
+    let tuning = Tuning::default();
+    let mut knob = Encoder::default();
+    let mut moved = 0;
+    let mut sent = 0;
+    for tick in 0..64u64 {
+        let counts = 8;
+        sent += counts;
+        moved += knob.turn(counts, tick * 16, &tuning);
+    }
+    assert_eq!(sent, encoder::COUNTS_PER_TURN);
+    assert!((45..=60).contains(&moved), "one turn moved {moved}%");
+    // A slower turn moves the same distance, never less.
+    let mut slow = Encoder::default();
+    let slow_moved: i32 = (0..256u64)
+        .map(|tick| slow.turn(2, tick * 16, &tuning))
+        .sum();
+    assert_eq!(slow_moved, encoder::COUNTS_PER_TURN / 10);
 }
 
 #[test]
@@ -213,8 +238,8 @@ fn slow_creep_is_dropped_once_it_settles() {
 fn a_slow_deliberate_turn_still_counts() {
     let tuning = Tuning::default();
     let mut knob = Encoder::default();
-    // 48 counts in 2-count reports 10 ms apart: one detent over half a second.
-    let moved: i32 = (0..24u64)
+    // One detent in 2-count reports 10 ms apart.
+    let moved: i32 = (0..(encoder::DETENT_COUNTS / 2) as u64)
         .map(|tick| knob.turn(2, tick * 10, &tuning))
         .sum();
     assert_eq!(moved, 2);
@@ -226,10 +251,10 @@ fn a_fast_spin_accelerates_within_the_cap() {
     let mut slow = Encoder::default();
     let mut fast = Encoder::default();
     let slow_total: i32 = (0..10u64)
-        .map(|tick| slow.turn(48, tick * SLOW, &tuning))
+        .map(|tick| slow.turn(encoder::DETENT_COUNTS, tick * SLOW, &tuning))
         .sum();
     let fast_total: i32 = (0..10u64)
-        .map(|tick| fast.turn(48, tick * 4, &tuning))
+        .map(|tick| fast.turn(encoder::DETENT_COUNTS, tick * 4, &tuning))
         .sum();
     assert_eq!(slow_total, 20);
     assert!(
@@ -252,9 +277,9 @@ fn a_burst_after_a_stall_is_capped() {
 fn discarded_counts_never_reappear() {
     let tuning = Tuning::default();
     let mut knob = Encoder::default();
-    assert_eq!(knob.turn(20, 0, &tuning), 0);
+    assert_eq!(knob.turn(9, 0, &tuning), 0);
     knob.discard();
-    assert_eq!(knob.turn(10, 5, &tuning), 0);
+    assert_eq!(knob.turn(5, 5, &tuning), 0);
 }
 
 #[test]

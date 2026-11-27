@@ -23,8 +23,24 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Encoder counts between two detents, as measured on the hardware.
-pub const DETENT_COUNTS: i32 = 48;
+/// Counts in one full turn of a knob, on every route alike.
+///
+/// The knobs are endless double-wiper potentiometers, not detented encoders:
+/// the controller's firmware turns the two wipers into a signed 16-bit
+/// accumulator at 512 counts per turn, clockwise up, and that accumulator is
+/// what every route reads - bytes 3-10 of the USB/HID report (Linux, WinUSB)
+/// and the `+0x0C` encoders of the Hercules SDK's state, which the SDK copies
+/// from the same report (CataclysmX/New-Hera-lunx, `docs/firmware/knobs.md`
+/// and `docs/protocol/inputs.md`, reversed from firmware 1.42 and matched
+/// against captures within 1%). So the scale is not a property of the route.
+pub const COUNTS_PER_TURN: i32 = 512;
+
+/// Counts in one step of the knob, the unit "Volume per click" is set in:
+/// about 26 steps per turn, so the default 2% moves about half the range in
+/// one turn. 48 was used before as "measured on the hardware", but it never
+/// was; with the 512-count turn it took five full turns to go from silent to
+/// full (BUG-0064).
+pub const DETENT_COUNTS: i32 = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]

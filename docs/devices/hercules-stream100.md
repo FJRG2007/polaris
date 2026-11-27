@@ -33,7 +33,12 @@ exists. No source code was copied from either.
 | 3-10 | four signed 16-bit little-endian encoder positions, knob 1 to 4 |
 
 Encoder positions are absolute and wrap at 16 bits; only the difference between
-two reports means anything. One detent is 48 counts.
+two reports means anything. The knobs are endless double-wiper
+potentiometers with no detents; the firmware's accumulator moves 512 counts per
+full turn, clockwise up (New-Hera-lunx, `docs/firmware/knobs.md`). The Hercules
+SDK's encoders are the same accumulator, so the scale is the same on every
+route. Polaris counts one step of "Volume per click" as 20 counts, about 26 per
+turn (BUG-0064; it was 48, never measured, so a turn moved about 21%).
 
 The knob-press bit order follows the printed numbers: measured on a real unit
 on 2026-11-26 (through the Hercules SDK, whose button word is bytes 1-2 of this
@@ -257,7 +262,7 @@ first run.
 | Input on Windows (feature `native`) | the HID API: the largest input collection of `06f8:e053`, opened read-only and shared, one overlapped read at a time with a timeout. Windows puts the report id first (`0` when the device numbers none) and `report::from_hid_read` brings it back to the USB transfer's bytes. Exercised against another HID device (opens, times out, cancels cleanly); never against the Stream 100, which the Hercules driver holds |
 | Input on Linux | the USB transport (`nusb`); needs the `uaccess` rule for the device, and without it the plugin says the system does not let Polaris open it |
 | Input on macOS | not written (HID manager), so no package is built for macOS |
-| Display transport | not written: `nusb` 0.2 has no isochronous transfers, and initialization is not understood (above) |
+| Display transport | not written: `nusb` 0.2 has no isochronous transfers, and initialization is not understood (above). The Hercules SDK does not draw a full image either: its graphic exports (`HSM_PrepareGraphicElement`, `HSM_SetGraphicElement`, `HSM_SetScreenConfiguration`) place its own panel elements, 32x32 icons and 110x16 labels, with undocumented arguments. The plugin's Screen group says Polaris does not draw on the screen yet |
 | Per-app audio backends | Windows Core Audio and PulseAudio/PipeWire done; macOS answers unsupported |
 | Desktop binding (`crates/polaris-stream100-node`) | `Controller` (reports in, volume out, actions back) and `Reader` (reads on a worker thread, `await reader.next(500)`) |
 | Device plugin (`clients/device-plugins/hercules-stream100`) | manifest generated from the crate (`cargo run -p polaris-stream100 --example manifest`, a test keeps them equal), entry `any/main.cjs`, native module built per platform by `.github/workflows/device-plugins.yml` (Windows x64, Linux x64). Settings live only on the plugin's page, never in the app's own settings |
@@ -410,8 +415,9 @@ standalone probe that makes the same calls; the callbacks are kept verbatim in
   held, and 3 then 2 in the two callbacks after the release; knobs 2-4 did
   not move. The filter drops the held and release nudges; the two before the
   switch closes are far below one volume step and dropped as a partial step.
-- The log has no detent marker, so it does not measure counts per detent; the
-  HID route's 48 is kept.
+- The log has no turn marker, so it does not measure counts per turn; the
+  512 per turn above comes from the firmware, and the SDK copies the report's
+  accumulator, so both routes count alike.
 
 The Polaris plugin itself has not been run against the device; only the probe
 has.

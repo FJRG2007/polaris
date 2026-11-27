@@ -284,7 +284,7 @@ mod tests {
         let sessions = [session("a", "Spotify.exe", 50, false)];
         // A small move once Spotify plays must not release the earlier 40 counts.
         let commands = engine.feed(
-            &report(0, [0, 50, 0, 0]),
+            &report(0, [0, 45, 0, 0]),
             1_050,
             &sessions,
             Output::default(),
