@@ -322,7 +322,8 @@ describe("updates in the manager", () => {
         failVersion("1.1.0");
         release("1.1.0");
         await manager.checkUpdates();
-        for (let i = 0; i < 20 && (await installedVersion(dir)) !== "1.0.0"; i++) await settle();
+        // The version is written back before the rollback's notice goes out: wait for both, not the file alone.
+        for (let i = 0; i < 50 && ((await installedVersion(dir)) !== "1.0.0" || news.length < 2); i++) await settle();
         expect(await installedVersion(dir)).toBe("1.0.0");
         expect(news.map((item) => item.kind)).toEqual(["updated", "rolled-back"]);
         expect((await manager.snapshot()).installed[0]).toMatchObject({ version: "1.0.0", failed: "1.1.0", update: "1.1.0" });
