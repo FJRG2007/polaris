@@ -127,11 +127,7 @@ vi.mock("@polaris/db", () => ({
         },
         chatMessage: {
             // One unread message in every room the count is asked about.
-            groupBy: async ({ where }: { where: { OR: { channelId: { in: string[] } }[] } }) =>
-                where.OR.flatMap((branch) => branch.channelId.in).map((channelId) => ({
-                    channelId,
-                    _count: { _all: 1 }
-                }))
+            findMany: async () => [{ id: "unread-1" }]
         }
     }
 }));

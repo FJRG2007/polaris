@@ -59,7 +59,7 @@ describe("what a nickname does not do", () => {
         const body = await searchPeople();
         // The scope clause sits on the same query the nickname ids are joined
         // into, so a name you gave somebody out of reach still finds nobody.
-        expect(body).toContain("...(scope ? { id: { in: scope } } : {})");
+        expect(body).toContain("...(inRoom ? { AND: [inRoom] } : scope ? { id: { in: scope } } : {})");
     });
 
     it("is not looked up for a search with nothing in it", async () => {

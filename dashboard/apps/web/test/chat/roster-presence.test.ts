@@ -1,9 +1,8 @@
 /**
  * The member list arrives with who is around, read beside the names.
  *
- * Read through the same privacy rule the faces use, in bounded batches, and once:
- * the counts in the headings are about everybody, so the browser must not have
- * to ask about every member a second time to draw them.
+ * Read through the same privacy rule the faces use, and only for the page being
+ * drawn: a space of a million is never asked about all at once.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +15,12 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/chat/chat-service", () => ({
-    listChannelMembers: async () => state.members
+    listChannelMembersPage: async () => ({
+        members: state.members.slice(0, 200),
+        next: state.members.length > 200 ? "cursor" : null,
+        total: state.members.length,
+        totalCapped: false
+    })
 }));
 vi.mock("@/lib/presence-service", () => ({
     presenceFor: async (viewer: unknown, ids: readonly string[]) => {
@@ -50,7 +54,7 @@ describe("reading a member list with presence", () => {
             ["b", "idle"],
             ["c", "busy"]
         ]);
-        const roster = await listChannelRoster(VIEWER, "c1");
+        const roster = (await listChannelRoster(VIEWER, "c1")).members;
         expect(roster.map((member) => [member.userId, member.online])).toEqual([
             ["a", true],
             ["b", true],
@@ -60,20 +64,21 @@ describe("reading a member list with presence", () => {
         expect(state.viewers).toEqual([VIEWER]);
     });
 
-    it("asks about a large space in bounded batches, each member once", async () => {
+    it("asks about one page of a large space, never the whole of it", async () => {
         state.members = Array.from({ length: 1201 }, (_, index) => ({
             userId: `u${index}`,
             name: `u${index}`,
             role: "member"
         }));
         const roster = await listChannelRoster(VIEWER, "c1");
-        expect(roster).toHaveLength(1201);
-        expect(state.batches).toEqual([500, 500, 201]);
+        expect(roster.members).toHaveLength(200);
+        expect(roster.next).toBe("cursor");
+        expect(state.batches).toEqual([200]);
     });
 
     it("asks nothing for an empty list", async () => {
         state.members = [];
-        expect(await listChannelRoster(VIEWER, "c1")).toEqual([]);
+        expect((await listChannelRoster(VIEWER, "c1")).members).toEqual([]);
         expect(state.batches).toEqual([]);
     });
 });

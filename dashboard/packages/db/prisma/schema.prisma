@@ -496,6 +496,9 @@ model User {
     // The people directory reads accounts a page at a time, oldest first, and
     // resumes after the last one it showed - see `pagination/cursor`.
     @@index([createdAt, id])
+
+    // The @ picker in a large room walks people in name order up to its limit.
+    @@index([name])
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -694,6 +697,8 @@ model NoteSpaceMember {
 
     @@unique([spaceId, userId])
     @@index([userId])
+    // The member list, paged in the order people joined.
+    @@index([spaceId, createdAt, id])
 }
 
 // A whole team given a space, resolved to the same three roles a person's
@@ -10451,6 +10456,11 @@ model ChatSpace {
     // instead of a seat (`lib/chat/join-requests.ts`). Off by default, which is
     // how every space admitted people before.
     requireApproval Boolean @default(false)
+    // Whether a member who is not an admin may use @everyone and @here, which
+    // tell the whole space. Off by default, as Discord's "Mention @everyone"
+    // is: in a space of a hundred thousand people one message is a hundred
+    // thousand notifications, and that is the owner's call to hand out.
+    membersMayMentionEveryone Boolean @default(false)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -11319,6 +11329,10 @@ model ChatMessage {
     hiddenFor   ChatMessageHidden[]
     keeps       ChatMessageKeep[]
 
+    // Unread counting also has a partial index the migration creates, which
+    // the schema cannot declare: ("channelId", "createdAt") over messages that
+    // are not deleted, not thread replies and not system lines
+    // (`ChatMessage_unread_channelId_createdAt_idx`, lib/chat/chat-service.ts).
     @@index([channelId, createdAt])
     @@unique([authorId, clientKey])
     // One channel's main conversation or one of its threads, in time order,

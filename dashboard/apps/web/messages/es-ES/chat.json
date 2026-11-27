@@ -312,7 +312,8 @@
         },
         "pollAnonymous": "Los votos de esa encuesta son anónimos",
         "pollVotersHidden": "Quién eligió qué se verá cuando cierre",
-        "sealedGroupFull": "Esta conversación privada está llena. Una cifrada de extremo a extremo admite {cap} personas: antes alguien debe salir."
+        "sealedGroupFull": "Esta conversación privada está llena. Una cifrada de extremo a extremo admite {cap} personas: antes alguien debe salir.",
+        "roomMentionAdminsOnly": "Solo los administradores de este espacio pueden usar @everyone y @here"
     },
     "media": {
         "refused": {
@@ -1257,7 +1258,10 @@
         "newcomerHistoryDefaultHint": "Se aplica a los canales que usan el valor del servidor.",
         "newcomerHistoryDefaultLocked": "Solo los admins del servidor cambian esto.",
         "webhookPicture": "Cambiar imagen",
-        "privateSealedNote": "Los canales privados se cifran de extremo a extremo. Hacerlo público deja de cifrar los mensajes nuevos; los anteriores siguen cifrados."
+        "privateSealedNote": "Los canales privados se cifran de extremo a extremo. Hacerlo público deja de cifrar los mensajes nuevos; los anteriores siguen cifrados.",
+        "roomMentions": "Los miembros pueden usar @everyone y @here",
+        "roomMentionsHint": "Desactivado: solo los administradores avisan a todo el espacio.",
+        "roomMentionsLocked": "Solo los administradores de este espacio pueden cambiarlo."
     },
     "callMenus": {
         "volume": "Volumen",
@@ -1878,6 +1882,7 @@
         "hideTheMembers": "Ocultar miembros",
         "heading": "Miembros",
         "headingCount": "Miembros - {count}",
+        "headingCountCapped": "Miembros - {count}+",
         "onlineCount": "En línea - {count}",
         "offlineCount": "Desconectados - {count}",
         "you": "(tú)",

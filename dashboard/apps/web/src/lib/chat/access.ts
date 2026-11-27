@@ -780,6 +780,88 @@ export async function conversationAudience(
     return [...new Set(ids)];
 }
 
+/** Who a conversation reaches, as the pieces its audience is made of - the
+ *  space when the channel is open to all of it, the space's owner, and the
+ *  channel's own rows - rather than as the list of every one of them. */
+interface AudienceParts {
+    readonly spaceId: string | null;
+    readonly ownerId: string | null;
+    readonly channelId: string;
+}
+
+async function audienceParts(actor: ChatActor, channelId: string): Promise<AudienceParts | null> {
+    const access = await channelAccess(actor, channelId);
+    if (!access) return null;
+    const open = access.spaceId ? !(await isPrivate(channelId)) : false;
+    const space =
+        open && access.spaceId
+            ? await prisma.chatSpace.findUnique({
+                  where: { id: access.spaceId },
+                  select: { ownerId: true }
+              })
+            : null;
+    return { spaceId: open ? access.spaceId : null, ownerId: space?.ownerId ?? null, channelId };
+}
+
+/**
+ * `conversationAudience` as a filter on people instead of a list of them, for
+ * a query that also has its own `take`: membership becomes an EXISTS the
+ * database answers with the (spaceId, userId) and (channelId, userId) indexes,
+ * so naming somebody in a room of a million never loads the million. Null when
+ * this account cannot reach the conversation, as `conversationAudience`.
+ */
+export async function conversationAudienceWhere(
+    actor: ChatActor,
+    channelId: string
+): Promise<Prisma.UserWhereInput | null> {
+    const parts = await audienceParts(actor, channelId);
+    if (!parts) return null;
+    return {
+        OR: [
+            ...(parts.spaceId ? [{ chatSpaceMemberships: { some: { spaceId: parts.spaceId } } }] : []),
+            ...(parts.ownerId ? [{ id: parts.ownerId }] : []),
+            { chatChannelMemberships: { some: { channelId: parts.channelId } } }
+        ]
+    };
+}
+
+/**
+ * One page of `conversationAudience`, in id order after `after`, read with a
+ * keyset in the database rather than by loading the whole list and slicing it
+ * - which made walking a large room page by page quadratic. The space's rows
+ * and the channel's rows are each read up to `take` past the cursor and merged,
+ * which is exactly the first `take` of their union.
+ */
+export async function conversationAudiencePage(
+    actor: ChatActor,
+    channelId: string,
+    after: string | null | undefined,
+    take: number
+): Promise<string[] | null> {
+    const parts = await audienceParts(actor, channelId);
+    if (!parts) return null;
+    const past = after ? { userId: { gt: after } } : {};
+    const [inSpace, inChannel] = await Promise.all([
+        parts.spaceId
+            ? prisma.chatSpaceMember.findMany({
+                  where: { spaceId: parts.spaceId, ...past },
+                  orderBy: { userId: "asc" },
+                  select: { userId: true },
+                  take
+              })
+            : [],
+        prisma.chatChannelMember.findMany({
+            where: { channelId, ...past },
+            orderBy: { userId: "asc" },
+            select: { userId: true },
+            take
+        })
+    ]);
+    const ids = new Set([...inSpace, ...inChannel].map((row) => row.userId));
+    if (parts.ownerId && (!after || parts.ownerId > after)) ids.add(parts.ownerId);
+    return [...ids].sort().slice(0, take);
+}
+
 async function isPrivate(channelId: string): Promise<boolean> {
     const channel = await prisma.chatChannel.findUnique({
         where: { id: channelId },
@@ -894,11 +976,24 @@ export function roomMentionsAllowed(
         readonly ownerId: string | null;
         readonly createdById?: string | null;
         readonly membersMayMention: boolean;
+        readonly spaceId?: string | null;
+        readonly space?: { readonly membersMayMentionEveryone: boolean } | null;
     },
-    actorId: string
+    actorId: string,
+    /** Whether the actor runs the space the channel is in. Only read for a
+     *  channel in a space. */
+    spaceAdmin = false
 ): boolean {
-    if (channel.kind !== "group") return true;
-    return groupOwnerId(channel) === actorId || channel.membersMayMention;
+    if (channel.kind === "group") return groupOwnerId(channel) === actorId || channel.membersMayMention;
+    // A channel in a space tells the whole space, so it is the space's admins'
+    // to use unless they handed it out - Discord's "Mention @everyone".
+    if (channel.spaceId && channel.space) return spaceAdmin || channel.space.membersMayMentionEveryone;
+    return true;
+}
+
+/** Whether a space standing runs the space, for `roomMentionsAllowed`. */
+export function runsSpace(standing: ChatSpaceAccess | null): boolean {
+    return standing === "owner" || standing === "admin";
 }
 
 export async function messageable(userIds: readonly string[]): Promise<Set<string>> {

@@ -32,7 +32,7 @@ import { backgroundUser } from "@/lib/session";
 import { sealedAppOutdated } from "./client-version";
 import { mlsBody, type MlsBody } from "./schemas";
 import { LEGACY_EPOCH } from "./mls-history-keys";
-import { channelAccess, conversationAudience, type ChatAccessError } from "@/lib/chat/access";
+import { channelAccess, conversationAudience, conversationAudiencePage, type ChatAccessError } from "@/lib/chat/access";
 import { rateLimit } from "@/lib/rate-limit-service";
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -180,8 +180,8 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
         }
         case "member-account-keys": {
             // The people in the conversation (the same list @ offers), by id, after the cursor.
-            const audience = ((await conversationAudience({ id: userId }, body.channelId)) ?? []).sort();
-            const page = audience.filter((id) => !body.after || id > body.after).slice(0, MEMBER_PAGE);
+            // A keyset page read in the database, not the whole list sliced in memory.
+            const page = (await conversationAudiencePage({ id: userId }, body.channelId, body.after, MEMBER_PAGE)) ?? [];
             const keys = await delivery.accountPublicKeys(page);
             return json({
                 accountKeys: keys.map((k) => ({ userId: k.userId, akVersion: k.akVersion, hpkePublicKey: text(k.hpkePublicKey) })),

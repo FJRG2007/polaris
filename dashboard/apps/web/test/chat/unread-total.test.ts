@@ -23,34 +23,28 @@ let channels: { id: string; spaceId: string | null; orgId: string | null }[] = [
 let spaces: { id: string; orgId: string | null }[] = [];
 /** Every countable message, by conversation and when it was written. */
 let posted: { channelId: string; createdAt: Date }[] = [];
-/** What each grouped count was asked, so a case can pin the question itself. */
-let asked: GroupWhere[] = [];
+/** What each conversation's read was asked, so a case can pin the question itself. */
+let asked: (UnreadWhere & { take?: number })[] = [];
 
-type Branch = { channelId: string; createdAt: { gt: Date } } | { channelId: { in: string[] } };
-interface GroupWhere {
+interface UnreadWhere {
+    channelId: string;
+    createdAt?: { gt: Date };
     deletedAt: null;
     authorId: { notIn: string[] };
     kind: { not: string };
     parentId: null;
-    OR: Branch[];
 }
 
-/** The grouped count, answered from `posted` the way the database would: a
- *  message counts when any one branch takes it. */
-function groupBy({ where }: { where: GroupWhere }) {
-    asked.push(where);
-    const counts = new Map<string, number>();
-    for (const message of posted) {
-        const taken = where.OR.some((branch) =>
-            typeof branch.channelId === "string"
-                ? branch.channelId === message.channelId &&
-                  "createdAt" in branch &&
-                  message.createdAt > branch.createdAt.gt
-                : branch.channelId.in.includes(message.channelId)
-        );
-        if (taken) counts.set(message.channelId, (counts.get(message.channelId) ?? 0) + 1);
-    }
-    return [...counts].map(([channelId, all]) => ({ channelId, _count: { _all: all } }));
+/** One conversation's bounded read, answered from `posted` the way the
+ *  database would: after the mark where there is one, at most `take` rows. */
+function unreadRead({ where, take }: { where: UnreadWhere; take?: number }) {
+    asked.push({ ...where, take });
+    const rows = posted.filter(
+        (message) =>
+            message.channelId === where.channelId &&
+            (!where.createdAt || message.createdAt > where.createdAt.gt)
+    );
+    return rows.slice(0, take ?? rows.length).map((_, index) => ({ id: `${where.channelId}-${index}` }));
 }
 
 /** `count` messages in one conversation, all written at `at`. */
@@ -97,8 +91,8 @@ vi.mock("@polaris/db", () => ({
                 spaces.filter((space) => where.id.in.includes(space.id))
         },
         chatMessage: {
-            groupBy: async (query: { where: GroupWhere }) => groupBy(query),
-            // Not asked any more: one grouped query answers every conversation.
+            findMany: async (query: { where: UnreadWhere; take?: number }) => unreadRead(query),
+            // Never a COUNT: each conversation's read stops at the cap.
             count: async () => {
                 throw new Error("counted one conversation at a time");
             }
@@ -281,9 +275,9 @@ describe("what is waiting in Chat, on the open shelf", () => {
 });
 
 describe("what is waiting in Chat, asked of the database", () => {
-    it("is one grouped question however many conversations there are", async () => {
-        // The rail and the badge read this on every page. One count per
-        // conversation was forty-one round trips for forty conversations.
+    it("is one bounded read per conversation, never a count of its history", async () => {
+        // A public room nobody here opened has no mark; counting its whole
+        // history on every message was the cost that grew with the space.
         const read = new Date("2026-08-18T10:00:00Z");
         members = [member("a", read), member("b", read), member("c"), member("d")];
         channels = [room("a"), room("b"), room("c"), room("d")];
@@ -292,7 +286,8 @@ describe("what is waiting in Chat, asked of the database", () => {
         say("b", 2, new Date("2026-08-18T11:00:00Z"));
         say("c", 5);
         expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 8, conversations: 3 });
-        expect(asked).toHaveLength(1);
+        expect(asked).toHaveLength(4);
+        expect(asked.every((where) => where.take === 100)).toBe(true);
     });
 
     it("asks after the mark where there is one, and from the start where there is not", async () => {
@@ -300,11 +295,10 @@ describe("what is waiting in Chat, asked of the database", () => {
         members = [member("a", read), member("c"), member("d")];
         channels = [room("a"), room("c"), room("d")];
         await unreadTotal({ id: "u1" });
-        expect(asked[0]?.OR).toEqual([
-            // The ones never opened share a branch: their threshold is the same.
-            { channelId: { in: ["c", "d"] } },
-            { channelId: "a", createdAt: { gt: read } }
-        ]);
+        const byRoom = new Map(asked.map((where) => [where.channelId, where.createdAt]));
+        expect(byRoom.get("a")).toEqual({ gt: read });
+        expect(byRoom.get("c")).toBeUndefined();
+        expect(byRoom.get("d")).toBeUndefined();
     });
 
     it("keeps the exclusions the badge has always had", async () => {

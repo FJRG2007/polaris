@@ -499,16 +499,28 @@ export async function listMembersAction(
 
 /** The members list beside a conversation, with who is around - see `roster`. */
 export async function listRosterAction(
-    channelId: unknown
-): Promise<{ members?: ChatRosterMember[]; error?: string }> {
+    channelId: unknown,
+    after?: unknown
+): Promise<{
+    members?: ChatRosterMember[];
+    next?: string | null;
+    total?: number;
+    totalCapped?: boolean;
+    error?: string;
+}> {
     const user = await requirePermission("chat.use");
     const parsed = z.string().uuid().safeParse(channelId);
-    if (!parsed.success)
+    const cursor = z.string().uuid().nullish().safeParse(after);
+    if (!parsed.success || !cursor.success)
         return { error: (await getTranslations("chat"))("errors.notInConversation") };
     const result = await guard(() =>
-        listChannelRoster({ id: user.id, isAdmin: Boolean(user.isAdmin) }, parsed.data)
+        listChannelRoster(
+            { id: user.id, isAdmin: Boolean(user.isAdmin) },
+            parsed.data,
+            cursor.data ?? null
+        )
     );
-    return result.error ? { error: result.error } : { members: result.value };
+    return result.error ? { error: result.error } : { ...result.value };
 }
 
 // ---------------------------------------------------------------------------
@@ -1152,6 +1164,22 @@ export async function setNewcomerHistoryAction(input: unknown): Promise<{ error?
     const parsed = newcomerHistorySchema.safeParse(input);
     if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notSaved") };
     const result = await guard(() => chat.setNewcomerHistory(me, parsed.data));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result.error ? { error: result.error } : {};
+}
+
+const spaceRoomMentionsSchema = z
+    .object({ spaceId: z.string().uuid(), value: z.boolean() })
+    .strict();
+
+/** Whether members who do not run a space may use @everyone and @here in it. */
+export async function setSpaceRoomMentionsAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = spaceRoomMentionsSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notSaved") };
+    const result = await guard(() =>
+        chat.setSpaceRoomMentions(me, parsed.data.spaceId, parsed.data.value)
+    );
     if (!result.error) revalidatePath(CHAT_PATH);
     return result.error ? { error: result.error } : {};
 }
