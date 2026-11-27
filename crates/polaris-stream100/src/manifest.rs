@@ -47,8 +47,34 @@ pub fn manifest() -> Value {
         "permissions": ["usb", "audio-sessions", "polaris-actions"],
         "settings": crate::plugin::plugin_settings(),
         "groups": crate::plugin::plugin_groups(),
+        // On Windows the desktop app puts Polaris' own WinUSB driver on the
+        // controller (`clients/desktop/src/main/plugins/requirements.ts`): listed
+        // in the install consent, one Windows prompt, put back when another
+        // driver takes the device. Linux reads it directly, so it needs nothing.
+        "requires": { "win32-x64": [driver_requirement()] },
         // The editor that shows the controller: its screen, knobs and buttons.
         "view": VIEW,
+    })
+}
+
+/// Polaris' driver for the Stream 100, as the Windows install lists it.
+fn driver_requirement() -> Value {
+    use crate::plugin::label;
+    json!({
+        "key": "driver",
+        "label": label("Install a driver for the Stream 100", "Instalar un driver para el Stream 100"),
+        "hint": label(
+            "Polaris sets up its driver for the Stream 100 (Windows asks once).",
+            "Polaris instala su driver para el Stream 100 (Windows pide permiso una vez).",
+        ),
+        "missing": label(
+            "Polaris' driver is not set up, so the Stream 100 works only through the Hercules software, if installed.",
+            "El driver de Polaris no está instalado: el Stream 100 solo funciona con el software de Hercules, si está.",
+        ),
+        "restored": label(
+            "Another driver had taken the Stream 100. Polaris put its own back.",
+            "Otro driver se había quedado el Stream 100. Polaris ha vuelto a poner el suyo.",
+        ),
     })
 }
 

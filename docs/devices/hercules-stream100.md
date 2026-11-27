@@ -185,15 +185,33 @@ What each route really takes:
 
 ### Polaris' WinUSB driver
 
-The plugin declares a toggle, "Polaris driver on this PC" (`polarisDriver`,
-off by default). Turning it on runs the setup below and turning it off the
-removal; the desktop app (`createDriverSetting` in `plugins/official.ts`) keeps
-the new value only when that went through and otherwise writes the old one back.
+On Windows the driver is a requirement of the plugin, not a setting. The
+manifest lists it under `requires` for `win32-x64` only ("Install a driver for
+the Stream 100"), so the install and update consent shows it as one more line
+beside the permissions, and installing is the consent. The desktop app
+(`plugins/requirements.ts`, with the driver adapter `driverRequirement` in
+`plugins/official.ts`) then runs the setup below; the single Windows prompt
+comes during the install. After that:
+
+- **An install from before 0.1.11** (the old "Polaris driver on this PC"
+  toggle, now gone and its stored value ignored): one that had the driver keeps
+  it and is looked after as below; one that never turned it on keeps working
+  through the Hercules software, and its page offers "Install a driver for the
+  Stream 100" until it is done. Nothing is installed without that click.
+- **Another driver takes the controller back** (a Hercules reinstall, Windows
+  Update): the app puts Polaris' driver back by itself on start or when the
+  controller is plugged in (one prompt) and says so in a notice.
+- **The prompt is declined or the setup fails:** the page says the driver is
+  not set up and that the Stream 100 works only through the Hercules software,
+  if installed, and offers the same action once, drawn by the dashboard next to
+  Uninstall (a host action, `InstalledPlugin.actions`). The app does not ask
+  again by itself until it is clicked.
+- **Uninstalling the plugin** puts the previous driver back (below).
+
+Linux and macOS have no driver step: the manifest names none for them.
 The plugin's own view (`any/view/`, above the screen preview) is text only: it
-asks `driver.look` and says when the toggle is needed (another driver holds the
-controller), and why the last change did not go through. A look also brings the
-toggle in line with the machine (off once a Hercules reinstall or Windows Update
-took the device back). Nothing of it is in the dashboard. One Windows
+asks `driver.look` and says where the driver stands and why its last setup did
+not go through. One Windows
 administrator prompt later the device is on WinUSB and Polaris reads it with
 no Hercules software at all: no Stream Control, no `hsm_api_core` DLL, no
 `HercStreamMixDevice` driver. The approach is libwdi's (studied as a reference

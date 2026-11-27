@@ -5,13 +5,14 @@
  * as buttons - and never a native select, checkbox or slider. A manifest
  * without groups (an app older than them) reads as one list. Every group and
  * setting a search result can name is drawn under that name, tiles included,
- * and the page scrolls to the one in its address.
+ * and the page scrolls to the one in its address. What the app offers to do
+ * for the plugin (its host actions) is a notice with its button.
  */
 
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { pluginSettingSections, pluginSettingTargets, readPluginManifest, readPluginSettingValues } from "@polaris/core/device-plugins";
 
 vi.mock("@/components/i18n/i18n-provider", () => ({
@@ -29,21 +30,22 @@ const { resetPluginsCache } = await import("@/lib/device-plugins-client");
 const raw = JSON.parse(readFileSync(join(process.cwd(), "../../../clients/device-plugins/hercules-stream100/manifest.json"), "utf8")) as Record<string, unknown>;
 const manifest = readPluginManifest(raw)!;
 
-function open(rawManifest: unknown) {
+function open(rawManifest: unknown, extra: { actions?: unknown[]; runAction?: (id: string, action: string) => Promise<boolean> } = {}) {
     desktop.bridge = {
         plugins: {
             get: async () => ({
                 platform: "win32-x64",
                 appVersion: "0.1.89",
                 catalog: null,
-                installed: [{ id: manifest.id, version: manifest.version, enabled: true, granted: [], manifest: rawManifest, update: null, run: { state: "sleeping" } }],
+                installed: [{ id: manifest.id, version: manifest.version, enabled: true, granted: [], manifest: rawManifest, update: null, run: { state: "sleeping" }, ...(extra.actions ? { actions: extra.actions } : {}) }],
                 installing: {}
             }),
             onChange: () => () => undefined,
             settings: async () => ({}),
             setSetting: vi.fn(async () => ({})),
             setEnabled: vi.fn(async () => true),
-            uninstall: vi.fn(async () => true)
+            uninstall: vi.fn(async () => true),
+            ...(extra.runAction ? { runAction: extra.runAction } : {})
         }
     };
     return render(<PluginPage id={manifest.id} />);
@@ -58,7 +60,7 @@ describe("a plugin's settings", () => {
     it("are sectioned in the declared order, loose ones first", () => {
         const sections = pluginSettingSections(manifest);
         expect(sections.map((section) => section.group?.key ?? null)).toEqual([null, "knobs", "buttons", "turning", "screen"]);
-        expect(sections[0]!.settings.map((setting) => setting.key)).toEqual(["enabled", "polarisDriver"]);
+        expect(sections[0]!.settings.map((setting) => setting.key)).toEqual(["enabled"]);
         expect(pluginSettingSections({ settings: manifest.settings, groups: [] })).toEqual([{ group: null, settings: manifest.settings }]);
     });
 
@@ -106,5 +108,19 @@ describe("a plugin's settings", () => {
         await waitFor(() => expect(view.container.querySelectorAll("[role=combobox]").length).toBe(9));
         expect(screen.queryByRole("region", { name: "Ruedas" })).toBeNull();
     });
-});
 
+    it("offer what the app can do for the plugin as a notice with its button, and run it on a click", async () => {
+        const runAction = vi.fn(async () => true);
+        const action = { id: "driver", label: { "en-US": "Set up the driver", "es-ES": "Instalar el driver" }, detail: { "en-US": "The Stream 100 uses another driver.", "es-ES": "El Stream 100 usa otro driver." } };
+        open(raw, { actions: [action], runAction });
+        expect(await screen.findByText("El Stream 100 usa otro driver.")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Instalar el driver" }));
+        await waitFor(() => expect(runAction).toHaveBeenCalledWith(manifest.id, "driver"));
+    });
+
+    it("offer no host action to an app that cannot run one", async () => {
+        open(raw, { actions: [{ id: "driver", label: { "en-US": "Set up the driver", "es-ES": "Instalar el driver" } }] });
+        await screen.findByRole("region", { name: "Ruedas" });
+        expect(screen.queryByRole("button", { name: "Instalar el driver" })).toBeNull();
+    });
+});

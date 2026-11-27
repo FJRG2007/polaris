@@ -257,7 +257,8 @@ export interface PolarisDesktop {
         /** Fetch the catalog now. */
         refresh(): Promise<void>;
         /** Install or update; `accepted` must hold every permission the plugin asks for. */
-        install(id: string, accepted: readonly string[]): Promise<unknown>;
+        /** `requires`: the keys of what the consent listed to set up (the manifest's `requires`). */
+        install(id: string, accepted: readonly string[], requires?: readonly string[]): Promise<unknown>;
         uninstall(id: string): Promise<boolean>;
         setEnabled(id: string, enabled: boolean): Promise<boolean>;
         /** Its settings as stored, every one present, or null when it is not installed. */
@@ -280,6 +281,8 @@ export interface PolarisDesktop {
          * plugin with no official software the app knows of.
          */
         official(id: string, request: unknown): Promise<unknown>;
+        /** Run one of an installed plugin's `actions` (the snapshot lists them). False when it is not offered or did not go through. */
+        runAction(id: string, action: string): Promise<boolean>;
     };
     /** @deprecated `plugins` by its name before the rename, the same object, for hosts that predate it. Removable once no supported desktop app or host predates the rename (desktop 0.1.124). */
     addons?: PolarisDesktop["plugins"];
@@ -869,6 +872,7 @@ export const CHANNELS = {
     pluginsChanged: "desktop:plugins-changed",
     pluginsOpen: "desktop:plugins-open",
     pluginsOfficial: "desktop:plugins-official",
+    pluginsAction: "desktop:plugins-action",
     openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",
     appIcon: "desktop:app-icon",

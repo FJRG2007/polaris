@@ -168,9 +168,9 @@ async function heldVersion(bridge: PluginsBridge, id: string): Promise<{ readonl
  * version either, so a plugin that is switched on is switched on again, which
  * has it start from the new files.
  */
-export async function installPlugin(bridge: PluginsBridge, entry: PluginEntry): Promise<InstallOutcome> {
+export async function installPlugin(bridge: PluginsBridge, entry: PluginEntry, requires: readonly string[] = []): Promise<InstallOutcome> {
     const before = await heldVersion(bridge, entry.id);
-    const answer = pluginInstallResultSchema.safeParse(await bridge.install(entry.id, entry.permissions).catch(() => null));
+    const answer = pluginInstallResultSchema.safeParse(await bridge.install(entry.id, entry.permissions, requires).catch(() => null));
     if (answer.success) return answer.data.ok ? { installed: true, started: answer.data.started ?? true } : { installed: false, problem: installProblem(answer.data.reason) };
     const after = await heldVersion(bridge, entry.id);
     if (!after || after.version !== entry.version || before?.version === entry.version) return { installed: false, problem: "other" };
@@ -179,8 +179,8 @@ export async function installPlugin(bridge: PluginsBridge, entry: PluginEntry): 
     return { installed: true, started: restarted === true };
 }
 
-export function useInstallPlugin(bridge: PluginsBridge | null): (entry: PluginEntry) => Promise<InstallOutcome> {
-    return useCallback(async (entry: PluginEntry) => (bridge ? installPlugin(bridge, entry) : { installed: false as const, problem: "other" as const }), [bridge]);
+export function useInstallPlugin(bridge: PluginsBridge | null): (entry: PluginEntry, requires?: readonly string[]) => Promise<InstallOutcome> {
+    return useCallback(async (entry: PluginEntry, requires: readonly string[] = []) => (bridge ? installPlugin(bridge, entry, requires) : { installed: false as const, problem: "other" as const }), [bridge]);
 }
 
 const officialEntrySchema = z.object({ displayName: z.string().max(300), version: z.string().max(100) });

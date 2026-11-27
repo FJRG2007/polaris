@@ -10,16 +10,23 @@ import { join } from "node:path";
 import type { PluginManager } from "./manager";
 import { spawn, execFile } from "node:child_process";
 import { access, mkdir, open, rename, writeFile } from "node:fs/promises";
-import { PLUGIN_PERMISSIONS, type PluginSettingValue } from "@polaris/core/device-plugins";
+import { PLUGIN_PERMISSIONS } from "@polaris/core/device-plugins";
 import { createOfficialRunner, type OfficialHost, type OfficialRunner } from "./hercules-official-run";
-import { createDriverRunner, type DriverFailure, type DriverOutcome, type DriverRunner, type DriverState } from "./hercules-driver";
+import type { RequirementRunner } from "./requirements";
+import { createDriverRunner, type DriverFailure, type DriverRunner, type DriverState } from "./hercules-driver";
 
 /** The plugins whose device ships official software Polaris knows how to find. */
 export const OFFICIAL_PLUGINS = ["hercules-stream100"] as const;
 
 export const officialRequestSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("look") }),
-    z.object({ kind: z.literal("choose"), choice: z.enum(["stop", "uninstall", "keep"]), accepted: z.array(z.enum(PLUGIN_PERMISSIONS)).max(PLUGIN_PERMISSIONS.length) }),
+    z.object({
+        kind: z.literal("choose"),
+        choice: z.enum(["stop", "uninstall", "keep"]),
+        accepted: z.array(z.enum(PLUGIN_PERMISSIONS)).max(PLUGIN_PERMISSIONS.length),
+        /** What the consent listed to set up (the manifest's `requires` keys); absent from a page older than it. */
+        requires: z.array(z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/)).max(8).default([])
+    }),
     z.object({ kind: z.literal("restore") }),
     z.object({ kind: z.literal("launch") })
 ]);
@@ -93,62 +100,41 @@ export function driverRunnerFor(id: string, pluginsDir: string, platform: NodeJS
     return createDriverRunner(host, { systemRoot: env.SystemRoot ?? env.WINDIR ?? "C:\\Windows", programData: env.ProgramData ?? "C:\\ProgramData", dataDir: join(pluginsDir, "official", id) }, platform);
 }
 
-/** The Stream 100's setting for Polaris' own driver ("Polaris driver on this PC"). */
-export const DRIVER_SETTING = "polarisDriver";
+/** The key the Stream 100's manifest lists its driver under (`requires`, Windows only). */
+export const DRIVER_REQUIREMENT = "driver";
 
-/** Whether the driver setting reads on: Polaris' driver holds the device, or was set up and the device is unplugged. */
-export function driverSettingOf(state: DriverState): boolean {
-    return state.state === "installed" || (state.state === "unplugged" && state.installed);
-}
-
-/**
- * Every setting change from the page or the view goes through `set`. For the
- * Stream 100's driver setting, on runs the driver setup and off its removal
- * (each one Windows permission prompt), and the new value is kept only when
- * that went through; otherwise the stored value is written back as it was, so
- * every page holding the setting hears that it did not change, and the reason
- * is kept for `look` (the view's `driver.look`) to show. `look` also brings the
- * setting in line with the machine, as a Hercules reinstall or Windows Update
- * can take the device back without Polaris doing anything.
- */
-export function createDriverSetting(manager: Pick<PluginManager, "settings" | "setSetting">, driverFor: (id: string) => DriverRunner | null) {
-    const failures = new Map<string, DriverFailure>();
-    const busy = new Set<string>();
+/** Polaris' driver as a requirement: met while it (or WinUSB) holds the device, missing while another driver does. */
+export function driverRequirement(driver: DriverRunner): RequirementRunner {
     return {
-        async set(id: string, key: unknown, value: unknown): Promise<Record<string, PluginSettingValue> | null> {
-            const driver = key === DRIVER_SETTING && typeof value === "boolean" ? driverFor(id) : null;
-            if (!driver) return manager.setSetting(id, key, value);
-            // One prompt at a time: a second change while one is open keeps what is stored.
-            if (busy.has(id)) return manager.settings(id);
-            busy.add(id);
-            try {
-                const outcome: DriverOutcome = value ? await driver.install() : (await driver.installed()) ? await driver.remove() : { ok: true };
-                if (outcome.ok) {
-                    failures.delete(id);
-                    return await manager.setSetting(id, key, value);
-                }
-                failures.set(id, outcome.reason);
-                const values = await manager.settings(id);
-                return values ? await manager.setSetting(id, key, values[DRIVER_SETTING] ?? !value) : null;
-            } finally {
-                busy.delete(id);
+        async look() {
+            const state = await driver.state();
+            switch (state.state) {
+                case "notNeeded":
+                case "installed":
+                    return { state: "met", before: state.state === "installed" };
+                case "needed":
+                    return { state: "missing", before: false };
+                case "repair":
+                    return { state: "missing", before: true };
+                case "unplugged":
+                    return { state: "away", before: state.installed };
             }
         },
-        async look(id: string): Promise<(DriverState & { readonly failure: DriverFailure | null }) | null> {
-            const driver = driverFor(id);
-            if (!driver) return null;
-            const state = await driver.state();
-            if (!busy.has(id)) {
-                const values = await manager.settings(id);
-                const on = driverSettingOf(state);
-                if (values && DRIVER_SETTING in values && values[DRIVER_SETTING] !== on) await manager.setSetting(id, DRIVER_SETTING, on);
-            }
-            return { ...state, failure: failures.get(id) ?? null };
-        }
+        setUp: () => driver.install()
     };
 }
 
-export type DriverSetting = ReturnType<typeof createDriverSetting>;
+/** What can set a plugin's requirement up on this machine; only the Stream 100's driver is known. */
+export function requirementRunnerFor(id: string, key: string, pluginsDir: string): RequirementRunner | null {
+    const driver = key === DRIVER_REQUIREMENT ? driverRunnerFor(id, pluginsDir) : null;
+    return driver ? driverRequirement(driver) : null;
+}
+
+/** The Stream 100 view's `driver.look`: where the driver stands and why its last setup did not go through. */
+export async function lookDriver(driver: DriverRunner | null, failure: string | null): Promise<(DriverState & { readonly failure: DriverFailure | null }) | null> {
+    if (!driver) return null;
+    return { ...(await driver.state()), failure: (failure as DriverFailure | null) ?? null };
+}
 
 /**
  * One request from the page. `choose` carries the choice out first and
@@ -156,7 +142,7 @@ export type DriverSetting = ReturnType<typeof createDriverSetting>;
  * official app are then put on the plugin, and the pages it had are kept
  * beside them (`layout.json`) for the plugin to take as it learns each one.
  */
-export async function answerOfficial(runner: OfficialRunner, manager: Pick<PluginManager, "install" | "setSetting">, id: string, request: OfficialRequest, write: (name: string, text: string) => Promise<void>): Promise<unknown> {
+export async function answerOfficial(runner: OfficialRunner, manager: Pick<PluginManager, "install" | "setSetting">, id: string, request: OfficialRequest, write: (name: string, text: string) => Promise<void>, installed: (requires: readonly string[]) => Promise<void> = async () => undefined): Promise<unknown> {
     switch (request.kind) {
         case "look": {
             const [{ found, imported }, backup] = await Promise.all([runner.look(), runner.readBackup()]);
@@ -169,10 +155,11 @@ export async function answerOfficial(runner: OfficialRunner, manager: Pick<Plugi
         case "choose": {
             const done = await runner.execute(request.choice);
             if (!done.ok) return done;
-            const installed = await manager.install(id, request.accepted);
-            if (!installed.ok) return { ok: false, reason: "install", install: installed.reason };
+            const install = await manager.install(id, request.accepted);
+            if (!install.ok) return { ok: false, reason: "install", install: install.reason };
             for (const [key, value] of Object.entries(done.values)) await manager.setSetting(id, key, value);
             if (done.layout) await write("layout.json", JSON.stringify(done.layout));
+            await installed(request.requires);
             return { ok: true };
         }
         case "restore":

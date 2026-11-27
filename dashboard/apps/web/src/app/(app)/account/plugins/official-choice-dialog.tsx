@@ -8,8 +8,8 @@
  */
 
 import { useCallback, useState, type ReactNode } from "react";
-import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { PluginEntry } from "@polaris/core/device-plugins";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { pluginRequirements, pluginText, type PluginEntry, type PluginPlatform } from "@polaris/core/device-plugins";
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, useToast } from "@polaris/ui";
 import { lookOfficial, readOfficialChoice, PERMISSION_KEY, type PluginsBridge, type OfficialControl, type OfficialLook } from "@/lib/device-plugins-client";
 
@@ -81,8 +81,9 @@ function ImportSummary({ look, say }: { look: OfficialLook; say: Say }) {
  * `offer(entry)` resolves true when it showed the choice (and carries it out),
  * false when there is nothing to choose and the plain install should run.
  */
-export function useOfficialChoice(bridge: PluginsBridge | null): [(entry: PluginEntry) => Promise<boolean>, ReactNode] {
+export function useOfficialChoice(bridge: PluginsBridge | null, platform: PluginPlatform | null = null): [(entry: PluginEntry) => Promise<boolean>, ReactNode] {
     const say = useSay();
+    const locale = useLocale();
     const toast = useToast();
     const [open, setOpen] = useState<{ entry: PluginEntry; look: OfficialLook } | null>(null);
     const [busy, setBusy] = useState<Choice | null>(null);
@@ -100,7 +101,7 @@ export function useOfficialChoice(bridge: PluginsBridge | null): [(entry: Plugin
     const choose = async (choice: Choice) => {
         if (!open || !bridge?.official || busy) return;
         setBusy(choice);
-        const answer = readOfficialChoice(await bridge.official(open.entry.id, { kind: "choose", choice, accepted: open.entry.permissions }).catch(() => null));
+        const answer = readOfficialChoice(await bridge.official(open.entry.id, { kind: "choose", choice, accepted: open.entry.permissions, requires: pluginRequirements(open.entry, platform).map((item) => item.key) }).catch(() => null));
         setBusy(null);
         if (answer.ok) {
             setOpen(null);
@@ -140,12 +141,15 @@ export function useOfficialChoice(bridge: PluginsBridge | null): [(entry: Plugin
                         </div>
                         <section className="flex min-w-0 flex-col gap-1" aria-label={say("official.permissions")}>
                             <h3 className="text-sm font-medium">{say("official.permissions")}</h3>
-                            {open.entry.permissions.length === 0 ? (
+                            {open.entry.permissions.length === 0 && pluginRequirements(open.entry, platform).length === 0 ? (
                                 <p className="text-sm text-muted-foreground">{say("install.none")}</p>
                             ) : (
                                 <ul className="list-disc ps-5 text-sm">
                                     {open.entry.permissions.map((permission) => (
                                         <li key={permission}>{say(`permission.${PERMISSION_KEY[permission]}`)}</li>
+                                    ))}
+                                    {pluginRequirements(open.entry, platform).map((requirement) => (
+                                        <li key={`requires.${requirement.key}`}>{pluginText(requirement.label, locale)}</li>
                                     ))}
                                 </ul>
                             )}

@@ -101,18 +101,6 @@ pub fn plugin_settings() -> Value {
     let defaults = Settings::default();
     let mut list = vec![
         json!({ "kind": "toggle", "key": "enabled", "label": label("Use the Stream 100", "Usar el Stream 100"), "default": defaults.enabled }),
-        // Read by the desktop app, not by this process: on sets up Polaris' WinUSB
-        // driver (`plugins/official.ts`, `createDriverSetting`), off takes it out.
-        json!({
-            "kind": "toggle",
-            "key": "polarisDriver",
-            "label": label("Polaris driver on this PC", "Driver de Polaris en este PC"),
-            "hint": label(
-                "Windows only. Replaces the Hercules driver, so no Hercules software is needed. Windows asks for permission.",
-                "Solo Windows. Sustituye al driver de Hercules, sin necesitar su software. Windows pide permiso."
-            ),
-            "default": false
-        }),
     ];
     for (index, target) in defaults.knobs.iter().enumerate() {
         list.push(json!({

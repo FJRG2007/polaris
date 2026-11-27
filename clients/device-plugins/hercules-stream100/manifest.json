@@ -62,6 +62,29 @@
         "polaris-actions"
     ],
     "publisher": "Polaris",
+    "requires": {
+        "win32-x64": [
+            {
+                "hint": {
+                    "en-US": "Polaris sets up its driver for the Stream 100 (Windows asks once).",
+                    "es-ES": "Polaris instala su driver para el Stream 100 (Windows pide permiso una vez)."
+                },
+                "key": "driver",
+                "label": {
+                    "en-US": "Install a driver for the Stream 100",
+                    "es-ES": "Instalar un driver para el Stream 100"
+                },
+                "missing": {
+                    "en-US": "Polaris' driver is not set up, so the Stream 100 works only through the Hercules software, if installed.",
+                    "es-ES": "El driver de Polaris no está instalado: el Stream 100 solo funciona con el software de Hercules, si está."
+                },
+                "restored": {
+                    "en-US": "Another driver had taken the Stream 100. Polaris put its own back.",
+                    "es-ES": "Otro driver se había quedado el Stream 100. Polaris ha vuelto a poner el suyo."
+                }
+            }
+        ]
+    },
     "schema": 1,
     "settings": [
         {
@@ -71,19 +94,6 @@
             "label": {
                 "en-US": "Use the Stream 100",
                 "es-ES": "Usar el Stream 100"
-            }
-        },
-        {
-            "default": false,
-            "hint": {
-                "en-US": "Windows only. Replaces the Hercules driver, so no Hercules software is needed. Windows asks for permission.",
-                "es-ES": "Solo Windows. Sustituye al driver de Hercules, sin necesitar su software. Windows pide permiso."
-            },
-            "key": "polarisDriver",
-            "kind": "toggle",
-            "label": {
-                "en-US": "Polaris driver on this PC",
-                "es-ES": "Driver de Polaris en este PC"
             }
         },
         {
@@ -492,6 +502,6 @@
         }
     ],
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.9",
+    "version": "0.1.11",
     "view": "view/index.html"
 }

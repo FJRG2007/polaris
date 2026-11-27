@@ -154,7 +154,7 @@ describe("Hercules Stream 100 plugin", () => {
             expect(view.wordsFor("fr-FR")).toBe(words);
         });
 
-        it("points at the driver setting only where the app says it is needed, in both languages", () => {
+        it("says where the driver stands only where the app says it is needed, in both languages", () => {
             expect(view.readDriver(null)).toBeNull();
             expect(view.readDriver({ state: "other" })).toBeNull();
             expect(view.driverSentence(view.readDriver({ state: "needed", hercules: true }))).toBe("neededHercules");

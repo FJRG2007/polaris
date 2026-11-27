@@ -6,12 +6,12 @@
  * around it. The page's `hello` and `settings` messages bring the look, the
  * language and every change.
  *
- * Above the preview, on Windows, a line about Polaris' own WinUSB driver: what
- * the "Polaris driver on this PC" setting would do, and why the last change to
- * it did not go through (`driver.look`, answered by the desktop app's
- * `plugins/official.ts`). Text only, like the rest of the view. Nothing is
- * drawn where the app answers null (another system, or an app older than the
- * driver setting).
+ * Above the preview, on Windows, a line about Polaris' own WinUSB driver: where
+ * it stands, and why its last setup did not go through (`driver.look`,
+ * answered by the desktop app's `plugins/official.ts`). The driver is set up by
+ * the app as the plugin's requirement (`requires` in the manifest); the page
+ * offers setting it up again. Text only, like the rest of the view. Nothing is
+ * drawn where the app answers null (another system, or an older app).
  */
 
 "use strict";
@@ -45,13 +45,13 @@ const WORDS = {
         nowPlayingNote: "What is playing shows here.",
         offNote: "The screen is off.",
         driver: {
-            needed: "To use the Stream 100 here, turn on Polaris driver on this PC. Windows asks for permission once.",
-            neededHercules: "To use the Stream 100 here, turn on Polaris driver on this PC. It replaces the Hercules driver; Stream Control stops working with it.",
-            repair: "Another driver took the Stream 100 back. Turn on Polaris driver on this PC again to use it here.",
+            needed: "Polaris' driver is not on the Stream 100 yet. Install it from this page; Windows asks once.",
+            neededHercules: "The Hercules driver holds the Stream 100, so it works only through the Hercules software. Install Polaris' driver from this page.",
+            repair: "Another driver took the Stream 100. Polaris puts its own back; Windows asks once.",
             unplugged: "Plug in the Stream 100 to set up its driver.",
             installed: "Stream 100 driver is set up on this PC.",
             failed: {
-                declined: "The change needs Windows' permission. Try again and choose Yes.",
+                declined: "Windows' permission was not given. Install the driver again from this page and choose Yes.",
                 unplugged: "The Stream 100 was unplugged. Plug it in and try again.",
                 certificate: "Windows did not create the driver's certificate. Try again.",
                 signing: "Windows did not accept the driver's signature. Try again.",
@@ -71,13 +71,13 @@ const WORDS = {
         nowPlayingNote: "Aquí aparece lo que suena.",
         offNote: "La pantalla está apagada.",
         driver: {
-            needed: "Para usar aquí el Stream 100, activa Driver de Polaris en este PC. Windows pide permiso una vez.",
-            neededHercules: "Para usar aquí el Stream 100, activa Driver de Polaris en este PC. Sustituye al driver de Hercules; Stream Control deja de funcionar con él.",
-            repair: "Otro driver volvió a quedarse el Stream 100. Activa otra vez Driver de Polaris en este PC para usarlo aquí.",
+            needed: "El driver de Polaris aún no está en el Stream 100. Instálalo desde esta página; Windows pide permiso una vez.",
+            neededHercules: "El driver de Hercules tiene el Stream 100: solo funciona con el software de Hercules. Instala el driver de Polaris desde esta página.",
+            repair: "Otro driver se quedó el Stream 100. Polaris vuelve a poner el suyo; Windows pide permiso una vez.",
             unplugged: "Conecta el Stream 100 para configurar su driver.",
             installed: "El driver del Stream 100 está configurado en este PC.",
             failed: {
-                declined: "El cambio necesita el permiso de Windows. Vuelve a probar y elige Sí.",
+                declined: "No se dio el permiso de Windows. Vuelve a instalar el driver desde esta página y elige Sí.",
                 unplugged: "Se desconectó el Stream 100. Conéctalo y vuelve a probar.",
                 certificate: "Windows no creó el certificado del driver. Vuelve a probar.",
                 signing: "Windows no aceptó la firma del driver. Vuelve a probar.",

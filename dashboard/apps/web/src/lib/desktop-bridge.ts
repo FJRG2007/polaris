@@ -307,7 +307,8 @@ export interface PolarisDesktop {
         get(): Promise<unknown>;
         /** Whether the list was reached; an app from before 0.1.125 answers nothing. */
         refresh(): Promise<"updated" | "unchanged" | "failed" | null | undefined | void>;
-        install(id: string, accepted: readonly string[]): Promise<unknown>;
+        /** `requires`: the keys of what the consent listed to set up (the manifest's `requires`); an app older than it ignores it. */
+        install(id: string, accepted: readonly string[], requires?: readonly string[]): Promise<unknown>;
         uninstall(id: string): Promise<boolean>;
         setEnabled(id: string, enabled: boolean): Promise<boolean>;
         settings(id: string): Promise<unknown>;
@@ -318,6 +319,8 @@ export interface PolarisDesktop {
         viewCall?(id: string, method: string, params: unknown): Promise<unknown>;
         /** The device's official software on this computer (look, choose, restore, launch). Absent from an app older than it. */
         official?(id: string, request: unknown): Promise<unknown>;
+        /** Run one of an installed plugin's `actions` from the snapshot. Absent from an app older than them. */
+        runAction?(id: string, action: string): Promise<boolean>;
         onChange(listener: () => void): () => void;
         onOpen(listener: (id: string) => void): () => void;
     };

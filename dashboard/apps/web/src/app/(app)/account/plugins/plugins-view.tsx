@@ -22,6 +22,7 @@ import { Badge, Button, ControlSlider, SegmentedControl, Select, Skeleton, Switc
 import {
     PLUGIN_ACTIONS,
     PLUGIN_CATEGORIES,
+    pluginRequirements,
     pluginText,
     pluginGroupAnchor,
     pluginSettingAnchor,
@@ -138,15 +139,23 @@ function OfferButton({ offer, href, onInstall, size = "sm" }: { offer: PluginOff
  */
 function useInstallFlow(bridge: PluginsBridge | null, snapshot: PluginsSnapshot | null): [(entry: PluginEntry) => void, ReactNode] {
     const t = useTranslations("account");
+    const locale = useLocale();
     const toast = useToast();
     const [confirm, element] = useConfirm();
     const install = useInstallPlugin(bridge);
-    const [offerOfficial, officialElement] = useOfficialChoice(bridge);
+    const platform = snapshot?.platform ?? null;
+    const [offerOfficial, officialElement] = useOfficialChoice(bridge, platform);
     const start = (entry: PluginEntry) => {
         const installed = snapshot?.installed.find((item) => item.id === entry.id) ?? null;
         const updating = Boolean(installed?.update);
         const listed = updating ? entry.permissions.filter((permission) => !installed?.granted.includes(permission)) : entry.permissions;
-        const asks = listed.map((permission) => `- ${say(t, `permission.${PERMISSION_KEY[permission]}`)}`);
+        // What the platform sets up for it reads as one more line; an update lists only what it adds.
+        const had = new Set(installed?.manifest ? pluginRequirements(installed.manifest, platform).map((item) => item.key) : []);
+        const requires = pluginRequirements(entry, platform).filter((item) => !updating || !had.has(item.key));
+        const asks = [
+            ...listed.map((permission) => `- ${say(t, `permission.${PERMISSION_KEY[permission]}`)}`),
+            ...requires.map((requirement) => `- ${pluginText(requirement.label, locale)}`)
+        ];
         const lead = updating ? (asks.length > 0 ? say(t, "update.added") : say(t, "update.noNew")) : asks.length > 0 ? say(t, "install.asks") : say(t, "install.none");
         const description = [lead, ...asks, ""].join("\n");
         void (async () => {
@@ -157,7 +166,7 @@ function useInstallFlow(bridge: PluginsBridge | null, snapshot: PluginsSnapshot 
                     : { title: say(t, "install.title", { name: entry.name }), description, confirmLabel: say(t, "install.confirm") }
             );
             if (!ok) return;
-            const outcome = await install(entry);
+            const outcome = await install(entry, requires.map((item) => item.key));
             if (!outcome.installed) toast.show({ title: say(t, `failure.${outcome.problem === "app-version" ? "appVersion" : outcome.problem}`) });
             else if (!outcome.started) toast.show({ title: say(t, "failure.notStarted") });
         })();
@@ -173,6 +182,37 @@ function useInstallFlow(bridge: PluginsBridge | null, snapshot: PluginsSnapshot 
 
 function hrefOf(id: string): string {
     return `/account/plugins/${encodeURIComponent(id)}`;
+}
+
+/**
+ * What the app offers to do for an installed plugin (`InstalledPlugin.actions`),
+ * each one a notice with its button, in the plugin's or the app's own words.
+ * The snapshot that follows says how it went: a done action is no longer listed.
+ */
+function HostActions({ bridge, id, actions }: { bridge: PluginsBridge; id: string; actions: InstalledPlugin["actions"] }) {
+    const locale = useLocale();
+    const [running, setRunning] = useState<string | null>(null);
+    const run = (action: string) => {
+        setRunning(action);
+        void (bridge.runAction?.(id, action) ?? Promise.resolve(false)).catch(() => false).finally(() => setRunning(null));
+    };
+    return (
+        <>
+            {actions.map((action) => (
+                <Notice
+                    key={action.id}
+                    action={
+                        <Button size="sm" disabled={running !== null} onClick={() => run(action.id)}>
+                            {running === action.id ? <Loader2 aria-hidden className="size-4 shrink-0 animate-spin" /> : null}
+                            {pluginText(action.label, locale)}
+                        </Button>
+                    }
+                >
+                    {pluginText(action.detail ?? action.label, locale)}
+                </Notice>
+            ))}
+        </>
+    );
 }
 
 function Notice({ children, action }: { children: ReactNode; action?: ReactNode }) {
@@ -223,7 +263,8 @@ function useUninstall(bridge: PluginsBridge | null): [(id: string, name: string)
  * The card's menu, as the Polaris apps' cards have it: the plugin's page, its
  * settings, the update, automatic updates, turning it off and uninstalling it.
  * Only what the desktop app can do; while it installs, what would race the
- * install is switched off with the reason.
+ * install is switched off with the reason. What the app offers to do for the
+ * plugin (`InstalledPlugin.actions`) sits here too, as on the plugin's page.
  */
 function pluginMenu(
     t: Words,
@@ -234,6 +275,7 @@ function pluginMenu(
         offer,
         href,
         name,
+        locale,
         go,
         onInstall,
         onUninstall,
@@ -245,6 +287,7 @@ function pluginMenu(
         offer: PluginOffer;
         href: string;
         name: string;
+        locale: string;
         go: (href: string) => void;
         onInstall: (entry: PluginEntry) => void;
         onUninstall: (id: string, name: string) => void;
@@ -259,6 +302,18 @@ function pluginMenu(
     if (installed.manifest) entries.push({ key: "settings", label: say(t, "detail.settings"), onSelect: () => go(`${href}#settings`) });
     const entry = listing.entry;
     if (offer.kind === "update" && entry) entries.push({ key: "update", label: say(t, "card.update", { version: offer.version }), onSelect: () => onInstall(entry) });
+    const runAction = bridge.runAction;
+    if (runAction) {
+        for (const action of installed.actions) {
+            entries.push({
+                key: `action:${action.id}`,
+                label: pluginText(action.label, locale),
+                disabled: busy,
+                hint,
+                onSelect: () => void runAction(listing.id, action.id).catch(() => false)
+            });
+        }
+    }
     const setAutoUpdate = bridge.setAutoUpdate;
     if (snapshot.autoUpdate !== null && setAutoUpdate) {
         const on = installed.autoUpdate ?? snapshot.autoUpdate;
@@ -341,6 +396,7 @@ function PluginCard({
     const t = useTranslations("account");
     const router = useRouter();
     const toast = useToast();
+    const locale = useLocale();
     const [uninstall, uninstallDialog] = useUninstall(bridge);
     const manifest = manifestOf(listing);
     if (!manifest) return null;
@@ -355,6 +411,7 @@ function PluginCard({
         offer,
         href,
         name: manifest.name,
+        locale,
         go: (to) => router.push(to),
         onInstall,
         onUninstall: uninstall,
@@ -847,6 +904,7 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 
 export function PluginPage({ id }: { id: string }) {
     const t = useTranslations("account");
+    const locale = useLocale();
     const state = usePlugins();
     const toast = useToast();
     const bridge = state.kind === "ready" || state.kind === "loading" ? state.bridge : null;
@@ -946,6 +1004,7 @@ export function PluginPage({ id }: { id: string }) {
                 </Notice>
             ) : null}
             {installed?.failed ? <Notice>{say(t, "notice.failed", { version: installed.failed })}</Notice> : null}
+            {installed && state.bridge.runAction ? <HostActions bridge={state.bridge} id={id} actions={installed.actions} /> : null}
             {installed ? <AutoUpdateRow bridge={state.bridge} snapshot={state.snapshot} id={id} /> : null}
             {installed && installed.manifest ? (
                 <section id="settings" className="flex min-w-0 scroll-mt-4 flex-col gap-2" aria-label={say(t, "detail.settings")}>
@@ -970,12 +1029,15 @@ export function PluginPage({ id }: { id: string }) {
             </dl>
             <section className="flex min-w-0 flex-col gap-1" aria-label={say(t, "detail.permissions")}>
                 <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.permissions")}</h2>
-                {manifest.permissions.length === 0 ? (
+                {manifest.permissions.length === 0 && pluginRequirements(manifest, state.snapshot.platform).length === 0 ? (
                     <p className="text-sm">{say(t, "install.none")}</p>
                 ) : (
                     <ul className="list-disc ps-5 text-sm">
                         {manifest.permissions.map((permission) => (
                             <li key={permission}>{say(t, `permission.${PERMISSION_KEY[permission]}`)}</li>
+                        ))}
+                        {pluginRequirements(manifest, state.snapshot.platform).map((requirement) => (
+                            <li key={`requires.${requirement.key}`}>{pluginText(requirement.label, locale)}</li>
                         ))}
                     </ul>
                 )}

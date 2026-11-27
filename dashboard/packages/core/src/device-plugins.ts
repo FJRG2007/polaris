@@ -126,6 +126,31 @@ export const pluginSettingGroupSchema = z.object({
 });
 
 export type PluginSettingGroup = z.infer<typeof pluginSettingGroupSchema>;
+
+/**
+ * Something the client sets up on one platform for a plugin to work fully (a
+ * driver, say). It is listed with the permissions when the plugin is installed
+ * or updated, in the plugin's own words, and the install is the consent; the
+ * client runs it and puts it back when something else undoes it. Optional and
+ * additive: a client older than it drops the field and installs as before.
+ */
+export const pluginRequirementSchema = z.object({
+    key: settingKeySchema,
+    /** The line in the consent list, and the action that sets it up again. */
+    label: pluginTextSchema,
+    hint: pluginTextSchema.optional(),
+    /** What the plugin's page says while it is not set up. */
+    missing: pluginTextSchema.optional(),
+    /** What the client says when it set it up again by itself. */
+    restored: pluginTextSchema.optional()
+});
+
+export type PluginRequirement = z.infer<typeof pluginRequirementSchema>;
+
+const requirementListSchema = z
+    .array(pluginRequirementSchema)
+    .max(8)
+    .refine((list) => new Set(list.map((item) => item.key)).size === list.length, "repeated requirement");
 export type PluginSettingValue = boolean | string | number | null;
 
 export const pluginManifestSchema = z.object({
@@ -158,6 +183,8 @@ export const pluginManifestSchema = z.object({
         .max(16)
         .default([])
         .refine((list) => new Set(list.map((item) => item.key)).size === list.length, "repeated group"),
+    /** What each platform sets up for it (`pluginRequirementSchema`); a platform left out needs nothing. */
+    requires: perPlatform(requirementListSchema).default({}),
     /**
      * A page of its own for what plain settings cannot draw, shown on its
      * Settings page in a sandboxed frame. It shows, it does not ask: every
@@ -249,6 +276,11 @@ export function readPluginManifest(value: unknown): PluginManifest | null {
 export function readPluginCatalog(value: unknown): PluginCatalog | null {
     const parsed = pluginCatalogSchema.safeParse(value);
     return parsed.success ? parsed.data : null;
+}
+
+/** What the manifest has this platform set up for it, none when it names nothing for it. */
+export function pluginRequirements(manifest: Pick<PluginManifest, "requires">, platform: PluginPlatform | null): readonly PluginRequirement[] {
+    return (platform ? manifest.requires[platform] : undefined) ?? [];
 }
 
 /** `1.2.3` against `1.10.0`: negative, zero or positive. Both must be versions. */
@@ -376,6 +408,20 @@ const pluginRunSchema = z.union([
     z.object({ state: z.enum(["disabled", "sleeping", "missing"]) })
 ]);
 
+/**
+ * Something the client offers to do for an installed plugin, drawn by the page
+ * beside Uninstall and run through `plugins.runAction` (setting up a
+ * requirement that is missing, say). The words are the plugin's or the client's.
+ */
+export const pluginHostActionSchema = z.object({
+    id: settingKeySchema,
+    label: pluginTextSchema,
+    /** What is wrong while the action is offered. */
+    detail: pluginTextSchema.optional()
+});
+
+export type PluginHostAction = z.infer<typeof pluginHostActionSchema>;
+
 const installedPluginSchema = z.object({
     id: z.string().regex(/^[a-z][a-z0-9-]{1,47}$/),
     version: versionSchema,
@@ -390,6 +436,8 @@ const installedPluginSchema = z.object({
     consent: z.array(z.enum(PLUGIN_PERMISSIONS)).max(PLUGIN_PERMISSIONS.length).default([]),
     /** A version that failed on this computer and was rolled back from. */
     failed: versionSchema.nullable().default(null),
+    /** What the client offers to do for it (`pluginHostActionSchema`). Absent from an older app. */
+    actions: z.array(pluginHostActionSchema).max(8).default([]),
     run: pluginRunSchema
 });
 

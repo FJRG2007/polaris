@@ -38,7 +38,7 @@ let updateListeners = 0;
 const pluginsBridge: NonNullable<PolarisDesktop["plugins"]> = {
     get: () => ipcRenderer.invoke(CHANNELS.pluginsGet),
     refresh: () => ipcRenderer.invoke(CHANNELS.pluginsRefresh),
-    install: (id, accepted) => ipcRenderer.invoke(CHANNELS.pluginsInstall, id, accepted),
+    install: (id, accepted, requires) => ipcRenderer.invoke(CHANNELS.pluginsInstall, id, accepted, requires),
     uninstall: (id) => ipcRenderer.invoke(CHANNELS.pluginsUninstall, id),
     setEnabled: (id, enabled) => ipcRenderer.invoke(CHANNELS.pluginsEnable, id, enabled),
     settings: (id) => ipcRenderer.invoke(CHANNELS.pluginsSettings, id),
@@ -46,6 +46,7 @@ const pluginsBridge: NonNullable<PolarisDesktop["plugins"]> = {
     setAutoUpdate: (id, value) => ipcRenderer.invoke(CHANNELS.pluginsSetAutoUpdate, id, value),
     viewCall: (id, method, params) => ipcRenderer.invoke(CHANNELS.pluginsViewCall, id, method, params),
     official: (id, request) => ipcRenderer.invoke(CHANNELS.pluginsOfficial, id, request),
+    runAction: (id, action) => ipcRenderer.invoke(CHANNELS.pluginsAction, id, action),
     onChange: (listener) => {
         const heard = () => listener();
         ipcRenderer.on(CHANNELS.pluginsChanged, heard);

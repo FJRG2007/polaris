@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DriverRunner } from "../../../src/main/plugins/hercules-driver";
 import type { OfficialRunner } from "../../../src/main/plugins/hercules-official-run";
-import { answerOfficial, createDriverSetting, DRIVER_SETTING, driverSettingOf, officialRequestSchema, officialRunnerFor } from "../../../src/main/plugins/official";
+import { answerOfficial, DRIVER_REQUIREMENT, driverRequirement, lookDriver, officialRequestSchema, officialRunnerFor, requirementRunnerFor } from "../../../src/main/plugins/official";
 
 type Execute = Awaited<ReturnType<OfficialRunner["execute"]>>;
 
@@ -40,8 +40,12 @@ const choose = (choice: "stop" | "uninstall" | "keep") => officialRequestSchema.
 describe("answerOfficial", () => {
     it("carries the choice out before installing, then sets the values and keeps the layout", async () => {
         const { runner, manager, write, order } = fakes({ ok: true, values: { knob1: "music", button2: "call.mic" }, layout: LAYOUT, install: true } as Execute);
-        const answer = await answerOfficial(runner, manager as never, "hercules-stream100", choose("stop"), write);
+        const installed = vi.fn(async () => undefined);
+        const request = officialRequestSchema.parse({ kind: "choose", choice: "stop", accepted: ["usb"], requires: ["driver"] });
+        const answer = await answerOfficial(runner, manager as never, "hercules-stream100", request, write, installed);
         expect(answer).toEqual({ ok: true });
+        // What the consent listed to set up follows the install, never before it.
+        expect(installed).toHaveBeenCalledWith(["driver"]);
         expect(order).toEqual(["execute", "install", "set:knob1", "set:button2", "write:layout.json"]);
         expect(runner.execute).toHaveBeenCalledWith("stop");
         expect(manager.install).toHaveBeenCalledWith("hercules-stream100", ["usb"]);
@@ -83,86 +87,36 @@ describe("answerOfficial", () => {
     });
 });
 
-describe("the Stream 100's driver setting", () => {
-    type Outcome = { ok: true; } | { ok: false; reason: "declined" | "removing"; };
+describe("the Stream 100's driver as a requirement", () => {
     type State = Awaited<ReturnType<DriverRunner["state"]>>;
+    const runner = (state: State) => ({ state: vi.fn(async () => state), install: vi.fn(async () => ({ ok: true })) }) as unknown as DriverRunner;
 
-    function setup(options: { install?: Outcome; remove?: Outcome; installed?: boolean; state?: State; stored?: boolean; } = {}) {
-        let stored: Record<string, boolean | string> = { enabled: true, polarisDriver: options.stored ?? false };
-        const manager = {
-            settings: vi.fn(async () => ({ ...stored })),
-            setSetting: vi.fn(async (_id: string, key: unknown, value: unknown) => {
-                stored = { ...stored, [key as string]: value as boolean };
-                return { ...stored };
-            })
-        };
-        const driver = {
-            install: vi.fn(async () => options.install ?? { ok: true }),
-            remove: vi.fn(async () => options.remove ?? { ok: true }),
-            installed: vi.fn(async () => options.installed ?? false),
-            state: vi.fn(async () => options.state ?? ({ state: "needed", hercules: true } as State))
-        } as unknown as DriverRunner;
-        const setting = createDriverSetting(manager, (id) => (id === "hercules-stream100" ? driver : null));
-        return { setting, manager, driver, stored: () => stored };
-    }
+    it("reads met while Polaris' driver or WinUSB holds it, missing while another driver does", async () => {
+        expect(await driverRequirement(runner({ state: "installed" })).look()).toEqual({ state: "met", before: true });
+        expect(await driverRequirement(runner({ state: "notNeeded" })).look()).toEqual({ state: "met", before: false });
+        expect(await driverRequirement(runner({ state: "needed", hercules: true })).look()).toEqual({ state: "missing", before: false });
+        // Set up once and taken back since (a Hercules reinstall): it is put back by itself.
+        expect(await driverRequirement(runner({ state: "repair" })).look()).toEqual({ state: "missing", before: true });
+        expect(await driverRequirement(runner({ state: "unplugged", installed: true })).look()).toEqual({ state: "away", before: true });
+    });
 
-    it("sets the driver up when turned on, and keeps it on only when that went through", async () => {
-        const { setting, driver, stored } = setup();
-        expect(await setting.set("hercules-stream100", DRIVER_SETTING, true)).toMatchObject({ polarisDriver: true });
+    it("sets up through the driver's own install, and is known only for the Stream 100's driver on Windows", async () => {
+        const driver = runner({ state: "needed", hercules: false });
+        expect(await driverRequirement(driver).setUp()).toEqual({ ok: true });
         expect(driver.install).toHaveBeenCalledTimes(1);
-        expect(stored().polarisDriver).toBe(true);
-        expect((await setting.look("hercules-stream100"))?.failure).toBeNull();
+        expect(requirementRunnerFor("hercules-stream100", "other", "C:\plugins")).toBeNull();
+        expect(requirementRunnerFor("another-plugin", DRIVER_REQUIREMENT, "C:\plugins")).toBeNull();
     });
 
-    it("keeps it off and says why when Windows' prompt is declined", async () => {
-        const { setting, manager, stored } = setup({ install: { ok: false, reason: "declined" } });
-        expect(await setting.set("hercules-stream100", DRIVER_SETTING, true)).toMatchObject({ polarisDriver: false });
-        expect(stored().polarisDriver).toBe(false);
-        // Written back as it was, so the pages holding the setting hear it did not change.
-        expect(manager.setSetting).toHaveBeenLastCalledWith("hercules-stream100", DRIVER_SETTING, false);
-        expect(await setting.look("hercules-stream100")).toEqual({ state: "needed", hercules: true, failure: "declined" });
+    it("answers the view's driver.look with the last failure, null without a driver", async () => {
+        expect(await lookDriver(null, null)).toBeNull();
+        expect(await lookDriver(runner({ state: "needed", hercules: true }), "declined")).toEqual({ state: "needed", hercules: true, failure: "declined" });
+        expect(await lookDriver(runner({ state: "installed" }), null)).toEqual({ state: "installed", failure: null });
     });
 
-    it("takes the driver out when turned off, and skips the prompt when it was never set up", async () => {
-        const kept = setup({ installed: true, stored: true, state: { state: "installed" } });
-        expect(await kept.setting.set("hercules-stream100", DRIVER_SETTING, false)).toMatchObject({ polarisDriver: false });
-        expect(kept.driver.remove).toHaveBeenCalledTimes(1);
-        const never = setup({ installed: false, stored: true });
-        await never.setting.set("hercules-stream100", DRIVER_SETTING, false);
-        expect(never.driver.remove).not.toHaveBeenCalled();
-        expect(never.stored().polarisDriver).toBe(false);
-        const refused = setup({ installed: true, stored: true, remove: { ok: false, reason: "removing" } });
-        expect(await refused.setting.set("hercules-stream100", DRIVER_SETTING, false)).toMatchObject({ polarisDriver: true });
-    });
-
-    it("runs one prompt at a time", async () => {
-        let finish: (outcome: Outcome) => void = () => {};
-        const { setting, driver } = setup();
-        (driver.install as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => new Promise<Outcome>((done) => (finish = done)));
-        const first = setting.set("hercules-stream100", DRIVER_SETTING, true);
-        expect(await setting.set("hercules-stream100", DRIVER_SETTING, true)).toMatchObject({ polarisDriver: false });
-        finish({ ok: true });
-        expect(await first).toMatchObject({ polarisDriver: true });
-        expect(driver.install).toHaveBeenCalledTimes(1);
-    });
-
-    it("follows the machine: on while Polaris' driver holds the device, off once another driver took it back", async () => {
-        const repaired = setup({ stored: true, state: { state: "repair" } });
-        await repaired.setting.look("hercules-stream100");
-        expect(repaired.stored().polarisDriver).toBe(false);
-        const holding = setup({ stored: false, state: { state: "unplugged", installed: true } });
-        await holding.setting.look("hercules-stream100");
-        expect(holding.stored().polarisDriver).toBe(true);
-        expect(driverSettingOf({ state: "notNeeded" })).toBe(false);
-        expect(driverSettingOf({ state: "installed" })).toBe(true);
-    });
-
-    it("leaves every other setting and plugin to the manager", async () => {
-        const { setting, manager, driver } = setup();
-        await setting.set("hercules-stream100", "enabled", false);
-        await setting.set("other", DRIVER_SETTING, true);
-        expect(driver.install).not.toHaveBeenCalled();
-        expect(manager.setSetting).toHaveBeenCalledTimes(2);
-        expect(await setting.look("other")).toBeNull();
+    it("carries what the consent listed to set up through the official choice, none from an older page", () => {
+        expect(officialRequestSchema.parse({ kind: "choose", choice: "keep", accepted: [] })).toMatchObject({ requires: [] });
+        expect(officialRequestSchema.parse({ kind: "choose", choice: "keep", accepted: [], requires: ["driver"] })).toMatchObject({ requires: ["driver"] });
+        expect(officialRequestSchema.safeParse({ kind: "choose", choice: "keep", accepted: [], requires: ["../x"] }).success).toBe(false);
     });
 });

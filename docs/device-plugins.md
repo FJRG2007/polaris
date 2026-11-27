@@ -142,11 +142,25 @@ origin) and speaks `postMessage` (`apps/web/src/lib/device-plugin-view.ts`):
   (`{key, value}`, checked against the declared settings), which only a view has;
   so is `driver.look`, the state of the device's own driver and why its last
   change did not go through, which the app answers per plugin (`null` for one
-  with no driver of its own). The setup itself is a declared toggle (the Stream
-  100's `polarisDriver`): the app runs the setup when it is turned on and the
-  removal when it is turned off, keeps the new value only when that went
-  through, and brings it in line with the machine on every look. Both ship with
-  the plugin, not the dashboard.
+  with no driver of its own). The setup itself is a requirement (below), not a
+  setting.
+
+## Requirements and host actions
+
+A manifest may list, per platform, what the client sets up for the plugin to
+work fully (`requires`, e.g. a driver on `win32-x64`): a key and the plugin's
+own words (`label`, `hint`, `missing`, `restored`). The install and update
+consent lists each one beside the permissions, and the install sends the keys
+it listed (`plugins.install(id, accepted, requires)`); that is the consent.
+The desktop app (`plugins/requirements.ts`) sets each one up right after the
+install, puts it back by itself on start and on a USB change when something
+else undid it, and never sets up one that was not consented to. One that is
+missing and will not be set up by itself (never consented to, or its last
+setup was declined or failed) is listed in the snapshot as a host action
+(`InstalledPlugin.actions`: id, label, detail), which the page draws next to
+Uninstall and runs through `plugins.runAction(id, action)`. Both fields are
+optional: an older client drops `requires` and lists no actions, an older page
+draws neither and sends no keys, so nothing is set up without a consent.
 
 ## Ways in
 

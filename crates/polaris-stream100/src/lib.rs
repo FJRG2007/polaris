@@ -25,13 +25,13 @@
 //! the operating system's per-app volume and the Windows ownership probe are
 //! behind `native` ([`native`]).
 
-pub mod plugin;
 pub mod audio;
 pub mod display;
 pub mod encoder;
 pub mod engine;
 pub mod manifest;
 pub mod ownership;
+pub mod plugin;
 pub mod report;
 pub mod sdk;
 pub mod session;

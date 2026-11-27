@@ -6,7 +6,7 @@
 
 import { z } from "zod";
 import { join } from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { packageDir, pluginsFolder } from "./packages";
 import { judgeViewCall, readViewUrl, resolveViewFile, viewContentType, VIEW_CSP, VIEW_SCHEMES } from "./view";
 import { CHANNELS } from "@/shared/bridge";
@@ -16,14 +16,18 @@ import { watchUsb, type UsbWatch } from "./presence";
 import { pluginShortcuts, sameShortcuts, type PluginShortcuts } from "./ways-in";
 import type { PluginChild, WantedPlugin } from "./supervisor";
 import { createPluginManager, type PluginManager } from "./manager";
-import { answerOfficial, createDriverSetting, driverRunnerFor, officialRequestSchema, officialRunnerFor } from "./official";
+import { createRequirements, type EnsureReason, type Requirements } from "./requirements";
+import { answerOfficial, DRIVER_REQUIREMENT, driverRunnerFor, lookDriver, officialRequestSchema, officialRunnerFor, requirementRunnerFor } from "./official";
 import { showNotice } from "../notices";
 import { newsWords } from "./updates";
 import { callPageAction, voiceStateNow, voiceWidgetAction } from "../voice-widget";
-import { PLUGIN_PERMISSIONS, pluginPlatform, type UsbDevice } from "@polaris/core/device-plugins";
+import { PLUGIN_PERMISSIONS, pluginPlatform, pluginRequirements, pluginText, type PluginManifest, type UsbDevice } from "@polaris/core/device-plugins";
 import { app, ipcMain, net, Notification, protocol, utilityProcess, webContents, type IpcMainInvokeEvent } from "electron";
 
 let manager: PluginManager | null = null;
+let requirements: Requirements | null = null;
+/** Requirement setups run one after another, so no two permission prompts are open at once. */
+let ensuring: Promise<void> = Promise.resolve();
 let usb: UsbWatch | null = null;
 let devices: UsbDevice[] | null = null;
 let shortcuts: PluginShortcuts = { installed: [], plugged: [] };
@@ -34,6 +38,32 @@ let lookAgain = false;
 let folder: string | null = null;
 /** Resolved once: the first call moves a folder from before the rename (`pluginsFolder`). */
 const pluginsDir = (): string => (folder ??= pluginsFolder(app.getPath("userData")));
+
+/** The installed plugin's manifest, or null. */
+async function installedManifest(id: string): Promise<PluginManifest | null> {
+    return (await manager?.snapshot())?.installed.find((plugin) => plugin.id === id)?.manifest ?? null;
+}
+
+/** Set up what one installed plugin (or every one) has this platform set up for it (`requirements.ts`), one at a time. */
+function ensureRequirements(reason: EnsureReason, id?: string): Promise<void> {
+    ensuring = ensuring.then(async () => {
+        if (!manager || !requirements) return;
+        for (const plugin of (await manager.snapshot()).installed) {
+            if ((id && plugin.id !== id) || !plugin.manifest) continue;
+            await requirements.ensure(plugin.id, plugin.manifest, reason).catch(() => undefined);
+        }
+    });
+    return ensuring;
+}
+
+/** The manager's snapshot with what the app offers to do for each plugin (`InstalledPlugin.actions`). */
+async function snapshotWithActions(running: PluginManager): Promise<unknown> {
+    const snapshot = await running.snapshot();
+    const installed = await Promise.all(
+        snapshot.installed.map(async (plugin) => ({ ...plugin, actions: plugin.manifest && requirements ? await requirements.actions(plugin.id, plugin.manifest) : [] }))
+    );
+    return { ...snapshot, installed };
+}
 
 /** Starts the device's official app for a plugin, when one is registered for it here (`official.ts`). */
 function launchOfficial(id: string): Promise<boolean> {
@@ -224,13 +254,44 @@ export function startDevicePlugins(showPolaris: (path?: string) => void): Plugin
         log: (id, level, text) => console[level === "info" ? "log" : level](`[plugin ${id}] ${text}`)
     });
     manager = created;
+    const keptAt = join(pluginsDir(), "requirements.json");
+    requirements = createRequirements({
+        platform: pluginPlatform(process.platform, process.arch),
+        runnerFor: (id, key) => requirementRunnerFor(id, key, pluginsDir()),
+        read: async () => JSON.parse(await readFile(keptAt, "utf8")),
+        async write(value) {
+            const temp = `${keptAt}.${process.pid}.${Date.now()}.tmp`;
+            await writeFile(temp, JSON.stringify(value), "utf8");
+            await rename(temp, keptAt);
+        },
+        changed: () => broadcast(CHANNELS.pluginsChanged),
+        restored: (id, requirement) => {
+            void installedManifest(id).then((found) =>
+                showNotice({
+                    title: found?.name ?? id,
+                    body: pluginText(requirement.restored ?? requirement.label, app.getLocale()),
+                    tag: `plugin-requirement:${id}`,
+                    silent: true,
+                    onClick: () => {
+                        showPolaris();
+                        broadcast(CHANNELS.pluginsOpen, id);
+                    }
+                })
+            );
+        }
+    });
     servePluginViews();
     usb = watchUsb((next) => {
         devices = next;
         void created.devicesChanged(next).finally(() => lookAtShortcuts(showPolaris));
+        // A device plugged in with another driver on it gets the plugin's back.
+        void ensureRequirements("plugged");
     });
     if (usb) devices = usb.list();
-    void created.start().finally(() => lookAtShortcuts(showPolaris));
+    void created
+        .start()
+        .finally(() => lookAtShortcuts(showPolaris))
+        .then(() => ensureRequirements("start"));
     created.startUpdates();
     return created;
 }
@@ -249,18 +310,38 @@ export function registerPluginIpc(
     showPolaris: (path?: string) => void
 ): void {
     const ready = () => startDevicePlugins(showPolaris);
-    // Settings change through here so the Stream 100's driver setting sets the driver up or takes it out.
-    const driverSetting = createDriverSetting(
-        { settings: (id) => ready().settings(id), setSetting: (id, key, value) => ready().setSetting(id, key, value) },
-        (id) => driverRunnerFor(id, pluginsDir())
-    );
-    handle(CHANNELS.pluginsGet, (event) => (allowed(event) ? ready().snapshot() : null));
+    const keySchema = z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/);
+    /** After an install whose consent listed `requires`: keep the consent, then set them up (the permission prompt comes now). */
+    const installedWith = async (id: string, requires: readonly string[]) => {
+        const listed = new Set(pluginRequirements((await installedManifest(id)) ?? { requires: {} }, pluginPlatform(process.platform, process.arch)).map((item) => item.key));
+        await requirements?.consent(id, requires.filter((key) => listed.has(key)));
+        void ensureRequirements("install", id);
+    };
+    handle(CHANNELS.pluginsGet, (event) => (allowed(event) ? snapshotWithActions(ready()) : null));
     handle(CHANNELS.pluginsRefresh, async (event) => (allowed(event) ? ready().refresh() : null));
-    handle(CHANNELS.pluginsInstall, (event, id: unknown, accepted: unknown) => {
+    handle(CHANNELS.pluginsInstall, async (event, id: unknown, accepted: unknown, requires: unknown) => {
         const parsedId = idSchema.safeParse(id);
         const parsedAccepted = z.array(z.enum(PLUGIN_PERMISSIONS)).max(PLUGIN_PERMISSIONS.length).safeParse(accepted);
-        if (!allowed(event) || !parsedId.success || !parsedAccepted.success) return { ok: false, reason: "refused" };
-        return ready().install(parsedId.data, parsedAccepted.data);
+        // A page older than requirements sends none: nothing is consented to, and the plugin's page offers it instead.
+        const parsedRequires = z.array(keySchema).max(8).safeParse(requires ?? []);
+        if (!allowed(event) || !parsedId.success || !parsedAccepted.success || !parsedRequires.success) return { ok: false, reason: "refused" };
+        const result = await ready().install(parsedId.data, parsedAccepted.data);
+        if (result.ok) await installedWith(parsedId.data, parsedRequires.data);
+        return result;
+    });
+    // One of the actions the snapshot offers for an installed plugin (`InstalledPlugin.actions`).
+    handle(CHANNELS.pluginsAction, async (event, id: unknown, action: unknown) => {
+        const parsedId = idSchema.safeParse(id);
+        const parsedAction = keySchema.safeParse(action);
+        if (!allowed(event) || !parsedId.success || !parsedAction.success) return false;
+        ready();
+        const found = await installedManifest(parsedId.data);
+        const held = requirements;
+        if (!found || !held) return false;
+        // After any automatic setup already under way, so only one prompt is open.
+        const run = ensuring.then(() => held.run(parsedId.data, found, parsedAction.data));
+        ensuring = run.then(() => undefined, () => undefined);
+        return run.catch(() => false);
     });
     handle(CHANNELS.pluginsUninstall, async (event, id: unknown) => {
         const parsed = idSchema.safeParse(id);
@@ -274,6 +355,7 @@ export function registerPluginIpc(
             if (!removed.ok) return false;
         }
         await ready().uninstall(parsed.data);
+        await requirements?.forget(parsed.data);
         return true;
     });
     handle(CHANNELS.pluginsEnable, (event, id: unknown, enabled: unknown) => {
@@ -296,11 +378,11 @@ export function registerPluginIpc(
         if (!verdict.ok) return verdict;
         try {
             if (verdict.kind === "set") {
-                const values = await driverSetting.set(parsed.data, verdict.key, verdict.value);
+                const values = await running.setSetting(parsed.data, verdict.key, verdict.value);
                 return values ? { ok: true, value: values } : { ok: false, error: "bad-params" };
             }
             // Only the Stream 100 has a driver of its own; any other view gets null.
-            if (verdict.kind === "driver") return { ok: true, value: await driverSetting.look(parsed.data) };
+            if (verdict.kind === "driver") return { ok: true, value: await lookDriver(driverRunnerFor(parsed.data, pluginsDir()), requirements?.failure(parsed.data, DRIVER_REQUIREMENT) ?? null) };
             if (verdict.method === "settings.get") return { ok: true, value: await running.settings(parsed.data) };
             if (verdict.method === "polaris.state") return { ok: true, value: { call: voiceStateNow() } };
             if (verdict.method === "system.launchOfficial") return { ok: true, value: await launchOfficial(parsed.data) };
@@ -317,10 +399,17 @@ export function registerPluginIpc(
         if (!runner) return null;
         const dataDir = join(pluginsDir(), "official", parsedId.data);
         try {
-            return await answerOfficial(runner, ready(), parsedId.data, parsedRequest.data, async (name, text) => {
-                await mkdir(dataDir, { recursive: true });
-                await writeFile(join(dataDir, name), text, "utf8");
-            });
+            return await answerOfficial(
+                runner,
+                ready(),
+                parsedId.data,
+                parsedRequest.data,
+                async (name, text) => {
+                    await mkdir(dataDir, { recursive: true });
+                    await writeFile(join(dataDir, name), text, "utf8");
+                },
+                (requires) => installedWith(parsedId.data, requires)
+            );
         } catch (error) {
             console.error(`[plugin ${parsedId.data}] official software: ${error instanceof Error ? error.message : String(error)}`);
             return { ok: false, reason: "failed" };
@@ -334,6 +423,6 @@ export function registerPluginIpc(
     });
     handle(CHANNELS.pluginsSetSetting, (event, id: unknown, key: unknown, value: unknown) => {
         const parsed = idSchema.safeParse(id);
-        return allowed(event) && parsed.success ? driverSetting.set(parsed.data, key, value) : null;
+        return allowed(event) && parsed.success ? ready().setSetting(parsed.data, key, value) : null;
     });
 }
