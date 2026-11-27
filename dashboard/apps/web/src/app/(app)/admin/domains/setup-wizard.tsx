@@ -28,7 +28,17 @@ import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
 import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
 import { connectCloudflareAccountAction } from "@/app/(app)/admin/integrations/actions";
 import { FORWARD_RULES, gameForwardRules, type RouterForwardRule } from "@/lib/router-guide";
-import { Badge, Button, Checkbox, DnsRecordTable, Input, Select, settingType, Skeleton } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Checkbox,
+    cn,
+    DnsRecordTable,
+    Input,
+    Select,
+    settingType,
+    Skeleton
+} from "@polaris/ui";
 import { ENVIRONMENT_CHOICES, environmentWords } from "@/app/(app)/apps/servers/environment-meta";
 import {
     clearSetupDraft,
@@ -252,7 +262,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
             >
                 {loadError ? (
                     <>
-                        <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
+                        <p className={cn(settingType.small, "flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-danger-ink")}>
                             <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {loadError}
                         </p>
                         <Button size="sm" variant="secondary" className="w-fit" onClick={load}>
@@ -383,7 +393,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
             }
         >
             {resumed && step <= 2 && (
-                <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
+                <div className={cn(settingType.small, "flex items-center justify-between gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-muted-foreground")}>
                     <span>{t("domainsSetup.resumed")}</span>
                     <button
                         type="button"
@@ -450,7 +460,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
             )}
 
             {error && (
-                <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
+                <p className={cn(settingType.small, "flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-danger-ink")}>
                     <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {error}
                 </p>
             )}
@@ -489,7 +499,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                     </Button>
                 )}
                 {step === 3 && (
-                    <span className="flex items-center gap-1.5 text-sm text-success">
+                    <span className={cn(settingType.body, "flex items-center gap-1.5 text-success")}>
                         <CheckCircle2 className="size-4" /> {t("domainsSetup.saved")}
                     </span>
                 )}
@@ -533,7 +543,7 @@ function EnvironmentStep({
                                     : "border-border/60 hover:bg-muted/40"
                             }`}
                         >
-                            <span className="flex items-center gap-2 text-sm font-medium">
+                            <span className={cn(settingType.body, "flex items-center gap-2 font-medium")}>
                                 {meta.label}
                                 {detected === option && (
                                     <Badge variant="neutral">
@@ -541,12 +551,12 @@ function EnvironmentStep({
                                     </Badge>
                                 )}
                             </span>
-                            <span className="text-xs text-muted-foreground">{meta.summary}</span>
+                            <span className={settingType.hint}>{meta.summary}</span>
                         </button>
                     );
                 })}
             </div>
-            <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
+            <p className={cn(settingType.small, "rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-muted-foreground")}>
                 {environmentWords(tc, selected).routing}
             </p>
         </div>
@@ -621,7 +631,7 @@ function StrategyStep({
                                         : "border-border/60 hover:bg-muted/40"
                                 }`}
                             >
-                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                                <span className={cn(settingType.body, "flex flex-wrap items-center gap-2 font-medium")}>
                                     {option.id === "tunnel" ? (
                                         <Cable className="size-4 text-primary" />
                                     ) : (
@@ -635,10 +645,10 @@ function StrategyStep({
                                         </Badge>
                                     )}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {approachWords(t, option.id).summary}
                                 </span>
-                                <span className="flex flex-col gap-1 text-xs">
+                                <span className={cn(settingType.small, "flex flex-col gap-1")}>
                                     {approachWords(t, option.id).pros.map((line) => (
                                         <span
                                             key={line}
@@ -659,7 +669,7 @@ function StrategyStep({
                                     ))}
                                 </span>
                                 {option.note && (
-                                    <span className="text-xs text-warning">
+                                    <span className={cn(settingType.small, "text-warning")}>
                                         {strategyNote(t, option)}
                                     </span>
                                 )}
@@ -668,7 +678,7 @@ function StrategyStep({
                     })}
                 </div>
                 {approach === "ports" && forwardable && (
-                    <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
+                    <div className={cn(settingType.small, "flex flex-col gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-muted-foreground")}>
                         <p className="font-medium text-foreground">
                             {t("domainsSetup.strategy.routerTitle")}
                         </p>
@@ -717,7 +727,7 @@ function StrategyStep({
                                         : "border-border/60 hover:bg-muted/40"
                                 } ${option.available ? "" : "cursor-not-allowed opacity-50"}`}
                             >
-                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                                <span className={cn(settingType.body, "flex flex-wrap items-center gap-2 font-medium")}>
                                     {strategyWords(t, option.id).label}
                                     {option.id === choice.recommended ? (
                                         <Badge variant="success">
@@ -745,16 +755,16 @@ function StrategyStep({
                                         </Badge>
                                     )}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {strategyWords(t, option.id).summary}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {t("domainsSetup.strategy.dependsOn", {
                                         value: strategyWords(t, option.id).dependency
                                     })}
                                 </span>
                                 {option.meta.requires.length > 0 && (
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className={settingType.hint}>
                                         {t("domainsSetup.strategy.needs", {
                                             value: strategyWords(t, option.id).requires.join(" - ")
                                         })}
@@ -762,7 +772,7 @@ function StrategyStep({
                                 )}
                                 {option.note && (
                                     <span
-                                        className={`text-xs ${option.available ? "text-primary" : "text-warning"}`}
+                                        className={cn(settingType.small, option.available ? "text-primary" : "text-warning")}
                                     >
                                         {strategyNote(t, option)}
                                     </span>
@@ -844,18 +854,18 @@ function DomainStep({
                             : t("domainsSetup.domain.nothingHint")
                     }
                 />
-                <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
+                <p className={cn(settingType.small, "rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-muted-foreground")}>
                     {strategyWords(t, strategy).summary}
                 </p>
                 {meta.needsDomain ? (
                     <a
                         href="/admin/integrations"
-                        className="w-fit text-xs text-primary hover:underline"
+                        className={cn(settingType.small, "w-fit text-primary hover:underline")}
                     >
                         {t("domainsSetup.domain.openIntegrations")}
                     </a>
                 ) : (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("domainsSetup.domain.comeBack")}
                     </p>
                 )}
@@ -872,7 +882,7 @@ function DomainStep({
 
             {strategy === "duckdns" ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("domainsSetup.domain.duckSubdomain")}
                         <Input
                             value={duckSub}
@@ -887,7 +897,7 @@ function DomainStep({
                             </span>
                         ) : null}
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("domainsSetup.domain.token")}
                         <Input
                             type="password"
@@ -903,7 +913,7 @@ function DomainStep({
                     </label>
                 </div>
             ) : (
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     {t("domainsSetup.domain.baseDomain")}
                     <Input
                         value={baseDomain}
@@ -917,7 +927,7 @@ function DomainStep({
                             {t("domainsSetup.domain.invalidBaseDomain")}
                         </span>
                     ) : null}
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("domainsSetup.domain.baseDomainHint")}
                     </span>
                 </label>
@@ -929,7 +939,7 @@ function DomainStep({
 
             <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">{t("domainsSetup.domain.zones")}</span>
+                    <span className={cn(settingType.body, "font-medium")}>{t("domainsSetup.domain.zones")}</span>
                     <Button
                         size="sm"
                         variant="secondary"
@@ -988,13 +998,13 @@ function DomainStep({
                             <Trash2 className="size-4" />
                         </Button>
                         {!zoneLabelOk(zone.label) ? (
-                            <span className="basis-full text-xs text-danger">
+                            <span className={cn(settingType.error, "basis-full")}>
                                 {t("domainsSetup.domain.invalidZoneLabel")}
                             </span>
                         ) : null}
                     </div>
                 ))}
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("domainsSetup.domain.zonesHint")}
                 </p>
             </div>
@@ -1004,14 +1014,14 @@ function DomainStep({
                 nothing is worse than no checkbox. */}
             {effectiveBase && zones.some((zone) => zone.scope === "polaris") && (
                 <div className="flex flex-col gap-1">
-                    <label className="flex items-center gap-2 text-sm">
+                    <label className={cn(settingType.body, "flex items-center gap-2")}>
                         <Checkbox
                             checked={useForDashboard}
                             onChange={(event) => onUseForDashboard(event.target.checked)}
                         />
                         {t("domainsSetup.domain.useForDashboard")}
                     </label>
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("domainsSetup.domain.useForDashboardHint")}
                     </span>
                 </div>
@@ -1148,7 +1158,7 @@ function DnsStep({
                             : t("domainsSetup.dns.noRecordsHint")
                     }
                 />
-                <p className="rounded-md border border-success-edge bg-success-soft px-3 py-2 text-xs text-muted-foreground">
+                <p className={cn(settingType.small, "rounded-md border border-success-edge bg-success-soft px-3 py-2 text-muted-foreground")}>
                     {duckdns
                         ? t("domainsSetup.dns.duckdnsBody", { domain: state.zones.baseDomain })
                         : t("domainsSetup.dns.noRecordsBody")}
@@ -1167,7 +1177,7 @@ function DnsStep({
                             {t("domainsSetup.dns.check")}
                         </Button>
                         {message && (
-                            <span className="text-xs text-muted-foreground">{message}</span>
+                            <span className={settingType.hint}>{message}</span>
                         )}
                     </div>
                 )}
@@ -1296,10 +1306,10 @@ function DnsStep({
                 />
             )}
 
-            {message && <p className="text-xs text-muted-foreground">{message}</p>}
+            {message && <p className={settingType.hint}>{message}</p>}
 
             {conflicts.length > 0 && (
-                <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
+                <div className={cn(settingType.small, "flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2")}>
                     <span className="flex items-start gap-2 text-muted-foreground">
                         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                         {t("domainsSetup.dns.conflicts")}
@@ -1397,7 +1407,7 @@ function CloudflareConnect({
     }
 
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+        <div className={cn(settingType.small, "flex flex-col gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2")}>
             <span className="text-muted-foreground">
                 {t.rich("domainsSetup.cloudflare.intro", {
                     zone: zone ? (
@@ -1466,9 +1476,11 @@ function ProviderHint({
     const automated = provider.automatable && cloudflareConnected;
     return (
         <div
-            className={`flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-xs ${
+            className={cn(
+                settingType.small,
+                "flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2",
                 automated ? "border-success-edge bg-success-soft" : "border-border/60 bg-surface/40"
-            }`}
+            )}
         >
             <span className="flex items-center gap-2 text-muted-foreground">
                 <Globe
@@ -1533,11 +1545,13 @@ function ZoneResults({
             {[...(report?.zones ?? []), ...(report?.gameZones ?? [])].map((zone) => (
                 <p
                     key={zone.wildcard}
-                    className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${
+                    className={cn(
+                        settingType.small,
+                        "flex items-start gap-2 rounded-md border px-3 py-2",
                         zone.ok
                             ? "border-success-edge bg-success-soft text-muted-foreground"
                             : "border-warning-edge bg-warning-soft text-muted-foreground"
-                    }`}
+                    )}
                 >
                     {zone.ok ? (
                         <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
@@ -1570,9 +1584,11 @@ function RouterAdviceNote({
     const danger = advice.level === "danger";
     return (
         <div
-            className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${
+            className={cn(
+                settingType.small,
+                "flex items-start gap-2 rounded-md border px-3 py-2",
                 danger ? "border-danger-edge bg-danger-soft" : "border-warning-edge bg-warning-soft"
-            }`}
+            )}
         >
             <TriangleAlert
                 className={`mt-0.5 size-3.5 shrink-0 ${danger ? "text-danger" : "text-warning"}`}
@@ -1611,7 +1627,7 @@ function StepTitle({ title, hint }: { title: string; hint: string }) {
     return (
         <div className="flex flex-col gap-0.5">
             <h3 className="text-sm font-medium">{title}</h3>
-            <p className="text-xs text-muted-foreground">{hint}</p>
+            <p className={settingType.hint}>{hint}</p>
         </div>
     );
 }

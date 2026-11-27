@@ -15,7 +15,7 @@
 
 import { useState, useTransition } from "react";
 import { setDiscoveryPolicyAction } from "./actions";
-import { Button, Card, CardBody, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, cn, settingType, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DISCOVERY_RULES, type DiscoveryPolicy } from "@/lib/discovery-policy";
 
@@ -54,12 +54,12 @@ export function PeopleDiscoveryForm({ policy }: { policy: DiscoveryPolicy }) {
                     {DISCOVERY_RULES.map((rule) => (
                         <li key={rule} className="flex items-start justify-between gap-3 py-2">
                             <div className="flex min-w-0 flex-col gap-0.5">
-                                <span className="text-sm">
+                                <span className={settingType.body}>
                                     {t(`privacy.discovery.rules.${rule}.label`)}
                                 </span>
                                 <span
                                     id={`discovery-${rule}`}
-                                    className="text-xs text-muted-foreground"
+                                    className={settingType.hint}
                                 >
                                     {t(`privacy.discovery.rules.${rule}.hint`)}
                                 </span>
@@ -78,9 +78,9 @@ export function PeopleDiscoveryForm({ policy }: { policy: DiscoveryPolicy }) {
                     ))}
                 </ul>
 
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 {done && !dirty ? (
-                    <p className="text-sm text-muted-foreground">{t("privacy.discovery.saved")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("privacy.discovery.saved")}</p>
                 ) : null}
 
                 <Button

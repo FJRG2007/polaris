@@ -293,7 +293,7 @@ export function IntegrationsView({
                             className="ps-9"
                         />
                     </div>
-                    <p className="text-muted-foreground whitespace-nowrap text-xs tabular-nums">
+                    <p className={cn(settingType.hint, "whitespace-nowrap tabular-nums")}>
                         {t("integrations.grid.count", { connected, total: cards.length })}
                     </p>
                 </div>
@@ -311,11 +311,11 @@ export function IntegrationsView({
                                 <div>
                                     <h2 className="text-sm font-medium">
                                         {section.name}
-                                        <span className="text-muted-foreground ms-2 text-xs font-normal tabular-nums">
+                                        <span className={cn(settingType.hint, "ms-2 font-normal tabular-nums")}>
                                             {section.cards.length}
                                         </span>
                                     </h2>
-                                    <p className="text-muted-foreground text-xs">{section.hint}</p>
+                                    <p className={settingType.hint}>{section.hint}</p>
                                 </div>
                             ) : null}
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -343,7 +343,7 @@ export function IntegrationsView({
                                                             </Badge>
                                                         ) : null}
                                                     </div>
-                                                    <p className="text-muted-foreground mt-0.5 text-xs">
+                                                    <p className={cn(settingType.hint, "mt-0.5")}>
                                                         {card.summary}
                                                     </p>
                                                 </div>
@@ -371,7 +371,7 @@ export function IntegrationsView({
                                                     href={card.docsUrl}
                                                     target="_blank"
                                                     rel="noreferrer noopener"
-                                                    className="text-muted-foreground hover:text-foreground me-auto inline-flex items-center gap-1 text-xs"
+                                                    className={cn(settingType.small, "text-muted-foreground hover:text-foreground me-auto inline-flex items-center gap-1")}
                                                 >
                                                     {t("integrations.grid.docs")}
                                                     <ExternalLink className="size-3 shrink-0" />
@@ -423,26 +423,26 @@ function ProvenState({ slug, name, proven }: { slug: string; name: string; prove
 
     if (proven) {
         return (
-            <p className="flex items-start gap-2 rounded-md border border-border p-3 text-xs text-muted-foreground">
+            <p className={cn(settingType.small, "flex items-start gap-2 rounded-md border border-border p-3 text-muted-foreground")}>
                 <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
                 {t("integrations.proven.done")}
             </p>
         );
     }
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm">
+        <div className={cn(settingType.body, "flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft p-3")}>
             <span className="flex items-start gap-2">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                 <span>
                     <span className="font-medium">{t("integrations.proven.title")}</span>
-                    <span className="block text-xs text-muted-foreground">
+                    <span className={cn(settingType.hint, "block")}>
                         {t("integrations.proven.body", { name })}
                     </span>
                 </span>
             </span>
             <a
                 href={`/api/connections/${slug}/link`}
-                className="inline-flex w-fit items-center gap-1 text-sm font-medium text-primary hover:underline"
+                className={cn(settingType.body, "inline-flex w-fit items-center gap-1 font-medium text-primary hover:underline")}
             >
                 {t("integrations.proven.connect", { name })}
                 <ExternalLink className="size-3 shrink-0" />
@@ -481,11 +481,11 @@ function GoogleApisHealth() {
     }, []);
 
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
+        <div className={cn(settingType.body, "flex flex-col gap-2 rounded-md border border-border p-3")}>
             <div className="flex items-center justify-between gap-2">
                 <span className="min-w-0">
                     <span className="block font-medium">{t("integrations.googleApis.title")}</span>
-                    <span className="block text-xs text-muted-foreground">
+                    <span className={cn(settingType.hint, "block")}>
                         {t("integrations.googleApis.lead")}
                     </span>
                 </span>
@@ -544,13 +544,13 @@ function GoogleApiRow({ api }: { api: GoogleApiHealth }) {
                     >
                         {api.title}
                     </span>
-                    <span className="block truncate text-xs text-muted-foreground" title={usedFor}>
+                    <span className={cn(settingType.hint, "block truncate")} title={usedFor}>
                         {usedFor}
                     </span>
                 </span>
                 <span
                     className={cn(
-                        "inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-[11px]",
+                        settingType.small, "inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5",
                         chip
                     )}
                 >
@@ -561,7 +561,7 @@ function GoogleApiRow({ api }: { api: GoogleApiHealth }) {
                     href={api.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    className={cn(settingType.small, "inline-flex shrink-0 items-center gap-1 font-medium text-primary hover:underline")}
                 >
                     {api.state === "disabled"
                         ? t("integrations.googleApis.turnOn")
@@ -569,7 +569,7 @@ function GoogleApiRow({ api }: { api: GoogleApiHealth }) {
                     <ExternalLink className="size-3 shrink-0" />
                 </a>
             </div>
-            {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
+            {hint ? <span className={settingType.hint}>{hint}</span> : null}
         </li>
     );
 }
@@ -614,7 +614,7 @@ function AccountLimitField({ slug, current }: { slug: string; current: number })
     }
 
     return (
-        <label className="flex flex-col gap-1 text-sm">
+        <label className={cn(settingType.body, "flex flex-col gap-1")}>
             <span className="font-medium">{t("integrations.accountLimit.label")}</span>
             <Input
                 type="number"
@@ -626,7 +626,7 @@ function AccountLimitField({ slug, current }: { slug: string; current: number })
                 onChange={(event) => setValue(event.target.value)}
                 onBlur={commit}
             />
-            <span className="text-xs text-muted-foreground">
+            <span className={settingType.hint}>
                 {t("integrations.accountLimit.hint")}
             </span>
             {error ? <span className={settingType.error}>{error}</span> : null}
@@ -653,7 +653,7 @@ function SetupValue({ kind, value }: { kind: IntegrationSetupValue; value: strin
 
     return (
         <div className="flex items-center gap-2 rounded border border-border bg-field px-2 py-1">
-            <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t(`integrations.setupValue.label.${kind}`)}>
+            <span className={cn(settingType.hint, "min-w-0 max-w-full shrink-0 truncate")} title={t(`integrations.setupValue.label.${kind}`)}>
                 {t(`integrations.setupValue.label.${kind}`)}
             </span>
             <code className="min-w-0 flex-1 truncate text-xs" title={value}>
@@ -663,7 +663,7 @@ function SetupValue({ kind, value }: { kind: IntegrationSetupValue; value: strin
                 <a
                     href={value}
                     download
-                    className="inline-flex shrink-0 items-center gap-1 text-xs text-primary hover:underline"
+                    className={cn(settingType.small, "inline-flex shrink-0 items-center gap-1 text-primary hover:underline")}
                 >
                     <Download className="size-3" />
                     {t("integrations.setupValue.download")}
@@ -696,7 +696,7 @@ function SetupSteps({
         <ol className="flex flex-col gap-3 rounded-md border border-border bg-muted/30 p-3">
             {links.map((step, index) => (
                 <li key={`${step.url}-${step.label}`} className="flex gap-2">
-                    <span className="mt-0.5 shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+                    <span className={cn(settingType.hint, "mt-0.5 shrink-0 font-medium tabular-nums")}>
                         {index + 1}.
                     </span>
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -704,13 +704,13 @@ function SetupSteps({
                             href={step.url}
                             target="_blank"
                             rel="noreferrer noopener"
-                            className="inline-flex w-fit items-center gap-1 text-sm font-medium text-primary hover:underline"
+                            className={cn(settingType.body, "inline-flex w-fit items-center gap-1 font-medium text-primary hover:underline")}
                         >
                             {step.label}
                             <ExternalLink className="size-3 shrink-0" />
                         </a>
                         {step.help ? (
-                            <span className="text-xs text-muted-foreground">{step.help}</span>
+                            <span className={settingType.hint}>{step.help}</span>
                         ) : null}
                         {step.values
                             ?.map((kind) => ({ kind, value: values?.[kind] }))
@@ -786,7 +786,7 @@ function AttentionBadge({ slug, name, seen }: { slug: string; name: string; seen
                 )}
             </span>
             {error ? (
-                <span role="alert" className="text-danger max-w-40 text-end text-xs">
+                <span role="alert" className={cn(settingType.error, "max-w-40 text-end")}>
                     {error}
                 </span>
             ) : null}
@@ -817,10 +817,10 @@ function AttentionNotice({
     const stopped = failure.kind === "out-of-service";
 
     return (
-        <div className="flex gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-xs">
+        <div className={cn(settingType.small, "flex gap-2 rounded-md border border-warning-edge bg-warning-soft p-3")}>
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
             <div className="flex min-w-0 flex-col gap-1">
-                <span className="text-sm font-medium">
+                <span className={cn(settingType.body, "font-medium")}>
                     {stopped
                         ? t("integrations.attention.stoppedTitle", { name })
                         : apiOff
@@ -908,11 +908,11 @@ function SignInSwitch({
     );
 
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
+        <div className={cn(settingType.body, "flex flex-col gap-2 rounded-md border border-border p-3")}>
             <div className="flex items-start justify-between gap-3">
                 <span>
                     <span className="font-medium">{t("integrations.signIn.label", { name })}</span>
-                    <span className="block text-xs text-muted-foreground">
+                    <span className={cn(settingType.hint, "block")}>
                         {t("integrations.signIn.hint", { name })}
                     </span>
                 </span>
@@ -923,7 +923,7 @@ function SignInSwitch({
                 />
             </div>
             {warning ? (
-                <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                <p className={cn(settingType.hint, "flex items-start gap-2")}>
                     <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                     {warning}
                 </p>
@@ -968,13 +968,13 @@ function EmailTrustSwitch({
     );
 
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
+        <div className={cn(settingType.body, "flex flex-col gap-2 rounded-md border border-border p-3")}>
             <div className="flex items-start justify-between gap-3">
                 <span>
                     <span className="font-medium">
                         {t("integrations.emailTrust.label", { name })}
                     </span>
-                    <span className="block text-xs text-muted-foreground">
+                    <span className={cn(settingType.hint, "block")}>
                         {t("integrations.emailTrust.hint", { name })}
                     </span>
                 </span>
@@ -984,7 +984,7 @@ function EmailTrustSwitch({
                     aria-label={t("integrations.emailTrust.label", { name })}
                 />
             </div>
-            <p className="flex items-start gap-2 text-xs text-muted-foreground">
+            <p className={cn(settingType.hint, "flex items-start gap-2")}>
                 <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                 {t("integrations.emailTrust.warning")}
             </p>
@@ -1090,7 +1090,7 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                     ) : null}
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">
                             {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
                         </span>
@@ -1106,12 +1106,12 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                             }
                         />
                         {card.apiKeyHelp ? (
-                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                            <span className={settingType.hint}>{card.apiKeyHelp}</span>
                         ) : null}
                     </label>
 
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">
+                        <span className={cn(settingType.body, "font-medium")}>
                             {t("integrations.criminalIp.block")}
                         </span>
                         <div className="flex flex-wrap gap-1.5">
@@ -1121,7 +1121,7 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                                     type="button"
                                     onClick={() => toggleRule(rule.value)}
                                     className={cn(
-                                        "rounded-full border px-3 py-1 text-xs transition-colors",
+                                        settingType.small, "rounded-full border px-3 py-1 transition-colors",
                                         deny.has(rule.value)
                                             ? "border-primary bg-primary/10 text-primary"
                                             : "border-border text-muted-foreground hover:bg-muted"
@@ -1131,12 +1131,12 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                                 </button>
                             ))}
                         </div>
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("integrations.criminalIp.hint")}
                         </span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
+                    <div className={cn(settingType.body, "flex items-center justify-between gap-3 rounded-md border border-border p-2.5")}>
                         <span className="flex items-center gap-1.5 font-medium">
                             <ShieldCheck className="size-4 text-primary" />
                             {t("integrations.dialog.enable", { name: card.name })}
@@ -1148,7 +1148,7 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                         />
                     </div>
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
@@ -1222,7 +1222,7 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                 <div className="flex flex-col gap-4">
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">{t("integrations.filter.moduleUrl")}</span>
                         <Input
                             value={moduleUrl}
@@ -1230,14 +1230,14 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                             placeholder="https://files.example.com/krisp/filter.js"
                             onChange={(event) => setModuleUrl(event.target.value)}
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t.rich("integrations.filter.moduleHint", {
                                 code: (chunks) => <code key="code">{chunks}</code>
                             })}
                         </span>
                     </label>
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">
                             {card.apiKeyLabel ?? t("integrations.dialog.token")}
                         </span>
@@ -1252,15 +1252,15 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                                     : t("integrations.dialog.optional")
                             }
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("integrations.filter.tokenHint")}
                         </span>
                     </label>
 
-                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                    <div className={cn(settingType.body, "flex items-start justify-between gap-3 rounded-md border border-border p-3")}>
                         <span>
                             <span className="font-medium">{t("integrations.filter.use")}</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "block")}>
                                 {t("integrations.filter.useHint")}
                             </span>
                         </span>
@@ -1271,7 +1271,7 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                         />
                     </div>
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
@@ -1337,7 +1337,7 @@ function ApplePushDialog({ card, onClose }: { card: IntegrationCard; onClose: ()
         onChange: (next: string) => void,
         placeholder: string
     ) => (
-        <label className="flex min-w-0 flex-col gap-1 text-sm">
+        <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
             <span className="font-medium">{label}</span>
             <Input
                 value={value}
@@ -1346,7 +1346,7 @@ function ApplePushDialog({ card, onClose }: { card: IntegrationCard; onClose: ()
                 placeholder={placeholder}
                 onChange={(event) => onChange(event.target.value)}
             />
-            <span className="text-xs text-muted-foreground">{hint}</span>
+            <span className={settingType.hint}>{hint}</span>
         </label>
     );
 
@@ -1389,7 +1389,7 @@ function ApplePushDialog({ card, onClose }: { card: IntegrationCard; onClose: ()
                         "app.example.mobile"
                     )}
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">
                             {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
                         </span>
@@ -1407,14 +1407,14 @@ function ApplePushDialog({ card, onClose }: { card: IntegrationCard; onClose: ()
                             className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs"
                         />
                         {card.apiKeyHelp ? (
-                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                            <span className={settingType.hint}>{card.apiKeyHelp}</span>
                         ) : null}
                     </label>
 
-                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                    <div className={cn(settingType.body, "flex items-start justify-between gap-3 rounded-md border border-border p-3")}>
                         <span className="min-w-0">
                             <span className="font-medium">{t("integrations.applePush.sandbox")}</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "block")}>
                                 {t("integrations.applePush.sandboxHint")}
                             </span>
                         </span>
@@ -1425,10 +1425,10 @@ function ApplePushDialog({ card, onClose }: { card: IntegrationCard; onClose: ()
                         />
                     </div>
 
-                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                    <div className={cn(settingType.body, "flex items-start justify-between gap-3 rounded-md border border-border p-3")}>
                         <span className="min-w-0">
                             <span className="font-medium">{t("integrations.applePush.use")}</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "block")}>
                                 {t("integrations.applePush.useHint")}
                             </span>
                         </span>
@@ -1439,7 +1439,7 @@ function ApplePushDialog({ card, onClose }: { card: IntegrationCard; onClose: ()
                         />
                     </div>
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
@@ -1513,7 +1513,7 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                 <div className="flex flex-col gap-4">
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">
                             {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
                         </span>
@@ -1529,14 +1529,14 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                             }
                         />
                         {card.apiKeyHelp ? (
-                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                            <span className={settingType.hint}>{card.apiKeyHelp}</span>
                         ) : null}
                     </label>
 
-                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                    <div className={cn(settingType.body, "flex items-start justify-between gap-3 rounded-md border border-border p-3")}>
                         <span>
                             <span className="font-medium">{switchLabel}</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "block")}>
                                 {words
                                     ? t(`integrations.${words}.hint`)
                                     : t("integrations.tenor.hint")}
@@ -1545,7 +1545,7 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                         <Switch checked={enabled} onChange={setEnabled} aria-label={switchLabel} />
                     </div>
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
@@ -1616,13 +1616,13 @@ function SatelliteImageryDialog({ card, onClose }: IntegrationDialogProps) {
 
                 <div className="flex flex-col gap-4">
                     {card.imagery?.envOverride ? (
-                        <p className="flex items-start gap-2 rounded-md border border-border p-3 text-sm">
+                        <p className={cn(settingType.body, "flex items-start gap-2 rounded-md border border-border p-3")}>
                             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                             <span className="min-w-0">{t("integrations.satelliteImagery.envOverride")}</span>
                         </p>
                     ) : null}
 
-                    <div className="flex flex-col gap-1 text-sm">
+                    <div className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">{t("integrations.satelliteImagery.provider")}</span>
                         <SegmentedControl
                             aria-label={t("integrations.satelliteImagery.provider")}
@@ -1639,7 +1639,7 @@ function SatelliteImageryDialog({ card, onClose }: IntegrationDialogProps) {
                                 { value: "esri", label: IMAGERY.esri.name }
                             ]}
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t(`integrations.satelliteImagery.hint.${provider}`)}
                         </span>
                     </div>
@@ -1647,7 +1647,7 @@ function SatelliteImageryDialog({ card, onClose }: IntegrationDialogProps) {
                     {keyed ? (
                         <>
                             <SetupSteps links={card.setupLinks} values={card.setupValues} />
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                 <span className="font-medium">
                                     {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
                                 </span>
@@ -1666,7 +1666,7 @@ function SatelliteImageryDialog({ card, onClose }: IntegrationDialogProps) {
                                             : t("integrations.dialog.pasteKey")
                                     }
                                 />
-                                <span className={cn("text-xs", keyInvalid ? "text-danger" : "text-muted-foreground")}>
+                                <span className={cn(settingType.small, keyInvalid ? "text-danger" : "text-muted-foreground")}>
                                     {keyInvalid ? t("integrations.satelliteImagery.badKey") : card.apiKeyHelp}
                                 </span>
                             </label>
@@ -1674,7 +1674,7 @@ function SatelliteImageryDialog({ card, onClose }: IntegrationDialogProps) {
                     ) : null}
 
                     {failure && current !== "default" && !works ? (
-                        <p className="flex items-start gap-2 rounded-md border border-border p-3 text-sm">
+                        <p className={cn(settingType.body, "flex items-start gap-2 rounded-md border border-border p-3")}>
                             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                             <span className="min-w-0">
                                 {t(`integrations.satelliteImagery.fellBack.${failure.reason}`, {
@@ -1686,12 +1686,12 @@ function SatelliteImageryDialog({ card, onClose }: IntegrationDialogProps) {
                     ) : null}
 
                     {works ? (
-                        <p className="flex items-center gap-2 text-sm text-success">
+                        <p className={cn(settingType.body, "flex items-center gap-2 text-success")}>
                             <CheckCircle2 className="size-4 shrink-0" />
                             {t("integrations.satelliteImagery.works", { provider: IMAGERY[provider].name })}
                         </p>
                     ) : null}
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
@@ -1819,7 +1819,7 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
 
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
-                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                    <div className={cn(settingType.body, "flex items-center justify-between gap-3 rounded-md border border-border p-3")}>
                         <span>{t("integrations.dialog.enabled")}</span>
                         <Switch
                             checked={enabled}
@@ -1828,7 +1828,7 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                         />
                     </div>
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">
                             {t(`integrations.oauth.idLabel.${app.idLabel}`)}
                         </span>
@@ -1840,7 +1840,7 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                         />
                     </label>
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">
                             {card.apiKeyLabel ?? t("integrations.dialog.clientSecret")}
                         </span>
@@ -1856,7 +1856,7 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                             autoComplete="off"
                         />
                         {card.apiKeyHelp ? (
-                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                            <span className={settingType.hint}>{card.apiKeyHelp}</span>
                         ) : null}
                     </label>
 
@@ -1871,13 +1871,13 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                     <ConnectionPolicy card={card} slug={card.slug} name={app.name} />
 
                     {card.oauthCallbackUrl ? (
-                        <div className="flex flex-col gap-1 rounded-md border border-border bg-muted/30 p-3 text-sm">
+                        <div className={cn(settingType.body, "flex flex-col gap-1 rounded-md border border-border bg-muted/30 p-3")}>
                             <span className="font-medium">
                                 {t("integrations.oauth.redirectTitle")}
                             </span>
                             <div className="flex items-center gap-2">
                                 <code
-                                    className="min-w-0 flex-1 truncate text-xs"
+                                    className={cn(settingType.small, "min-w-0 flex-1 truncate")}
                                     title={card.oauthCallbackUrl}
                                 >
                                     {card.oauthCallbackUrl}
@@ -1887,13 +1887,13 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                                     label={t("integrations.oauth.copyRedirect")}
                                 />
                             </div>
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("integrations.oauth.redirectHint", { name: app.name })}
                             </span>
                         </div>
                     ) : null}
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
                             {tc("actions.cancel")}
@@ -1960,10 +1960,10 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                 <div className="flex flex-col gap-4">
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
-                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                    <div className={cn(settingType.body, "flex items-center justify-between gap-3 rounded-md border border-border p-3")}>
                         <span className="flex flex-col gap-0.5">
                             <span>{t("integrations.dialog.enabled")}</span>
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("integrations.steam.enabledHint")}
                             </span>
                         </span>
@@ -1974,7 +1974,7 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                         />
                     </div>
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">
                             {card.apiKeyLabel ?? t("integrations.dialog.webApiKey")}
                         </span>
@@ -1990,7 +1990,7 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                             autoComplete="off"
                         />
                         {card.apiKeyHelp ? (
-                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                            <span className={settingType.hint}>{card.apiKeyHelp}</span>
                         ) : null}
                     </label>
 
@@ -1998,7 +1998,7 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
 
                     <ConnectionPolicy card={card} slug={card.slug} name={card.name} />
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
                             {tc("actions.cancel")}
@@ -2062,7 +2062,7 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                 <div className="flex flex-col gap-4">
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
-                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                    <div className={cn(settingType.body, "flex items-center justify-between gap-3 rounded-md border border-border p-3")}>
                         <span>{t("integrations.dialog.enabled")}</span>
                         <Switch
                             checked={enabled}
@@ -2070,7 +2070,7 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                             aria-label={t("integrations.dialog.enabled")}
                         />
                     </div>
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {card.apiKeyLabel ?? t("integrations.dialog.token")}
                         <Input
                             type="password"
@@ -2088,10 +2088,10 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                                 {t(`integrations.tunnelHint.${provider}`)}
                             </span>
                         ) : card.apiKeyHelp ? (
-                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                            <span className={settingType.hint}>{card.apiKeyHelp}</span>
                         ) : null}
                     </label>
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
                             {tc("actions.cancel")}
@@ -2210,10 +2210,10 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
     return (
         <div className="flex flex-col gap-3 border-t border-border pt-4">
             <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium">
+                <span className={cn(settingType.body, "font-medium")}>
                     {t("integrations.cloudflare.apiAccess")}
                 </span>
-                <span className="text-xs text-muted-foreground">
+                <span className={settingType.hint}>
                     {t("integrations.cloudflare.apiAccessHint")}
                 </span>
             </div>
@@ -2247,17 +2247,19 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                                 key={entry}
                                 type="button"
                                 onClick={() => setScope(entry)}
-                                className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                                className={cn(
+                                    settingType.small,
+                                    "rounded-md border px-2 py-1 transition-colors",
                                     scope === entry
                                         ? "border-primary bg-primary/5 text-foreground"
                                         : "border-border/60 text-muted-foreground hover:bg-muted/40"
-                                }`}
+                                )}
                             >
                                 {t(`integrations.cloudflare.scope.${entry}.label`)}
                             </button>
                         ))}
                     </div>
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("integrations.cloudflare.scopeHint", {
                             hint: t(`integrations.cloudflare.scope.${scope}.hint`),
                             permissions: CLOUDFLARE_TOKEN_PERMISSIONS[scope].join(", ")
@@ -2272,7 +2274,7 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                         placeholder={t("integrations.cloudflare.tokenPlaceholder")}
                     />
                     {accounts.length > 0 ? (
-                        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        <div className={cn(settingType.hint, "flex flex-col gap-1")}>
                             {t("integrations.cloudflare.pickAccount")}
                             <Select
                                 value={accountId}
@@ -2289,7 +2291,7 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                             href={CLOUDFLARE_TOKEN_LINKS[scope]}
                             target="_blank"
                             rel="noreferrer noopener"
-                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            className={cn(settingType.small, "inline-flex items-center gap-1 text-primary hover:underline")}
                         >
                             {t("integrations.cloudflare.createToken")}{" "}
                             <ExternalLink className="size-3" />
@@ -2314,8 +2316,8 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                 </div>
             )}
 
-            {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {note ? <p className={settingType.hint}>{note}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
         </div>
     );
 }
@@ -2339,7 +2341,7 @@ function CloudflareCapability({
     return (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface/40 p-2.5">
             <span className="flex min-w-0 flex-col">
-                <span className="flex items-center gap-1.5 text-sm">
+                <span className={cn(settingType.body, "flex items-center gap-1.5")}>
                     {connected ? (
                         <CheckCircle2 className="size-4 shrink-0 text-success" />
                     ) : (
@@ -2347,7 +2349,7 @@ function CloudflareCapability({
                     )}
                     {label}
                 </span>
-                <span className="truncate ps-5.5 text-xs text-muted-foreground">
+                <span className={cn(settingType.hint, "truncate ps-5.5")}>
                     {connected ? detail : t("integrations.cloudflare.notConnected", { detail })}
                 </span>
             </span>
@@ -2422,7 +2424,7 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                 <div className="flex flex-col gap-4">
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">{t("integrations.duckdns.subdomain")}</span>
                         <div className="flex items-center gap-2">
                             <Input
@@ -2431,13 +2433,13 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                                 placeholder="myhome"
                                 autoComplete="off"
                             />
-                            <span className="shrink-0 text-sm text-muted-foreground">
+                            <span className={cn(settingType.body, "shrink-0 text-muted-foreground")}>
                                 .duckdns.org
                             </span>
                         </div>
                     </label>
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">
                             {card.apiKeyLabel ?? t("integrations.dialog.token")}
                         </span>
@@ -2453,12 +2455,12 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                             }
                         />
                         {card.apiKeyHelp ? (
-                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                            <span className={settingType.hint}>{card.apiKeyHelp}</span>
                         ) : null}
                     </label>
 
                     {card.hasSecret ? (
-                        <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
+                        <div className={cn(settingType.body, "flex items-center justify-between gap-3 rounded-md border border-border p-2.5")}>
                             <span className="text-muted-foreground">
                                 {t("integrations.duckdns.syncHint")}
                             </span>
@@ -2480,12 +2482,12 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                     ) : null}
 
                     {synced ? (
-                        <span className="flex items-center gap-1 text-xs text-success">
+                        <span className={cn(settingType.small, "flex items-center gap-1 text-success")}>
                             <CheckCircle2 className="size-3" />
                             {synced}
                         </span>
                     ) : null}
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
@@ -2578,7 +2580,7 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                     ) : null}
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">
                             {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
                         </span>
@@ -2608,20 +2610,20 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                             </Button>
                         </div>
                         {card.apiKeyHelp ? (
-                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                            <span className={settingType.hint}>{card.apiKeyHelp}</span>
                         ) : null}
                         {tested ? (
-                            <span className="flex items-center gap-1 text-xs text-success">
+                            <span className={cn(settingType.small, "flex items-center gap-1 text-success")}>
                                 <CheckCircle2 className="size-3" />
                                 {tested}
                             </span>
                         ) : null}
                     </label>
 
-                    <div className="flex items-start justify-between gap-3 text-sm">
+                    <div className={cn(settingType.body, "flex items-start justify-between gap-3")}>
                         <span>
                             <span className="font-medium">{t("integrations.dymo.verify")}</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "block")}>
                                 {t("integrations.dymo.verifyHint")}
                             </span>
                         </span>
@@ -2633,7 +2635,7 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">{t("integrations.dymo.block")}</span>
+                        <span className={cn(settingType.body, "font-medium")}>{t("integrations.dymo.block")}</span>
                         <div className="flex flex-wrap gap-1.5">
                             {DYMO_IP_RULES.map((rule) => (
                                 <button
@@ -2641,7 +2643,7 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                                     type="button"
                                     onClick={() => toggleRule(rule.value)}
                                     className={cn(
-                                        "rounded-full border px-3 py-1 text-xs transition-colors",
+                                        settingType.small, "rounded-full border px-3 py-1 transition-colors",
                                         deny.has(rule.value)
                                             ? "border-primary bg-primary/10 text-primary"
                                             : "border-border text-muted-foreground hover:bg-muted"
@@ -2657,7 +2659,7 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
+                    <div className={cn(settingType.body, "flex items-center justify-between gap-3 rounded-md border border-border p-2.5")}>
                         <span className="flex items-center gap-1.5 font-medium">
                             <ShieldCheck className="size-4 text-primary" />
                             {t("integrations.dialog.enable", { name: "Dymo API" })}
@@ -2669,7 +2671,7 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                         />
                     </div>
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
@@ -2710,14 +2712,14 @@ function RunnerAccessAnswer({ pending }: { pending: Promise<RunnerAccessNoteData
     if (!access) return null;
     if (access.ready && !access.advice) {
         return (
-            <p className="flex items-start gap-2 text-xs text-muted-foreground">
+            <p className={cn(settingType.hint, "flex items-start gap-2")}>
                 <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-success" />
                 {t("integrations.runners.ready")}
             </p>
         );
     }
     return (
-        <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+        <p className={cn(settingType.small, "flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}>
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-warning" />
             <span>
                 <span className="block font-medium text-foreground">
@@ -2762,7 +2764,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                         <AttentionNotice failure={card.failure} name={card.name} slug={card.slug} />
                     ) : null}
 
-                    <div className="flex items-center gap-2 rounded-md border border-border bg-surface/40 p-3 text-sm">
+                    <div className={cn(settingType.body, "flex items-center gap-2 rounded-md border border-border bg-surface/40 p-3")}>
                         <CheckCircle2 className="size-4 text-success" />
                         {t.rich("integrations.github.connectedVia", {
                             method: isApp ? "app" : "token",
@@ -2788,7 +2790,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                     <ConnectionPolicy card={card} slug="github" name="GitHub" />
 
                     {isApp ? (
-                        <div className="flex flex-col gap-2 text-sm">
+                        <div className={cn(settingType.body, "flex flex-col gap-2")}>
                             <span className="font-medium">
                                 {t("integrations.github.installations")}
                             </span>
@@ -2797,14 +2799,14 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                                     {card.githubInstallations.map((login) => (
                                         <span
                                             key={login}
-                                            className="rounded-full border border-border px-2 py-0.5 text-xs"
+                                            className={cn(settingType.small, "rounded-full border border-border px-2 py-0.5")}
                                         >
                                             {login}
                                         </span>
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-xs text-muted-foreground">
+                                <p className={settingType.hint}>
                                     {t("integrations.github.notInstalled")}
                                 </p>
                             )}
@@ -2814,7 +2816,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                                         href={`${card.githubHtmlUrl}/installations/new`}
                                         target="_blank"
                                         rel="noreferrer noopener"
-                                        className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+                                        className={cn(settingType.small, "inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 hover:bg-muted")}
                                     >
                                         {t("integrations.github.installManage")}{" "}
                                         <ExternalLink className="size-3" />
@@ -2846,7 +2848,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                         </div>
                     ) : null}
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
@@ -2946,7 +2948,7 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                     />
 
                     {method === "app" ? (
-                        <div className="flex flex-col gap-3 text-sm">
+                        <div className={cn(settingType.body, "flex flex-col gap-3")}>
                             <p className="text-muted-foreground">
                                 {t("integrations.github.createIntro")}
                             </p>
@@ -2957,14 +2959,14 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                             ) : null}
                             <a
                                 href="/api/integrations/github/new"
-                                className="inline-flex w-fit items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                                className={cn(settingType.body, "inline-flex w-fit items-center gap-2 rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground hover:bg-primary/90")}
                             >
                                 <IntegrationLogo slug="github" className="size-4" />
                                 {t("integrations.github.createGithubApp")}
                             </a>
                         </div>
                     ) : method === "existing" ? (
-                        <div className="flex flex-col gap-3 text-sm">
+                        <div className={cn(settingType.body, "flex flex-col gap-3")}>
                             <label className="flex flex-col gap-1">
                                 <span className="font-medium">
                                     {t("integrations.github.appId")}
@@ -3010,7 +3012,7 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                                     onChange={(event) => setClientSecret(event.target.value)}
                                     placeholder={t("integrations.dialog.optional")}
                                 />
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {t("integrations.github.clientSecretHint")}
                                 </span>
                             </label>
@@ -3034,7 +3036,7 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
 
                     <ConnectionPolicy card={card} slug="github" name="GitHub" />
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                 </div>
             </DialogContent>
         </Dialog>
@@ -3102,7 +3104,7 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                 <div className="flex flex-col gap-4">
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">
                             {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
                         </span>
@@ -3132,20 +3134,20 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                             </Button>
                         </div>
                         {card.apiKeyHelp ? (
-                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                            <span className={settingType.hint}>{card.apiKeyHelp}</span>
                         ) : null}
                         {tested ? (
-                            <span className="flex items-center gap-1 text-xs text-success">
+                            <span className={cn(settingType.small, "flex items-center gap-1 text-success")}>
                                 <CheckCircle2 className="size-3" />
                                 {tested}
                             </span>
                         ) : null}
                     </label>
 
-                    <div className="flex items-start justify-between gap-3 text-sm">
+                    <div className={cn(settingType.body, "flex items-start justify-between gap-3")}>
                         <span>
                             <span className="font-medium">{t("integrations.virusTotal.scan")}</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "block")}>
                                 {t("integrations.virusTotal.scanHint")}
                             </span>
                         </span>
@@ -3157,7 +3159,7 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">
+                        <span className={cn(settingType.body, "font-medium")}>
                             {t("integrations.virusTotal.whenFlagged")}
                         </span>
                         <div className="flex flex-col gap-1.5">
@@ -3167,7 +3169,7 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                                     type="button"
                                     onClick={() => setOnDetection(action.value)}
                                     className={cn(
-                                        "flex items-start gap-2 rounded-md border p-2.5 text-start text-sm transition-colors",
+                                        settingType.body, "flex items-start gap-2 rounded-md border p-2.5 text-start transition-colors",
                                         onDetection === action.value
                                             ? "border-primary bg-primary/5"
                                             : "border-border hover:bg-muted"
@@ -3191,7 +3193,7 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                                                 `integrations.virusTotal.actions.${action.value}.label`
                                             )}
                                         </span>
-                                        <span className="block text-xs text-muted-foreground">
+                                        <span className={cn(settingType.hint, "block")}>
                                             {t(
                                                 `integrations.virusTotal.actions.${action.value}.help`
                                             )}
@@ -3202,7 +3204,7 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
+                    <div className={cn(settingType.body, "flex items-center justify-between gap-3 rounded-md border border-border p-2.5")}>
                         <span className="flex items-center gap-1.5 font-medium">
                             <ShieldCheck className="size-4 text-primary" />
                             {t("integrations.dialog.enable", { name: "VirusTotal" })}
@@ -3214,7 +3216,7 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                         />
                     </div>
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>

@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { Button, Card, CardBody } from "@polaris/ui";
+import { Button, Card, CardBody, cn, settingType } from "@polaris/ui";
 import { ChannelCard } from "./channel-card";
 import { EMAIL_CHANNEL_MARK } from "./email-mark";
 import { EmailChannelDialog } from "./email-channel-dialog";
@@ -35,9 +35,9 @@ export function EmailSendersView({
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                     <h2 className="text-sm font-medium">{t("email.senders.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("email.senders.hint")}</p>
+                    <p className={settingType.hint}>{t("email.senders.hint")}</p>
                     {canManage ? null : (
-                        <p className="text-xs text-muted-foreground">{t("email.readOnly")}</p>
+                        <p className={settingType.hint}>{t("email.readOnly")}</p>
                     )}
                 </div>
                 {canManage ? (
@@ -48,7 +48,7 @@ export function EmailSendersView({
             </div>
             {senders.length === 0 ? (
                 <Card>
-                    <CardBody className="text-sm text-muted-foreground">
+                    <CardBody className={cn(settingType.body, "text-muted-foreground")}>
                         {t("email.senders.empty")}
                     </CardBody>
                 </Card>

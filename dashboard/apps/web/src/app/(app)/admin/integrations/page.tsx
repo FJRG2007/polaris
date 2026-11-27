@@ -3,6 +3,7 @@
  * installed state. Admin-only: configuring one stores an instance-wide secret.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { IntegrationsLoader } from "./loader";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
@@ -27,7 +28,7 @@ export default async function IntegrationsPage({
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("integrations.page.title")}
                 </h1>
-                <p className="text-muted-foreground text-sm">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {t("integrations.page.intro")}
                 </p>
             </div>

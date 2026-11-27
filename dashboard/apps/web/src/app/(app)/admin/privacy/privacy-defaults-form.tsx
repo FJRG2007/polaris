@@ -11,7 +11,7 @@
 
 import * as core from "@polaris/core";
 import { useState, useTransition } from "react";
-import { Card, CardBody, Select, settingType, Switch } from "@polaris/ui";
+import { Card, CardBody, cn, Select, settingType, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setPrivacyDefaultAction, setPrivacyLockAction } from "./actions";
 
@@ -91,11 +91,11 @@ export function PrivacyDefaultsForm({
                                     key={field}
                                     className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
                                 >
-                                    <span className="min-w-0 flex-1 text-[0.8125rem] sm:min-w-[12rem]">
+                                    <span className={cn(settingType.body, "min-w-0 flex-1 sm:min-w-[12rem]")}>
                                         {tp(`fields.${field}.label` as const)}
                                     </span>
                                     <Select
-                                        className="h-8 w-full shrink-0 text-xs sm:w-64"
+                                        className={cn(settingType.body, "h-8 w-full shrink-0 sm:w-64")}
                                         aria-label={tp(`fields.${field}.label` as const)}
                                         value={values[field]}
                                         disabled={busy === field}
@@ -107,7 +107,7 @@ export function PrivacyDefaultsForm({
                                             choose(field, value as core.PrivacyAudience)
                                         }
                                     />
-                                    <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                                    <label className={cn(settingType.hint, "flex shrink-0 items-center gap-2")}>
                                         <Switch
                                             checked={locked.has(field)}
                                             disabled={busy === field}

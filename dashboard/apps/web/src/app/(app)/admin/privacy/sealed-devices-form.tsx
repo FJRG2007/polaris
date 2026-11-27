@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { setSealedDeviceDaysAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Card, CardBody, Select, useOptimisticValue } from "@polaris/ui";
+import { Card, CardBody, cn, Select, settingType, useOptimisticValue } from "@polaris/ui";
 
 /** The choices offered: the default and a spread across the allowed 7-90. */
 const CHOICES = [7, 14, 30, 45, 60, 90] as const;
@@ -33,13 +33,13 @@ export function SealedDevicesForm({ days }: { days: number }) {
             <CardBody className="flex flex-col divide-y divide-border py-1">
                 <div className="flex flex-wrap items-center justify-between gap-3 py-3">
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="text-sm">{t("privacy.devices.label")}</span>
-                        <span id="privacy-sealed-devices" className="text-xs text-muted-foreground">
+                        <span className={settingType.body}>{t("privacy.devices.label")}</span>
+                        <span id="privacy-sealed-devices" className={settingType.hint}>
                             {t("privacy.devices.hint")}
                         </span>
                     </div>
                     <Select
-                        className="h-8 w-full shrink-0 text-xs sm:w-40"
+                        className={cn(settingType.body, "h-8 w-full shrink-0 sm:w-40")}
                         aria-label={t("privacy.devices.label")}
                         aria-describedby="privacy-sealed-devices"
                         value={String(value)}
@@ -51,7 +51,7 @@ export function SealedDevicesForm({ days }: { days: number }) {
                         }}
                     />
                 </div>
-                {error ? <p className="py-3 text-sm text-danger">{error}</p> : null}
+                {error ? <p className={cn(settingType.error, "py-3")}>{error}</p> : null}
             </CardBody>
         </Card>
     );

@@ -13,13 +13,15 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { AlertTriangle, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import {
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
     Input,
-    isDirty
+    isDirty,
+    settingType
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -224,7 +226,7 @@ export function MessagingChannelDialog({
                                 <Loader2 className="size-6 animate-spin text-muted-foreground" />
                             </div>
                         )}
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {qrStatus === "connected"
                                 ? t("messaging.qr.connected")
                                 : qrStatus === "error"
@@ -234,7 +236,7 @@ export function MessagingChannelDialog({
                     </div>
                 ) : (
                     <div className="flex flex-col gap-4">
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             <span className="font-medium">{t("messaging.add.provider")}</span>
                             <EmailProviderSelect
                                 options={options}
@@ -244,20 +246,20 @@ export function MessagingChannelDialog({
                             />
                         </label>
                         {row.banRisk ? (
-                            <p className="flex items-start gap-2 text-xs text-warning">
+                            <p className={cn(settingType.small, "flex items-start gap-2 text-warning")}>
                                 <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
                                 {t("messaging.providers.banRisk")}
                             </p>
                         ) : null}
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             <span className="font-medium">{t("messaging.add.name")}</span>
                             <Input value={name} maxLength={64} onChange={(event) => setName(event.target.value)} />
                             {row.platform === "telegram" ? (
-                                <span className="text-xs text-muted-foreground">{t("messaging.add.nameHint")}</span>
+                                <span className={settingType.hint}>{t("messaging.add.nameHint")}</span>
                             ) : null}
                         </label>
                         {row.qr ? null : (
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                 <span className="font-medium">{t(`messaging.secret.${secretKey(row)}` as const)}</span>
                                 <Input
                                     type="password"
@@ -269,7 +271,7 @@ export function MessagingChannelDialog({
                             </label>
                         )}
                         {row.fields.map((field) => (
-                            <label key={field.name} className="flex flex-col gap-1 text-sm">
+                            <label key={field.name} className={cn(settingType.body, "flex flex-col gap-1")}>
                                 <span className="font-medium">
                                     {t(`messaging.fields.${field.name}` as const)}
                                     {field.optional ? (
@@ -286,14 +288,14 @@ export function MessagingChannelDialog({
                             </label>
                         ))}
                         {row.template ? (
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {t(row.id === "whatsapp-twilio" ? "messaging.add.twilioTemplateHint" : "messaging.add.templateHint")}
                             </p>
                         ) : null}
                         {editing && row.platform === "telegram" ? <TelegramBotProfile channelId={channel.id} /> : null}
                     </div>
                 )}
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 <div className="flex items-center justify-between gap-2">
                     {editing && !qrChannel && !branding ? (
                         <div className="flex gap-1">

@@ -49,13 +49,13 @@ export function ChannelCard({
                             <h2 className="truncate text-sm font-medium">{name}</h2>
                             <Badge className={cn(CHANNEL_STATUS_TONE[status])}>{statusLabel}</Badge>
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{detail}</p>
+                        <p className={cn(settingType.hint, "mt-0.5 truncate")}>{detail}</p>
                     </div>
                 </div>
                 {error ? <p className={settingType.error}>{error}</p> : null}
                 <div className="flex items-center justify-end gap-2">
                     {ready ? (
-                        <span className="me-auto inline-flex items-center gap-1 text-xs text-success">
+                        <span className={cn(settingType.small, "me-auto inline-flex items-center gap-1 text-success")}>
                             <CheckCircle2 className="size-3.5" /> {ready}
                         </span>
                     ) : null}

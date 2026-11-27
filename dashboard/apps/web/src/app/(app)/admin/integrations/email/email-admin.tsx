@@ -12,7 +12,7 @@
 import { useState, useTransition } from "react";
 import { setAuthMailChannelAction } from "./actions";
 import type { EmailChannelView } from "@/lib/mail-service";
-import { Button, Card, CardBody, Select } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Select, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { providerLabel } from "./email-providers";
 
@@ -62,15 +62,15 @@ export function AccountMailView({
         <section className="flex flex-col gap-3">
             <div>
                 <h2 className="text-sm font-medium">{t("email.accountMail.title")}</h2>
-                <p className="text-xs text-muted-foreground">{t("email.accountMail.hint")}</p>
+                <p className={settingType.hint}>{t("email.accountMail.hint")}</p>
             </div>
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     {channels.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t("email.empty")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("email.empty")}</p>
                     ) : (
                         <>
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                 <span className="font-medium">{t("email.sendThrough")}</span>
                                 <Select
                                     value={choice}
@@ -78,9 +78,9 @@ export function AccountMailView({
                                     options={options}
                                 />
                             </label>
-                            <p className="text-xs text-muted-foreground">{t("email.hint")}</p>
-                            {error ? <p className="text-sm text-danger">{error}</p> : null}
-                            {notice ? <p className="text-sm text-success">{notice}</p> : null}
+                            <p className={settingType.hint}>{t("email.hint")}</p>
+                            {error ? <p className={settingType.error}>{error}</p> : null}
+                            {notice ? <p className={cn(settingType.body, "text-success")}>{notice}</p> : null}
                             <div className="flex justify-end">
                                 <Button onClick={save} disabled={saving || choice === saved}>
                                     {saving ? tc("actions.saving") : tc("actions.save")}

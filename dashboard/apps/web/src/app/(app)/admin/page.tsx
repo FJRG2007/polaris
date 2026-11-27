@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PageHeader } from "@polaris/ui";
+import { cn, PageHeader, settingType } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import {
@@ -125,7 +125,7 @@ export default async function ManagementPage() {
                     >
                         <h2
                             id={`overview-${group.key}`}
-                            className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                            className={cn(settingType.hint, "font-medium uppercase tracking-wide")}
                         >
                             {t(`overview.groups.${group.key}`)}
                         </h2>
@@ -142,11 +142,11 @@ export default async function ManagementPage() {
                                             <Icon className="size-5" />
                                         </span>
                                         <span className="flex min-w-0 flex-col">
-                                            <span className="flex items-center gap-1 text-sm font-medium">
+                                            <span className={cn(settingType.body, "flex items-center gap-1 font-medium")}>
                                                 {t(`overview.sections.${section.key}.title`)}
                                                 <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                                             </span>
-                                            <span className="text-xs text-muted-foreground">
+                                            <span className={settingType.hint}>
                                                 {t(`overview.sections.${section.key}.description`)}
                                             </span>
                                         </span>

@@ -8,7 +8,7 @@
  * says from here whether it works yet, so the page answers once the rule is saved.
  */
 
-import { Button } from "@polaris/ui";
+import { Button, cn, settingType } from "@polaris/ui";
 import { ChevronDown } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState } from "react";
@@ -62,7 +62,7 @@ export function RelayFirewallGuide({
     );
 
     return (
-        <div className="flex flex-col gap-3 text-xs">
+        <div className={cn(settingType.small, "flex flex-col gap-3")}>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className={blocked > 0 ? "text-danger" : "text-muted-foreground"}>
                     {blocked > 0

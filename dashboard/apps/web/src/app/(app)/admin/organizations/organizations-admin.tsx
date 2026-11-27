@@ -31,7 +31,17 @@ import { runAction } from "@/lib/run-action";
 import { OrgAvatar } from "@/components/avatar";
 import { Building2, Search } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    cn,
+    Input,
+    Select,
+    settingType
+} from "@polaris/ui";
 import type { Page } from "@/lib/pagination/cursor";
 import type { OrgDirectoryRow } from "@/lib/org-directory";
 import { usePagedList } from "@/components/paged-list/use-paged-list";
@@ -103,8 +113,8 @@ function OrganizationList({ first }: { first: Page<OrgRow> }) {
             </div>
 
             <div className="overflow-hidden rounded-lg border border-border">
-                <table className="w-full text-sm">
-                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                <table className={cn(settingType.body, "w-full")}>
+                    <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">
                                 {t("organizations.table.organization")}
@@ -161,7 +171,7 @@ function OrganizationList({ first }: { first: Page<OrgRow> }) {
                                     <tr className="border-t border-border">
                                         <td
                                             colSpan={5}
-                                            className="px-3 py-3 text-center text-xs text-muted-foreground"
+                                            className={cn(settingType.hint, "px-3 py-3 text-center")}
                                         >
                                             {list.error ? (
                                                 <span className="inline-flex items-center gap-2">
@@ -207,7 +217,7 @@ function OrganizationList({ first }: { first: Page<OrgRow> }) {
                                                 >
                                                     {org.name}
                                                 </p>
-                                                <p className="truncate text-xs text-muted-foreground">
+                                                <p className={cn(settingType.hint, "truncate")}>
                                                     @{org.slug}
                                                 </p>
                                             </div>
@@ -218,13 +228,13 @@ function OrganizationList({ first }: { first: Page<OrgRow> }) {
                                             {org.ownerName}
                                         </span>
                                     </td>
-                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                    <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 lg:table-cell")}>
                                         {org.memberCount}
                                     </td>
-                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                    <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 lg:table-cell")}>
                                         {org.teamCount}
                                     </td>
-                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                    <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 lg:table-cell")}>
                                         {org.spaceCount}
                                     </td>
                                 </tr>
@@ -289,7 +299,7 @@ function OrganizationPolicyForm({
         set: (next: string) => void,
         hint: string
     ) => (
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+        <label className={cn(settingType.hint, "flex flex-col gap-1")}>
             {label}
             <Input
                 type="number"
@@ -326,7 +336,7 @@ function OrganizationPolicyForm({
                         router.refresh();
                     }}
                 >
-                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                         {t("organizations.creation.label")}
                         <Select
                             value={creation}
@@ -364,7 +374,7 @@ function OrganizationPolicyForm({
                         )}
                     </div>
 
-                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                         {t("organizations.newPeople.label")}
                         <Select
                             value={newPeople}
@@ -390,14 +400,14 @@ function OrganizationPolicyForm({
                         )}
                     </div>
 
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("organizations.policy.lowering")}
                     </p>
 
                     {error && (
                         <p
                             role="alert"
-                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                            className={cn(settingType.body, "rounded-md bg-danger-soft px-3 py-2 text-danger-ink")}
                         >
                             {error}
                         </p>
@@ -405,7 +415,7 @@ function OrganizationPolicyForm({
 
                     <div className="flex items-center justify-end gap-3">
                         {saved && !changed && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("organizations.policy.saved")}
                             </span>
                         )}

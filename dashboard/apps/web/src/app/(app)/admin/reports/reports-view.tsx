@@ -30,7 +30,7 @@ import { ReportContextList } from "@/components/report-context-list";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import type { ChatReportFileView } from "@/lib/chat/report-files";
 import { placeholderUrl } from "@/lib/chat/media-shape";
-import { Badge, Button, Card, CardBody, Select, settingType } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn, Select, settingType } from "@polaris/ui";
 import { Check, Download, MessageSquare, Paperclip, Trash2 } from "lucide-react";
 
 /** Which reports the queue can show. Each is named by `reports.filters.<value>`. */
@@ -69,7 +69,7 @@ export function ReportsView({
                     aria-label={t("reports.filterLabel")}
                     className="w-44"
                 />
-                <span className="text-xs text-muted-foreground">
+                <span className={settingType.hint}>
                     {reports.length === 0 ? t("reports.empty") : t("reports.count", { count: reports.length })}
                 </span>
             </div>
@@ -87,13 +87,13 @@ export function ReportsView({
                             <Badge variant={report.status === "open" ? "primary" : "neutral"}>
                                 {t(`reports.reasons.${report.reason}`)}
                             </Badge>
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {report.channelName}
                             </span>
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("reports.reportedBy", { name: report.reporterName })}
                             </span>
-                            <span className="ms-auto text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "ms-auto")}>
                                 {format.dateTime(report.createdAt)}
                             </span>
                         </div>
@@ -103,7 +103,7 @@ export function ReportsView({
                             surface, and a report is not a place to run somebody
                             else's formatting. */}
                         {report.kind === "message" && (
-                            <blockquote className="whitespace-pre-wrap break-words border-s-2 border-border ps-3 text-sm">
+                            <blockquote className={cn(settingType.body, "whitespace-pre-wrap break-words border-s-2 border-border ps-3")}>
                                 {report.excerpt || (
                                     <span className="text-muted-foreground">
                                         {report.files.length > 0 ? t("reports.noTextSeeBelow") : t("reports.noText")}
@@ -130,7 +130,7 @@ export function ReportsView({
                         {/* A whole conversation has no one author; its
                             messages above each say who wrote them. */}
                         {report.kind === "message" && (
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {report.authorName
                                     ? t("reports.writtenBy", { name: report.authorName, live: String(report.live) })
                                     : t("reports.writtenByGone", { live: String(report.live) })}
@@ -138,7 +138,7 @@ export function ReportsView({
                         )}
 
                         {report.note && (
-                            <p className="rounded-md bg-muted px-3 py-2 text-sm">{report.note}</p>
+                            <p className={cn(settingType.body, "rounded-md bg-muted px-3 py-2")}>{report.note}</p>
                         )}
 
                         <div className="flex flex-wrap items-center gap-2">
@@ -164,7 +164,7 @@ export function ReportsView({
                                     </Button>
                                 </>
                             ) : (
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {t("reports.handled", {
                                         status: report.status === "removed" ? "removed" : "kept",
                                         by: report.handledByName ?? "",
@@ -177,7 +177,7 @@ export function ReportsView({
                             {report.live && report.messageId && (
                                 <Link
                                     href={`/chat/c/${report.channelId}/${report.messageId}`}
-                                    className="ms-auto flex items-center gap-1 text-xs text-muted-foreground no-underline hover:text-foreground"
+                                    className={cn(settingType.small, "ms-auto flex items-center gap-1 text-muted-foreground no-underline hover:text-foreground")}
                                 >
                                     <MessageSquare className="size-3.5" />
                                     {t("reports.open")}
@@ -255,7 +255,7 @@ function ReportFiles({
                     ) : (
                         <a
                             href={`${href(file)}?download=1`}
-                            className="flex w-fit items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs no-underline hover:bg-muted"
+                            className={cn(settingType.small, "flex w-fit items-center gap-2 rounded-md border border-border px-2.5 py-1.5 no-underline hover:bg-muted")}
                         >
                             <Paperclip className="size-3.5 shrink-0" />
                             {/* enigma:allow-clipped-value - the same name is
@@ -266,7 +266,7 @@ function ReportFiles({
                             <Download className="size-3.5 shrink-0 text-muted-foreground" />
                         </a>
                     )}
-                    <span className="text-[0.6875rem] text-foreground-subtle">
+                    <span className={settingType.hint}>
                         {/* Said out loud, because the two are different claims: a
                             live file is the one still on the message, and a kept
                             one is the copy that outlived it. */}
@@ -296,7 +296,7 @@ function ReportLink({ link }: { link: LinkPreviewView }) {
                 />
             ) : null}
             <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-[0.6875rem] text-foreground-subtle">
+                <span className={settingType.hint}>
                     {link.siteName || new URL(link.url).hostname}
                 </span>
                 <span
@@ -305,11 +305,11 @@ function ReportLink({ link }: { link: LinkPreviewView }) {
                     // recoverable without following the address, which is the
                     // one thing a moderator should not have to do.
                     title={link.title}
-                    className="truncate text-sm font-medium text-foreground"
+                    className={cn(settingType.body, "truncate font-medium text-foreground")}
                 >
                     {link.title}
                 </span>
-                <span className="line-clamp-2 text-[0.75rem] text-muted-foreground">
+                <span className={cn(settingType.hint, "line-clamp-2")}>
                     {link.description}
                 </span>
             </span>

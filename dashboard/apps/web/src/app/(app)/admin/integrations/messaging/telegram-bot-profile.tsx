@@ -12,7 +12,7 @@
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Check, ExternalLink, Loader2, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { Button, Input, Skeleton, Textarea, isDirty, settingType } from "@polaris/ui";
+import { Button, Input, Skeleton, Textarea, cn, isDirty, settingType } from "@polaris/ui";
 import type { BotProfile, BotProfileField } from "@/lib/messaging/telegram-bot-profile";
 import { applyTelegramBotProfileAction, telegramBotProfileAction, type BotProfileFieldOutcome } from "./actions";
 
@@ -91,7 +91,7 @@ export function TelegramBotProfile({ channelId }: { channelId: string }) {
         const outcome = outcomes[field];
         if (!outcome) return null;
         return outcome.ok ? (
-            <p className="flex items-center gap-1 text-xs text-success">
+            <p className={cn(settingType.small, "flex items-center gap-1 text-success")}>
                 <Check className="size-3.5 shrink-0" />
                 {t("messaging.botProfile.updated")}
             </p>
@@ -109,7 +109,7 @@ export function TelegramBotProfile({ channelId }: { channelId: string }) {
                 setValues((current) => (current ? { ...current, [name]: event.target.value } : current))
         };
         return (
-            <label className="flex min-w-0 flex-col gap-1 text-sm">
+            <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
                 <span className="font-medium">{label}</span>
                 {values ? (
                     name === "description" ? (
@@ -120,7 +120,7 @@ export function TelegramBotProfile({ channelId }: { channelId: string }) {
                 ) : (
                     <Skeleton className={name === "description" ? "h-20 w-full" : "h-9 w-full"} />
                 )}
-                {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
+                {hint ? <span className={settingType.hint}>{hint}</span> : null}
                 {status(name)}
             </label>
         );
@@ -130,18 +130,18 @@ export function TelegramBotProfile({ channelId }: { channelId: string }) {
         <section className="flex flex-col gap-3 border-t border-border pt-4">
             <div className="flex min-w-0 flex-col gap-0.5">
                 <h3 className="text-sm font-medium">{t("messaging.botProfile.title")}</h3>
-                <p className="text-xs text-muted-foreground">{t("messaging.botProfile.description")}</p>
+                <p className={settingType.hint}>{t("messaging.botProfile.description")}</p>
             </div>
             {loadError ? (
                 <div className="flex flex-wrap items-center gap-2">
-                    <p className="min-w-0 flex-1 text-sm text-danger">{loadError}</p>
+                    <p className={cn(settingType.error, "min-w-0 flex-1")}>{loadError}</p>
                     <Button type="button" size="sm" variant="secondary" onClick={() => void load()}>
                         {t("messaging.botProfile.retry")}
                     </Button>
                 </div>
             ) : (
                 <>
-                    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+                    <dl className={cn(settingType.body, "grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1")}>
                         <dt className="text-muted-foreground">{t("messaging.botProfile.username")}</dt>
                         <dd className="min-w-0">
                             {profile ? (
@@ -184,7 +184,7 @@ export function TelegramBotProfile({ channelId }: { channelId: string }) {
                         t("messaging.botProfile.shortDescription"),
                         t("messaging.botProfile.shortDescriptionHint")
                     )}
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div className="flex flex-wrap items-center justify-end gap-2">
                         <Button
                             type="button"
@@ -199,7 +199,7 @@ export function TelegramBotProfile({ channelId }: { channelId: string }) {
                             {t("messaging.botProfile.save")}
                         </Button>
                     </div>
-                    <p className="text-end text-xs text-muted-foreground">{t("messaging.botProfile.usePolarisHint")}</p>
+                    <p className={cn(settingType.hint, "text-end")}>{t("messaging.botProfile.usePolarisHint")}</p>
                 </>
             )}
         </section>

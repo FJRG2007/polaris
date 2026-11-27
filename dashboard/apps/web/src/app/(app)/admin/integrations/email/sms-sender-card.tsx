@@ -28,6 +28,7 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -59,7 +60,7 @@ export function SmsSenderCard({
             <CardHeader className="flex-row items-center justify-between gap-3">
                 <div>
                     <CardTitle>{t("inboxChannels.sms.title")}</CardTitle>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("inboxChannels.sms.hint", { summary: PROVIDER.summary })}
                     </p>
                 </div>
@@ -72,7 +73,7 @@ export function SmsSenderCard({
             </CardHeader>
             <CardBody className="p-0">
                 {senders.length === 0 ? (
-                    <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "px-4 py-6 text-center text-muted-foreground")}>
                         {t("inboxChannels.sms.empty")}
                     </p>
                 ) : (
@@ -81,10 +82,10 @@ export function SmsSenderCard({
                             <li key={sender.id} className="flex flex-col gap-1 px-4 py-3">
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium">
+                                        <p className={cn(settingType.body, "truncate font-medium")}>
                                             {sender.name}
                                         </p>
-                                        <p className="truncate text-xs text-muted-foreground">
+                                        <p className={cn(settingType.hint, "truncate")}>
                                             {t("inboxChannels.sms.sendsFrom", {
                                                 provider: PROVIDER.label,
                                                 from: sender.from
@@ -214,12 +215,12 @@ function SmsSenderDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">{t("inbox.connect.name")}</span>
                         <Input value={name} onChange={(event) => setName(event.target.value)} />
                     </label>
                     {PROVIDER.fields.map((field) => (
-                        <label key={field.name} className="flex flex-col gap-1 text-sm">
+                        <label key={field.name} className={cn(settingType.body, "flex flex-col gap-1")}>
                             <span className="font-medium">{field.label}</span>
                             <Input
                                 value={settings[field.name] ?? ""}
@@ -232,11 +233,11 @@ function SmsSenderDialog({
                                 }
                             />
                             {field.hint ? (
-                                <span className="text-xs text-muted-foreground">{field.hint}</span>
+                                <span className={settingType.hint}>{field.hint}</span>
                             ) : null}
                         </label>
                     ))}
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">{PROVIDER.secretLabel}</span>
                         <Input
                             type="password"
@@ -244,9 +245,9 @@ function SmsSenderDialog({
                             placeholder={sender ? t("inboxChannels.sms.keepSecret") : ""}
                             onChange={(event) => setSecret(event.target.value)}
                         />
-                        <span className="text-xs text-muted-foreground">{PROVIDER.secretHint}</span>
+                        <span className={settingType.hint}>{PROVIDER.secretHint}</span>
                     </label>
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
                             {tc("actions.cancel")}

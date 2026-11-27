@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { Button, Skeleton } from "@polaris/ui";
+import { Button, cn, settingType, Skeleton } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { polarisMailStateAction, type PolarisMailState } from "./mail-server-sender";
@@ -97,7 +97,7 @@ export function PolarisMailPanel({ onSending }: { onSending: () => void }) {
     }
 
     return (
-        <div className="flex flex-col gap-3 text-sm">
+        <div className={cn(settingType.body, "flex flex-col gap-3")}>
             {state ? <StateBody state={state} waiting={waiting} /> : null}
             {error ? <p className="text-danger">{error}</p> : null}
             <div className="flex flex-wrap gap-2">

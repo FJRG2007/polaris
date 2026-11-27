@@ -21,13 +21,15 @@ import { Loader2, Send, Trash2 } from "lucide-react";
 import { MAIL_PROVIDER_INFO, type MailProvider, type MailProviderField } from "@polaris/core";
 import {
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
     Input,
-    isDirty
+    isDirty,
+    settingType
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -197,7 +199,7 @@ export function EmailChannelDialog({
                 </DialogHeader>
 
                 <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain">
-                    <div className="flex flex-col gap-1 text-sm">
+                    <div className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span className="font-medium">{t("inboxChannels.email.provider")}</span>
                         <EmailProviderSelect
                             options={options}
@@ -206,7 +208,7 @@ export function EmailChannelDialog({
                             disabled={busy}
                         />
                         {own ? null : (
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t.rich("inboxChannels.email.sendingAddress", {
                                     requirement: info.senderRequirement,
                                     docs: (chunks) => (
@@ -229,7 +231,7 @@ export function EmailChannelDialog({
                         <PolarisMailPanel onSending={() => onPolarisMailSending?.()} />
                     ) : (
                         <>
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                 <span className="font-medium">{t("inbox.connect.name")}</span>
                                 <Input
                                     value={name}
@@ -249,7 +251,7 @@ export function EmailChannelDialog({
                                 />
                             ))}
 
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                 <span className="font-medium">{info.secretLabel}</span>
                                 <Input
                                     type="password"
@@ -258,12 +260,12 @@ export function EmailChannelDialog({
                                     onChange={(event) => setSecret(event.target.value)}
                                     placeholder={editing ? t("inboxChannels.email.secretPlaceholder") : ""}
                                 />
-                                <span className="text-xs text-muted-foreground">{info.secretHint}</span>
+                                <span className={settingType.hint}>{info.secretHint}</span>
                             </label>
 
                             {editing && (
                                 <div className="flex flex-col gap-1 rounded-md border border-border p-3">
-                                    <span className="text-sm font-medium">
+                                    <span className={cn(settingType.body, "font-medium")}>
                                         {t("inboxChannels.email.testTitle")}
                                     </span>
                                     <div className="flex items-start gap-2">
@@ -288,7 +290,7 @@ export function EmailChannelDialog({
                                             {t("inboxChannels.email.send")}
                                         </Button>
                                     </div>
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className={settingType.hint}>
                                         {t("inboxChannels.email.testHint")}
                                     </span>
                                 </div>
@@ -296,8 +298,8 @@ export function EmailChannelDialog({
                         </>
                     )}
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
-                    {notice ? <p className="text-sm text-success">{notice}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
+                    {notice ? <p className={cn(settingType.body, "text-success")}>{notice}</p> : null}
                 </div>
 
                 <div className="flex items-center justify-between gap-2">
@@ -351,7 +353,7 @@ function SettingField({
 }) {
     const t = useTranslations("admin");
     return (
-        <label className="flex flex-col gap-1 text-sm">
+        <label className={cn(settingType.body, "flex flex-col gap-1")}>
             <span className="font-medium">
                 {field.label}
                 {field.optional ? (
@@ -374,7 +376,7 @@ function SettingField({
                 onChange={(event) => onChange(event.target.value)}
             />
             {field.hint ? (
-                <span className="text-xs text-muted-foreground">{field.hint}</span>
+                <span className={settingType.hint}>{field.hint}</span>
             ) : null}
         </label>
     );

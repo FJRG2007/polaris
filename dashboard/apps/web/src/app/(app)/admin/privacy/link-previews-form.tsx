@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { setLinkPreviewsAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
+import { Card, CardBody, cn, settingType, Switch, useOptimisticToggle } from "@polaris/ui";
 
 export function LinkPreviewsForm({ allowed }: { allowed: boolean }) {
     const t = useTranslations("admin");
@@ -28,8 +28,8 @@ export function LinkPreviewsForm({ allowed }: { allowed: boolean }) {
             <CardBody className="flex flex-col divide-y divide-border py-1">
                 <div className="flex items-start justify-between gap-3 py-3">
                     <div className="flex min-w-0 flex-col gap-0.5">
-                        <span className="text-sm">{t("privacy.previews.label")}</span>
-                        <span id="privacy-link-previews" className="text-xs text-muted-foreground">
+                        <span className={settingType.body}>{t("privacy.previews.label")}</span>
+                        <span id="privacy-link-previews" className={settingType.hint}>
                             {t("privacy.previews.hint")}
                         </span>
                     </div>
@@ -40,7 +40,7 @@ export function LinkPreviewsForm({ allowed }: { allowed: boolean }) {
                         onChange={toggle}
                     />
                 </div>
-                {error ? <p className="py-3 text-sm text-danger">{error}</p> : null}
+                {error ? <p className={cn(settingType.error, "py-3")}>{error}</p> : null}
             </CardBody>
         </Card>
     );

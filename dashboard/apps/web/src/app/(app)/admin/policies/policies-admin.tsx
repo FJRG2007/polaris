@@ -10,7 +10,18 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Plus, Trash2, X } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    cn,
+    Input,
+    Select,
+    settingType
+} from "@polaris/ui";
 import { JsonEditor, JsonView, prettyJson } from "@/components/json-view";
 import {
     POLICY_TEMPLATES,
@@ -169,12 +180,12 @@ export function PoliciesAdmin({
                         value={document}
                         onChange={setDocument}
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t.rich("policies.create.hint", {
                             code: (chunks) => <code key={String(chunks)}>{chunks}</code>
                         })}
                     </p>
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div>
                         <Button onClick={onCreate} disabled={pending || !name.trim()}>
                             <Plus className="size-4" />
@@ -190,7 +201,7 @@ export function PoliciesAdmin({
                 </h2>
                 {own.length === 0 ? (
                     <Card>
-                        <CardBody className="p-8 text-center text-sm text-muted-foreground">
+                        <CardBody className={cn(settingType.body, "p-8 text-center text-muted-foreground")}>
                             {t("policies.empty")}
                         </CardBody>
                     </Card>
@@ -213,7 +224,7 @@ export function PoliciesAdmin({
                         <h2 id="policies-ready" className="text-sm font-semibold">
                             {t("policies.sections.ready")}
                         </h2>
-                        <p className="text-xs text-muted-foreground">{t("policies.sections.readyHint")}</p>
+                        <p className={settingType.hint}>{t("policies.sections.readyHint")}</p>
                     </div>
                     {ready.map((policy) => (
                         <PolicyCard
@@ -295,11 +306,11 @@ function PolicyCard({
                             ) : null}
                         </CardTitle>
                         {policy.template ? (
-                            <p className="mt-1 text-sm text-muted-foreground">
+                            <p className={cn(settingType.body, "mt-1 text-muted-foreground")}>
                                 {t(`policies.templates.${policy.template}.description`)}
                             </p>
                         ) : null}
-                        <p className="mt-1 truncate text-xs text-muted-foreground" title={summarize(policy.document, t)}>
+                        <p className={cn(settingType.hint, "mt-1 truncate")} title={summarize(policy.document, t)}>
                             {summarize(policy.document, t)}
                         </p>
                     </div>
@@ -330,14 +341,14 @@ function PolicyCard({
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground">{t("policies.card.attachedTo")}</span>
+                    <span className={settingType.hint}>{t("policies.card.attachedTo")}</span>
                     {policy.attachments.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">{t("policies.card.nobody")}</span>
+                        <span className={settingType.hint}>{t("policies.card.nobody")}</span>
                     ) : (
                         policy.attachments.map((attachment) => (
                             <span
                                 key={`${attachment.principalType}:${attachment.principalId}`}
-                                className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs"
+                                className={cn(settingType.small, "inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5")}
                             >
                                 {attachment.label}
                                 <button
@@ -421,7 +432,7 @@ function PolicyCard({
                                     value={document}
                                     onChange={setDocument}
                                 />
-                                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                                {error ? <p className={settingType.error}>{error}</p> : null}
                                 <div>
                                     <Button size="sm" disabled={disabled || unchanged} onClick={onSave}>
                                         {t("policies.card.save")}

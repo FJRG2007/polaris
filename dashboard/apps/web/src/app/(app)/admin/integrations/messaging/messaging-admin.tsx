@@ -14,7 +14,16 @@ import { ChannelCard } from "../email/channel-card";
 import { IntegrationLogo } from "@/components/logos";
 import { providerRowFor } from "./messaging-providers";
 import { MessagingChannelDialog } from "./channel-dialog";
-import { Button, buttonVariants, Card, CardBody, Select, settingType, Switch } from "@polaris/ui";
+import {
+    Button,
+    buttonVariants,
+    Card,
+    CardBody,
+    cn,
+    Select,
+    settingType,
+    Switch
+} from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { MessagingChannelView } from "@/lib/messaging/channel-admin";
 import type { SmsCodeSenderOption } from "@/lib/messaging/code-senders";
@@ -57,7 +66,7 @@ export function MessagingAdmin({
                 {channels.length === 0 ? (
                     <Card>
                         <CardBody>
-                            <p className="text-sm text-muted-foreground">{t("messaging.channels.empty")}</p>
+                            <p className={cn(settingType.body, "text-muted-foreground")}>{t("messaging.channels.empty")}</p>
                         </CardBody>
                     </Card>
                 ) : (
@@ -110,7 +119,7 @@ function CodeSendersCard({
         <section className="flex flex-col gap-3">
             <div>
                 <h2 className="text-sm font-medium">{t("messaging.codes.title")}</h2>
-                <p className="text-xs text-muted-foreground">{t("messaging.codes.hint")}</p>
+                <p className={settingType.hint}>{t("messaging.codes.hint")}</p>
             </div>
             <Card>
                 <CardBody className="flex flex-col gap-4">
@@ -166,9 +175,9 @@ function CodeSenderRow({
 
     return (
         <div className="flex flex-col gap-1">
-            <span className="text-sm font-medium">{t(`messaging.codes.${platform}` as const)}</span>
+            <span className={cn(settingType.body, "font-medium")}>{t(`messaging.codes.${platform}` as const)}</span>
             {channels.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t(`messaging.codes.${platform}Empty` as const)}</p>
+                <p className={settingType.hint}>{t(`messaging.codes.${platform}Empty` as const)}</p>
             ) : (
                 <div className="flex min-w-0 items-center gap-2">
                     <div className="min-w-0 flex-1">
@@ -218,7 +227,7 @@ function SmsCodesRow({ senders, saved: initial }: { senders: SmsCodeSenderOption
     return (
         <div className="flex flex-col gap-1">
             <div className="flex min-w-0 items-center justify-between gap-2">
-                <span className="min-w-0 truncate text-sm font-medium">{t("messaging.codes.sms")}</span>
+                <span className={cn(settingType.body, "min-w-0 truncate font-medium")}>{t("messaging.codes.sms")}</span>
                 <Switch
                     checked={on}
                     disabled={saving || blocked}
@@ -229,20 +238,20 @@ function SmsCodesRow({ senders, saved: initial }: { senders: SmsCodeSenderOption
             </div>
             {blocked ? (
                 <div id={reasonId} className="flex flex-wrap items-center gap-2">
-                    <p className="min-w-0 flex-1 text-xs text-muted-foreground">{t("messaging.codes.smsEmpty")}</p>
+                    <p className={cn(settingType.hint, "min-w-0 flex-1")}>{t("messaging.codes.smsEmpty")}</p>
                     <Link href="/admin/integrations/email" className={buttonVariants({ size: "sm", variant: "secondary" })}>
                         {t("messaging.codes.smsAdd")}
                     </Link>
                 </div>
             ) : on && !current?.connected ? (
                 <div id={reasonId} className="flex flex-wrap items-center gap-2">
-                    <p className="min-w-0 flex-1 text-xs text-warning">{t("messaging.codes.smsStopped")}</p>
+                    <p className={cn(settingType.small, "min-w-0 flex-1 text-warning")}>{t("messaging.codes.smsStopped")}</p>
                     <Link href="/admin/integrations/email" className={buttonVariants({ size: "sm", variant: "secondary" })}>
                         {t("messaging.codes.smsFix")}
                     </Link>
                 </div>
             ) : (
-                <p id={reasonId} className="text-xs text-muted-foreground">
+                <p id={reasonId} className={settingType.hint}>
                     {on ? t("messaging.codes.smsOn") : t("messaging.codes.smsOff")}
                 </p>
             )}

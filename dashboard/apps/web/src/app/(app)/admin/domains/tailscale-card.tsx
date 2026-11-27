@@ -17,7 +17,15 @@ import { FUNNEL_APP_PORTS } from "@/lib/tailscale/tailscale-model";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TailnetAppView, TailscaleView } from "@/lib/tailscale/tailscale-service";
-import { Button, ConfirmDeleteDialog, CopyButton, settingType, Skeleton, Switch } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    ConfirmDeleteDialog,
+    CopyButton,
+    settingType,
+    Skeleton,
+    Switch
+} from "@polaris/ui";
 import {
     connectTailscaleAction,
     disconnectTailscaleAction,
@@ -104,15 +112,15 @@ export function TailscaleCard() {
                     <Skeleton className="h-8 w-40" />
                 </div>
             ) : (
-                <div className="flex flex-col gap-4 text-sm">
+                <div className={cn(settingType.body, "flex flex-col gap-4")}>
                     {!on ? (
                         <div className="flex flex-col gap-3">
                             {limited ? (
-                                <p className="text-xs text-muted-foreground">
+                                <p className={settingType.hint}>
                                     {t("domains.tailscale.limited")}
                                 </p>
                             ) : null}
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {view.hasAuthKey
                                     ? t("domains.tailscale.withKey")
                                     : t("domains.tailscale.withLink")}{" "}
@@ -144,7 +152,7 @@ export function TailscaleCard() {
                                 <div className="flex flex-col gap-1.5">
                                     {status.loginUrl ? (
                                         <>
-                                            <span className="text-xs text-muted-foreground">
+                                            <span className={settingType.hint}>
                                                 {t("domains.tailscale.loginHint")}
                                             </span>
                                             <div className="flex min-w-0 items-center gap-2">
@@ -161,7 +169,7 @@ export function TailscaleCard() {
                                             </div>
                                         </>
                                     ) : (
-                                        <span className="text-xs text-muted-foreground">
+                                        <span className={settingType.hint}>
                                             {t("domains.tailscale.waitingLink")}
                                         </span>
                                     )}
@@ -283,7 +291,7 @@ function Address({ view }: { view: TailscaleView }) {
     const url = `https://${view.status.host}`;
     return (
         <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">{t("domains.tailscale.address")}</span>
+            <span className={settingType.hint}>{t("domains.tailscale.address")}</span>
             <div className="flex min-w-0 items-center gap-2">
                 <a
                     href={url}
@@ -296,7 +304,7 @@ function Address({ view }: { view: TailscaleView }) {
                 </a>
                 <CopyButton value={url} />
             </div>
-            <span className="text-xs text-muted-foreground">
+            <span className={settingType.hint}>
                 {view.config.funnel
                     ? t("domains.tailscale.addressPublic")
                     : t("domains.tailscale.addressTailnet")}
@@ -317,14 +325,14 @@ function AppList(props: {
         <div className="flex flex-col gap-2">
             <div>
                 <h3 className="font-medium">{t("domains.tailscale.appsTitle")}</h3>
-                <p className="text-xs text-muted-foreground">{t("domains.tailscale.appsHint")}</p>
+                <p className={settingType.hint}>{t("domains.tailscale.appsHint")}</p>
             </div>
             {view.apps.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t("domains.tailscale.appsEmpty")}</p>
+                <p className={settingType.hint}>{t("domains.tailscale.appsEmpty")}</p>
             ) : (
                 <>
                     {!connected ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("domains.tailscale.appsWaiting")}
                         </p>
                     ) : null}
@@ -382,7 +390,7 @@ function AppRow(props: {
                 )}
                 {app.appName ? (
                     <span
-                        className="min-w-0 truncate text-xs text-muted-foreground"
+                        className={cn(settingType.hint, "min-w-0 truncate")}
                         title={app.hostname}
                     >
                         {app.hostname}
@@ -441,7 +449,7 @@ function Toggle(props: {
             />
             <span className="min-w-0">
                 {props.label}
-                <span id={hintId} className="block text-xs text-muted-foreground">
+                <span id={hintId} className={cn(settingType.hint, "block")}>
                     {props.reason ?? props.hint}
                 </span>
             </span>
@@ -451,7 +459,7 @@ function Toggle(props: {
 
 function Notice({ children }: { children: React.ReactNode }) {
     return (
-        <p className="break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+        <p className={cn(settingType.small, "break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}>
             {children}
         </p>
     );

@@ -5,7 +5,7 @@
  */
 
 import type * as React from "react";
-import { Skeleton } from "@polaris/ui";
+import { cn, settingType, Skeleton } from "@polaris/ui";
 
 /** A toolbar over a table of `rows` lines. */
 export function TableSkeleton({ rows = 8 }: { rows?: number }) {
@@ -79,7 +79,7 @@ export function ViewHeadingSkeleton({
             <div className="flex flex-col gap-1">
                 {lead}
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{title}</h1>
-                {intro ? <p className="text-sm text-muted-foreground">{intro}</p> : null}
+                {intro ? <p className={cn(settingType.body, "text-muted-foreground")}>{intro}</p> : null}
             </div>
             {children}
         </div>

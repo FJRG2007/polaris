@@ -10,6 +10,7 @@
  * four six-hour blocks (overnight, morning, afternoon, evening) and nothing else.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { BackupView } from "@/lib/backup-access/service";
@@ -26,7 +27,7 @@ export function StarlinkUpdateGuide({ view }: { view: BackupView }) {
     const time = format.time(view.starlinkQuietAt);
 
     return (
-        <div className="flex flex-col gap-2 text-xs">
+        <div className={cn(settingType.small, "flex flex-col gap-2")}>
             <p className="break-words text-muted-foreground">
                 {t("domains.backup.starlink.title")} {t("domains.backup.starlink.why")}
             </p>

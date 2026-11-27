@@ -15,7 +15,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, settingType, Skeleton } from "@polaris/ui";
+import { Button, cn, settingType, Skeleton } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
 import { issueWildcardCertificateAction } from "./actions";
 import { useDisplayFormat } from "@/components/display-format";
@@ -66,14 +66,14 @@ export function WildcardCertificateCard() {
                     <Skeleton className="h-3 w-4/5" />
                 </div>
             ) : view.problem === null ? (
-                <p className="min-w-0 break-words text-sm text-success">
+                <p className={cn(settingType.body, "min-w-0 break-words text-success")}>
                     {t("domains.wildcard.covered", {
                         base: view.base ?? "",
                         when: view.expiresAt ? format.date(view.expiresAt) : ""
                     })}
                 </p>
             ) : (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+                <div className={cn(settingType.small, "flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-muted-foreground")}>
                     <span className="min-w-0 flex-1 break-words">
                         {t(`domains.wildcard.problem.${PROBLEM_KEY[view.problem]}`, { base: view.base ?? "" })}
                     </span>

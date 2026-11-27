@@ -149,8 +149,8 @@ export function GroupsAdmin({ groups }: { groups: GroupRow[] }) {
             </div>
 
             <div className="overflow-hidden rounded-lg border border-border">
-                <table className="w-full text-sm">
-                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                <table className={cn(settingType.body, "w-full")}>
+                    <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">{t("groups.table.group")}</th>
                             <th className="hidden px-3 py-2 font-medium sm:table-cell">
@@ -201,7 +201,7 @@ export function GroupsAdmin({ groups }: { groups: GroupRow[] }) {
                                                         <Badge>{t("groups.system")}</Badge>
                                                     ) : null}
                                                 </p>
-                                                <p className="truncate text-xs text-muted-foreground">
+                                                <p className={cn(settingType.hint, "truncate")}>
                                                     {group.description || t("groups.noDescription")}
                                                 </p>
                                             </div>
@@ -209,14 +209,14 @@ export function GroupsAdmin({ groups }: { groups: GroupRow[] }) {
                                     </td>
                                     <td className="hidden px-3 py-2 sm:table-cell">
                                         {group.memberCount === 0 ? (
-                                            <span className="text-xs text-muted-foreground">
+                                            <span className={settingType.hint}>
                                                 {t("groups.nobodyYet")}
                                             </span>
                                         ) : (
                                             <AvatarStack people={group.members.items} total={group.memberCount} />
                                         )}
                                     </td>
-                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                    <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 lg:table-cell")}>
                                         {t("groups.peopleCount", { count: group.memberCount })}
                                     </td>
                                 </tr>
@@ -388,7 +388,7 @@ function GroupDialog({
 
                 <div className="-mx-1 flex max-h-80 flex-col gap-1 overflow-y-auto overscroll-contain px-1" onScroll={onScroll}>
                     {roster.items.length === 0 ? (
-                        <p className="py-2 text-sm text-muted-foreground">
+                        <p className={cn(settingType.body, "py-2 text-muted-foreground")}>
                             {t("groups.dialog.noMembers")}
                         </p>
                     ) : (
@@ -400,10 +400,10 @@ function GroupDialog({
                             >
                                 <Avatar person={member} size={28} />
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm" title={member.name}>
+                                    <p className={cn(settingType.body, "truncate")} title={member.name}>
                                         <PersonName id={member.id} name={member.name} />
                                     </p>
-                                    <p className="truncate text-xs text-muted-foreground">
+                                    <p className={cn(settingType.hint, "truncate")}>
                                         {member.email}
                                     </p>
                                 </div>
@@ -426,11 +426,11 @@ function GroupDialog({
                         ))
                     )}
                     {roster.loading && roster.items.length > 0 ? (
-                        <p className="py-2 text-center text-xs text-muted-foreground">
+                        <p className={cn(settingType.hint, "py-2 text-center")}>
                             {t("users.directory.loadingMore")}
                         </p>
                     ) : roster.error ? (
-                        <p className="flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground">
+                        <p className={cn(settingType.hint, "flex items-center justify-center gap-2 py-2")}>
                             {t("users.directory.loadFailed")}
                             <Button size="sm" variant="ghost" onClick={roster.retry}>
                                 {t("users.directory.retry")}

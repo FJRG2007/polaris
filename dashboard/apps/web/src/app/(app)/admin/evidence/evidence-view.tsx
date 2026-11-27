@@ -21,7 +21,17 @@ import type { EvidenceReport } from "@/lib/compliance/evidence";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { EvidenceExport } from "@/lib/compliance/evidence-export";
-import { Button, Card, CardBody, CopyButton, PageHeader, Skeleton, useToast } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    cn,
+    CopyButton,
+    PageHeader,
+    settingType,
+    Skeleton,
+    useToast
+} from "@polaris/ui";
 
 /** The facts are configuration; they move when somebody changes a setting. */
 const POLL_MS = 5 * 60_000;
@@ -79,14 +89,14 @@ export function EvidenceView() {
                 }
             />
             <div className="flex flex-col gap-4">
-                <p className="text-xs text-muted-foreground">{t("evidence.certification")}</p>
+                <p className={settingType.hint}>{t("evidence.certification")}</p>
 
                 {exported ? (
                     <Card>
-                        <CardBody className="flex flex-col gap-3 text-sm">
+                        <CardBody className={cn(settingType.body, "flex flex-col gap-3")}>
                             <p>{t("evidence.export.summary", { at: format.dateTime(exported.generatedAt) })}</p>
                             <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
-                                <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("evidence.export.hash")}>{t("evidence.export.hash")}</span>
+                                <span className={cn(settingType.hint, "min-w-0 max-w-full shrink-0 truncate")} title={t("evidence.export.hash")}>{t("evidence.export.hash")}</span>
                                 <code className="min-w-0 flex-1 truncate font-mono text-xs" title={exported.sha256}>
                                     {exported.sha256}
                                 </code>
@@ -108,7 +118,7 @@ export function EvidenceView() {
 
                 {data ? (
                     <>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {data.instance.build
                                 ? t("evidence.readFromBuild", {
                                       at: format.dateTime(data.generatedAt),
@@ -121,7 +131,7 @@ export function EvidenceView() {
                             <EvidenceSectionCard key={section.id} section={section} formatDate={formatDate} />
                         ))}
                         <Card>
-                            <CardBody className="flex flex-col gap-2 text-sm">
+                            <CardBody className={cn(settingType.body, "flex flex-col gap-2")}>
                                 <h2 className="text-[0.8125rem] font-semibold tracking-tight">{t("evidence.outside")}</h2>
                                 <ul className="list-disc space-y-1 ps-5 text-muted-foreground">
                                     {data.outsidePolaris.map((item) => (
@@ -139,7 +149,7 @@ export function EvidenceView() {
                     </div>
                 ) : (
                     <Card>
-                        <CardBody className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                        <CardBody className={cn(settingType.body, "flex flex-wrap items-center justify-between gap-3")}>
                             <p className="text-danger">{error ?? t("evidence.readFailed")}</p>
                             <Button size="sm" variant="outline" onClick={refresh}>
                                 {t("evidence.tryAgain")}

@@ -12,7 +12,7 @@
 import Link from "next/link";
 import { Fragment } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Card, CardBody, CardHeader, CardTitle, cn } from "@polaris/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, cn, settingType } from "@polaris/ui";
 import { factText, type EvidenceFact, type EvidenceSection } from "@/lib/compliance/evidence";
 
 /** A value, with the flag that says it is worth a second look. */
@@ -42,7 +42,7 @@ export function EvidenceSectionCard({
         <Card>
             <CardHeader>
                 <CardTitle>{section.title}</CardTitle>
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t.rich("evidence.setIn", {
                         places: (
                             <Fragment key="places">
@@ -60,7 +60,7 @@ export function EvidenceSectionCard({
                 </p>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
-                <dl className="flex flex-col text-sm">
+                <dl className={cn(settingType.body, "flex flex-col")}>
                     {section.facts.map((fact) => (
                         <div
                             key={fact.id}
@@ -76,7 +76,7 @@ export function EvidenceSectionCard({
 
                 {rows && rows.items.length > 0 ? (
                     <div className="flex flex-col gap-1.5">
-                        <p className="text-xs font-medium">
+                        <p className={cn(settingType.small, "font-medium")}>
                             {rows.title}
                             {rows.items.length < rows.total ? (
                                 <span className="font-normal text-muted-foreground">
@@ -86,7 +86,7 @@ export function EvidenceSectionCard({
                             ) : null}
                         </p>
                         <div className="overflow-x-auto rounded-md border border-border">
-                            <table className="w-full text-sm">
+                            <table className={cn(settingType.body, "w-full")}>
                                 <thead>
                                     <tr className="border-b border-border">
                                         <th className="px-3 py-2 text-start">{t("evidence.name")}</th>
@@ -118,7 +118,7 @@ export function EvidenceSectionCard({
                     </div>
                 ) : null}
 
-                <div className="flex flex-col gap-1 border-t border-border pt-3 text-xs text-muted-foreground">
+                <div className={cn(settingType.small, "flex flex-col gap-1 border-t border-border pt-3 text-muted-foreground")}>
                     {change ? (
                         <p>
                             {t.rich("evidence.lastChanged", {

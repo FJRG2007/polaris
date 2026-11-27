@@ -6,6 +6,7 @@
  * skeleton, which is why the headings never wait on the data.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import type { ReactNode } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -23,7 +24,7 @@ function Section({
                 <h2 id={`privacy-${id}`} className="text-sm font-medium">
                     {t(`privacy.${id}.title`)}
                 </h2>
-                <p className="text-sm text-muted-foreground">{t(`privacy.${id}.description`)}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t(`privacy.${id}.description`)}</p>
             </div>
             {children}
         </section>
