@@ -19,6 +19,7 @@ import {
     Card,
     CardBody,
     Checkbox,
+    cn,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -239,7 +240,7 @@ export function PolarAgents({
             <div className="flex flex-col gap-3">
                 <div className="min-w-0">
                     <h2 className="text-sm font-semibold">{t("settings.agents.builtInTitle")}</h2>
-                    <p className="text-sm text-muted-foreground">{t("settings.agents.builtInIntro")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.agents.builtInIntro")}</p>
                 </div>
                 <Card>
                     <CardBody className="flex flex-col divide-y divide-border p-0">
@@ -247,10 +248,10 @@ export function PolarAgents({
                             <div key={entry.engine} className="flex items-center gap-3 px-4 py-3">
                                 <EngineMark engine={entry.engine} name={entry.name} />
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium" title={entry.name}>
+                                    <p className={cn(settingType.body, "truncate font-medium")} title={entry.name}>
                                         {entry.name}
                                     </p>
-                                    <p className="truncate text-xs text-muted-foreground">
+                                    <p className={cn(settingType.hint, "truncate")}>
                                         {workSummary(workOf(entry.engine), picks.engines, picks.models, t)}
                                     </p>
                                 </div>
@@ -271,7 +272,7 @@ export function PolarAgents({
                         {builtIns.length > COLLAPSED_TOOLS ? (
                             <button
                                 type="button"
-                                className="px-4 py-2 text-start text-xs text-muted-foreground hover:text-foreground"
+                                className={cn(settingType.small, "px-4 py-2 text-start text-muted-foreground hover:text-foreground")}
                                 aria-expanded={allTools}
                                 onClick={() => setAllTools((current) => !current)}
                             >
@@ -289,7 +290,7 @@ export function PolarAgents({
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                         <h2 className="text-sm font-semibold">{t("settings.agents.title")}</h2>
-                        <p className="text-sm text-muted-foreground">{t("settings.agents.intro")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.agents.intro")}</p>
                     </div>
                     {!readOnly ? (
                         <div className="flex shrink-0 flex-wrap justify-end gap-2">
@@ -310,7 +311,7 @@ export function PolarAgents({
                     </p>
                 ) : null}
                 {rows.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("settings.agents.empty")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.agents.empty")}</p>
                 ) : (
                     <Card>
                         <CardBody className="flex flex-col divide-y divide-border p-0">
@@ -329,19 +330,19 @@ export function PolarAgents({
                                             <EngineMark engine={row.engine} name={engineName(row.engine)} />
                                         )}
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-medium" title={row.name}>
+                                            <p className={cn(settingType.body, "truncate font-medium")} title={row.name}>
                                                 {row.name}
                                             </p>
                                             <p
-                                                className="truncate text-xs text-muted-foreground"
+                                                className={cn(settingType.hint, "truncate")}
                                                 title={row.description || row.instructions}
                                             >
                                                 {row.description || row.instructions}
                                             </p>
-                                            <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                                            <p className={cn(settingType.hint, "flex min-w-0 items-center gap-1.5")}>
                                                 {row.shared ? (
                                                     <span
-                                                        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 text-[11px]"
+                                                        className={cn(settingType.small, "inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5")}
                                                         title={
                                                             row.mine
                                                                 ? t("settings.agents.sharedMine")
@@ -687,7 +688,7 @@ function AgentEditor({
                         const problem = agentFieldError(field.key, values[field.key]);
                         const id = `agent-${field.key}`;
                         return (
-                            <div key={field.key} className="flex flex-col gap-1 text-sm">
+                            <div key={field.key} className={cn(settingType.body, "flex flex-col gap-1")}>
                                 <label htmlFor={id}>
                                     {field.label}
                                     {field.required ? " *" : ""}
@@ -703,8 +704,8 @@ function AgentEditor({
                                 <span
                                     className={
                                         problem
-                                            ? "text-xs text-danger"
-                                            : "text-xs text-muted-foreground"
+                                            ? settingType.error
+                                            : settingType.hint
                                     }
                                 >
                                     {problem ? t("settings.agents.errors.too_long") : field.hint}
@@ -715,13 +716,13 @@ function AgentEditor({
                     {!advanced ? (
                         <button
                             type="button"
-                            className="self-start text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                            className={cn(settingType.small, "self-start text-muted-foreground underline-offset-2 hover:text-foreground hover:underline")}
                             onClick={() => setAdvanced(true)}
                         >
                             {t("settings.agents.editor.engineMore")}
                         </button>
                     ) : (
-                    <div className="flex flex-col gap-1 text-sm">
+                    <div className={cn(settingType.body, "flex flex-col gap-1")}>
                         <label htmlFor="agent-engine">{t("settings.agents.editor.engine")}</label>
                         <Select
                             id="agent-engine"
@@ -736,14 +737,14 @@ function AgentEditor({
                                 )
                             }
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {onPolar
                                 ? t("settings.agents.editor.enginePolarHint")
                                 : t("settings.agents.editor.engineToolHint")}
                         </span>
                     </div>
                     )}
-                    <div className="flex flex-col gap-1 text-sm">
+                    <div className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span>{t("settings.agents.editor.instructions")} *</span>
                         <MarkdownDocumentField
                             value={values.instructions}
@@ -755,8 +756,8 @@ function AgentEditor({
                         <span
                             className={
                                 instructionsProblem
-                                    ? "text-xs text-danger"
-                                    : "text-xs text-muted-foreground"
+                                    ? settingType.error
+                                    : settingType.hint
                             }
                         >
                             {instructionsProblem
@@ -773,10 +774,10 @@ function AgentEditor({
                     />
                     {onPolar ? (
                         <>
-                            <label className="flex items-center justify-between gap-3 text-sm">
+                            <label className={cn(settingType.body, "flex items-center justify-between gap-3")}>
                                 <span className="min-w-0">
                                     <span className="block">{t("settings.agents.editor.web")}</span>
-                                    <span className="block text-xs text-muted-foreground">
+                                    <span className={cn(settingType.hint, "block")}>
                                         {t("settings.agents.editor.webHint")}
                                     </span>
                                 </span>
@@ -807,7 +808,7 @@ function AgentEditor({
                             />
                         </>
                     ) : null}
-                    <div className="flex flex-col gap-1 text-sm">
+                    <div className={cn(settingType.body, "flex flex-col gap-1")}>
                         <label htmlFor="agent-mode">{t("settings.agents.editor.mode")}</label>
                         <Select
                             id="agent-mode"
@@ -818,7 +819,7 @@ function AgentEditor({
                             }))}
                             onValueChange={(mode) => set("mode", mode as AgentInput["mode"])}
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t(`settings.agents.editor.modeHints.${values.mode}`)}
                         </span>
                     </div>
@@ -827,10 +828,10 @@ function AgentEditor({
                         onChange={(permission) => set("permission", permission)}
                     />
                     {admin ? (
-                        <label className="flex items-center justify-between gap-3 text-sm">
+                        <label className={cn(settingType.body, "flex items-center justify-between gap-3")}>
                             <span className="min-w-0">
                                 <span className="block">{t("settings.agents.editor.shared")}</span>
-                                <span className="block text-xs text-muted-foreground">
+                                <span className={cn(settingType.hint, "block")}>
                                     {t("settings.agents.editor.sharedHint")}
                                 </span>
                             </span>
@@ -880,9 +881,9 @@ function PickList({
     onToggle: (id: string, on: boolean) => void;
 }) {
     return (
-        <fieldset className="flex min-w-0 flex-col gap-1 text-sm">
+        <fieldset className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
             <legend>{title}</legend>
-            <span className="text-xs text-muted-foreground">{items.length > 0 ? hint : empty}</span>
+            <span className={settingType.hint}>{items.length > 0 ? hint : empty}</span>
             {items.length > 0 ? (
                 <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
                     {items.map((item) => {

@@ -23,7 +23,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowLeft, Filter, Loader2, Play, Zap } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { swap, within, type Path } from "@polaris/ui/automation-graph";
-import { Button, Input, SegmentedControl, Switch, cn } from "@polaris/ui";
+import { Button, Input, SegmentedControl, Switch, cn, settingType } from "@polaris/ui";
 import {
     FlowCanvas,
     type CanvasSelection,
@@ -393,7 +393,7 @@ export function FilterEditor({
             case "gate":
                 return (
                     <div className="flex flex-col gap-2">
-                        <p className="text-xs text-muted-foreground">{t("rules.editor.ifHint")}</p>
+                        <p className={settingType.hint}>{t("rules.editor.ifHint")}</p>
                         {groupsMatch}
                     </div>
                 );
@@ -448,7 +448,7 @@ export function FilterEditor({
                             />
                         )}
                     </flow.Field>
-                    <label className="flex h-8 items-center gap-2 text-xs text-muted-foreground">
+                    <label className={cn(settingType.body, "flex h-8 items-center gap-2 text-muted-foreground")}>
                         <Switch
                             checked={draft.enabled}
                             aria-label={t("rules.editor.enabled")}
@@ -470,7 +470,7 @@ export function FilterEditor({
                 {serverError && (
                     <p
                         role="alert"
-                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                        className={cn(settingType.body, "rounded-md bg-danger-soft px-3 py-2 text-danger-ink")}
                     >
                         {serverError}
                     </p>

@@ -18,7 +18,7 @@ import type { MailAccountView } from "@/lib/mailbox/accounts";
 import * as core from "@polaris/core";
 import { mailOptionLabel } from "@/app/(app)/mail/option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Select, Switch, Textarea, useToast } from "@polaris/ui";
+import { Button, cn, Select, settingType, Switch, Textarea, useToast } from "@polaris/ui";
 
 export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
     const router = useRouter();
@@ -54,7 +54,7 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
 
             <div className="space-y-3">
                 <label className="block">
-                    <span className="mb-1 block text-[12px] text-muted-foreground">
+                    <span className={cn(settingType.hint, "mb-1 block")}>
                         {t("signature.signedFrom", { address: account.address })}
                     </span>
                     <Textarea
@@ -66,7 +66,7 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
                 </label>
 
                 <label className="mb-3 block">
-                    <span className="mb-1 block text-[12px] text-muted-foreground">
+                    <span className={cn(settingType.hint, "mb-1 block")}>
                         {t("signature.when")}
                     </span>
                     <Select
@@ -79,12 +79,12 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
                             label: one in core.MAIL_SIGNATURE_AUTO_LABELS ? mailOptionLabel(tm, "signatureAuto", one) : one
                         }))}
                     />
-                    <span className="mt-1 block text-[12px] text-foreground-subtle">
+                    <span className={cn(settingType.hint, "mt-1 block")}>
                         {t("signature.whenHint")}
                     </span>
                 </label>
 
-                <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                <label className={cn(settingType.body, "flex items-center gap-2 text-muted-foreground")}>
                     <Switch
                         checked={above}
                         onChange={setAbove}
@@ -92,7 +92,7 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
                     />
                     {t("signature.above")}
                 </label>
-                <p className="text-[12px] text-foreground-subtle">
+                <p className={settingType.hint}>
                     {t("signature.aboveHint")}
                 </p>
 

@@ -418,8 +418,8 @@ export function PolarConnectors({
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1 basis-64">
                     <h2 className="text-sm font-semibold">{t("polarConnectors.title")}</h2>
-                    <p className="text-sm text-muted-foreground">{t("polarConnectors.intro")}</p>
-                    <p className="text-xs text-foreground-subtle">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("polarConnectors.intro")}</p>
+                    <p className={settingType.hint}>
                         {t("polarConnectors.reverse")}{" "}
                         <Link href="/account/assistants" className="text-primary hover:underline">
                             {t("polarConnectors.reverseLink")}
@@ -438,11 +438,11 @@ export function PolarConnectors({
                 </Button>
             </div>
             {waiting ? (
-                <p role="status" className="text-sm text-muted-foreground">
+                <p role="status" className={cn(settingType.body, "text-muted-foreground")}>
                     {t("polarConnectors.waiting")}
                 </p>
             ) : returned === "signed_in" || signedInNow ? (
-                <p role="status" className="text-sm text-success-ink">
+                <p role="status" className={cn(settingType.body, "text-success-ink")}>
                     {t("polarConnectors.signedIn")}
                 </p>
             ) : null}
@@ -482,7 +482,7 @@ export function PolarConnectors({
                 }}
             />
             {loadFailed && shown.length > 0 ? (
-                <p role="alert" className="flex flex-wrap items-center gap-2 text-sm text-danger">
+                <p role="alert" className={cn(settingType.error, "flex flex-wrap items-center gap-2")}>
                     {t("polarConnectors.directory.loadFailed")}
                     <Button type="button" size="sm" variant="ghost" onClick={() => void load(filters, 0)}>
                         {t("polarConnectors.directory.retry")}
@@ -671,10 +671,10 @@ function DirectoryCard({
                 >
                     <EntryMark item={item} />
                     <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium" title={item.name}>
+                        <span className={cn(settingType.body, "block truncate font-medium")} title={item.name}>
                             {item.name}
                         </span>
-                        <span className="block truncate text-xs text-muted-foreground" title={subtitle}>
+                        <span className={cn(settingType.hint, "block truncate")} title={subtitle}>
                             {subtitle}
                         </span>
                     </span>
@@ -730,7 +730,7 @@ function ConnectorDetail({
                         <DialogTitle className="truncate" title={item.name}>
                             {item.name}
                         </DialogTitle>
-                        <p className="truncate text-xs text-muted-foreground" title={subtitle}>
+                        <p className={cn(settingType.hint, "truncate")} title={subtitle}>
                             {subtitle}
                         </p>
                     </div>
@@ -744,7 +744,7 @@ function ConnectorDetail({
                         href={item.entry.docs}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        className={cn(settingType.small, "inline-flex items-center gap-1 text-primary hover:underline")}
                     >
                         {tp("settings.connectorCatalog.docs")}
                         <ExternalLink className="size-3 shrink-0" />
@@ -752,7 +752,7 @@ function ConnectorDetail({
                 ) : null}
             </div>
             {item.state === "unavailable" ? (
-                <p className="text-sm text-warning-ink">{tp("settings.connectorCatalog.hostBlocked")}</p>
+                <p className={cn(settingType.body, "text-warning-ink")}>{tp("settings.connectorCatalog.hostBlocked")}</p>
             ) : null}
             {item.connections.length === 0 && item.entry && item.state === "available" ? (
                 <Button type="button" className="self-start" onClick={onConnect}>
@@ -806,11 +806,11 @@ function ConnectionSection({
             <div className="flex min-w-0 items-center gap-3">
                 <div className="min-w-0 flex-1">
                     {showUrl ? (
-                        <p className="truncate text-sm" title={row.url}>
+                        <p className={cn(settingType.body, "truncate")} title={row.url}>
                             {row.url}
                         </p>
                     ) : (
-                        <p className="text-sm font-medium">{t("polarConnectors.directory.connection")}</p>
+                        <p className={cn(settingType.body, "font-medium")}>{t("polarConnectors.directory.connection")}</p>
                     )}
                 </div>
                 <StatusBadge row={row} />
@@ -858,13 +858,13 @@ function ConnectionSection({
                     {t("polarConnectors.directory.tools", { count: row.tools.length })}
                 </h3>
                 {row.tools.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">{t("polarConnectors.noTools")}</p>
+                    <p className={settingType.hint}>{t("polarConnectors.noTools")}</p>
                 ) : (
                     <ul className="flex flex-col divide-y divide-border">
                         {row.tools.map((tool) => (
                             <li key={tool.name} className="flex flex-col gap-2 py-2">
                                 <div className="min-w-0">
-                                    <p className="flex min-w-0 items-center gap-2 text-sm">
+                                    <p className={cn(settingType.body, "flex min-w-0 items-center gap-2")}>
                                         <span className="truncate" title={tool.name}>
                                             {tool.title}
                                         </span>
@@ -876,7 +876,7 @@ function ConnectionSection({
                                     </p>
                                     {tool.description ? (
                                         <p
-                                            className="line-clamp-2 text-xs text-muted-foreground"
+                                            className={cn(settingType.hint, "line-clamp-2")}
                                             title={tool.description}
                                         >
                                             {tool.description}
@@ -1011,7 +1011,7 @@ function AddConnector({
                     <DialogDescription>{t("polarConnectors.dialogBody")}</DialogDescription>
                 </DialogHeader>
                 <form className="flex flex-col gap-3" onSubmit={(event) => void submit(event)}>
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span>{t("polarConnectors.name")} *</span>
                         <Input
                             value={name}
@@ -1021,7 +1021,7 @@ function AddConnector({
                             placeholder={t("polarConnectors.namePlaceholder")}
                         />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span>{t("polarConnectors.url")} *</span>
                         <Input
                             value={url}
@@ -1037,7 +1037,7 @@ function AddConnector({
                             </span>
                         ) : null}
                     </label>
-                    <div className="flex flex-col gap-1 text-sm">
+                    <div className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span>{t("polarConnectors.auth")}</span>
                         <SegmentedControl<Auth>
                             size="sm"
@@ -1051,7 +1051,7 @@ function AddConnector({
                         />
                     </div>
                     {auth === "bearer" ? (
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             <span>{t("polarConnectors.token")} *</span>
                             <Input
                                 type="password"
@@ -1063,13 +1063,13 @@ function AddConnector({
                         </label>
                     ) : null}
                     {auth === "oauth" ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("polarConnectors.oauthHint")}
                         </p>
                     ) : null}
                     <button
                         type="button"
-                        className="flex items-center gap-1 self-start text-xs text-muted-foreground hover:text-foreground"
+                        className={cn(settingType.small, "flex items-center gap-1 self-start text-muted-foreground hover:text-foreground")}
                         aria-expanded={advanced}
                         onClick={() => setAdvanced(!advanced)}
                     >
@@ -1084,7 +1084,7 @@ function AddConnector({
                     {advanced ? (
                         <div className="flex flex-col gap-3">
                             {auth === "oauth" ? (
-                                <label className="flex flex-col gap-1 text-sm">
+                                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                     <span>{t("polarConnectors.clientId")}</span>
                                     <Input
                                         value={clientId}
@@ -1095,7 +1095,7 @@ function AddConnector({
                                 </label>
                             ) : null}
                             {auth === "oauth" && clientId.trim() ? (
-                                <label className="flex flex-col gap-1 text-sm">
+                                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                     <span>{t("polarConnectors.clientSecret")}</span>
                                     <Input
                                         type="password"
@@ -1106,7 +1106,7 @@ function AddConnector({
                                     />
                                 </label>
                             ) : null}
-                            <div className="flex flex-col gap-1 text-sm">
+                            <div className={cn(settingType.body, "flex flex-col gap-1")}>
                                 <span>{t("polarConnectors.transport")}</span>
                                 <SegmentedControl<Transport>
                                     size="sm"

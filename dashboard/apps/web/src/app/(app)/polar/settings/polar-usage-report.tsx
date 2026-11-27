@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { IntegrationLogo } from "@/components/logos";
 import { modelLabel } from "@/components/polar/routing-editor";
 import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
-import { Badge, Button, SegmentedControl, Skeleton, cn } from "@polaris/ui";
+import { Badge, Button, SegmentedControl, Skeleton, cn, settingType } from "@polaris/ui";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import type { ModelSelectorProvider } from "@/components/polar/elements/model-selector";
@@ -77,7 +77,7 @@ export function UsageReportCard({ providers }: { providers: ModelSelectorProvide
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                     <h2 className="text-sm font-medium text-foreground">{t("usageReport.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("usageReport.intro")}</p>
+                    <p className={settingType.hint}>{t("usageReport.intro")}</p>
                 </div>
                 <SegmentedControl
                     aria-label={t("usageReport.range")}
@@ -131,7 +131,7 @@ export function UsageReportData({
                 role="alert"
                 className="flex flex-col items-center gap-3 rounded-md border border-border px-4 py-8 text-center"
             >
-                <p className="text-sm text-danger">{t("usageReport.failed")}</p>
+                <p className={settingType.error}>{t("usageReport.failed")}</p>
                 <Button size="sm" variant="outline" onClick={onRetry}>
                     <RotateCw className="size-4 shrink-0" />
                     {t("usageReport.retry")}
@@ -141,7 +141,7 @@ export function UsageReportData({
     }
     if (load.report.totals.answers === 0) {
         return (
-            <p className="rounded-md border border-border px-4 py-8 text-center text-sm text-muted-foreground">
+            <p className={cn(settingType.body, "rounded-md border border-border px-4 py-8 text-center text-muted-foreground")}>
                 {t("usageReport.empty")}
             </p>
         );
@@ -172,7 +172,7 @@ function Report({
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                 {tiles.map((tile) => (
                     <div key={tile.label} className="min-w-0 rounded-md border border-border p-3">
-                        <dt className="truncate text-xs text-muted-foreground" title={tile.label}>
+                        <dt className={cn(settingType.hint, "truncate")} title={tile.label}>
                             {tile.label}
                         </dt>
                         <dd className="truncate text-base font-semibold tabular-nums" title={tile.value}>
@@ -182,7 +182,7 @@ function Report({
                 ))}
             </dl>
             {totals.unpriced > 0 ? (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("usageReport.unpriced", { count: totals.unpriced })}
                 </p>
             ) : null}
@@ -215,7 +215,7 @@ function TokensChart({ report }: { report: PolarUsageReport }) {
         <div className="flex min-w-0 flex-col gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-xs font-medium text-foreground">{t("usageReport.perDay")}</h3>
-                <span className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className={cn(settingType.hint, "flex items-center gap-3")}>
                     <span className="inline-flex items-center gap-1">
                         <span className="size-2 rounded-sm bg-primary" aria-hidden="true" />
                         {t("usageReport.input")}
@@ -277,7 +277,7 @@ function TokensChart({ report }: { report: PolarUsageReport }) {
                     })}
                 </svg>
                 {first && last ? (
-                    <div className="mt-1 flex justify-between gap-2 text-xs text-muted-foreground">
+                    <div className={cn(settingType.hint, "mt-1 flex justify-between gap-2")}>
                         <span className="truncate">{day(first.t)}</span>
                         <span className="truncate">{day(last.t)}</span>
                     </div>
@@ -304,7 +304,7 @@ function ModelsTable({
         <div className="flex min-w-0 flex-col gap-2">
             <h3 className="text-xs font-medium text-foreground">{t("usageReport.byModel")}</h3>
             <div className="overflow-x-auto rounded-md border border-border">
-                <table className="w-full min-w-[36rem] text-sm">
+                <table className={cn(settingType.body, "w-full min-w-[36rem]")}>
                     <thead className="bg-surface/60 text-start">
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">{t("usageReport.model")}</th>
@@ -390,10 +390,10 @@ function LatencyTable({
         <div className="flex min-w-0 flex-col gap-2">
             <h3 className="text-xs font-medium text-foreground">{t("usageReport.latency")}</h3>
             {rows.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t("usageReport.latencyEmpty")}</p>
+                <p className={settingType.hint}>{t("usageReport.latencyEmpty")}</p>
             ) : (
                 <div className="overflow-x-auto rounded-md border border-border">
-                    <table className="w-full min-w-[36rem] text-sm">
+                    <table className={cn(settingType.body, "w-full min-w-[36rem]")}>
                         <thead className="bg-surface/60 text-start">
                             <tr>
                                 <th className="w-full max-w-0 px-3 py-2 font-medium">{t("usageReport.model")}</th>
@@ -430,7 +430,7 @@ function LatencyTable({
                 </div>
             )}
             {untimed > 0 ? (
-                <p className="text-xs text-muted-foreground">{t("usageReport.untimed", { count: untimed })}</p>
+                <p className={settingType.hint}>{t("usageReport.untimed", { count: untimed })}</p>
             ) : null}
         </div>
     );
@@ -444,7 +444,7 @@ function ChatsTable({ report }: { report: PolarUsageReport }) {
         <div className="flex min-w-0 flex-col gap-2">
             <h3 className="text-xs font-medium text-foreground">{t("usageReport.byChat")}</h3>
             <div className="overflow-x-auto rounded-md border border-border">
-                <table className="w-full min-w-[28rem] text-sm">
+                <table className={cn(settingType.body, "w-full min-w-[28rem]")}>
                     <thead className="bg-surface/60 text-start">
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">{t("usageReport.chat")}</th>

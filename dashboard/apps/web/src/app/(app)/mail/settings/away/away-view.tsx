@@ -17,7 +17,7 @@ import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { setVacationAction } from "@/app/(app)/mail/actions";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { Button, Input, Switch, Textarea, useToast, DateInput } from "@polaris/ui";
+import { Button, Input, Switch, Textarea, useToast, DateInput, settingType, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 interface Vacation {
@@ -63,7 +63,7 @@ export function AwayView({
             <AccountPicker accounts={accounts} value={accountId} onChange={pick} />
 
             <div className="space-y-3">
-                <label className="flex items-center gap-2 text-[13px]">
+                <label className={cn(settingType.body, "flex items-center gap-2")}>
                     <Switch
                         checked={form.enabled}
                         onChange={(next) => setForm({ ...form, enabled: next })}
@@ -73,7 +73,7 @@ export function AwayView({
                 </label>
 
                 <label className="block">
-                    <span className="mb-1 block text-[12px] text-muted-foreground">
+                    <span className={cn(settingType.hint, "mb-1 block")}>
                         {t("away.subject")}
                     </span>
                     <Input
@@ -83,7 +83,7 @@ export function AwayView({
                 </label>
 
                 <label className="block">
-                    <span className="mb-1 block text-[12px] text-muted-foreground">
+                    <span className={cn(settingType.hint, "mb-1 block")}>
                         {t("away.body")} {form.enabled ? <span aria-hidden>*</span> : null}
                     </span>
                     <Textarea
@@ -96,7 +96,7 @@ export function AwayView({
 
                 <div className="flex flex-wrap gap-3">
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                        <span className={cn(settingType.hint, "mb-1 block")}>
                             {t("away.from")}
                         </span>
                         <DateInput
@@ -106,7 +106,7 @@ export function AwayView({
                         />
                     </label>
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                        <span className={cn(settingType.hint, "mb-1 block")}>
                             {t("away.until")}
                         </span>
                         <DateInput
@@ -116,7 +116,7 @@ export function AwayView({
                         />
                     </label>
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                        <span className={cn(settingType.hint, "mb-1 block")}>
                             {t("away.repeat")}
                         </span>
                         <Input
@@ -132,9 +132,9 @@ export function AwayView({
                     </label>
                 </div>
 
-                <p className="text-[12px] text-foreground-subtle">{t("away.never")}</p>
+                <p className={settingType.hint}>{t("away.never")}</p>
 
-                {problem ? <p className="text-[13px] text-danger">{problem}</p> : null}
+                {problem ? <p className={settingType.error}>{problem}</p> : null}
 
                 <Button
                     disabled={!dirty || saving}

@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
-import { Button, Select, Switch } from "@polaris/ui";
+import { Button, cn, Select, settingType, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 // Not lib/agents/model-key-providers: that one reaches the server-only key
 // checks, and this is drawn in the browser.
@@ -148,7 +148,7 @@ export function AgentWorkFields({
     return (
         <>
             {!polar ? (
-                <div className="flex flex-col gap-1 text-sm">
+                <div className={cn(settingType.body, "flex flex-col gap-1")}>
                     <label htmlFor={`${idPrefix}-account`}>{t("settings.agents.work.account")}</label>
                     <Select
                         id={`${idPrefix}-account`}
@@ -158,7 +158,7 @@ export function AgentWorkFields({
                             onChange({ ...value, account: next === ANY_ACCOUNT ? null : next })
                         }
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("settings.agents.work.accountHint")}{" "}
                         <Link href="/polar/settings/providers" className="text-primary hover:underline">
                             {t("settings.agents.work.manageAccounts")}
@@ -166,15 +166,15 @@ export function AgentWorkFields({
                     </span>
                 </div>
             ) : null}
-            <fieldset className="flex min-w-0 flex-col gap-1.5 text-sm">
+            <fieldset className={cn(settingType.body, "flex min-w-0 flex-col gap-1.5")}>
                 <legend>{t("settings.agents.work.models")}</legend>
                 {!takesModels ? (
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("settings.agents.work.ownModel")}
                     </span>
                 ) : (
                     <>
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {value.models.length === 0
                                 ? t("settings.agents.work.anyModel")
                                 : t("settings.agents.work.modelsHint")}
@@ -186,14 +186,14 @@ export function AgentWorkFields({
                                         key={keyOf(entry.provider, entry.model)}
                                         className="flex min-w-0 items-center gap-2 px-2 py-1.5"
                                     >
-                                        <span className="w-5 shrink-0 text-center text-xs tabular-nums text-muted-foreground">
+                                        <span className={cn(settingType.hint, "w-5 shrink-0 text-center tabular-nums")}>
                                             {index + 1}
                                         </span>
                                         <span className="min-w-0 flex-1 truncate" title={labelOf(entry)}>
                                             {labelOf(entry)}
                                         </span>
                                         {index === 0 ? (
-                                            <span className="min-w-0 max-w-full shrink-0 truncate rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary" title={t("settings.agents.work.preferred")}>
+                                            <span className={cn(settingType.small, "min-w-0 max-w-full shrink-0 truncate rounded-full bg-primary/10 px-2 py-0.5 text-primary")} title={t("settings.agents.work.preferred")}>
                                                 {t("settings.agents.work.preferred")}
                                             </span>
                                         ) : null}
@@ -240,7 +240,7 @@ export function AgentWorkFields({
                                 providers={selectorProviders(free)}
                                 choice={null}
                                 forCode
-                                triggerClassName="inline-flex h-8 w-full min-w-0 items-center gap-2 rounded-md border border-border bg-background px-2 text-start text-sm text-muted-foreground"
+                                triggerClassName={cn(settingType.body, "inline-flex h-8 w-full min-w-0 items-center gap-2 rounded-md border border-border bg-background px-2 text-start text-muted-foreground")}
                                 triggerContent={t("settings.agents.work.add")}
                                 onChoice={(picked) =>
                                     setModels([
@@ -250,7 +250,7 @@ export function AgentWorkFields({
                                 }
                             />
                         ) : options.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("settings.agents.work.noModels")}{" "}
                                 <Link href="/polar/settings/providers" className="text-primary hover:underline">
                                     {t("settings.agents.work.manageAccounts")}
@@ -261,7 +261,7 @@ export function AgentWorkFields({
                             <label className="flex items-center justify-between gap-3">
                                 <span className="min-w-0">
                                     <span className="block">{t("settings.agents.work.required")}</span>
-                                    <span className="block text-xs text-muted-foreground">
+                                    <span className={cn(settingType.hint, "block")}>
                                         {t("settings.agents.work.requiredHint")}
                                     </span>
                                 </span>

@@ -23,6 +23,7 @@ import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { deleteTemplateAction, saveTemplateAction } from "@/app/(app)/mail/actions";
 import {
     Button,
+    cn,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -30,6 +31,7 @@ import {
     DialogTitle,
     Input,
     Select,
+    settingType,
     useToast
 } from "@polaris/ui";
 
@@ -70,7 +72,7 @@ export function TemplatesView({
             <div className="flex flex-wrap items-start gap-3">
                 <div className="min-w-0 flex-1">
                     <h2 className="text-[13px] font-medium">{t("nav.templates")}</h2>
-                    <p className="text-[12px] text-muted-foreground">{t("templates.hint")}</p>
+                    <p className={settingType.hint}>{t("templates.hint")}</p>
                 </div>
                 <Button onClick={() => setEditing("")}>
                     <Plus className="size-4 shrink-0" aria-hidden />
@@ -79,7 +81,7 @@ export function TemplatesView({
             </div>
 
             {templates.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
+                <p className={cn(settingType.body, "rounded-md border border-dashed border-border px-4 py-6 text-center text-muted-foreground")}>
                     {t("templates.empty")}
                 </p>
             ) : (
@@ -94,11 +96,11 @@ export function TemplatesView({
                                 aria-hidden
                             />
                             <div className="min-w-0 flex-1">
-                                <span className="block truncate text-[13px]" title={template.name}>
+                                <span className={cn(settingType.body, "block truncate")} title={template.name}>
                                     {template.name}
                                 </span>
                                 <span
-                                    className="block truncate text-[12px] text-foreground-subtle"
+                                    className={cn(settingType.hint, "block truncate")}
                                     title={template.subject || undefined}
                                 >
                                     {accountLabel(template.accountId)}
@@ -245,7 +247,7 @@ function TemplateEditor({
                 </DialogHeader>
                 <div className="space-y-3">
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                        <span className={cn(settingType.hint, "mb-1 block")}>
                             {t("labels.name")} <span aria-hidden>*</span>
                         </span>
                         <Input
@@ -258,14 +260,14 @@ function TemplateEditor({
                             }}
                         />
                         {nameProblem ? (
-                            <span className="mt-1 block text-[12px] text-danger">
+                            <span className={cn(settingType.error, "mt-1 block")}>
                                 {nameProblem}
                             </span>
                         ) : null}
                     </label>
 
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                        <span className={cn(settingType.hint, "mb-1 block")}>
                             {t("templates.offered")}
                         </span>
                         <Select
@@ -288,7 +290,7 @@ function TemplateEditor({
                     </label>
 
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                        <span className={cn(settingType.hint, "mb-1 block")}>
                             {tm("print.subject")}
                         </span>
                         <Input
@@ -301,7 +303,7 @@ function TemplateEditor({
                     </label>
 
                     <div>
-                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                        <span className={cn(settingType.hint, "mb-1 block")}>
                             {t("away.body")} <span aria-hidden>*</span>
                         </span>
                         <div className="rounded-md border border-border px-2 py-1.5">
@@ -314,14 +316,14 @@ function TemplateEditor({
                             />
                         </div>
                         {invalid && invalid.path[0] === "body" ? (
-                            <span className="mt-1 block text-[12px] text-danger">
+                            <span className={cn(settingType.error, "mt-1 block")}>
                                 {mailRefusalText(tm, invalid.message)}
                             </span>
                         ) : null}
                     </div>
 
                     {problem && problem.field !== "name" ? (
-                        <p className="text-[12px] text-danger">{problem.message}</p>
+                        <p className={settingType.error}>{problem.message}</p>
                     ) : null}
 
                     <div className="flex gap-2">

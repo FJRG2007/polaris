@@ -6,6 +6,7 @@
  * a place you go twenty times a day next to one you go to twice a year.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import Link from "next/link";
 import { SettingsNav } from "./settings-nav";
 import { getTranslations } from "@/lib/i18n/request";
@@ -18,7 +19,7 @@ export default async function MailSettingsLayout({ children }: { children: React
         <div className="mx-auto w-full max-w-4xl px-4 py-6">
             <div className="mb-4 flex items-baseline gap-3">
                 <h1 className="text-[17px] font-semibold tracking-tight">{t("layout.title")}</h1>
-                <Link href="/mail" className="text-[12px] text-muted-foreground hover:text-foreground">
+                <Link href="/mail" className={cn(settingType.small, "text-muted-foreground hover:text-foreground")}>
                     {t("layout.back")}
                 </Link>
             </div>

@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { Button, Card, CardBody, settingType } from "@polaris/ui";
+import { Button, Card, CardBody, cn, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 
@@ -50,7 +50,7 @@ export function PolarToolGrants({ grants }: { grants: PolarToolGrantView[] }) {
                     </p>
                 ) : null}
                 {rows.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("polarTools.empty")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("polarTools.empty")}</p>
                 ) : (
                     <ul className="flex flex-col divide-y divide-border">
                         {rows.map((grant) => {
@@ -58,10 +58,10 @@ export function PolarToolGrants({ grants }: { grants: PolarToolGrantView[] }) {
                             return (
                                 <li key={grant.id} className="flex items-center gap-3 py-2">
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium" title={name}>
+                                        <p className={cn(settingType.body, "truncate font-medium")} title={name}>
                                             {name}
                                         </p>
-                                        <p className="truncate text-xs text-muted-foreground">
+                                        <p className={cn(settingType.hint, "truncate")}>
                                             {grant.title === null
                                                 ? `${t("polarTools.unknownTool")} - `
                                                 : ""}

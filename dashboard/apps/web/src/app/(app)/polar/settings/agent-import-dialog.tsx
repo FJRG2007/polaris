@@ -19,7 +19,8 @@ import {
     DialogTitle,
     AsyncSelect,
     type AsyncLoad,
-    settingType
+    settingType,
+    cn
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
@@ -92,7 +93,7 @@ export function AgentImportDialog({
                     <DialogDescription>{t("settings.agents.import.body")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex max-h-[65vh] min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain pe-1">
-                    <div className="flex min-w-0 flex-col gap-1 text-sm">
+                    <div className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
                         <label htmlFor="agent-import-paste">{t("settings.agents.import.paste")}</label>
                         <CodeEditor
                             id="agent-import-paste"
@@ -135,19 +136,19 @@ export function AgentImportDialog({
                     ) : null}
                     {read ? (
                         read.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">{t("settings.agents.import.none")}</p>
+                            <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.agents.import.none")}</p>
                         ) : (
                             <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                                 {read.map((entry, index) => (
                                     <li key={`${entry.path}-${index}`} className="flex min-w-0 items-center gap-3 px-3 py-2">
                                         <div className="min-w-0 flex-1">
                                             <p
-                                                className="truncate text-sm font-medium"
+                                                className={cn(settingType.body, "truncate font-medium")}
                                                 title={entry.agent?.name ?? entry.path}
                                             >
                                                 {entry.agent?.name ?? entry.path}
                                             </p>
-                                            <p className="truncate text-xs text-muted-foreground" title={entry.path}>
+                                            <p className={cn(settingType.hint, "truncate")} title={entry.path}>
                                                 {entry.agent
                                                     ? entry.agent.description || entry.path
                                                     : t("settings.agents.import.unreadable")}
@@ -214,7 +215,7 @@ function RepoAgentsSource({ show }: { show: (read: ReadAgentFile[] | string) => 
     }
 
     return (
-        <div className="flex min-w-0 flex-col gap-1 text-sm">
+        <div className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
             <span>{t("settings.agents.import.repo")}</span>
             <div className="flex min-w-0 flex-wrap gap-2">
                 <AsyncSelect<RepoEntry>

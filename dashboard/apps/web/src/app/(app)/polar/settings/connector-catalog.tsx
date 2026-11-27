@@ -12,6 +12,7 @@
 import { useState, type FormEvent } from "react";
 import {
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -149,7 +150,7 @@ export function ConnectDialog({
                 </DialogHeader>
                 <form className="flex flex-col gap-3" onSubmit={(event) => void submit(event)}>
                     {entry.field ? (
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             <span>{t("settings.connectorCatalog.fields.shop")} *</span>
                             <Input
                                 value={shop}
@@ -162,7 +163,7 @@ export function ConnectDialog({
                                 onChange={(event) => setShop(event.target.value)}
                             />
                             <span
-                                className={shopBad ? "text-xs text-danger" : "text-xs text-muted-foreground"}
+                                className={shopBad ? settingType.error : settingType.hint}
                             >
                                 {shopBad
                                     ? t("settings.connectorCatalog.fields.shopInvalid")
@@ -171,7 +172,7 @@ export function ConnectDialog({
                         </label>
                     ) : null}
                     {entry.auth === "oauth_or_bearer" ? (
-                        <div className="flex flex-col gap-1 text-sm">
+                        <div className={cn(settingType.body, "flex flex-col gap-1")}>
                             <span>{t("settings.connectorCatalog.method")}</span>
                             <SegmentedControl<Method>
                                 size="sm"
@@ -186,7 +187,7 @@ export function ConnectDialog({
                         </div>
                     ) : null}
                     {usesKey ? (
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             <span>{t("settings.connectorCatalog.apiKey")} *</span>
                             <Input
                                 type="password"
@@ -198,7 +199,7 @@ export function ConnectDialog({
                         </label>
                     ) : null}
                     {(entry.headers ?? []).map((header, index) => (
-                        <label key={header.name} className="flex flex-col gap-1 text-sm">
+                        <label key={header.name} className={cn(settingType.body, "flex flex-col gap-1")}>
                             <span>{t(`settings.connectorCatalog.fields.${header.label}` as never)} *</span>
                             <Input
                                 type={header.secret ? "password" : "text"}
@@ -223,7 +224,7 @@ export function ConnectDialog({
                         </label>
                     ))}
                     {hostBlocked ? (
-                        <p className="text-xs text-warning-ink">
+                        <p className={cn(settingType.small, "text-warning-ink")}>
                             {t("settings.connectorCatalog.hostBlocked")}
                         </p>
                     ) : null}

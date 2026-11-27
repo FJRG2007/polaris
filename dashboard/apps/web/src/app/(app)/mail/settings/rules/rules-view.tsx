@@ -22,10 +22,12 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import {
     Button,
+    cn,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    settingType,
     Switch,
     useToast
 } from "@polaris/ui";
@@ -374,7 +376,7 @@ export function RulesView({
                     <h2 className="break-words text-[13px] font-medium [overflow-wrap:anywhere]">
                         {t("rules.title", { address: account.address })}
                     </h2>
-                    <p className="text-[12px] text-muted-foreground">{t("rules.hint")}</p>
+                    <p className={settingType.hint}>{t("rules.hint")}</p>
                 </div>
                 <Button
                     variant="secondary"
@@ -404,7 +406,7 @@ export function RulesView({
             </div>
 
             {mine.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
+                <p className={cn(settingType.body, "rounded-md border border-dashed border-border px-4 py-6 text-center text-muted-foreground")}>
                     {t("rules.empty")}
                 </p>
             ) : null}
@@ -427,13 +429,13 @@ export function RulesView({
                             className="rounded-md border border-border bg-card px-3 py-2"
                         >
                             <div className="flex min-w-0 items-start gap-2">
-                                <span className="mt-0.5 w-5 shrink-0 text-end text-[11px] tabular-nums text-foreground-subtle">
+                                <span className={cn(settingType.hint, "mt-0.5 w-5 shrink-0 text-end tabular-nums")}>
                                     {index + 1}
                                 </span>
                                 <div className="min-w-0 flex-1">
                                     <button
                                         type="button"
-                                        className="flex max-w-full items-center gap-1.5 text-start text-[13px] font-medium hover:underline disabled:no-underline"
+                                        className={cn(settingType.body, "flex max-w-full items-center gap-1.5 text-start font-medium hover:underline disabled:no-underline")}
                                         disabled={rule.saving}
                                         title={t("rules.list.editNamed", { name: rule.name })}
                                         onClick={() => open(rule)}
@@ -441,10 +443,10 @@ export function RulesView({
                                         <span className="min-w-0 truncate">{rule.name}</span>
                                         {rule.saving ? <Saving /> : null}
                                     </button>
-                                    <p className="break-words text-[12px] text-muted-foreground [overflow-wrap:anywhere]">
+                                    <p className={cn(settingType.hint, "break-words [overflow-wrap:anywhere]")}>
                                         {sentence}
                                     </p>
-                                    <p className="text-[11px] text-foreground-subtle">
+                                    <p className={settingType.hint}>
                                         {rule.enabled ? t("rules.on") : t("rules.off")}
                                         {stops ? t("rules.stops") : ""}
                                         {rule.matchCount > 0
@@ -452,7 +454,7 @@ export function RulesView({
                                             : ""}
                                     </p>
                                     {unverified.length > 0 ? (
-                                        <p className="break-words text-[11px] text-warning [overflow-wrap:anywhere]">
+                                        <p className={cn(settingType.small, "break-words text-warning [overflow-wrap:anywhere]")}>
                                             {t("rules.list.unverified", {
                                                 to: unverified.join(", ")
                                             })}{" "}

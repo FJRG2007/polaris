@@ -16,7 +16,7 @@ import { JsonView } from "@/components/json-view";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createApiKeyAction } from "@/app/(app)/account/api-keys/actions";
-import { Button, SegmentedControl, Skeleton, useToast } from "@polaris/ui";
+import { Button, cn, SegmentedControl, settingType, Skeleton, useToast } from "@polaris/ui";
 import { ACP_EDITORS, acpSnippet, type AcpEditor } from "@/lib/polar/acp-setup";
 import { editorSetupAccessAction } from "@/app/(app)/polar/settings/routing-actions";
 
@@ -54,19 +54,19 @@ export function EditorsCard() {
         <section className="flex min-w-0 flex-col gap-2">
             <div className="min-w-0">
                 <h3 className="text-sm font-medium text-foreground">{t("routing.editors.title")}</h3>
-                <p className="text-xs text-muted-foreground">{t("routing.editors.intro")}</p>
+                <p className={settingType.hint}>{t("routing.editors.intro")}</p>
             </div>
             {access === null ? (
                 <Skeleton className="h-48 w-full rounded-md" data-testid="editors-skeleton" />
             ) : access === "failed" ? (
                 <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2">
-                    <p className="min-w-0 text-xs text-muted-foreground">{t("routing.editors.checkFailed")}</p>
+                    <p className={cn(settingType.hint, "min-w-0")}>{t("routing.editors.checkFailed")}</p>
                     <Button size="sm" variant="outline" onClick={check}>
                         {t("routing.editors.retry")}
                     </Button>
                 </div>
             ) : !access.use ? (
-                <p className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
+                <p className={cn(settingType.small, "rounded-md border border-border px-3 py-2 text-muted-foreground")}>
                     {t("routing.editors.noAccess")}
                 </p>
             ) : (
@@ -78,19 +78,19 @@ export function EditorsCard() {
                         aria-label={t("routing.editors.pick")}
                         options={ACP_EDITORS.map((value) => ({ value, label: t(`routing.editors.${value}.name`) }))}
                     />
-                    <p className="text-xs text-muted-foreground">{t(`routing.editors.${editor}.where`)}</p>
+                    <p className={settingType.hint}>{t(`routing.editors.${editor}.where`)}</p>
                     <JsonView value={acpSnippet(editor, base, secret ?? undefined)} label={t(`routing.editors.${editor}.name`)} />
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                         {!access.keys ? (
-                            <p className="min-w-0 text-xs text-muted-foreground">{t("routing.editors.noKeys")}</p>
+                            <p className={cn(settingType.hint, "min-w-0")}>{t("routing.editors.noKeys")}</p>
                         ) : secret ? (
-                            <p className="min-w-0 text-xs text-muted-foreground">{t("routing.editors.keyMade")}</p>
+                            <p className={cn(settingType.hint, "min-w-0")}>{t("routing.editors.keyMade")}</p>
                         ) : (
                             <>
                                 <Button size="sm" variant="outline" onClick={createKey} disabled={creating}>
                                     {t("routing.editors.createKey")}
                                 </Button>
-                                <p className="min-w-0 text-xs text-muted-foreground">
+                                <p className={cn(settingType.hint, "min-w-0")}>
                                     {t.rich("routing.editors.keyHint", {
                                         link: (chunks) => (
                                             <Link key="link" href="/account/api-keys" className="text-primary hover:underline">
@@ -102,7 +102,7 @@ export function EditorsCard() {
                             </>
                         )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{t("routing.editors.node")}</p>
+                    <p className={settingType.hint}>{t("routing.editors.node")}</p>
                 </div>
             )}
         </section>

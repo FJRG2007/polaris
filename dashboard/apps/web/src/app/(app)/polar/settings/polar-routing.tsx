@@ -18,7 +18,7 @@ import { useAppUrl } from "@/components/app-url";
 import type { PolarRouting } from "@/lib/polar/routing";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useSettingsModels } from "@/components/polar/settings-models";
-import { Button, CopyButton, Skeleton, useToast } from "@polaris/ui";
+import { Button, cn, CopyButton, settingType, Skeleton, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CodingToolsEditor, FallbackEditor } from "@/components/polar/routing-editor";
 import type { RoutingScreen } from "@/lib/polar/routing-screen";
@@ -110,7 +110,7 @@ export function PolarRoutingSettings({ part }: { part: "fallbacks" | "tools" }) 
                 <>
                     {screen.own ? (
                         <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2">
-                            <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                            <p className={cn(settingType.hint, "min-w-0 flex-1")}>
                                 {t("routing.own.body")}
                             </p>
                             <Button
@@ -125,10 +125,10 @@ export function PolarRoutingSettings({ part }: { part: "fallbacks" | "tools" }) 
                     ) : (
                         <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-md border border-border bg-surface px-3 py-2">
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-foreground">
+                                <p className={cn(settingType.body, "text-foreground")}>
                                     {t("routing.following.title")}
                                 </p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className={settingType.hint}>
                                     {t("routing.following.body")}
                                 </p>
                             </div>
@@ -168,7 +168,7 @@ function LoadFailed({ onRetry }: { onRetry: () => void }) {
     const t = useTranslations("polar");
     return (
         <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-md border border-border px-3 py-3">
-            <p className="min-w-0 flex-1 text-sm text-muted-foreground" role="alert">
+            <p className={cn(settingType.body, "min-w-0 flex-1 text-muted-foreground")} role="alert">
                 {t("routing.errors.load")}
             </p>
             <Button type="button" size="sm" variant="outline" onClick={onRetry}>
@@ -225,13 +225,13 @@ function ConnectCard() {
                 <h3 className="text-sm font-medium text-foreground">
                     {t("routing.connect.title")}
                 </h3>
-                <p className="text-xs text-muted-foreground">{t("routing.connect.intro")}</p>
+                <p className={settingType.hint}>{t("routing.connect.intro")}</p>
             </div>
             <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                 {endpoints.map((endpoint) => (
                     <li key={endpoint.id} className="flex min-w-0 flex-col gap-1 px-3 py-2">
-                        <p className="text-sm text-foreground">{endpoint.title}</p>
-                        <p className="text-xs text-muted-foreground">{endpoint.hint}</p>
+                        <p className={cn(settingType.body, "text-foreground")}>{endpoint.title}</p>
+                        <p className={settingType.hint}>{endpoint.hint}</p>
                         <div className="flex min-w-0 items-center gap-2 rounded-md bg-field px-2 py-1">
                             <code className="min-w-0 flex-1 truncate font-mono text-xs" title={endpoint.url}>
                                 {endpoint.url}
@@ -239,7 +239,7 @@ function ConnectCard() {
                             <CopyButton value={endpoint.url} label={endpoint.title} />
                         </div>
                         {endpoint.variables.length > 0 ? (
-                            <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                            <div className={cn(settingType.hint, "flex flex-wrap items-center gap-1")}>
                                 <span>{t("routing.connect.variables")}</span>
                                 {endpoint.variables.map((name) => (
                                     <span key={name} className="inline-flex items-center gap-1">
@@ -251,7 +251,7 @@ function ConnectCard() {
                         ) : null}
                     </li>
                 ))}
-                <li className="px-3 py-2 text-xs text-muted-foreground">
+                <li className={cn(settingType.hint, "px-3 py-2")}>
                     {t.rich("routing.connect.key", {
                         link: (chunks) => (
                             <Link

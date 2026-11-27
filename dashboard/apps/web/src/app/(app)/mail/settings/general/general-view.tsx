@@ -18,7 +18,7 @@
 
 import * as core from "@polaris/core";
 import { refusalOf } from "@/app/(app)/mail/refusal";
-import { Button, Select, useToast } from "@polaris/ui";
+import { Button, cn, Select, settingType, useToast } from "@polaris/ui";
 import { useMailLayout } from "@/app/(app)/mail/use-mail-layout";
 import { setMailPreferencesAction } from "@/app/(app)/mail/actions";
 import { useEffect, useState, type ReactNode } from "react";
@@ -151,7 +151,7 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
                     {saving ? t("shortcuts.saving") : tc("actions.save")}
                 </Button>
                 {changed ? (
-                    <span className="text-[12px] text-muted-foreground">{t("shortcuts.unsaved")}</span>
+                    <span className={settingType.hint}>{t("shortcuts.unsaved")}</span>
                 ) : null}
             </div>
 
@@ -232,7 +232,7 @@ function MailtoHandler() {
             hint={t("general.mailtoHint")}
         >
             {supported === false ? (
-                <p className="text-[13px] text-muted-foreground">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {t("general.mailtoUnsupported", { surface: desktop ? "app" : "browser" })}
                 </p>
             ) : (
@@ -273,9 +273,9 @@ function MailtoHandler() {
 function Field({ label, hint, children }: { label: string; hint: string; children: ReactNode }) {
     return (
         <div className="space-y-1">
-            <span className="block text-[13px] font-medium">{label}</span>
+            <span className={cn(settingType.body, "block font-medium")}>{label}</span>
             <div className="max-w-sm">{children}</div>
-            <p className="text-[12px] text-muted-foreground">{hint}</p>
+            <p className={settingType.hint}>{hint}</p>
         </div>
     );
 }

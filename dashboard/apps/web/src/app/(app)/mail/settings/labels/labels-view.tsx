@@ -16,7 +16,19 @@ import { useRouter } from "next/navigation";
 import { Plus, Tag, Trash2 } from "lucide-react";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailLabelView } from "@/lib/mailbox/labels";
-import { Button, ColorPicker, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, useToast } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    ColorPicker,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    settingType,
+    useToast
+} from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createLabelAction, deleteLabelAction } from "@/app/(app)/mail/actions";
 
@@ -34,7 +46,7 @@ export function LabelsView({ labels }: { labels: MailLabelView[] }) {
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                     <h2 className="text-[13px] font-medium">{t("nav.labels")}</h2>
-                    <p className="text-[12px] text-muted-foreground">{t("labels.hint")}</p>
+                    <p className={settingType.hint}>{t("labels.hint")}</p>
                 </div>
                 <Button size="sm" onClick={() => setAdding(true)}>
                     <Plus className="size-4 shrink-0" aria-hidden />
@@ -43,13 +55,13 @@ export function LabelsView({ labels }: { labels: MailLabelView[] }) {
             </div>
 
             {labels.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
+                <p className={cn(settingType.body, "rounded-md border border-dashed border-border px-4 py-6 text-center text-muted-foreground")}>
                     {t("labels.empty")}
                 </p>
             ) : (
                 <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full text-sm">
-                        <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                    <table className={cn(settingType.body, "w-full")}>
+                        <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                             <tr>
                                 <th scope="col" className="w-full max-w-0 px-3 py-2 text-start font-medium">
                                     {t("labels.columns.name")}
@@ -68,12 +80,12 @@ export function LabelsView({ labels }: { labels: MailLabelView[] }) {
                                     <td className="max-w-0 px-3 py-2 align-middle">
                                         <span className="flex min-w-0 items-center gap-2">
                                             <Tag className="size-4 shrink-0" style={{ color: label.color }} aria-hidden />
-                                            <span className="min-w-0 truncate text-[13px]" title={label.name}>
+                                            <span className={cn(settingType.body, "min-w-0 truncate")} title={label.name}>
                                                 {label.name}
                                             </span>
                                         </span>
                                     </td>
-                                    <td className="hidden whitespace-nowrap px-3 py-2 align-middle text-[12px] text-foreground-subtle sm:table-cell">
+                                    <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 align-middle sm:table-cell")}>
                                         {t("labels.count", { count: label.count })}
                                     </td>
                                     <td className="px-3 py-2 align-middle">
@@ -146,7 +158,7 @@ function AddLabelDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
                 <form className="flex flex-col gap-3" onSubmit={submit}>
                     <div className="flex items-end gap-2">
                         <label className="block min-w-0 flex-1">
-                            <span className="mb-1 block text-[12px] text-muted-foreground">
+                            <span className={cn(settingType.hint, "mb-1 block")}>
                                 {t("labels.name")} <span aria-hidden>*</span>
                             </span>
                             <Input
@@ -163,7 +175,7 @@ function AddLabelDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
                         <ColorPicker value={color} onChange={setColor} aria-label={t("labels.colour")} />
                     </div>
                     {problem ? (
-                        <p className="text-[13px] text-danger" role="alert">
+                        <p className={settingType.error} role="alert">
                             {problem}
                         </p>
                     ) : null}

@@ -16,7 +16,7 @@ import * as flow from "@polaris/ui/automation";
 import type { MailLabelView } from "@/lib/mailbox/labels";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import { Plus, X } from "lucide-react";
-import { Checkbox, Input, Select, settingType, SizeField } from "@polaris/ui";
+import { Checkbox, cn, Input, Select, settingType, SizeField } from "@polaris/ui";
 import { swap, type Path } from "@polaris/ui/automation-graph";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -27,7 +27,7 @@ export function TriggerCard() {
     const t = useTranslations("mailSettings");
     return (
         <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-card p-3">
-            <p className="min-w-0 text-xs text-muted-foreground">{t("rules.trigger.onSave")}</p>
+            <p className={cn(settingType.hint, "min-w-0")}>{t("rules.trigger.onSave")}</p>
         </div>
     );
 }
@@ -71,13 +71,13 @@ export function GroupCard({
                         onChange={(match) => onChange({ ...group, match })}
                     />
                 ) : (
-                    <span className="text-xs text-muted-foreground">{t("rules.editor.group")}</span>
+                    <span className={settingType.hint}>{t("rules.editor.group")}</span>
                 )}
                 <span className="flex-1" />
                 {!disabled && (
                     <button
                         type="button"
-                        className="h-7 shrink-0 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                        className={cn(settingType.body, "h-7 shrink-0 rounded-md px-2 text-muted-foreground hover:bg-muted hover:text-foreground")}
                         onClick={onRemove}
                     >
                         {t("rules.editor.removeGroup")}
@@ -330,7 +330,7 @@ export function ConditionCard({
                                 <div className="flex min-w-0 flex-col gap-2">
                                     {more.map((value, at) => (
                                         <div key={at} className="flex min-w-0 items-center gap-2">
-                                            <span className="w-6 shrink-0 text-xs text-muted-foreground">
+                                            <span className={cn(settingType.hint, "w-6 shrink-0")}>
                                                 {negative
                                                     ? t("rules.editor.nor")
                                                     : t("rules.editor.or")}
@@ -383,7 +383,7 @@ export function ConditionCard({
                             {more.length < core.MAIL_FILTER_LIMITS.alternatives ? (
                                 <button
                                     type="button"
-                                    className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    className={cn(settingType.body, "inline-flex h-7 items-center gap-1 rounded-md px-2 text-muted-foreground hover:bg-muted hover:text-foreground")}
                                     onClick={() => setMore([...more, ""])}
                                 >
                                     <Plus className="size-3.5" />
@@ -391,7 +391,7 @@ export function ConditionCard({
                                 </button>
                             ) : null}
                             {core.mailTellsCapitals(condition.operator, condition.kind) ? (
-                                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <label className={cn(settingType.hint, "flex items-center gap-2")}>
                                     <Checkbox
                                         checked={condition.caseSensitive === true}
                                         onChange={(event) =>
@@ -411,11 +411,11 @@ export function ConditionCard({
             {/* What "similar" and a pattern will actually do, so the condition
                 can be judged before it is saved. */}
             {condition.operator === "similar" && condition.value.trim() ? (
-                <p className="min-w-0 break-words text-[0.6875rem] text-foreground-subtle [overflow-wrap:anywhere] sm:col-span-2">
+                <p className={cn(settingType.hint, "min-w-0 break-words [overflow-wrap:anywhere] sm:col-span-2")}>
                     {shape ? t("rules.similarShape", { shape }) : t("rules.similarNothing")}
                 </p>
             ) : condition.operator === "matches" ? (
-                <p className="text-[0.6875rem] text-foreground-subtle sm:col-span-2">
+                <p className={cn(settingType.hint, "sm:col-span-2")}>
                     {t("rules.editor.patternHint", { count: core.MAIL_FILTER_LIMITS.patternText })}
                 </p>
             ) : null}
@@ -479,7 +479,7 @@ export function StepCard({
                 <flow.Field label={t("rules.folderLabel")} path={[...path, "folder"]} required>
                     {(id) =>
                         folders.length === 0 ? (
-                            <p id={id} className="text-xs text-muted-foreground">
+                            <p id={id} className={settingType.hint}>
                                 {t("rules.editor.noFolders")}
                             </p>
                         ) : (
@@ -502,7 +502,7 @@ export function StepCard({
                 <flow.Field label={t("rules.labelLabel")} path={[...path, "label"]} required>
                     {(id) =>
                         labels.length === 0 ? (
-                            <p id={id} className="text-xs text-muted-foreground">
+                            <p id={id} className={settingType.hint}>
                                 {t("rules.editor.noLabels")}
                             </p>
                         ) : (
@@ -545,13 +545,13 @@ export function StepCard({
                                     onValueChange={(to) => onChange({ ...step, to })}
                                 />
                             ) : (
-                                <p id={id} className="text-xs text-muted-foreground">
+                                <p id={id} className={settingType.hint}>
                                     {t("rules.editor.noVerified")}
                                 </p>
                             )}
                             <Link
                                 href="/account/details"
-                                className="self-start text-[0.6875rem] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                                className={cn(settingType.small, "self-start text-muted-foreground underline-offset-2 hover:text-foreground hover:underline")}
                             >
                                 {t("rules.editor.verifyAddress")}
                             </Link>
@@ -560,12 +560,12 @@ export function StepCard({
                 </flow.Field>
             )}
             {step.kind === "forward" && (
-                <p className="text-[0.6875rem] text-foreground-subtle sm:col-span-2">
+                <p className={cn(settingType.hint, "sm:col-span-2")}>
                     {t("rules.forwardHint")}
                 </p>
             )}
             {step.kind === "stop" && (
-                <p className="text-[0.6875rem] text-foreground-subtle sm:col-span-2">
+                <p className={cn(settingType.hint, "sm:col-span-2")}>
                     {t("rules.editor.stopHint")}
                 </p>
             )}

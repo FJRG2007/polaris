@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button, Card, CardBody, settingType, Skeleton } from "@polaris/ui";
+import { Button, Card, CardBody, cn, settingType, Skeleton } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 interface SitesView {
@@ -66,14 +66,14 @@ export function PolarBrowserSites() {
                 {!view ? (
                     <Skeleton className="h-10 w-full" />
                 ) : !view.connected ? (
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                    <div className={cn(settingType.body, "flex flex-wrap items-center gap-2 text-muted-foreground")}>
                         <span className="min-w-0">{t("settings.browserSites.notConnected")}</span>
                         <Button size="sm" variant="outline" asChild>
                             <Link href="/account/downloads">{t("web.browserConnect")}</Link>
                         </Button>
                     </div>
                 ) : view.sites.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t("settings.browserSites.empty")}
                     </p>
                 ) : (
@@ -81,7 +81,7 @@ export function PolarBrowserSites() {
                         {view.sites.map((site) => (
                             <li key={site} className="flex items-center gap-3 py-2">
                                 <p
-                                    className="min-w-0 flex-1 truncate text-sm font-medium"
+                                    className={cn(settingType.body, "min-w-0 flex-1 truncate font-medium")}
                                     title={site}
                                 >
                                     {site}

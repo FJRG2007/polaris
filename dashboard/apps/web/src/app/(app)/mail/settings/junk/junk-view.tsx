@@ -17,7 +17,15 @@ import { useBusy } from "@/app/(app)/mail/use-busy";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { Button, EmptyState, Switch, useOptimisticToggle, useToast } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    EmptyState,
+    settingType,
+    Switch,
+    useOptimisticToggle,
+    useToast
+} from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { forgetSpamAction, setSpamFilterAction } from "@/app/(app)/mail/actions";
 
@@ -84,15 +92,15 @@ export function JunkView({
         <div>
             <AccountPicker accounts={accounts} value={account.id} onChange={setAccountId} />
 
-            <p className="rounded-md border border-border bg-card px-3 py-2 text-[13px] text-muted-foreground">
+            <p className={cn(settingType.body, "rounded-md border border-border bg-card px-3 py-2 text-muted-foreground")}>
                 {t("junk.explain")}
             </p>
 
             <section className="mt-4 rounded-md border border-border">
                 <div className="flex items-center gap-3 px-3 py-2.5">
                     <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium">{t("junk.judge")}</p>
-                        <p className="text-[12px] text-muted-foreground">{t("junk.judgeHint")}</p>
+                        <p className={cn(settingType.body, "font-medium")}>{t("junk.judge")}</p>
+                        <p className={settingType.hint}>{t("junk.judgeHint")}</p>
                     </div>
                     <SpamSwitch
                         key={account.id}
@@ -101,7 +109,7 @@ export function JunkView({
                         onSaved={(id, next) => setOn((held) => ({ ...held, [id]: next }))}
                     />
                 </div>
-                <p className="border-t border-border px-3 py-2 text-[12px] text-foreground-subtle">
+                <p className={cn(settingType.small, "border-t border-border px-3 py-2 text-foreground-subtle")}>
                     {t("junk.offHint")}
                 </p>
             </section>
@@ -109,15 +117,15 @@ export function JunkView({
             <section className="mt-4">
                 <h2 className="text-[13px] font-medium">{t("junk.learned")}</h2>
                 {state.junk + state.good === 0 ? (
-                    <p className="mt-1 text-[12px] text-muted-foreground">
+                    <p className={cn(settingType.hint, "mt-1")}>
                         {t("junk.nothingYet")}
                     </p>
                 ) : (
                     <>
-                        <p className="mt-1 text-[13px]">
+                        <p className={cn(settingType.body, "mt-1")}>
                             {t("junk.counts", { junk: state.junk, good: state.good, words: state.words })}
                         </p>
-                        <p className="mt-1 text-[12px] text-foreground-subtle">
+                        <p className={cn(settingType.hint, "mt-1")}>
                             {t("junk.changeMind")}
                         </p>
                     </>

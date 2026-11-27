@@ -18,6 +18,7 @@ import {
     Card,
     CardBody,
     Checkbox,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -124,14 +125,14 @@ function AuditNote({ audit }: { audit: DirectoryAudit | null }) {
     const providers = audit.flaggedBy.join(", ");
     if (audit.status === "pass")
         return (
-            <p className="flex items-center gap-1.5 text-xs text-success">
+            <p className={cn(settingType.small, "flex items-center gap-1.5 text-success")}>
                 <ShieldCheck className="size-3.5 shrink-0" />
                 {t("settings.skills.audit.pass")}
             </p>
         );
     return (
         <p
-            className={`flex items-center gap-1.5 text-xs ${audit.status === "fail" ? "text-danger" : "text-warning"}`}
+            className={cn(settingType.small, "flex items-center gap-1.5", audit.status === "fail" ? "text-danger" : "text-warning")}
         >
             <ShieldAlert className="size-3.5 shrink-0" />
             {t(`settings.skills.audit.${audit.status}`, { providers })}
@@ -304,7 +305,7 @@ export function SkillImportDialog({
                         </div>
                     ) : (
                         <div className="flex flex-col gap-3">
-                            <form className="flex flex-col gap-1 text-sm" onSubmit={submitAddress}>
+                            <form className={cn(settingType.body, "flex flex-col gap-1")} onSubmit={submitAddress}>
                                 <label htmlFor="skill-import-address">
                                     {t("settings.skills.importer.url")}
                                 </label>
@@ -330,7 +331,7 @@ export function SkillImportDialog({
                                     </Button>
                                 </div>
                             </form>
-                            <p className="text-center text-xs text-muted-foreground">
+                            <p className={cn(settingType.hint, "text-center")}>
                                 {t("settings.skills.importer.or")}
                             </p>
                             <Button
@@ -342,7 +343,7 @@ export function SkillImportDialog({
                                 <Upload className="h-3.5 w-3.5 shrink-0" />
                                 {t("settings.skills.importer.file")}
                             </Button>
-                            <p className="text-center text-xs text-muted-foreground">
+                            <p className={cn(settingType.hint, "text-center")}>
                                 {t("settings.skills.importer.fileHint")}
                             </p>
                             {pending ? <Skeleton className="h-16 w-full" /> : null}
@@ -418,13 +419,13 @@ function CandidateRow({
                     {entry.skill.name || "-"}
                 </span>
                 <span
-                    className="line-clamp-2 text-xs text-muted-foreground"
+                    className={cn(settingType.hint, "line-clamp-2")}
                     title={entry.skill.description}
                 >
                     {entry.skill.description || entry.origin}
                 </span>
                 {entry.problem ? (
-                    <span className="block text-xs text-danger">
+                    <span className={cn(settingType.error, "block")}>
                         {t(`settings.skills.importer.problems.${entry.problem}`)}
                     </span>
                 ) : null}
@@ -512,7 +513,7 @@ export function SkillDirectory({
                 <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {t("settings.skills.directoryTitle")}
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {t("settings.skills.directoryIntro")}
                 </p>
             </div>
@@ -533,7 +534,7 @@ export function SkillDirectory({
                 </p>
             ) : null}
             {query.trim().length === 1 ? (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("settings.skills.directoryHint")}
                 </p>
             ) : null}
@@ -545,7 +546,7 @@ export function SkillDirectory({
                 </div>
             ) : null}
             {results && results.length === 0 && !searching ? (
-                <p className="text-sm text-muted-foreground">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {t("settings.skills.directoryEmpty")}
                 </p>
             ) : null}
@@ -568,7 +569,7 @@ export function SkillDirectory({
                                         >
                                             {entry.name}
                                         </a>
-                                        <p className="flex min-w-0 gap-2 text-xs text-muted-foreground">
+                                        <p className={cn(settingType.hint, "flex min-w-0 gap-2")}>
                                             <span className="truncate" title={entry.source}>
                                                 {entry.source}
                                             </span>

@@ -16,7 +16,7 @@ import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailIdentityView } from "@/lib/mailbox/labels";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { Button, Input, Switch, Textarea, cn, useToast } from "@polaris/ui";
+import { Button, Input, Switch, Textarea, cn, settingType, useToast } from "@polaris/ui";
 import { deleteIdentityAction, saveIdentityAction } from "@/app/(app)/mail/actions";
 import { addressState } from "@/app/(app)/mail/address-state";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -45,7 +45,7 @@ export function IdentitiesView({
                     <h2 className="text-[13px] font-medium">
                         {t("identities.title", { address: account.address })}
                     </h2>
-                    <p className="text-[12px] text-muted-foreground">{t("identities.hint")}</p>
+                    <p className={settingType.hint}>{t("identities.hint")}</p>
                 </div>
                 <Button variant="secondary" onClick={() => setAdding(true)}>
                     <Plus className="size-4 shrink-0" aria-hidden />
@@ -54,7 +54,7 @@ export function IdentitiesView({
             </div>
 
             {mine.length === 0 && !adding ? (
-                <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
+                <p className={cn(settingType.body, "rounded-md border border-dashed border-border px-4 py-6 text-center text-muted-foreground")}>
                     {t("identities.empty", { address: account.address })}
                 </p>
             ) : null}
@@ -68,12 +68,12 @@ export function IdentitiesView({
                         <div className="flex items-center gap-3">
                             <div className="min-w-0 flex-1">
                                 <p
-                                    className="truncate text-[13px] font-medium"
+                                    className={cn(settingType.body, "truncate font-medium")}
                                     title={identity.address}
                                 >
                                     {identity.address}
                                 </p>
-                                <p className="truncate text-[12px] text-muted-foreground">
+                                <p className={cn(settingType.hint, "truncate")}>
                                     {identity.displayName || t("identities.noName")}
                                     {identity.isDefault ? t("identities.default") : ""}
                                 </p>
@@ -160,7 +160,7 @@ function IdentityForm({
     return (
         <div className="mt-3 space-y-2 rounded-md border border-border p-3">
             <label className="block">
-                <span className="mb-1 block text-[12px] text-muted-foreground">
+                <span className={cn(settingType.hint, "mb-1 block")}>
                     {t("identities.address")} <span aria-hidden>*</span>
                 </span>
                 <Input
@@ -176,7 +176,7 @@ function IdentityForm({
                 <span
                     id="identity-address"
                     className={cn(
-                        "mt-1 block text-[12px]",
+                        settingType.small, "mt-1 block",
                         wrong ? "text-danger" : "text-foreground-subtle"
                     )}
                 >
@@ -184,7 +184,7 @@ function IdentityForm({
                 </span>
             </label>
             <label className="block">
-                <span className="mb-1 block text-[12px] text-muted-foreground">
+                <span className={cn(settingType.hint, "mb-1 block")}>
                     {t("identities.name")}
                 </span>
                 <Input
@@ -193,13 +193,13 @@ function IdentityForm({
                 />
             </label>
             <label className="block">
-                <span className="mb-1 block text-[12px] text-muted-foreground">
+                <span className={cn(settingType.hint, "mb-1 block")}>
                     {t("identities.replyTo")}
                 </span>
                 <Input value={replyTo} onChange={(event) => setReplyTo(event.target.value)} />
             </label>
             <label className="block">
-                <span className="mb-1 block text-[12px] text-muted-foreground">
+                <span className={cn(settingType.hint, "mb-1 block")}>
                     {t("identities.signature")}
                 </span>
                 <Textarea
@@ -208,7 +208,7 @@ function IdentityForm({
                     onChange={(event) => setSignature(event.target.value)}
                 />
             </label>
-            <label className="flex items-center gap-2 text-[13px]">
+            <label className={cn(settingType.body, "flex items-center gap-2")}>
                 <Switch
                     checked={isDefault}
                     onChange={setIsDefault}
@@ -217,7 +217,7 @@ function IdentityForm({
                 {t("identities.defaultToggle")}
             </label>
 
-            {problem ? <p className="text-[13px] text-danger">{problem}</p> : null}
+            {problem ? <p className={settingType.error}>{problem}</p> : null}
 
             <div className="flex gap-2">
                 <Button

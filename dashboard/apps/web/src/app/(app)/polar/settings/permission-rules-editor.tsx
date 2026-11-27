@@ -6,7 +6,7 @@
  * can be moved; each is checked against the server's schema as it is typed.
  */
 
-import { Button, Input, Select, settingType } from "@polaris/ui";
+import { Button, cn, Input, Select, settingType } from "@polaris/ui";
 import { useMemo } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -60,9 +60,9 @@ export function PermissionRulesEditor({
     };
 
     return (
-        <fieldset className="flex min-w-0 flex-col gap-2 text-sm">
+        <fieldset className={cn(settingType.body, "flex min-w-0 flex-col gap-2")}>
             <legend>{t("settings.agents.rules.title")}</legend>
-            <span className="text-xs text-muted-foreground">
+            <span className={settingType.hint}>
                 {value.length > 0 ? t("settings.agents.rules.hint") : t("settings.agents.rules.empty")}
             </span>
             {value.length > 0 ? (
@@ -143,7 +143,7 @@ export function PermissionRulesEditor({
                                         .filter((gap) => gap.index === validIndex.get(index) && gap.kind === kind)
                                         .map((gap) => CLI_NAMES[gap.cli]);
                                     return tools.length > 0 ? (
-                                        <span key={kind} className="text-xs text-muted-foreground">
+                                        <span key={kind} className={settingType.hint}>
                                             {t(`settings.agents.rules.gaps.${kind}`, { tools: tools.join(", ") })}
                                         </span>
                                     ) : null;

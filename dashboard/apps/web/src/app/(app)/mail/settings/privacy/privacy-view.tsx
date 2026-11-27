@@ -21,7 +21,7 @@ import { useState } from "react";
 import { useBusy } from "@/app/(app)/mail/use-busy";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
-import { Button, Select, Switch, useToast } from "@polaris/ui";
+import { Button, cn, Select, settingType, Switch, useToast } from "@polaris/ui";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { setPrivacyAction, trustSenderAction } from "@/app/(app)/mail/actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -89,7 +89,7 @@ export function PrivacyView({
 
             <section className="space-y-2">
                 <h2 className="text-[13px] font-medium">{t("privacy.title")}</h2>
-                <p className="text-[12px] text-muted-foreground">{t("privacy.lead")}</p>
+                <p className={settingType.hint}>{t("privacy.lead")}</p>
                 <ul className="space-y-1.5">
                     {MODES.map((mode) => (
                         <li key={mode}>
@@ -102,10 +102,10 @@ export function PrivacyView({
                                     onChange={() => setRemoteContent(mode)}
                                 />
                                 <span className="min-w-0">
-                                    <span className="block text-[13px] text-foreground">
+                                    <span className={cn(settingType.body, "block text-foreground")}>
                                         {t(`privacy.modes.${mode}.title`)}
                                     </span>
-                                    <span className="block text-[12px] text-muted-foreground">
+                                    <span className={cn(settingType.hint, "block")}>
                                         {t(`privacy.modes.${mode}.body`)}
                                     </span>
                                 </span>
@@ -119,16 +119,16 @@ export function PrivacyView({
                 <label className="flex items-start gap-2">
                     <Switch checked={nameTrackers} onChange={setNameTrackers} aria-label={t("privacy.nameTrackersLabel")} />
                     <span className="min-w-0">
-                        <span className="block text-[13px]">{t("privacy.nameTrackers")}</span>
-                        <span className="block text-[12px] text-muted-foreground">{t("privacy.nameTrackersHint")}</span>
+                        <span className={cn(settingType.body, "block")}>{t("privacy.nameTrackers")}</span>
+                        <span className={cn(settingType.hint, "block")}>{t("privacy.nameTrackersHint")}</span>
                     </span>
                 </label>
 
                 <label className="flex items-start gap-2">
                     <Switch checked={cleanLinks} onChange={setCleanLinks} aria-label={t("privacy.cleanLinksLabel")} />
                     <span className="min-w-0">
-                        <span className="block text-[13px]">{t("privacy.cleanLinks")}</span>
-                        <span className="block text-[12px] text-muted-foreground">{t("privacy.cleanLinksHint")}</span>
+                        <span className={cn(settingType.body, "block")}>{t("privacy.cleanLinks")}</span>
+                        <span className={cn(settingType.hint, "block")}>{t("privacy.cleanLinksHint")}</span>
                     </span>
                 </label>
 
@@ -139,8 +139,8 @@ export function PrivacyView({
                         aria-label={t("privacy.receipts")}
                     />
                     <span className="min-w-0">
-                        <span className="block text-[13px]">{t("privacy.receipts")}</span>
-                        <span className="block text-[12px] text-muted-foreground">{t("privacy.receiptsHint")}</span>
+                        <span className={cn(settingType.body, "block")}>{t("privacy.receipts")}</span>
+                        <span className={cn(settingType.hint, "block")}>{t("privacy.receiptsHint")}</span>
                     </span>
                 </label>
 
@@ -151,21 +151,21 @@ export function PrivacyView({
                         aria-label={t("privacy.codes")}
                     />
                     <span className="min-w-0">
-                        <span className="block text-[13px]">{t("privacy.codes")}</span>
-                        <span className="block text-[12px] text-muted-foreground">{t("privacy.codesHint")}</span>
+                        <span className={cn(settingType.body, "block")}>{t("privacy.codes")}</span>
+                        <span className={cn(settingType.hint, "block")}>{t("privacy.codesHint")}</span>
                         {keepCodes > 0 ? (
                             <span className="mt-1.5 flex items-center gap-2">
                                 <Select
                                     value={String(keepCodes)}
                                     onValueChange={(next) => setKeepCodes(Number(next))}
                                     aria-label={t("privacy.keepLabel")}
-                                    className="h-7 w-44 text-[12px]"
+                                    className={cn(settingType.body, "h-7 w-44")}
                                     options={KEEP_CHOICES.map((one) => ({
                                         value: String(one.minutes),
                                         label: t(`privacy.keep.${one.id}`)
                                     }))}
                                 />
-                                <span className="text-[12px] text-foreground-subtle">
+                                <span className={settingType.hint}>
                                     {t("privacy.thenTrash")}
                                 </span>
                             </span>
@@ -201,7 +201,7 @@ export function PrivacyView({
             <section className="mt-6">
                 <h2 className="text-[13px] font-medium">{t("privacy.trusted")}</h2>
                 {(trusted[account.id] ?? []).length === 0 ? (
-                    <p className="mt-1 text-[12px] text-muted-foreground">
+                    <p className={cn(settingType.hint, "mt-1")}>
                         {t("privacy.trustedEmpty")}
                     </p>
                 ) : (
@@ -209,7 +209,7 @@ export function PrivacyView({
                         {(trusted[account.id] ?? []).map((address) => (
                             <li
                                 key={address}
-                                className="flex items-center gap-2 rounded-md border border-border px-2 py-1 text-[12px]"
+                                className={cn(settingType.small, "flex items-center gap-2 rounded-md border border-border px-2 py-1")}
                             >
                                 <span className="max-w-[16rem] truncate" title={address}>{address}</span>
                                 <button

@@ -11,7 +11,7 @@
 import { useState } from "react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { Eye, Pencil } from "lucide-react";
-import { Button, Card, CardBody, Select, settingType, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Select, settingType, Switch } from "@polaris/ui";
 import { skillKey } from "@/lib/polar/skills/overrides";
 import type { OverrideSummary } from "@/lib/polar/skills/override-store";
 import { EditedBadges, SkillDetailDialog, type SkillTarget } from "./skill-detail-dialog";
@@ -46,11 +46,11 @@ function Row({
     return (
         <div className="flex items-center gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium" title={label}>
+                <p className={cn(settingType.body, "truncate font-medium")} title={label}>
                     {label}
                 </p>
                 {hint ? (
-                    <p className="line-clamp-2 text-xs text-muted-foreground" title={hint}>
+                    <p className={cn(settingType.hint, "line-clamp-2")} title={hint}>
                         {hint}
                     </p>
                 ) : null}
@@ -102,7 +102,7 @@ export function EnigmaSettings({
         <section className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
                 <h2 className="text-sm font-semibold">Enigma {/* i18n-ignore a product's name */}</h2>
-                <p className="text-sm text-muted-foreground">{t("settings.enigma.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.enigma.intro")}</p>
             </div>
             {error ? (
                 <p role="alert" className={settingType.error}>
@@ -184,7 +184,7 @@ export function EnigmaSettings({
                         {t("settings.enigma.skillsTitle")}
                     </h3>
                     {!available ? (
-                        <p className="text-sm text-muted-foreground">{t("settings.enigma.unavailable")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.enigma.unavailable")}</p>
                     ) : (
                         <Card>
                             <CardBody className="flex flex-col divide-y divide-border p-0">

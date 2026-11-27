@@ -14,6 +14,7 @@ import {
     Card,
     CardBody,
     Checkbox,
+    cn,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -23,6 +24,7 @@ import {
     DialogTitle,
     Input,
     Select,
+    settingType,
     Switch
 } from "@polaris/ui";
 import * as actions from "./custom-tools-actions";
@@ -136,7 +138,7 @@ export function PolarCustomTools({ tools: initialTools, plugins: initialPlugins,
                 <div className="flex min-w-0 items-center justify-between gap-3">
                     <div className="min-w-0">
                         <h2 className="text-base font-semibold">{t("settings.customTools.title")}</h2>
-                        <p className="text-sm text-muted-foreground">{t("settings.customTools.intro")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.customTools.intro")}</p>
                     </div>
                     {!readOnly && (
                         <Button size="sm" onClick={() => setEditing("new")}>
@@ -146,12 +148,12 @@ export function PolarCustomTools({ tools: initialTools, plugins: initialPlugins,
                     )}
                 </div>
                 {error && (
-                    <p role="alert" className="text-sm text-destructive">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 )}
                 {tools.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("settings.customTools.empty")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.customTools.empty")}</p>
                 ) : (
                     <Card>
                         <CardBody className="flex flex-col divide-y p-0">
@@ -161,7 +163,7 @@ export function PolarCustomTools({ tools: initialTools, plugins: initialPlugins,
                                         <p className="truncate font-mono text-sm" title={shared.turnToolName(tool.name)}>
                                             {shared.turnToolName(tool.name)}
                                         </p>
-                                        <p className="truncate text-xs text-muted-foreground" title={tool.description}>
+                                        <p className={cn(settingType.hint, "truncate")} title={tool.description}>
                                             {t(`settings.customTools.permission.${tool.permission}`)} - {tool.description}
                                         </p>
                                     </div>
@@ -199,7 +201,7 @@ export function PolarCustomTools({ tools: initialTools, plugins: initialPlugins,
                 <div className="flex min-w-0 items-center justify-between gap-3">
                     <div className="min-w-0">
                         <h2 className="text-base font-semibold">{t("settings.customTools.plugins.title")}</h2>
-                        <p className="text-sm text-muted-foreground">{t("settings.customTools.plugins.intro")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.customTools.plugins.intro")}</p>
                     </div>
                     {!readOnly && (
                         <Button size="sm" onClick={() => setEditingPlugin("new")}>
@@ -209,17 +211,17 @@ export function PolarCustomTools({ tools: initialTools, plugins: initialPlugins,
                     )}
                 </div>
                 {plugins.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("settings.customTools.plugins.empty")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.customTools.plugins.empty")}</p>
                 ) : (
                     <Card>
                         <CardBody className="flex flex-col divide-y p-0">
                             {plugins.map((plugin) => (
                                 <div key={plugin.id} className="flex min-w-0 items-center gap-3 px-4 py-3">
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm" title={plugin.name}>
+                                        <p className={cn(settingType.body, "truncate")} title={plugin.name}>
                                             {plugin.name}
                                         </p>
-                                        <p className="truncate text-xs text-muted-foreground">
+                                        <p className={cn(settingType.hint, "truncate")}>
                                             {plugin.events.map((event) => t(`settings.customTools.events.${event.replace(".", "_")}` as never)).join(", ")}
                                             {" -> "}
                                             {plugin.action.kind === "webhook" ? plugin.action.url : shared.turnToolName(plugin.action.tool)}
@@ -371,9 +373,9 @@ function ToolDialog({
                             className="max-h-80"
                         />
                     </Field>
-                    <p className="text-xs text-muted-foreground">{t("settings.customTools.scriptHint")}</p>
+                    <p className={settingType.hint}>{t("settings.customTools.scriptHint")}</p>
                     {error && (
-                        <p role="alert" className="text-sm text-destructive">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     )}
@@ -441,10 +443,10 @@ function PluginDialog({
                         <Input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
                     </Field>
                     <fieldset className="flex flex-col gap-2">
-                        <legend className="mb-1 text-sm font-medium">{t("settings.customTools.plugins.events")} *</legend>
+                        <legend className={cn(settingType.body, "mb-1 font-medium")}>{t("settings.customTools.plugins.events")} *</legend>
                         <div className="grid gap-2 sm:grid-cols-2">
                             {shared.PLUGIN_EVENTS.map((event) => (
-                                <label key={event} className="flex min-w-0 items-center gap-2 text-sm">
+                                <label key={event} className={cn(settingType.body, "flex min-w-0 items-center gap-2")}>
                                     <Checkbox
                                         checked={draft.events.includes(event)}
                                         onChange={(change) =>
@@ -483,7 +485,7 @@ function PluginDialog({
                             />
                         </Field>
                     ) : runnable.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t("settings.customTools.plugins.noRunnable")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.customTools.plugins.noRunnable")}</p>
                     ) : (
                         <Field label={t("settings.customTools.plugins.tool")}>
                             <Select
@@ -494,7 +496,7 @@ function PluginDialog({
                         </Field>
                     )}
                     {error && (
-                        <p role="alert" className="text-sm text-destructive">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     )}
@@ -546,32 +548,32 @@ function ProjectTools({ readOnly }: { readOnly: boolean }) {
             <div className="flex min-w-0 items-center justify-between gap-3">
                 <div className="min-w-0">
                     <h2 className="text-base font-semibold">{t("settings.customTools.project.title")}</h2>
-                    <p className="text-sm text-muted-foreground">{t("settings.customTools.project.intro")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.customTools.project.intro")}</p>
                 </div>
                 <Button size="sm" variant="outline" onClick={load} disabled={pending}>
                     {t("settings.customTools.project.review")}
                 </Button>
             </div>
             {error && (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             )}
             {noNode && (
-                <p role="status" className="text-sm text-destructive">
+                <p role="status" className={settingType.error}>
                     {t("settings.customTools.project.noNode")}
                 </p>
             )}
-            {review === "none" && <p className="text-sm text-muted-foreground">{t("settings.customTools.project.none")}</p>}
+            {review === "none" && <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.customTools.project.none")}</p>}
             {review && review !== "none" && (
                 <Card>
                     <CardBody className="flex flex-col gap-3">
                         {review.tools.map((tool) => (
                             <details key={tool.path} className="min-w-0">
-                                <summary className="cursor-pointer truncate text-sm">
+                                <summary className={cn(settingType.body, "cursor-pointer truncate")}>
                                     <span className="font-mono">{shared.turnToolName(tool.name)}</span> - {tool.description}
                                 </summary>
-                                <p className="mt-1 truncate text-xs text-muted-foreground" title={tool.path}>
+                                <p className={cn(settingType.hint, "mt-1 truncate")} title={tool.path}>
                                     {tool.path}
                                 </p>
                                 <CodeView value={tool.script} language={scriptLanguage(tool.runtime)} label={tool.path} className="mt-1 max-h-60" />
@@ -579,7 +581,7 @@ function ProjectTools({ readOnly }: { readOnly: boolean }) {
                         ))}
                         {review.modules.map((module) => (
                             <details key={module.path} className="min-w-0">
-                                <summary className="cursor-pointer truncate text-sm">
+                                <summary className={cn(settingType.body, "cursor-pointer truncate")}>
                                     <span className="font-mono">{module.path}</span> -{" "}
                                     <span className={module.status === "ready" ? "" : "text-muted-foreground"}>
                                         {t(`settings.customTools.project.module.${module.status}`)}
@@ -589,12 +591,12 @@ function ProjectTools({ readOnly }: { readOnly: boolean }) {
                             </details>
                         ))}
                         {review.refused.length > 0 && (
-                            <p className="text-xs text-destructive">
+                            <p className={settingType.error}>
                                 {t("settings.customTools.project.refused", { files: review.refused.join(", ") })}
                             </p>
                         )}
                         {review.approved ? (
-                            <p className="text-sm">{t("settings.customTools.project.approved")}</p>
+                            <p className={settingType.body}>{t("settings.customTools.project.approved")}</p>
                         ) : (
                             !readOnly &&
                             (review.tools.length > 0 || review.modules.length > 0) && (
@@ -614,10 +616,10 @@ function ProjectTools({ readOnly }: { readOnly: boolean }) {
 
 function Field({ label, error = null, children }: { label: string; error?: string | null; children: React.ReactNode }) {
     return (
-        <label className="flex min-w-0 flex-col gap-1.5 text-sm">
+        <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1.5")}>
             <span className="font-medium">{label}</span>
             {children}
-            {error && <span className="text-xs text-destructive">{error}</span>}
+            {error && <span className={settingType.error}>{error}</span>}
         </label>
     );
 }

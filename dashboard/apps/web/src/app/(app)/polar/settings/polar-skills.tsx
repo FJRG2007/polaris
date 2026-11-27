@@ -18,6 +18,7 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -157,7 +158,7 @@ export function PolarSkills({
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                         <h2 className="text-sm font-semibold">{t("settings.skills.title")}</h2>
-                        <p className="text-sm text-muted-foreground">{t("settings.skills.intro")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.skills.intro")}</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap justify-end gap-2">
                         {rows.length > 0 ? (
@@ -211,7 +212,7 @@ export function PolarSkills({
                     {t("settings.skills.mine")}
                 </h3>
                 {rows.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("settings.skills.empty")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.skills.empty")}</p>
                 ) : null}
                 {rows.length > SEARCH_FROM ? (
                     <Input
@@ -223,7 +224,7 @@ export function PolarSkills({
                     />
                 ) : null}
                 {rows.length > 0 && shown.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("settings.skills.noMatch")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.skills.noMatch")}</p>
                 ) : null}
                 {shown.length > 0 ? (
                     <Card>
@@ -231,7 +232,7 @@ export function PolarSkills({
                             {shown.map((row) => (
                                 <div key={row.id} className="flex items-center gap-3 px-4 py-3">
                                     <div className="min-w-0 flex-1">
-                                        <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                                        <p className={cn(settingType.body, "flex min-w-0 items-center gap-2 font-medium")}>
                                             <span className="truncate font-mono" title={row.name}>
                                                 {row.name}
                                             </span>
@@ -246,7 +247,7 @@ export function PolarSkills({
                                             ) : null}
                                         </p>
                                         <p
-                                            className="line-clamp-2 text-xs text-muted-foreground"
+                                            className={cn(settingType.hint, "line-clamp-2")}
                                             title={row.description}
                                         >
                                             {row.description}
@@ -325,7 +326,7 @@ export function PolarSkills({
                                         <div className="min-w-0 flex-1">
                                             <div className="flex min-w-0 items-start gap-2">
                                                 <p
-                                                    className="min-w-0 flex-1 truncate text-sm font-medium"
+                                                    className={cn(settingType.body, "min-w-0 flex-1 truncate font-medium")}
                                                     title={t(`settings.skills.catalog.${skill.id}.title` as never)}
                                                 >
                                                     {t(`settings.skills.catalog.${skill.id}.title` as never)}
@@ -337,7 +338,7 @@ export function PolarSkills({
                                                     onChange={(enabled) => void toggleBuiltin(key, enabled)}
                                                 />
                                             </div>
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className={settingType.hint}>
                                                 {t(`settings.skills.catalog.${skill.id}.description` as never)}
                                             </p>
                                         </div>
@@ -555,7 +556,7 @@ function SkillEditor({
                         const problem = fieldError(field.key);
                         const id = `skill-${field.key}`;
                         return (
-                            <div key={field.key} className="flex flex-col gap-1 text-sm">
+                            <div key={field.key} className={cn(settingType.body, "flex flex-col gap-1")}>
                                 {field.multiline ? (
                                     <span>{field.label} *</span>
                                 ) : (
@@ -581,7 +582,7 @@ function SkillEditor({
                                 )}
                                 <span
                                     className={
-                                        problem ? "text-xs text-danger" : "text-xs text-muted-foreground"
+                                        problem ? settingType.error : settingType.hint
                                     }
                                 >
                                     {problem ?? field.hint}
