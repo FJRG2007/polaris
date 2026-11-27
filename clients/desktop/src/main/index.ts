@@ -1088,7 +1088,10 @@ function start(): void {
         launcher.startLauncher({ server, showPolaris, plugins: () => pluginShortcutsNow().installed, pluginsSnapshot: pluginsSnapshotNow });
         // Device plugins start after the window, never before it: with none
         // installed this reads one small file and starts nothing.
-        setTimeout(() => startDevicePlugins((path) => showPolaris(path)), 3_000).unref();
+        setTimeout(() => startDevicePlugins((path) => showPolaris(path), () => {
+            const game = games.running();
+            return game ? [game.key] : [];
+        }), 3_000).unref();
         registerIpc({
             server,
             showPolaris,

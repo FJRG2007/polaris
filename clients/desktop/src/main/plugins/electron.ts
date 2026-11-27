@@ -27,6 +27,8 @@ import { PLUGIN_PERMISSIONS, pluginPlatform, pluginRequirements, pluginText, typ
 import { app, ipcMain, net, Notification, protocol, utilityProcess, webContents, type IpcMainInvokeEvent } from "electron";
 
 let manager: PluginManager | null = null;
+/** The program keys of the games this app sees running, sent as `games` in a `polaris.state` answer. */
+let runningGames: () => readonly string[] = () => [];
 let requirements: Requirements | null = null;
 /** Requirement setups run one after another, so no two permission prompts are open at once. */
 let ensuring: Promise<void> = Promise.resolve();
@@ -211,8 +213,9 @@ function servePluginViews(): void {
     for (const scheme of VIEW_SCHEMES) protocol.handle(scheme, serve);
 }
 
-export function startDevicePlugins(showPolaris: (path?: string) => void): PluginManager {
+export function startDevicePlugins(showPolaris: (path?: string) => void, games: () => readonly string[] = () => []): PluginManager {
     if (manager) return manager;
+    runningGames = games;
     const created = createPluginManager({
         dir: pluginsDir(),
         platform: pluginPlatform(process.platform, process.arch),
@@ -222,7 +225,7 @@ export function startDevicePlugins(showPolaris: (path?: string) => void): Plugin
         fork,
         call: async (id, method, params) => {
             if (method === "settings.get") return manager?.settings(id) ?? null;
-            if (method === "polaris.state") return { call: voiceStateNow() };
+            if (method === "polaris.state") return { call: voiceStateNow(), games: runningGames() };
             if (method === "system.launchOfficial") return launchOfficial(id);
             // judgeCall checked the shape: one of PLUGIN_ACTIONS.
             return runPluginAction((params as { action: PluginAction }).action);
@@ -402,7 +405,7 @@ export function registerPluginIpc(
             // Only the Stream 100 has a driver of its own; any other view gets null.
             if (verdict.kind === "driver") return { ok: true, value: await lookDriver(driverRunnerFor(parsed.data, pluginsDir()), requirements?.failure(parsed.data, DRIVER_REQUIREMENT) ?? null) };
             if (verdict.method === "settings.get") return { ok: true, value: await running.settings(parsed.data) };
-            if (verdict.method === "polaris.state") return { ok: true, value: { call: voiceStateNow() } };
+            if (verdict.method === "polaris.state") return { ok: true, value: { call: voiceStateNow(), games: runningGames() } };
             if (verdict.method === "system.launchOfficial") return { ok: true, value: await launchOfficial(parsed.data) };
             return { ok: true, value: runPluginAction((verdict.params as { action: PluginAction }).action) };
         } catch {
