@@ -5,7 +5,7 @@
 use polaris_stream100::audio::Session;
 use polaris_stream100::display::{
     self, IndexedFrame, Sequence, ACK, CHUNK_COUNT, CUSTOM_BACKGROUND, END, HEIGHT, HOST_KEEPALIVE,
-    MAX_TRANSFER_PACKETS, PACKET_SIZE, SCREEN_OFF, SCREEN_ON, TILE_OFFSETS, WIDTH,
+    MAX_TRANSFER_PACKETS, PACKET_SIZE, SCREEN_OFF, SCREEN_ON, TILE_OFFSETS, WIDTH, CHUNK_SIZE, TILE_BLOCKS,
 };
 use polaris_stream100::engine::{Command, Engine, Output};
 use polaris_stream100::plugin::Locale;
@@ -289,31 +289,167 @@ fn an_unchanged_page_costs_nothing_and_a_brightness_change_costs_one_command() {
     assert!(!painter.is_drawing());
 }
 
-#[test]
-fn a_new_volume_redraws_without_setting_the_screen_up_again() {
-    let mut painter = Painter::default();
-    painter.show(&page(40));
-    let start = Instant::now();
-    run(&mut painter, start, TILE_EVERY * 40);
-    painter.show(&page(41));
-    let sent = run(&mut painter, start + TILE_EVERY * 41, TILE_EVERY * 40);
-    let tiles = draws(&sent);
-    assert_eq!(tiles.len(), CHUNK_COUNT);
-    assert!(tiles.iter().all(|tile| tile.len() == 4098));
+/// The tile number and samples of each tile message in `sent`.
+fn tiles_in(sent: &[Vec<u8>]) -> Vec<(usize, Vec<u8>)> {
+    draws(sent)
+        .into_iter()
+        .map(|message| {
+            let body = &message[8..];
+            let at = body
+                .windows(2)
+                .rposition(|w| w == [0x37, 0x01])
+                .expect("a tile command");
+            let tile = usize::from(body[at + 2]);
+            let samples = body[at + 9..at + 9 + CHUNK_SIZE].to_vec();
+            (tile, samples)
+        })
+        .collect()
+}
+
+/// A panel as the firmware may hold it: filling each sample's block (what it
+/// does on the first pass), or storing only the sample.
+struct Panel {
+    pixels: Vec<u16>,
+    fills: bool,
+}
+
+impl Panel {
+    fn new(fills: bool) -> Self {
+        Self {
+            pixels: vec![u16::MAX; WIDTH * HEIGHT],
+            fills,
+        }
+    }
+
+    fn apply(&mut self, sent: &[Vec<u8>]) {
+        for (tile, samples) in tiles_in(sent) {
+            let (dx, dy) = TILE_OFFSETS[tile];
+            let (width, height) = if self.fills {
+                TILE_BLOCKS[tile]
+            } else {
+                (1, 1)
+            };
+            for (index, value) in samples.iter().enumerate() {
+                let x = (index % (WIDTH / 8)) * 8 + usize::from(dx);
+                let y = (index / (WIDTH / 8)) * 4 + usize::from(dy);
+                for row in 0..usize::from(height) {
+                    for column in 0..usize::from(width) {
+                        self.pixels[(y + row) * WIDTH + x + column] = u16::from(*value);
+                    }
+                }
+            }
+        }
+    }
+
+    fn shows(&self, screen: &Screen) -> bool {
+        let frame = render(screen).unwrap();
+        self.pixels
+            .iter()
+            .zip(&frame.pixels)
+            .all(|(held, want)| *held == u16::from(*want))
+    }
 }
 
 #[test]
-fn a_page_that_comes_in_mid_draw_waits_for_it_to_finish() {
+fn a_coarse_tile_is_never_sent_after_a_finer_one_inside_its_block() {
+    // The firmware's blocks nest: a tile's block never covers an earlier
+    // tile's sample, so sending coarse to fine never undoes a sent tile.
+    for (tile, (width, height)) in TILE_BLOCKS.iter().enumerate() {
+        let (dx, dy) = TILE_OFFSETS[tile];
+        assert!(usize::from(dx + width) <= 8 && usize::from(dy + height) <= 4);
+        for earlier in 0..tile {
+            let (ex, ey) = TILE_OFFSETS[earlier];
+            let inside = (dx..dx + width).contains(&ex) && (dy..dy + height).contains(&ey);
+            assert!(!inside, "tile {tile} covers tile {earlier}");
+        }
+    }
+}
+
+#[test]
+fn a_new_volume_sends_only_the_tiles_that_changed_and_ends_right() {
     let mut painter = Painter::default();
+    let start = Instant::now();
+    let first = run(&mut painter, start, TILE_EVERY * 40);
+    let mut filled = Panel::new(true);
+    let mut sampled = Panel::new(false);
+    filled.apply(&first);
+    sampled.apply(&first);
+    // Nothing was shown yet: the first page is still drawn whole.
+    painter.show(&page(40));
+    let whole = run(&mut painter, start + TILE_EVERY * 41, TILE_EVERY * 40);
+    assert_eq!(draws(&whole).len(), CHUNK_COUNT);
+    filled.apply(&whole);
+    sampled.apply(&whole);
+
+    // The value text changes too, so most tiles do; the screen's other
+    // three knobs, labels and dividers are never resent on their own.
+    painter.show(&page(42));
+    let later = start + TILE_EVERY * 82;
+    let change = run(&mut painter, later, TILE_EVERY * 40);
+    let tiles = tiles_in(&change);
+    assert!(!tiles.is_empty() && tiles.len() <= CHUNK_COUNT);
+    assert!(tiles.windows(2).all(|pair| pair[0].0 < pair[1].0));
+    assert!(change.iter().all(|message| message.len() <= 4098));
+    filled.apply(&change);
+    sampled.apply(&change);
+    assert!(filled.shows(&page(42)) && sampled.shows(&page(42)));
+    assert!(!painter.is_drawing());
+
+    // The first tile of the change goes out within one tile period.
+    painter.show(&page(44));
+    let soon = run(&mut painter, later + TILE_EVERY * 41, TILE_EVERY);
+    assert_eq!(draws(&soon).len(), 1);
+}
+
+#[test]
+fn a_page_that_comes_in_mid_draw_supersedes_the_one_being_drawn() {
+    let mut painter = Painter::default();
+    let mut filled = Panel::new(true);
+    let mut sampled = Panel::new(false);
     painter.show(&page(40));
     let start = Instant::now();
-    run(&mut painter, start, TILE_EVERY * 3);
+    let begun = run(&mut painter, start, TILE_EVERY * 3);
+    assert_eq!(draws(&begun).len(), 4);
     painter.show(&page(50));
     painter.show(&page(60));
-    let sent = run(&mut painter, start + TILE_EVERY * 4, TILE_EVERY * 80);
-    // The rest of the first page, then the newest page whole.
-    let tiles = draws(&sent);
-    assert_eq!(tiles.len(), CHUNK_COUNT - 4 + CHUNK_COUNT);
+    let rest = run(&mut painter, start + TILE_EVERY * 4, TILE_EVERY * 80);
+    // Not the rest of the first page and then the newest whole: only what
+    // the newest still needs, and never a tile of the page in between.
+    let tiles = draws(&rest);
+    assert!(tiles.len() <= CHUNK_COUNT, "{} tiles", tiles.len());
+    for panel in [&mut filled, &mut sampled] {
+        panel.apply(&begun);
+        panel.apply(&rest);
+        assert!(panel.shows(&page(60)));
+    }
+    let fifty = render(&page(50)).unwrap();
+    let sixty = render(&page(60)).unwrap();
+    for (tile, samples) in tiles_in(&rest) {
+        if fifty.tile(tile) != sixty.tile(tile) {
+            assert_ne!(samples, fifty.tile(tile), "tile {tile} of the stale page");
+        }
+    }
+}
+
+#[test]
+fn a_turn_is_followed_live_and_the_panel_settles_on_the_last_volume() {
+    let mut painter = Painter::default();
+    let start = Instant::now();
+    painter.show(&page(10));
+    let mut sent = run(&mut painter, start, TILE_EVERY * 40);
+    // A turn: a new volume every 20 ms, for a second.
+    let mut at = start + TILE_EVERY * 41;
+    for step in 0..50u8 {
+        painter.show(&page(10 + step));
+        sent.extend(run(&mut painter, at, Duration::from_millis(19)));
+        at += Duration::from_millis(20);
+    }
+    sent.extend(run(&mut painter, at, TILE_EVERY * 40));
+    let mut filled = Panel::new(true);
+    let mut sampled = Panel::new(false);
+    filled.apply(&sent);
+    sampled.apply(&sent);
+    assert!(filled.shows(&page(59)) && sampled.shows(&page(59)));
 }
 
 #[test]

@@ -7,9 +7,9 @@
 //! - [`render`]: that page as a 480x272 indexed image, with a fixed palette
 //!   so a redraw never has to resend it.
 //! - [`Painter`]: everything one session sends on the display interface -
-//!   the keep-alive and the heartbeat between, the acknowledgement the controller asks for, and the 32
-//!   tiles of each new page - as ready transfers, paced the way the official
-//!   software paces them. It is the same on every transport; a transport
+//!   the keep-alive and the heartbeat between, the acknowledgement the controller asks for, and the
+//!   tiles of each new page that differ from what the panel shows - as ready
+//!   transfers, paced the way the official software paces them. It is the same on every transport; a transport
 //!   only writes what it is handed.
 //! - [`post`] / [`latest`]: the engine and the USB session live on different
 //!   threads of the plugin process; the newest page is handed over here.
@@ -17,8 +17,8 @@
 //! The command bytes and the tile layout are in [`crate::display`].
 
 use crate::display::{
-    self, IndexedFrame, Sequence, ACK, CUSTOM_BACKGROUND, END, HEIGHT, HOST_KEEPALIVE,
-    PALETTE_COLORS, SCREEN_OFF, SCREEN_ON, WIDTH,
+    self, IndexedFrame, Sequence, ACK, CHUNK_COUNT, CUSTOM_BACKGROUND, END, HEIGHT,
+    HOST_KEEPALIVE, PALETTE_COLORS, SCREEN_OFF, SCREEN_ON, WIDTH,
 };
 use crate::plugin::Locale;
 use crate::session::KEEPALIVE_EVERY;
@@ -124,15 +124,6 @@ pub struct Screen {
 impl Screen {
     fn is_off(&self) -> bool {
         self.mode == DisplayMode::Off
-    }
-
-    /// Whether the pixels differ (brightness is a command of its own).
-    fn same_picture(&self, other: &Screen) -> bool {
-        let unlit = |screen: &Screen| Screen {
-            brightness: 0,
-            ..screen.clone()
-        };
-        self.is_off() == other.is_off() && (self.is_off() || unlit(self) == unlit(other))
     }
 }
 
@@ -511,38 +502,111 @@ pub const TILE_EVERY: Duration = Duration::from_millis(40);
 /// `docs/PROTOCOL.md`).
 pub const HEARTBEAT_EVERY: Duration = Duration::from_millis(20);
 
+/// A pixel the panel holds that Polaris does not know (nothing drawn yet in
+/// this session, or the screen was switched off since).
+const UNKNOWN: u16 = 256;
+
 /// What one session sends on the display interface, in order.
-#[derive(Debug, Default)]
+///
+/// It keeps a model of the panel and sends only the tiles whose pixels
+/// differ from the newest page, coarse to fine, one per [`TILE_EVERY`]. A
+/// page that comes in mid-draw replaces the one being drawn at once: the
+/// tiles still owed to the older page are never sent, and the next tile is
+/// the first one the newer page needs.
+///
+/// The panel is modelled twice, because how the firmware treats a tile sent
+/// again after the whole picture is not documented: once as if it fills each
+/// sample's block ([`display::TILE_BLOCKS`], what it does on the first pass)
+/// and once as if it stores only the sample. A tile goes out while either
+/// model differs from the page, so the picture ends right under both.
+#[derive(Debug)]
 pub struct Painter {
     sequence: Sequence,
-    /// Command lists still to send for the page being drawn.
+    /// Command lists that go out on their own (the screen switched off).
     queue: VecDeque<Vec<u8>>,
-    /// The page last queued (drawn, or being drawn).
+    /// The newest page asked for.
     shown: Option<Screen>,
-    /// A page that came in while another was still being drawn.
-    waiting: Option<Screen>,
+    /// Its picture, while the screen is on.
+    target: Option<IndexedFrame>,
+    /// The panel if the firmware fills each sample's block.
+    filled: Vec<u16>,
+    /// The panel if it stores only each sample.
+    sampled: Vec<u16>,
     /// Whether the screen is on with Polaris' background (set up once per
     /// session, and again after it was switched off).
     set_up: bool,
+    /// The screen set-up (with the palette) rides on the next tile.
+    setup_due: bool,
+    /// A new brightness rides on the next tile, or goes alone.
+    brightness_due: bool,
     ack: bool,
     last_keepalive: Option<Instant>,
     last_tile: Option<Instant>,
     last_sent: Option<Instant>,
 }
 
+impl Default for Painter {
+    fn default() -> Self {
+        Self {
+            sequence: Sequence::default(),
+            queue: VecDeque::new(),
+            shown: None,
+            target: None,
+            filled: vec![UNKNOWN; WIDTH * HEIGHT],
+            sampled: vec![UNKNOWN; WIDTH * HEIGHT],
+            set_up: false,
+            setup_due: false,
+            brightness_due: false,
+            ack: false,
+            last_keepalive: None,
+            last_tile: None,
+            last_sent: None,
+        }
+    }
+}
+
+/// The pixel index of each of tile `tile`'s samples, in the order it sends them.
+fn samples(tile: usize) -> impl Iterator<Item = usize> {
+    let (dx, dy) = display::TILE_OFFSETS[tile];
+    (0..HEIGHT / 4).flat_map(move |row| {
+        (0..WIDTH / 8)
+            .map(move |column| (row * 4 + usize::from(dy)) * WIDTH + column * 8 + usize::from(dx))
+    })
+}
+
 impl Painter {
     /// Asks for `screen` to be drawn. Unchanged pages cost nothing; a page
-    /// that comes in mid-draw waits for that draw to finish, so a knob being
-    /// turned never restarts it forever.
+    /// that comes in mid-draw supersedes the one being drawn.
     pub fn show(&mut self, screen: &Screen) {
-        if self.shown.as_ref() == Some(screen) || self.waiting.as_ref() == Some(screen) {
+        if self.shown.as_ref() == Some(screen) {
             return;
         }
-        if self.queue.is_empty() {
-            self.queue_page(screen.clone());
-        } else {
-            self.waiting = Some(screen.clone());
+        let previous = self.shown.replace(screen.clone());
+        let Some(frame) = render(screen) else {
+            if self.set_up || previous.is_none() {
+                self.queue.push_back([&SCREEN_OFF[..], &[END]].concat());
+            }
+            self.forget_panel();
+            return;
+        };
+        if !self.set_up {
+            self.set_up = true;
+            self.setup_due = true;
+            self.brightness_due = false;
+        } else if previous.is_some_and(|previous| previous.brightness != screen.brightness) {
+            self.brightness_due = true;
         }
+        self.target = Some(frame);
+    }
+
+    /// The screen went off: what it shows next is set up and drawn whole.
+    fn forget_panel(&mut self) {
+        self.set_up = false;
+        self.setup_due = false;
+        self.brightness_due = false;
+        self.target = None;
+        self.filled.fill(UNKNOWN);
+        self.sampled.fill(UNKNOWN);
     }
 
     /// The controller asked for an acknowledgement ([`display::asks_for_ack`]).
@@ -550,50 +614,88 @@ impl Painter {
         self.ack = true;
     }
 
-    fn queue_page(&mut self, screen: Screen) {
-        let previous = self.shown.replace(screen.clone());
-        let Some(frame) = render(&screen) else {
-            self.queue.push_back([&SCREEN_OFF[..], &[END]].concat());
-            self.set_up = false;
+    /// The first tile, coarse to fine, whose samples the panel does not
+    /// show yet under either model.
+    fn next_tile(&self) -> Option<usize> {
+        let target = self.target.as_ref()?;
+        (0..CHUNK_COUNT).find(|tile| {
+            samples(*tile).any(|at| {
+                let want = u16::from(target.pixels[at]);
+                self.filled[at] != want || self.sampled[at] != want
+            })
+        })
+    }
+
+    /// The panel after `tile` of the newest page went out.
+    fn sent_tile(&mut self, tile: usize) {
+        let Some(target) = self.target.as_ref() else {
             return;
+        };
+        let (width, height) = display::TILE_BLOCKS[tile];
+        for at in samples(tile) {
+            let value = u16::from(target.pixels[at]);
+            self.sampled[at] = value;
+            for row in 0..usize::from(height) {
+                let start = at + row * WIDTH;
+                self.filled[start..start + usize::from(width)].fill(value);
+            }
+        }
+    }
+
+    /// The commands that ride ahead of the next tile (no [`END`]).
+    fn prefix(&mut self) -> Vec<u8> {
+        let Some(screen) = self.shown.as_ref() else {
+            return Vec::new();
         };
         let brightness = display::brightness_command(screen.brightness);
-        let unchanged = previous
-            .as_ref()
-            .is_some_and(|previous| self.set_up && previous.same_picture(&screen));
-        if unchanged {
-            self.queue.push_back([&brightness[..], &[END]].concat());
-            return;
+        if std::mem::take(&mut self.setup_due) {
+            self.brightness_due = false;
+            let palette = self
+                .target
+                .as_ref()
+                .map(IndexedFrame::palette_command)
+                .unwrap_or_default();
+            return [
+                &SCREEN_ON[..],
+                &brightness[..],
+                &CUSTOM_BACKGROUND[..],
+                &palette[..],
+            ]
+            .concat();
         }
-        let setup = if self.set_up {
-            None
-        } else {
-            self.set_up = true;
-            Some([&SCREEN_ON[..], &brightness[..], &CUSTOM_BACKGROUND[..]].concat())
+        if std::mem::take(&mut self.brightness_due) {
+            return brightness.to_vec();
+        }
+        Vec::new()
+    }
+
+    /// The next drawing transfer's body, when one is owed.
+    fn next_draw(&mut self) -> Option<Vec<u8>> {
+        if let Some(body) = self.queue.pop_front() {
+            return Some(body);
+        }
+        let tile = self.next_tile();
+        if tile.is_none() && !self.setup_due && !self.brightness_due {
+            return None;
+        }
+        let prefix = self.prefix();
+        let Some(tile) = tile else {
+            return Some([&prefix[..], &[END]].concat());
         };
-        let mut bodies = frame.bodies(setup.as_deref());
-        if setup.is_none()
-            && previous.is_some_and(|previous| previous.brightness != screen.brightness)
-        {
-            bodies[0].splice(0..0, brightness);
-        }
-        self.queue.extend(bodies);
+        let body = self.target.as_ref()?.tile_body(tile, &prefix);
+        self.sent_tile(tile);
+        Some(body)
     }
 
     /// The next transfer due at `now`, ready to write as is, or `None` when
     /// nothing is due yet ([`Painter::wait`] says for how long).
     pub fn next(&mut self, now: Instant) -> Option<Vec<u8>> {
+        let draw_due = self.is_drawing() && due(self.last_tile, now, TILE_EVERY);
         let body = if std::mem::take(&mut self.ack) {
             vec![ACK, END]
-        } else if !self.queue.is_empty() && due(self.last_tile, now, TILE_EVERY) {
+        } else if let Some(draw) = draw_due.then(|| self.next_draw()).flatten() {
             self.last_tile = Some(now);
-            let body = self.queue.pop_front()?;
-            if self.queue.is_empty() {
-                if let Some(waiting) = self.waiting.take() {
-                    self.queue_page(waiting);
-                }
-            }
-            body
+            draw
         } else if due(self.last_keepalive, now, KEEPALIVE_EVERY) {
             self.last_keepalive = Some(now);
             HOST_KEEPALIVE.to_vec()
@@ -616,16 +718,16 @@ impl Painter {
             now,
             HEARTBEAT_EVERY,
         ));
-        if self.queue.is_empty() {
-            idle
-        } else {
+        if self.is_drawing() {
             idle.min(remaining(self.last_tile, now, TILE_EVERY))
+        } else {
+            idle
         }
     }
 
-    /// Whether a page is still being drawn.
+    /// Whether the panel does not show the newest page yet.
     pub fn is_drawing(&self) -> bool {
-        !self.queue.is_empty()
+        !self.queue.is_empty() || self.setup_due || self.brightness_due || self.next_tile().is_some()
     }
 }
 

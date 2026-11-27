@@ -7,9 +7,17 @@
 //! A session id is `<endpoint id>|<session instance id>`, stable while the
 //! session lives. COM objects stay on the thread that made them; the backend
 //! is created and used on one thread.
+//!
+//! Each read of the sessions keeps every session's volume handle by id, and
+//! the default output's, so a volume change is one call on a handle already
+//! held instead of walking every output and session again. The handles are
+//! replaced on the next read ([`crate::audio::Cached`] asks again at most
+//! every [`crate::audio::AUDIO_FRESH`]); one that fails is dropped and looked
+//! up afresh.
 
 use crate::audio::{AudioError, AudioSessions, Session};
 use crate::ownership::{Observed, STREAM_CONTROL_PROCESS};
+use std::collections::HashMap;
 use windows::core::{Interface, PCWSTR, PWSTR};
 use windows::Win32::Devices::DeviceAndDriverInstallation::{
     SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInfo, SetupDiGetClassDevsW,
@@ -67,6 +75,10 @@ fn process_name(pid: u32) -> String {
 
 pub struct CoreAudio {
     enumerator: IMMDeviceEnumerator,
+    /// Each session's volume, by session id, from the last read.
+    volumes: HashMap<String, ISimpleAudioVolume>,
+    /// The default output's volume, until the next read of the sessions.
+    output: Option<IAudioEndpointVolume>,
 }
 
 impl CoreAudio {
@@ -76,7 +88,11 @@ impl CoreAudio {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
             let enumerator =
                 CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(backend)?;
-            Ok(Self { enumerator })
+            Ok(Self {
+                enumerator,
+                volumes: HashMap::new(),
+                output: None,
+            })
         }
     }
 
@@ -93,6 +109,47 @@ impl CoreAudio {
             }
             Ok(out)
         }
+    }
+
+    /// The session's volume handle: the one kept from the last read, or
+    /// looked up now (and kept).
+    fn volume(&mut self, id: &str) -> Result<ISimpleAudioVolume, AudioError> {
+        if let Some(simple) = self.volumes.get(id) {
+            return Ok(simple.clone());
+        }
+        let simple = self.volume_of(id)?;
+        self.volumes.insert(id.to_owned(), simple.clone());
+        Ok(simple)
+    }
+
+    /// Runs `change` on the session's kept handle; when that handle fails
+    /// (the session or its output went away), once more on a fresh lookup.
+    fn on_session(
+        &mut self,
+        id: &str,
+        change: impl Fn(&ISimpleAudioVolume) -> windows::core::Result<()>,
+    ) -> Result<(), AudioError> {
+        if change(&self.volume(id)?).is_ok() {
+            return Ok(());
+        }
+        self.volumes.remove(id);
+        change(&self.volume(id)?).map_err(backend)
+    }
+
+    /// The default output's volume handle, kept until the next read.
+    fn on_output<T>(
+        &mut self,
+        use_it: impl Fn(&IAudioEndpointVolume) -> windows::core::Result<T>,
+    ) -> Result<T, AudioError> {
+        if let Some(output) = &self.output {
+            if let Ok(value) = use_it(output) {
+                return Ok(value);
+            }
+        }
+        let output = self.output()?;
+        let value = use_it(&output).map_err(backend);
+        self.output = value.is_ok().then_some(output);
+        value
     }
 
     fn volume_of(&self, id: &str) -> Result<ISimpleAudioVolume, AudioError> {
@@ -139,6 +196,9 @@ fn percent(level: f32) -> u8 {
 impl AudioSessions for CoreAudio {
     fn sessions(&mut self) -> Result<Vec<Session>, AudioError> {
         let mut out = Vec::new();
+        let mut volumes = HashMap::new();
+        // The default output may have changed since: look it up again on use.
+        self.output = None;
         unsafe {
             for (endpoint, device) in self.endpoints()? {
                 let Ok(manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) else {
@@ -155,8 +215,10 @@ impl AudioSessions for CoreAudio {
                     let pid = control2.GetProcessId().unwrap_or(0);
                     let system = control2.IsSystemSoundsSession() == S_OK;
                     let instance = take(control2.GetSessionInstanceIdentifier().map_err(backend)?);
+                    let id = format!("{endpoint}|{instance}");
+                    volumes.insert(id.clone(), simple.clone());
                     out.push(Session {
-                        id: format!("{endpoint}|{instance}"),
+                        id,
                         program: if system {
                             String::new()
                         } else {
@@ -170,44 +232,41 @@ impl AudioSessions for CoreAudio {
                 }
             }
         }
+        self.volumes = volumes;
         Ok(out)
     }
 
     fn set_volume(&mut self, id: &str, volume: u8) -> Result<(), AudioError> {
-        let simple = self.volume_of(id)?;
-        unsafe {
-            simple
-                .SetMasterVolume(scalar(volume), std::ptr::null())
-                .map_err(backend)
-        }
+        // SAFETY: a COM call on a live session volume handle.
+        self.on_session(id, |simple| unsafe {
+            simple.SetMasterVolume(scalar(volume), std::ptr::null())
+        })
     }
 
     fn set_muted(&mut self, id: &str, muted: bool) -> Result<(), AudioError> {
-        let simple = self.volume_of(id)?;
-        unsafe { simple.SetMute(muted, std::ptr::null()).map_err(backend) }
+        // SAFETY: a COM call on a live session volume handle.
+        self.on_session(id, |simple| unsafe { simple.SetMute(muted, std::ptr::null()) })
     }
 
     fn output_volume(&mut self) -> Result<(u8, bool), AudioError> {
-        let output = self.output()?;
-        unsafe {
-            let level = output.GetMasterVolumeLevelScalar().map_err(backend)?;
-            let muted = output.GetMute().map_err(backend)?.as_bool();
+        // SAFETY: COM calls on a live endpoint volume handle.
+        self.on_output(|output| unsafe {
+            let level = output.GetMasterVolumeLevelScalar()?;
+            let muted = output.GetMute()?.as_bool();
             Ok((percent(level), muted))
-        }
+        })
     }
 
     fn set_output_volume(&mut self, volume: u8) -> Result<(), AudioError> {
-        let output = self.output()?;
-        unsafe {
-            output
-                .SetMasterVolumeLevelScalar(scalar(volume), std::ptr::null())
-                .map_err(backend)
-        }
+        // SAFETY: a COM call on a live endpoint volume handle.
+        self.on_output(|output| unsafe {
+            output.SetMasterVolumeLevelScalar(scalar(volume), std::ptr::null())
+        })
     }
 
     fn set_output_muted(&mut self, muted: bool) -> Result<(), AudioError> {
-        let output = self.output()?;
-        unsafe { output.SetMute(muted, std::ptr::null()).map_err(backend) }
+        // SAFETY: a COM call on a live endpoint volume handle.
+        self.on_output(|output| unsafe { output.SetMute(muted, std::ptr::null()) })
     }
 }
 

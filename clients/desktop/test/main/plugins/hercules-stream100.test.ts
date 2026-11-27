@@ -12,6 +12,7 @@ const entry = createRequire(import.meta.url)(fileURLToPath(new URL("any/main.cjs
     run(options: unknown): void;
     describe(error: string, ownership: unknown): { state: string; detail?: string; code?: string; };
     connectedStatus(access: string): { state: string; detail?: string; code?: string; };
+    gamesOf(value: unknown): string[] | null;
 };
 
 type Read = { report?: Uint8Array; error?: string; };
@@ -22,6 +23,7 @@ function fakeNative(reads: Read[], actions: string[][] = [], playing: () => Prom
     const setLocale = vi.fn();
     const setCall = vi.fn();
     const setNowPlaying = vi.fn();
+    const setGames = vi.fn();
     const nowPlaying = vi.fn(playing);
     const setSettings = vi.fn();
     const reset = vi.fn();
@@ -42,12 +44,13 @@ function fakeNative(reads: Read[], actions: string[][] = [], playing: () => Prom
             setLocale = setLocale;
             setCall = setCall;
             setNowPlaying = setNowPlaying;
+            setGames = setGames;
         },
         nowPlaying,
         settingsFromPlugin: (values: string) => `full:${values}`,
         ownershipJson: () => JSON.stringify({ observed: {}, ownership: { state: "herculesSdk" } })
     };
-    return { native, feed, setSettings, reset, close, setLocale, setCall, setNowPlaying, nowPlaying };
+    return { native, feed, setSettings, reset, close, setLocale, setCall, setNowPlaying, setGames, nowPlaying };
 }
 
 function fakePort() {
@@ -163,6 +166,39 @@ describe("Hercules Stream 100 plugin", () => {
         expect(fake.setCall).toHaveBeenLastCalledWith("null");
         // Never reads what is playing on the call page.
         expect(fake.nowPlaying).not.toHaveBeenCalled();
+    });
+
+    it("hands the app's running games to a knob on games, and leaves an app that sends none alone", async () => {
+        const fake = fakeNative([]);
+        const { port, sent, deliver } = fakePort();
+        const ticks: (() => void)[] = [];
+        let clock = 0;
+        entry.run({ port, native: fake.native, now: () => clock, every: (tick: () => void) => ticks.push(tick), exit: vi.fn() });
+        deliver({ type: "start", id: "hercules-stream100", version: "0.1.0", permissions: ["polaris-actions"], devices: [], settings: { knob3: "games" } });
+        const asked = () => sent.filter((message) => (message as { method?: string; }).method === "polaris.state") as { id: number; }[];
+        expect(asked()).toHaveLength(1);
+        deliver({ type: "reply", id: asked()[0]!.id, ok: true, value: { call: null, games: ["eldenring.exe", 42, "", "cs2.exe"] } });
+        await flush();
+        expect(fake.setGames).toHaveBeenLastCalledWith(["eldenring.exe", "cs2.exe"]);
+
+        // Not asked again before the app's detection could have looked again.
+        ticks[0]!();
+        await flush();
+        expect(asked()).toHaveLength(1);
+        clock = 15_000;
+        ticks[0]!();
+        // An app older than `games`: the native module keeps what it knows.
+        deliver({ type: "reply", id: asked()[1]!.id, ok: true, value: { call: null } });
+        await flush();
+        expect(fake.setGames).toHaveBeenCalledTimes(1);
+
+        // No knob on games: never asked.
+        deliver({ type: "settings", settings: { knob3: "music" } });
+        clock = 60_000;
+        ticks[0]!();
+        await flush();
+        expect(asked()).toHaveLength(2);
+        expect(entry.gamesOf({ games: "eldenring.exe" })).toBeNull();
     });
 
     it("shows what the system says is playing on the now-playing page, and nothing when it cannot say", async () => {

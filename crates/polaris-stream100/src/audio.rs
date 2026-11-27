@@ -12,6 +12,7 @@
 //! model and the rules.
 
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -263,6 +264,128 @@ pub trait AudioSessions {
     fn output_volume(&mut self) -> Result<(u8, bool), AudioError>;
     fn set_output_volume(&mut self, volume: u8) -> Result<(), AudioError>;
     fn set_output_muted(&mut self, muted: bool) -> Result<(), AudioError>;
+}
+
+/// How long a read of the sessions and the output is reused. A knob report
+/// comes every few milliseconds while it turns; asking the audio service for
+/// every app on every output each time is what made a turn lag. An app that
+/// starts or stops playing shows within this long.
+pub const AUDIO_FRESH: Duration = Duration::from_millis(1_000);
+
+/// Any [`AudioSessions`] with its reads kept for [`AUDIO_FRESH`]. Its own
+/// changes are written through to what it keeps, so the next report starts
+/// from the volume just set; a change the backend refuses (the app closed,
+/// the output went away) drops what it keeps, and the next read asks again.
+pub struct Cached<A> {
+    inner: A,
+    fresh: Duration,
+    sessions: Option<(Instant, Vec<Session>)>,
+    output: Option<(Instant, (u8, bool))>,
+}
+
+impl<A: AudioSessions> Cached<A> {
+    pub fn new(inner: A) -> Self {
+        Self::fresh_for(inner, AUDIO_FRESH)
+    }
+
+    /// Reads kept for `fresh` instead of [`AUDIO_FRESH`].
+    pub fn fresh_for(inner: A, fresh: Duration) -> Self {
+        Self {
+            inner,
+            fresh,
+            sessions: None,
+            output: None,
+        }
+    }
+
+    pub fn inner(&self) -> &A {
+        &self.inner
+    }
+
+    /// Forgets everything kept: the next read asks the backend.
+    pub fn invalidate(&mut self) {
+        self.sessions = None;
+        self.output = None;
+    }
+
+    fn is_fresh(&self, at: Instant) -> bool {
+        at.elapsed() < self.fresh
+    }
+
+    fn after<T>(&mut self, result: Result<T, AudioError>) -> Result<T, AudioError> {
+        if result.is_err() {
+            self.invalidate();
+        }
+        result
+    }
+
+    fn update(&mut self, id: &str, change: impl FnOnce(&mut Session)) {
+        if let Some(session) = self
+            .sessions
+            .as_mut()
+            .and_then(|(_, sessions)| sessions.iter_mut().find(|session| session.id == id))
+        {
+            change(session);
+        }
+    }
+}
+
+impl<A: AudioSessions> AudioSessions for Cached<A> {
+    fn sessions(&mut self) -> Result<Vec<Session>, AudioError> {
+        if let Some((at, sessions)) = &self.sessions {
+            if self.is_fresh(*at) {
+                return Ok(sessions.clone());
+            }
+        }
+        let read = self.inner.sessions();
+        let sessions = self.after(read)?;
+        self.sessions = Some((Instant::now(), sessions.clone()));
+        Ok(sessions)
+    }
+
+    fn set_volume(&mut self, id: &str, volume: u8) -> Result<(), AudioError> {
+        let result = self.inner.set_volume(id, volume);
+        self.after(result)?;
+        self.update(id, |session| session.volume = volume.min(100));
+        Ok(())
+    }
+
+    fn set_muted(&mut self, id: &str, muted: bool) -> Result<(), AudioError> {
+        let result = self.inner.set_muted(id, muted);
+        self.after(result)?;
+        self.update(id, |session| session.muted = muted);
+        Ok(())
+    }
+
+    fn output_volume(&mut self) -> Result<(u8, bool), AudioError> {
+        if let Some((at, output)) = self.output {
+            if self.is_fresh(at) {
+                return Ok(output);
+            }
+        }
+        let read = self.inner.output_volume();
+        let output = self.after(read)?;
+        self.output = Some((Instant::now(), output));
+        Ok(output)
+    }
+
+    fn set_output_volume(&mut self, volume: u8) -> Result<(), AudioError> {
+        let result = self.inner.set_output_volume(volume);
+        self.after(result)?;
+        if let Some((_, output)) = self.output.as_mut() {
+            output.0 = volume.min(100);
+        }
+        Ok(())
+    }
+
+    fn set_output_muted(&mut self, muted: bool) -> Result<(), AudioError> {
+        let result = self.inner.set_output_muted(muted);
+        self.after(result)?;
+        if let Some((_, output)) = self.output.as_mut() {
+            output.1 = muted;
+        }
+        Ok(())
+    }
 }
 
 /// Where each operating system's backend stands, said plainly so a screen can

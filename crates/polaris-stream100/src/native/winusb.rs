@@ -20,6 +20,7 @@ use crate::session::{
 };
 use crate::transport::TransportError;
 use std::ffi::c_void;
+use std::sync::Mutex;
 use std::time::Duration;
 use windows::core::{GUID, PCWSTR};
 use windows::Win32::Devices::DeviceAndDriverInstallation::{
@@ -125,18 +126,32 @@ pub struct WinUsbLink {
     isoch: *mut c_void,
     read_event: HANDLE,
     write_event: HANDLE,
-    // Boxed: the system writes into these while a transfer is pending, so
-    // they must not move.
-    read_overlapped: Box<OVERLAPPED>,
-    write_overlapped: Box<OVERLAPPED>,
+    read: Mutex<ReadSide>,
+    write: Mutex<WriteSide>,
+}
+
+/// The input direction's state, used by the session's thread.
+struct ReadSide {
+    // Boxed: the system writes into these while a read is pending, so they
+    // must not move.
+    overlapped: Box<OVERLAPPED>,
     report: Box<[u8; REPORT_LEN]>,
-    packet: Box<[u8; TRANSFER_LEN]>,
     pending: bool,
 }
 
-// SAFETY: plain kernel and WinUSB handles, usable from any thread; the struct
-// is only ever used by one thread at a time (`&mut self`).
+/// The display direction's state, used by the display thread.
+struct WriteSide {
+    // Boxed: registered with WinUSB and read while a write is pending.
+    overlapped: Box<OVERLAPPED>,
+    packet: Box<[u8; TRANSFER_LEN]>,
+}
+
+// SAFETY: plain kernel and WinUSB handles, usable from any thread. Each
+// direction's buffers and overlapped are behind their own lock, and the two
+// directions use different events, pipes and overlapped structures, which
+// WinUSB allows concurrently on one device handle.
 unsafe impl Send for WinUsbLink {}
+unsafe impl Sync for WinUsbLink {}
 
 impl WinUsbLink {
     fn open() -> Result<Self, TransportError> {
@@ -174,11 +189,15 @@ impl WinUsbLink {
             isoch: std::ptr::null_mut(),
             read_event: HANDLE::default(),
             write_event: HANDLE::default(),
-            read_overlapped: Box::default(),
-            write_overlapped: Box::default(),
-            report: Box::new([0u8; REPORT_LEN]),
-            packet: Box::new([0u8; TRANSFER_LEN]),
-            pending: false,
+            read: Mutex::new(ReadSide {
+                overlapped: Box::default(),
+                report: Box::new([0u8; REPORT_LEN]),
+                pending: false,
+            }),
+            write: Mutex::new(WriteSide {
+                overlapped: Box::default(),
+                packet: Box::new([0u8; TRANSFER_LEN]),
+            }),
         };
         // From here on `Drop` releases whatever was set up.
         opened.read_event = event()?;
@@ -229,12 +248,16 @@ impl Link for WinUsbLink {
             return false;
         }
         let mut isoch = std::ptr::null_mut();
+        let write = self
+            .write
+            .get_mut()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // SAFETY: `packet` is boxed and outlives the registration (released in `drop`).
         if unsafe {
             WinUsb_RegisterIsochBuffer(
                 self.display,
                 DISPLAY_ENDPOINT,
-                &mut self.packet[..],
+                &mut write.packet[..],
                 &mut isoch,
             )
         }
@@ -246,13 +269,18 @@ impl Link for WinUsbLink {
         true
     }
 
-    fn write_transfer(&mut self, transfer: &[u8], wait: Duration) {
+    fn write_transfer(&self, transfer: &[u8], wait: Duration) {
         if self.isoch.is_null() {
             return;
         }
+        let mut write = self
+            .write
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let write = &mut *write;
         let length = transfer.len().min(TRANSFER_LEN);
-        self.packet[..length].copy_from_slice(&transfer[..length]);
-        *self.write_overlapped = OVERLAPPED {
+        write.packet[..length].copy_from_slice(&transfer[..length]);
+        *write.overlapped = OVERLAPPED {
             hEvent: self.write_event,
             ..Default::default()
         };
@@ -265,7 +293,7 @@ impl Link for WinUsbLink {
                 0,
                 length as u32,
                 false,
-                Some(&*self.write_overlapped),
+                Some(&*write.overlapped),
             );
             match started {
                 Ok(()) => {}
@@ -273,20 +301,25 @@ impl Link for WinUsbLink {
                 Err(_) => return,
             }
             if WaitForSingleObject(self.write_event, millis(wait)) != WAIT_OBJECT_0 {
-                let _ = CancelIoEx(self.file, Some(&*self.write_overlapped));
+                let _ = CancelIoEx(self.file, Some(&*write.overlapped));
             }
             let mut written = 0u32;
-            let _ = GetOverlappedResult(self.file, &*self.write_overlapped, &mut written, true);
+            let _ = GetOverlappedResult(self.file, &*write.overlapped, &mut written, true);
         }
     }
 
     fn read_report(
-        &mut self,
+        &self,
         buffer: &mut [u8; REPORT_LEN],
         wait: Duration,
     ) -> Result<Option<usize>, TransportError> {
-        if !self.pending {
-            *self.read_overlapped = OVERLAPPED {
+        let mut read_side = self
+            .read
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let side = &mut *read_side;
+        if !side.pending {
+            *side.overlapped = OVERLAPPED {
                 hEvent: self.read_event,
                 ..Default::default()
             };
@@ -296,9 +329,9 @@ impl Link for WinUsbLink {
                 WinUsb_ReadPipe(
                     self.input,
                     INPUT_ENDPOINT,
-                    Some(&mut self.report[..]),
+                    Some(&mut side.report[..]),
                     None,
-                    Some(&*self.read_overlapped),
+                    Some(&*side.overlapped),
                 )
             };
             match started {
@@ -306,7 +339,7 @@ impl Link for WinUsbLink {
                 Err(error) if error.code() == ERROR_IO_PENDING.to_hresult() => {}
                 Err(error) => return Err(TransportError::Io(error.message())),
             }
-            self.pending = true;
+            side.pending = true;
         }
         // SAFETY: waits on the event this struct owns.
         match unsafe { WaitForSingleObject(self.read_event, millis(wait)) } {
@@ -322,11 +355,11 @@ impl Link for WinUsbLink {
         let mut read = 0u32;
         // SAFETY: the read has completed (its event is set).
         let done =
-            unsafe { GetOverlappedResult(self.file, &*self.read_overlapped, &mut read, false) };
-        self.pending = false;
+            unsafe { GetOverlappedResult(self.file, &*side.overlapped, &mut read, false) };
+        side.pending = false;
         done.map_err(|error| TransportError::Io(error.message()))?;
         let read = (read as usize).min(REPORT_LEN);
-        buffer[..read].copy_from_slice(&self.report[..read]);
+        buffer[..read].copy_from_slice(&side.report[..read]);
         Ok(Some(read))
     }
 }
@@ -336,11 +369,15 @@ impl Drop for WinUsbLink {
         // SAFETY: cancels this struct's own read and waits for it, so the
         // system is done with the buffers; then every handle opened in `open`
         // is released once, in reverse order. Null handles are skipped.
+        let side = self
+            .read
+            .get_mut()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         unsafe {
-            if self.pending {
-                let _ = CancelIoEx(self.file, Some(&*self.read_overlapped));
+            if side.pending {
+                let _ = CancelIoEx(self.file, Some(&*side.overlapped));
                 let mut read = 0u32;
-                let _ = GetOverlappedResult(self.file, &*self.read_overlapped, &mut read, true);
+                let _ = GetOverlappedResult(self.file, &*side.overlapped, &mut read, true);
             }
             if !self.isoch.is_null() {
                 let _ = WinUsb_UnregisterIsochBuffer(self.isoch);

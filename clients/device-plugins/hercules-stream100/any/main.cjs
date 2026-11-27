@@ -11,6 +11,11 @@
  * system's on an app older than that). Its "Call" page follows the app's call
  * state (`polaris.state`) and its "Now playing" page the system's media
  * session (`nowPlaying()`), each read every WATCH_MS while that page is chosen.
+ *
+ * A knob set to "Games" follows the games the app's game detection finds
+ * running (`games` in the `polaris.state` answer, program keys), read every
+ * GAMES_EVERY_MS while a knob is on games. An app that does not send them
+ * leaves the knob on the games the native module recognises by itself.
  */
 
 "use strict";
@@ -23,6 +28,17 @@ const RETRY_MS = 3_000;
 const OWNERSHIP_EVERY_MS = 15_000;
 const CALL_TIMEOUT_MS = 10_000;
 const WATCH_MS = 1_000;
+/** The app's game detection looks every 15 s; asking more often finds nothing new. */
+const GAMES_EVERY_MS = 15_000;
+const MAX_GAMES = 64;
+const KNOBS = ["knob1", "knob2", "knob3", "knob4"];
+
+/** The program keys in a `polaris.state` answer's `games`, or null when it sends none. */
+function gamesOf(value) {
+    const games = value?.games;
+    if (!Array.isArray(games)) return null;
+    return games.filter((key) => typeof key === "string" && key.trim() && key.length <= 260).slice(0, MAX_GAMES);
+}
 
 /** This system's language, for an app that does not send its own. */
 function systemLocale() {
@@ -92,6 +108,7 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     let locale = "en-US";
     let watcher = null;
     let watching = false;
+    let gamesAt = -Infinity;
     let nextCall = 1;
     const pending = new Map();
 
@@ -140,7 +157,13 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
         else if (action.startsWith("call.")) void watch();
     }
 
-    /** Reads what the chosen page shows: the app's call, or what is playing. */
+    /** Hands the app's running games to the native module, when the app sent them. */
+    function followGames(value) {
+        const games = gamesOf(value);
+        if (games && running) ensureController().setGames(games);
+    }
+
+    /** Reads what the chosen page shows (the app's call, or what is playing) and the running games. */
     async function watch() {
         if (watching || !running) return;
         watching = true;
@@ -150,7 +173,13 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
                 // An app older than `polaris.state`, or one that refused it: no call.
                 const state = reply.ok ? reply.value?.call ?? null : null;
                 if (running) ensureController().setCall(JSON.stringify(state));
-            } else if (values.display === "nowPlaying") {
+                if (reply.ok) followGames(reply.value);
+            } else if (KNOBS.some((knob) => values[knob] === "games") && now() - gamesAt >= GAMES_EVERY_MS) {
+                gamesAt = now();
+                const reply = await call("polaris.state");
+                if (reply.ok) followGames(reply.value);
+            }
+            if (values.display === "nowPlaying") {
                 let playing = "null";
                 try {
                     playing = await native.nowPlaying();
@@ -267,7 +296,7 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     });
 }
 
-module.exports = { run, describe, connectedStatus, systemLocale, RENAMED };
+module.exports = { run, describe, connectedStatus, systemLocale, gamesOf, RENAMED };
 
 /** Started by the plugin host: load the native module, or say plainly that it did not load. */
 function main(port) {

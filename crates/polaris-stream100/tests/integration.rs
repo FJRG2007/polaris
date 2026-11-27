@@ -315,3 +315,100 @@ fn macos_asks_once_for_recording_system_audio() {
         }
     }
 }
+
+/// A backend that counts how often it is asked, and can refuse a change.
+#[derive(Default)]
+struct Counting {
+    reads: usize,
+    output_reads: usize,
+    refuse: bool,
+    sessions: Vec<Session>,
+}
+
+impl audio::AudioSessions for Counting {
+    fn sessions(&mut self) -> Result<Vec<Session>, audio::AudioError> {
+        self.reads += 1;
+        Ok(self.sessions.clone())
+    }
+    fn set_volume(&mut self, _id: &str, _volume: u8) -> Result<(), audio::AudioError> {
+        if self.refuse {
+            return Err(audio::AudioError::Gone);
+        }
+        Ok(())
+    }
+    fn set_muted(&mut self, _id: &str, _muted: bool) -> Result<(), audio::AudioError> {
+        Ok(())
+    }
+    fn output_volume(&mut self) -> Result<(u8, bool), audio::AudioError> {
+        self.output_reads += 1;
+        Ok((30, false))
+    }
+    fn set_output_volume(&mut self, _volume: u8) -> Result<(), audio::AudioError> {
+        Ok(())
+    }
+    fn set_output_muted(&mut self, _muted: bool) -> Result<(), audio::AudioError> {
+        Ok(())
+    }
+}
+
+fn playing(id: &str, volume: u8) -> Session {
+    Session {
+        id: id.into(),
+        program: "spotify.exe".into(),
+        pid: 1,
+        system: false,
+        volume,
+        muted: false,
+    }
+}
+
+#[test]
+fn every_report_reuses_one_read_of_the_sessions_and_its_own_changes_show() {
+    use audio::AudioSessions;
+    let mut mixer = audio::Cached::fresh_for(
+        Counting {
+            sessions: vec![playing("a", 40)],
+            ..Default::default()
+        },
+        std::time::Duration::from_secs(3_600),
+    );
+    for _ in 0..50 {
+        mixer.sessions().unwrap();
+        mixer.output_volume().unwrap();
+    }
+    assert_eq!((mixer.inner().reads, mixer.inner().output_reads), (1, 1));
+    // A change it made is what the next report starts from.
+    mixer.set_volume("a", 46).unwrap();
+    mixer.set_muted("a", true).unwrap();
+    mixer.set_output_volume(35).unwrap();
+    assert_eq!(mixer.sessions().unwrap()[0].volume, 46);
+    assert!(mixer.sessions().unwrap()[0].muted);
+    assert_eq!(mixer.output_volume().unwrap(), (35, false));
+    assert_eq!(mixer.inner().reads, 1);
+}
+
+#[test]
+fn a_refused_change_or_an_old_read_asks_the_backend_again() {
+    use audio::AudioSessions;
+    let mut mixer = audio::Cached::fresh_for(
+        Counting {
+            sessions: vec![playing("a", 40)],
+            refuse: true,
+            ..Default::default()
+        },
+        std::time::Duration::from_secs(3_600),
+    );
+    mixer.sessions().unwrap();
+    // The app closed: the kept sessions are dropped, the next read is fresh.
+    assert!(mixer.set_volume("a", 46).is_err());
+    assert_eq!(mixer.sessions().unwrap()[0].volume, 40);
+    assert_eq!(mixer.inner().reads, 2);
+    mixer.invalidate();
+    mixer.sessions().unwrap();
+    assert_eq!(mixer.inner().reads, 3);
+
+    let mut always = audio::Cached::fresh_for(Counting::default(), std::time::Duration::ZERO);
+    always.sessions().unwrap();
+    always.sessions().unwrap();
+    assert_eq!(always.inner().reads, 2);
+}

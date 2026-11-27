@@ -6,7 +6,8 @@ use polaris_stream100::session::{
     keepalive_due, read_slice, VendorRead, DEVICE_INTERFACE_GUID, DEVICE_INTERFACE_GUID_U128,
     FORBIDDEN_REQUESTS, INIT_READS, KEEPALIVE_EVERY,
 };
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 #[test]
 fn the_start_up_reads_are_the_documented_vendor_reads() {
@@ -72,14 +73,22 @@ fn the_interface_guid_string_and_number_agree() {
     );
 }
 
-/// A link that records what the session asks of it.
+/// A link that records what the session asks of it. Reads and writes come
+/// from two threads, as on a real link.
 #[derive(Default)]
 struct Recorder {
     display: bool,
     controls: Vec<polaris_stream100::session::Setup>,
-    transfers: Vec<Vec<u8>>,
-    reports: Vec<Vec<u8>>,
-    waits: Vec<Duration>,
+    transfers: Mutex<Vec<Vec<u8>>>,
+    reports: Mutex<Vec<Vec<u8>>>,
+    /// How long each write takes, as a slow display interface would.
+    write_takes: Duration,
+}
+
+impl Recorder {
+    fn transfers(&self) -> Vec<Vec<u8>> {
+        self.transfers.lock().unwrap().clone()
+    }
 }
 
 impl polaris_stream100::session::Link for Recorder {
@@ -93,17 +102,17 @@ impl polaris_stream100::session::Link for Recorder {
         self.display
     }
 
-    fn write_transfer(&mut self, transfer: &[u8], _wait: Duration) {
-        self.transfers.push(transfer.to_vec());
+    fn write_transfer(&self, transfer: &[u8], _wait: Duration) {
+        std::thread::sleep(self.write_takes);
+        self.transfers.lock().unwrap().push(transfer.to_vec());
     }
 
     fn read_report(
-        &mut self,
+        &self,
         buffer: &mut [u8; polaris_stream100::report::REPORT_LEN],
         wait: Duration,
     ) -> Result<Option<usize>, ()> {
-        self.waits.push(wait);
-        let Some(report) = self.reports.pop() else {
+        let Some(report) = self.reports.lock().unwrap().pop() else {
             std::thread::sleep(wait);
             return Ok(None);
         };
@@ -131,19 +140,19 @@ fn a_session_keeps_the_controller_alive_while_it_waits() {
         display: true,
         ..Default::default()
     });
+    // One read that blocks the whole time: the display is fed meanwhile.
     let read = session.next(Duration::from_millis(600)).unwrap();
     assert!(read.is_none());
-    let link = session.link();
+    let transfers = session.link().transfers();
     // The painter's transfers, as built: the sync packet first, whole packets.
-    assert!(!link.transfers.is_empty());
-    assert!(link.transfers.iter().all(|transfer| {
+    assert!(!transfers.is_empty());
+    assert!(transfers.iter().all(|transfer| {
         transfer.len() % PACKET_SIZE == 0
             && transfer.len() <= TRANSFER_LEN
             && transfer.starts_with(&SYNC)
     }));
     // The official keep-alive went out at least once a 500 ms, so twice in 600 ms.
-    let keepalives = link
-        .transfers
+    let keepalives = transfers
         .iter()
         .filter(|transfer| {
             transfer[PACKET_SIZE..]
@@ -153,13 +162,30 @@ fn a_session_keeps_the_controller_alive_while_it_waits() {
         .count();
     assert!(keepalives >= 2, "{keepalives} keep-alives");
     // A quiet display still hears from the host every 20 ms or so.
+    assert!(transfers.len() >= 10, "{} transfers", transfers.len());
+}
+
+#[test]
+fn a_slow_display_write_never_holds_back_a_report() {
+    let mut report = vec![0u8; 64];
+    report[0] = 0x01;
+    let mut session = polaris_stream100::session::Session::start(Recorder {
+        display: true,
+        // Every write takes as long as a write may (WRITE_WAIT).
+        write_takes: polaris_stream100::session::WRITE_WAIT,
+        ..Default::default()
+    });
+    // Let the display thread get into a write first.
+    std::thread::sleep(Duration::from_millis(10));
+    session.link().reports.lock().unwrap().push(report);
+    let started = Instant::now();
+    let read = session.next(Duration::from_millis(500)).unwrap();
+    assert!(read.is_some());
     assert!(
-        link.transfers.len() >= 10,
-        "{} transfers",
-        link.transfers.len()
+        started.elapsed() < Duration::from_millis(50),
+        "the report waited {:?}",
+        started.elapsed()
     );
-    // No read blocks past the next heartbeat.
-    assert!(link.waits.iter().all(|wait| *wait <= KEEPALIVE_EVERY));
 }
 
 #[test]
@@ -169,20 +195,22 @@ fn a_request_for_an_acknowledgement_is_answered_on_the_display() {
     assert!(asks_for_ack(&report));
     let mut session = polaris_stream100::session::Session::start(Recorder {
         display: true,
-        reports: vec![report],
+        reports: Mutex::new(vec![report]),
         ..Default::default()
     });
+    let before = session.link().transfers().len();
     session.next(Duration::from_millis(50)).unwrap();
-    let before = session.link().transfers.len();
-    let _ = session.next(Duration::from_millis(1));
-    let after = &session.link().transfers[before..];
-    assert!(
-        after
-            .first()
+    let deadline = Instant::now() + Duration::from_millis(500);
+    let acked = || {
+        session.link().transfers()[before..]
+            .iter()
             // The body follows the 8-byte message header.
-            .is_some_and(|transfer| transfer[PACKET_SIZE + 8] == ACK),
-        "the next transfer is the acknowledgement"
-    );
+            .any(|transfer| transfer[PACKET_SIZE + 8] == ACK)
+    };
+    while !acked() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(acked(), "the acknowledgement went out");
 }
 
 #[test]
@@ -191,12 +219,12 @@ fn without_the_display_interface_no_keep_alive_is_sent_and_input_is_still_read()
     report[0] = 0x01;
     let mut session = polaris_stream100::session::Session::start(Recorder {
         display: false,
-        reports: vec![report],
+        reports: Mutex::new(vec![report]),
         ..Default::default()
     });
     assert!(!session.has_display());
     let read = session.next(Duration::from_millis(100)).unwrap();
-    assert!(session.link().transfers.is_empty());
+    assert!(session.link().transfers().is_empty());
     assert_eq!(
         read,
         polaris_stream100::report::Report::parse(&{
