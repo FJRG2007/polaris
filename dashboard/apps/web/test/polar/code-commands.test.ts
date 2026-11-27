@@ -36,6 +36,7 @@ describe("the commands on offer", () => {
             "plan",
             "simplify",
             "copy",
+            "btw",
             "exit"
         ]);
     });
@@ -58,6 +59,7 @@ describe("the commands on offer", () => {
             "memory",
             "goal",
             "copy",
+            "btw",
             "exit"
         ]);
         expect(codeCommands.codeCommandsFor("thread", null)).not.toContain("compact");
