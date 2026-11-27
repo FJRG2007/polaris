@@ -315,6 +315,17 @@
             "yourself": "{name} (you)"
         },
         "actions": "Actions",
+        "rowActions": {
+            "label": "Actions",
+            "of": "Actions for {title}",
+            "open": "Open",
+            "back": "Back",
+            "treatAsGame": "Treat as Game",
+            "treatAsApp": "Treat as Application",
+            "keyControl": "Control",
+            "keyCommand": "Command",
+            "keyEscape": "Escape"
+        },
         "calculator": "Calculator",
         "host": {
             "url": "Link",

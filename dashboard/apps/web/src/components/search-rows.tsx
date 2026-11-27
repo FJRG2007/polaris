@@ -20,7 +20,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ClockCommand, RecentSearch } from "@polaris/core";
 import { LAUNCHER_COMMANDS, typedUrl } from "@polaris/core";
 import { AlarmClock, AppWindow, Calculator, Clipboard, Clock, Copy, CornerDownLeft, Gamepad2, Globe, Link, Power, Timer, Watch, X } from "lucide-react";
-import type { HostRow, HostRowKind } from "@/lib/search/search-host";
+import type { HostRow, HostRowAction, HostRowKind } from "@/lib/search/search-host";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -401,6 +401,30 @@ export function HostResultRow({ row, query, ...props }: RowProps & { row: HostRo
     return (
         <Row {...props} label={label}>
             <SearchItem icon={icon} label={label} context={context} />
+        </Row>
+    );
+}
+
+/** One entry of a host row's action panel (Raycast's Ctrl+K): opening it first, as Enter does, then what else it can do. */
+export type HostActionEntry = "open" | HostRowAction;
+
+export function hostActionEntries(row: HostRow): HostActionEntry[] {
+    return ["open", ...(row.actions ?? [])];
+}
+
+/** An entry of that panel. */
+export function HostActionRow({ entry, ...props }: RowProps & { entry: HostActionEntry }) {
+    const t = useTranslations("components");
+    const label =
+        entry === "open"
+            ? t("search.rowActions.open")
+            : entry === "treat-as-game"
+              ? t("search.rowActions.treatAsGame")
+              : t("search.rowActions.treatAsApp");
+    const Icon = entry === "open" ? CornerDownLeft : entry === "treat-as-game" ? Gamepad2 : AppWindow;
+    return (
+        <Row {...props} label={label}>
+            <SearchItem icon={<Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />} label={label} />
         </Row>
     );
 }

@@ -95,7 +95,9 @@ function Launcher() {
     const [active, setActive] = useState(0);
     const [answered, setAnswered] = useState(false);
     /** The row whose actions are listed instead of the results (Raycast's action panel), and the entry the keys are on. */
-    const [panel, setPanel] = useState<{ row: LauncherRow; active: number; } | null>(null);
+    const [panel, setPanel] = useState<{ row: LauncherRow; version: number; active: number; } | null>(null);
+    /** The number of the answer the rows on screen came from, which an action names. */
+    const [version, setVersion] = useState<number | null>(null);
     const field = useRef<HTMLInputElement>(null);
     const list = useRef<HTMLDivElement>(null);
     /** Each query numbered, so a slow answer never replaces a newer one. */
@@ -107,6 +109,7 @@ function Launcher() {
         const answer = await window.polarisLauncher.query(text).catch(() => null);
         if (mine !== asked.current || !answer) return;
         setRows(answer.rows);
+        setVersion(answer.version ?? null);
         setNotice(answer.notice);
         setActive(Math.min(keep, Math.max(0, answer.rows.length - 1)));
         setAnswered(true);
@@ -140,9 +143,9 @@ function Launcher() {
         field.current?.focus();
     };
     const activeRow = rows[active];
-    const hasActions = Boolean(activeRow?.actions?.length && window.polarisLauncher.act);
+    const hasActions = Boolean(activeRow?.actions?.length && window.polarisLauncher.act && version !== null);
     const openPanel = () => {
-        if (activeRow && hasActions) setPanel({ row: activeRow, active: 0 });
+        if (activeRow && hasActions && version !== null) setPanel({ row: activeRow, version, active: 0 });
         field.current?.focus();
     };
     const closePanel = () => {
@@ -157,10 +160,10 @@ function Launcher() {
             if (at >= 0) choose(at);
             return;
         }
-        void window.polarisLauncher.act?.(panel.row.id, entry.id).then(() => search(query, Math.max(0, at)));
+        void window.polarisLauncher.act?.(panel.row.id, entry.id, panel.version).then(() => search(query, Math.max(0, at)));
         field.current?.focus();
     };
-    const onPanelKey = (event: KeyboardEvent<HTMLInputElement>, open: { row: LauncherRow; active: number; }) => {
+    const onPanelKey = (event: KeyboardEvent<HTMLInputElement>, open: { row: LauncherRow; version: number; active: number; }) => {
         const entries = panelEntries(open.row);
         const next = stepActive(event.key, open.active, entries.length);
         if (next !== null) {

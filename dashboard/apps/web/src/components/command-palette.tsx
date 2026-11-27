@@ -63,8 +63,11 @@ import {
     EntryRow,
     HitRow,
     hostGroup,
+    HostActionRow,
+    hostActionEntries,
     HostResultRow,
-    RecentRow
+    RecentRow,
+    type HostActionEntry
 } from "@/components/search-rows";
 import { useToast } from "@polaris/ui";
 import { groupRows, stepActive } from "@polaris/ui/search-match";
@@ -99,7 +102,7 @@ import {
     recordSearchAction
 } from "@/app/(app)/search-actions";
 import * as polls from "./shared-polls";
-import { readHostRows, type HostRow, type SearchHost } from "@/lib/search/search-host";
+import { readHostRows, readHostVersion, type HostRow, type SearchHost } from "@/lib/search/search-host";
 import { usePluginEntries } from "@/lib/search/use-plugin-entries";
 import { keepUnlockProofs } from "@/app/(app)/chat/lock-session";
 import { openLockedChatsAction, searchLockAction } from "@/app/(app)/chat/lock-actions";
@@ -193,6 +196,11 @@ function rowElementId(row: Row): string {
     return `polaris-search-${row.id.replace(/[^a-z0-9-]+/gi, "-")}`;
 }
 
+/** An entry of a host row's action panel, for `aria-activedescendant`. */
+function hostEntryId(position: number): string {
+    return `polaris-search-action-${position}`;
+}
+
 /** A list the palette was handed, back from the joined key its memo is keyed
  *  on. */
 function fromKey(key: string): string[] {
@@ -238,6 +246,12 @@ export function CommandPalette({
     const navLabel = useNavLabel();
     const [open, setOpen] = useState(Boolean(host));
     const [hostRows, setHostRows] = useState<HostRow[]>([]);
+    /** The number of the host's answer the rows on screen came from, which an action names; null from a host too old to number them. */
+    const [hostVersion, setHostVersion] = useState<number | null>(null);
+    /** A host row whose actions are listed instead of the results (Raycast's action panel), and the entry the keys are on. */
+    const [hostPanel, setHostPanel] = useState<{ row: HostRow; version: number; active: number } | null>(null);
+    /** Bumped after an action, so the host's rows are asked for again with the change in them. */
+    const [hostAsked, setHostAsked] = useState(0);
     /** The host's rows for an empty field, which the next open starts from
      *  instead of growing when they arrive again. */
     const idleHostRowsRef = useRef<HostRow[]>([]);
@@ -473,6 +487,7 @@ export function CommandPalette({
         }
         // Asked again next time: the reader may change the setting in between.
         if (!next) setSecretCode(undefined);
+        if (!next) setHostPanel(null);
         setOpen(next);
     }
 
@@ -487,6 +502,7 @@ export function CommandPalette({
                 return;
             }
         }
+        setHostPanel(null);
         setQuery(value);
         setActive(0);
     }
@@ -551,6 +567,7 @@ export function CommandPalette({
     useEffect(() => {
         if (!host || scope) {
             setHostRows([]);
+            setHostVersion(null);
             return;
         }
         if (!open) {
@@ -566,6 +583,7 @@ export function CommandPalette({
                 const found = readHostRows(raw);
                 if (!trimmed) idleHostRowsRef.current = found;
                 setHostRows(found);
+                setHostVersion(readHostVersion(raw));
             })
             .catch(() => {
                 if (live) setHostRows([]);
@@ -573,7 +591,7 @@ export function CommandPalette({
         return () => {
             live = false;
         };
-    }, [host, open, scope, trimmed]);
+    }, [host, open, scope, trimmed, hostAsked]);
 
     // One scoped search per pause, dropped if the field moves on before it lands.
     useEffect(() => {
@@ -1038,7 +1056,69 @@ export function CommandPalette({
         setOpen(false);
     }
 
+    const activeRow = rows[active];
+    /** The host row the keys are on, when it has actions the host can do. */
+    const actionable =
+        host?.act && hostVersion !== null && activeRow?.kind === "host" && activeRow.row.actions?.length ? activeRow.row : null;
+    const mac = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
+
+    /** Ctrl+K, or Cmd+K on a Mac: the key Raycast opens a row's actions with. */
+    function isActionsKey(event: ReactKeyboardEvent<HTMLInputElement>): boolean {
+        return event.key.toLowerCase() === "k" && (mac ? event.metaKey : event.ctrlKey) && !event.altKey && !event.shiftKey;
+    }
+
+    function openHostPanel(): void {
+        if (actionable && hostVersion !== null) setHostPanel({ row: actionable, version: hostVersion, active: 0 });
+        fieldRef.current?.focus();
+    }
+
+    function closeHostPanel(): void {
+        setHostPanel(null);
+        fieldRef.current?.focus();
+    }
+
+    function runHostEntry(entry: HostActionEntry): void {
+        if (!hostPanel) return;
+        const panel = hostPanel;
+        setHostPanel(null);
+        if (entry === "open") {
+            go(rows.find((row) => row.kind === "host" && row.row.id === panel.row.id));
+            return;
+        }
+        // The answer the row was drawn from goes with it, so the host acts on
+        // that program even if a newer answer has numbered its rows anew.
+        void host?.act?.(panel.row.id, entry, panel.version).then(
+            () => setHostAsked((asked) => asked + 1),
+            () => undefined
+        );
+        fieldRef.current?.focus();
+    }
+
+    function onHostPanelKeyDown(event: ReactKeyboardEvent<HTMLInputElement>, panel: { row: HostRow; version: number; active: number }) {
+        const entries = hostActionEntries(panel.row);
+        const next = stepActive(event.key, panel.active, entries.length);
+        if (next !== null) {
+            event.preventDefault();
+            setHostPanel({ ...panel, active: next });
+        } else if (event.key === "Enter") {
+            event.preventDefault();
+            const entry = entries[panel.active];
+            if (entry) runHostEntry(entry);
+        } else if (event.key === "Escape" || isActionsKey(event)) {
+            // The panel closes, not the palette behind it.
+            event.preventDefault();
+            event.stopPropagation();
+            closeHostPanel();
+        }
+    }
+
     function onFieldKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+        if (hostPanel) return onHostPanelKeyDown(event, hostPanel);
+        if (actionable && isActionsKey(event)) {
+            event.preventDefault();
+            openHostPanel();
+            return;
+        }
         const next = stepActive(event.key, active, rows.length);
         if (next !== null) {
             event.preventDefault();
@@ -1119,7 +1199,7 @@ export function CommandPalette({
                 fieldLabel={scope ? scopeWords(t, scope.id).placeholder : t("search.label")}
                 fieldRef={fieldRef}
                 fieldProps={{ enterKeyHint: "go" }}
-                activeId={rows[active] ? rowElementId(rows[active]!) : undefined}
+                activeId={hostPanel ? hostEntryId(hostPanel.active) : rows[active] ? rowElementId(rows[active]!) : undefined}
                 listId="polaris-search-results"
                 listLabel={t("search.results")}
                 listRef={listRef}
@@ -1207,7 +1287,23 @@ export function CommandPalette({
                             />
                         </span>
                         <span className="flex min-w-0 items-center gap-3">
-                            {scope ? (
+                            {hostPanel ? (
+                                <button type="button" onClick={closeHostPanel} className="rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground">
+                                    <KeyHint keys={[{ cap: "Esc", name: t("search.rowActions.keyEscape") }]} label={t("search.rowActions.back")} />
+                                </button>
+                            ) : actionable ? (
+                                <button type="button" onClick={openHostPanel} className="rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground">
+                                    <KeyHint
+                                        keys={[
+                                            mac
+                                                ? { cap: "\u2318", name: t("search.rowActions.keyCommand") }
+                                                : { cap: "Ctrl", name: t("search.rowActions.keyControl") },
+                                            { cap: "K", name: "K" }
+                                        ]}
+                                        label={t("search.rowActions.label")}
+                                    />
+                                </button>
+                            ) : scope ? (
                                 <KeyHint
                                     keys={[{ cap: KEY_GLYPHS.backspace, name: t("search.keyBackspace") }]}
                                     label={t("search.hintClear")}
@@ -1236,7 +1332,20 @@ export function CommandPalette({
                     their own names - somebody searching for a person
                     types the name that account is under. */}
                 <PlainNames>
-                    {failure ? (
+                    {hostPanel ? (
+                        <SearchGroup label={t("search.rowActions.of", { title: hostPanel.row.title })}>
+                            {hostActionEntries(hostPanel.row).map((entry, position) => (
+                                <HostActionRow
+                                    key={entry}
+                                    id={hostEntryId(position)}
+                                    entry={entry}
+                                    selected={position === hostPanel.active}
+                                    onSelect={() => runHostEntry(entry)}
+                                    onHover={() => setHostPanel({ ...hostPanel, active: position })}
+                                />
+                            ))}
+                        </SearchGroup>
+                    ) : failure ? (
                         <SearchMessage tone="danger">{failure}</SearchMessage>
                     ) : rows.length === 0 && searching ? (
                         <SearchSkeleton />

@@ -315,6 +315,17 @@
             "yourself": "{name} (tú)"
         },
         "actions": "Acciones",
+        "rowActions": {
+            "label": "Acciones",
+            "of": "Acciones de {title}",
+            "open": "Abrir",
+            "back": "Volver",
+            "treatAsGame": "Tratar como juego",
+            "treatAsApp": "Tratar como aplicación",
+            "keyControl": "Control",
+            "keyCommand": "Comando",
+            "keyEscape": "Escape"
+        },
         "calculator": "Calculadora",
         "host": {
             "url": "Enlace",

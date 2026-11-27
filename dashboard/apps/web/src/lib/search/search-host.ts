@@ -18,6 +18,15 @@ export const HOST_ROW_KINDS = ["url", "answer", "system", "app", "polar", "web",
 
 export type HostRowKind = (typeof HOST_ROW_KINDS)[number];
 
+/** What a host row can do besides opening it (Raycast's action panel, Ctrl+K), drawn here in the reader's language. */
+export const HOST_ROW_ACTIONS = ["treat-as-game", "treat-as-app"] as const;
+
+export type HostRowAction = (typeof HOST_ROW_ACTIONS)[number];
+
+function isHostRowAction(value: string): value is HostRowAction {
+    return (HOST_ROW_ACTIONS as readonly string[]).includes(value);
+}
+
 /** One row the host found. Validated: it crosses a process boundary. */
 export const hostRowSchema = z.object({
     id: z.string().min(1).max(40),
@@ -34,7 +43,13 @@ export const hostRowSchema = z.object({
     command: z.enum(SYSTEM_COMMAND_IDS).nullish(),
     /** A program that is a game, with the store it comes from (a brand name). */
     game: z.boolean().nullish(),
-    store: z.string().max(60).nullish()
+    store: z.string().max(60).nullish(),
+    /** Its actions by id; one a newer host adds and this page cannot name is left out, never the row. */
+    actions: z
+        .array(z.string().max(40))
+        .max(8)
+        .nullish()
+        .transform((actions) => actions?.filter(isHostRowAction))
 });
 
 export type HostRow = z.infer<typeof hostRowSchema>;
@@ -49,11 +64,19 @@ export function readHostRows(raw: unknown): HostRow[] {
     });
 }
 
+/** The host's answer number, which an action on one of its rows names; null from a host too old to number them. */
+export function readHostVersion(raw: unknown): number | null {
+    const answer = z.object({ version: z.number().int().positive() }).safeParse(raw);
+    return answer.success ? answer.data.version : null;
+}
+
 export interface SearchHost {
     /** Rows only the host can find, for what is typed. */
     readonly query: (text: string) => Promise<unknown>;
     /** Run one of those rows. */
     readonly run: (id: string) => void;
+    /** Do one of a row's `actions`, naming the answer (`readHostVersion`) the row came from; absent from a host too old to have any. */
+    readonly act?: (id: string, action: HostRowAction, version: number) => Promise<boolean>;
     /** Open a Polaris address (a path of this instance). */
     readonly navigate: (href: string) => void;
     /** Put the search away. */

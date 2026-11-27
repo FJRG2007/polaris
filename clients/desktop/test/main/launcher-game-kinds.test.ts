@@ -100,7 +100,7 @@ const launcher = await import("../../src/main/launcher");
 const apps = await import("../../src/main/launcher-apps");
 const kinds = await import("../../src/main/game-kinds");
 
-type Row = { id: string; kind: string; title: string; subtitle: string; game?: boolean; store?: string; actions?: string[] };
+type Row = { version?: number; id: string; kind: string; title: string; subtitle: string; game?: boolean; store?: string; actions?: string[] };
 
 const STEAM_GAME = { label: "Hollow Knight", path: "steam:367520", launch: { kind: "uri", uri: "steam://rungameid/367520" } };
 const EMULATOR = { label: "Dolphin", path: "C:/menu/Dolphin.lnk", target: "C:/Tools/Dolphin/Dolphin.exe" };
@@ -115,13 +115,15 @@ function launcherEvent(sender?: unknown) {
 async function ask(text: string): Promise<Row[]> {
     const query = handlers.get("launcher:query");
     if (!query) throw new Error("The query handler was not registered.");
-    return ((await query(launcherEvent(), text, "host-only")) as { rows: Row[] }).rows;
+    const answer = (await query(launcherEvent(), text, "host-only")) as { rows: Row[]; version: number };
+    // Each row keeps the answer it came from, as a page keeps it beside the rows it draws.
+    return answer.rows.map((row) => ({ ...row, version: answer.version }));
 }
 
 async function act(row: Row | undefined, action: string, sender?: unknown): Promise<unknown> {
     const handler = handlers.get("launcher:act");
     if (!handler) throw new Error("The act handler was not registered.");
-    return handler(launcherEvent(sender), row?.id, action);
+    return handler(launcherEvent(sender), row?.id, action, row?.version);
 }
 
 const named = (rows: Row[], title: string) => rows.find((row) => row.title === title);
@@ -168,6 +170,23 @@ describe("treat as game or application", () => {
         await act(named(await ask("hollow"), "Hollow Knight"), "treat-as-game");
         expect(chosen.size).toBe(0);
         expect(named(await ask("hollow"), "Hollow Knight")).toMatchObject({ game: true, store: "Steam" });
+    });
+
+    it("acts on the row the page drew, even after a newer answer numbered its rows anew", async () => {
+        const drawn = named(await ask("dolphin"), "Dolphin");
+        const newer = await ask("hollow");
+        expect(newer.some((row) => row.id === drawn?.id)).toBe(true);
+        expect(await act(drawn, "treat-as-game")).toBe(true);
+        expect(kinds.setGameKind).toHaveBeenCalledWith(EMULATOR.path, "game", "app");
+        expect(chosen.get(STEAM_GAME.path)).toBeUndefined();
+    });
+
+    it("refuses an action that names no answer, or one too old to remember", async () => {
+        const drawn = named(await ask("dolphin"), "Dolphin");
+        expect(await act(drawn && { ...drawn, version: undefined }, "treat-as-game")).toBe(false);
+        for (let typed = 0; typed < 8; typed += 1) await ask(`dol${typed}`);
+        expect(await act(drawn, "treat-as-game")).toBe(false);
+        expect(kinds.setGameKind).not.toHaveBeenCalled();
     });
 
     it("refuses a row that is not a program, an unknown action, and any other page", async () => {

@@ -2,12 +2,14 @@
 
 import { useMemo } from "react";
 import { CommandPalette } from "@/components/command-palette";
-import { isInstancePath, type SearchHost } from "@/lib/search/search-host";
+import { isInstancePath, type HostRowAction, type SearchHost } from "@/lib/search/search-host";
 
 /** What Polaris Desktop's search window exposes to this page (its preload). */
 interface DesktopLauncherBridge {
     query(text: string, mode: "host-only"): Promise<unknown>;
     run(id: string): Promise<boolean>;
+    /** A row's action, naming the answer the row came from (desktop 0.1.132). */
+    act(id: string, action: HostRowAction, version: number): Promise<boolean>;
     hide(): Promise<void>;
     open(href: string): Promise<void>;
     onOpened(listener: (query?: unknown) => void): void;
@@ -44,6 +46,7 @@ export function LauncherSearch({
         // A launcher from before the rename answers under `addons`.
         const plugins = bridge?.plugins ?? bridge?.addons;
         const onHidden = bridge?.onHidden;
+        const act = bridge?.act;
         // Feature-detected call by call: a desktop build that predates one of
         // them still gets everything else.
         return {
@@ -52,6 +55,7 @@ export function LauncherSearch({
                     ? bridge.query(text, "host-only")
                     : Promise.resolve({ rows: [] }),
             run: (id) => void bridge?.run?.(id),
+            act: typeof act === "function" ? (id, action, version) => act(id, action, version).then((done) => done === true) : undefined,
             navigate: (href) => {
                 if (!isInstancePath(href)) return;
                 if (typeof bridge?.open === "function") void bridge.open(href);

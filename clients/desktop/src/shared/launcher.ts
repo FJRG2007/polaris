@@ -44,6 +44,8 @@ export interface LauncherAnswer {
     readonly rows: readonly LauncherRow[];
     /** Why Polaris results are missing, when they are: signed out, unreachable. */
     readonly notice: string | null;
+    /** This answer's number, which an action on one of its rows names (`act`). */
+    readonly version?: number;
 }
 
 /** The bridge the launcher page gets as `window.polarisLauncher`. */
@@ -53,8 +55,9 @@ export interface PolarisLauncher {
     /** Show a path of the instance in the main window (the dashboard's palette only). */
     open(href: string): Promise<void>;
     run(id: string): Promise<boolean>;
-    /** Do one of a listed row's `actions`; the list should be asked again after, since the row changes. Absent on desktops that predate it. */
-    act?(id: string, action: LauncherRowAction): Promise<boolean>;
+    /** Do one of a listed row's `actions`, naming the answer (`version`) the row was drawn from; the list should be asked
+     *  again after, since the row changes. Absent on desktops that predate it. */
+    act?(id: string, action: LauncherRowAction, version: number): Promise<boolean>;
     hide(): Promise<void>;
     clearClipboard(): Promise<void>;
     /** Heard on each open, with the text it opens with (empty from the key; what

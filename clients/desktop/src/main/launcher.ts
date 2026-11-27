@@ -106,6 +106,13 @@ let actions = new Map<string, () => void>();
 let useKeys = new Map<string, string>();
 /** The program behind each app row listed last, for its icon. */
 let appPaths = new Map<string, InstalledApp>();
+/** Each answer's number, so an action names the list its row was drawn from. */
+let answerVersion = 0;
+/** The program behind each app row of the last few answers, by answer number then row id: an action on a row the
+ *  page drew acts on that row's program, even when a newer answer has numbered its rows differently. */
+const answeredApps = new Map<number, ReadonlyMap<string, InstalledApp>>();
+/** How many answers an action may still name: a few keystrokes' worth. */
+const ANSWERS_KEPT = 8;
 /** Program icons already worked out, by the program's `path`. Bounded by the list of installed programs. */
 const appIcons = new Map<string, string | null>();
 /** The instance whose `/launcher` page the window shows, or null for the window's own panel. */
@@ -333,8 +340,11 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     }
     actions = next;
     appPaths = paths;
+    answerVersion += 1;
+    answeredApps.set(answerVersion, paths);
+    for (const old of answeredApps.keys()) if (answeredApps.size > ANSWERS_KEPT) answeredApps.delete(old);
     useKeys = keys;
-    return { rows, notice: origin ? indexNotice : "Connect to a Polaris to search it." };
+    return { rows, notice: origin ? indexNotice : "Connect to a Polaris to search it.", version: answerVersion };
 }
 
 /**
@@ -892,10 +902,12 @@ export function startLauncher(given: LauncherHost): void {
         action();
         return true;
     });
-    ipcMain.handle(LAUNCHER_CHANNELS.act, (event, rawId: unknown, rawAction: unknown) => {
+    ipcMain.handle(LAUNCHER_CHANNELS.act, (event, rawId: unknown, rawAction: unknown, rawVersion: unknown) => {
         const id = z.string().max(10).safeParse(rawId);
         const action = z.enum(LAUNCHER_ROW_ACTIONS).safeParse(rawAction);
-        const listed = fromLauncher(event) && id.success && action.success ? appPaths.get(id.data) : undefined;
+        const version = z.number().int().positive().safeParse(rawVersion);
+        // The row the page drew, from the answer it drew it from: never whatever row has that id now.
+        const listed = fromLauncher(event) && id.success && action.success && version.success ? answeredApps.get(version.data)?.get(id.data) : undefined;
         if (!listed || !action.success) return false;
         setGameKind(listed.path, ACTION_KIND[action.data], gameStore(listed) !== null ? "game" : "app");
         return true;
