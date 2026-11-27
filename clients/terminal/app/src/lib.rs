@@ -2650,14 +2650,19 @@ pub(crate) fn initialize_app(
     }
     #[cfg(feature = "local_fs")]
     ctx.add_singleton_model(polaris_sign_in::PolarisSignIn::new);
+    // The relay is in every build: it stays offline until the terminal is
+    // signed in, and answers only read-only requests unless the person turns
+    // on "Let Polaris control this terminal". The loopback server (Settings >
+    // Scripting) still ships only with the control CLI flag.
     #[cfg(feature = "local_fs")]
     if matches!(
         launch_mode,
         LaunchMode::App { .. } | LaunchMode::Test { .. }
-    ) && FeatureFlag::PtermControlCli.is_enabled()
-    {
+    ) {
         ctx.add_singleton_model(local_control::LocalControlBridge::new);
-        ctx.add_singleton_model(local_control::LocalControlServer::new);
+        if FeatureFlag::PtermControlCli.is_enabled() {
+            ctx.add_singleton_model(local_control::LocalControlServer::new);
+        }
         ctx.add_singleton_model(local_control::PolarisRelay::new);
     }
 

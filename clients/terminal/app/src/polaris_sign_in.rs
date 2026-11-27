@@ -15,11 +15,14 @@ mod device_identity;
 
 use std::time::Duration;
 
+use ::settings::Setting as _;
+
 use ptermui::r#async::Timer;
 use ptermui::{AppContext, Entity, ModelContext, SingletonEntity};
 use serde::{Deserialize, Serialize};
 
 use crate::polaris_account::{self, PolarisAccount};
+use crate::settings::PolarisControlSettings;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 /// The poll interval when the instance does not say, and the floor for one it does.
@@ -267,15 +270,24 @@ impl PolarisSignIn {
             ctx.spawn(end_session(account), |_, _, _| {});
         }
         polaris_account::clear(ctx);
+        // The grant was for the account just signed out of; the next sign-in,
+        // perhaps to another Polaris, starts read-only again.
+        if ctx.has_singleton_model::<PolarisControlSettings>() {
+            PolarisControlSettings::handle(ctx).update(ctx, |settings, ctx| {
+                pterm_errors::report_if_error!(
+                    settings.allow_polaris_control.set_value(false, ctx)
+                );
+            });
+        }
         restart_relay(ctx);
         self.set_state(SignInState::Idle, ctx);
     }
 }
 
-/// Reconnects the relay with the account as it now stands. The relay exists
-/// only where local control does (Settings > Scripting).
+/// Reconnects the relay with the account as it now stands. Absent only where the
+/// app was started without it (tests, headless modes).
 fn restart_relay(ctx: &mut ModelContext<PolarisSignIn>) {
-    if crate::features::FeatureFlag::PtermControlCli.is_enabled() {
+    if ctx.has_singleton_model::<crate::local_control::PolarisRelay>() {
         crate::local_control::PolarisRelay::handle(ctx)
             .update(ctx, |relay, ctx| relay.restart(ctx));
     }

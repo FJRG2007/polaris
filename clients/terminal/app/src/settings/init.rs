@@ -107,6 +107,7 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     if FeatureFlag::PtermControlCli.is_enabled() {
         LocalControlSettings::register(ctx);
     }
+    super::PolarisControlSettings::register(ctx);
 
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     super::LinuxAppConfiguration::register(ctx);
