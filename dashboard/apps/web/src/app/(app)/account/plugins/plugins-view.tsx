@@ -12,7 +12,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatBytes, initialsInk, tintFor } from "@polaris/core";
-import { Loader2, Package } from "lucide-react";
+import { Loader2, Package, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { StoreCard, StatusBadge, StorePreview } from "@polaris/ui/store-card";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -33,6 +33,7 @@ import {
 import {
     PLUGIN_ACTIONS,
     PLUGIN_CATEGORIES,
+    pluginReleases,
     pluginRequirements,
     pluginText,
     pluginGroupAnchor,
@@ -62,6 +63,9 @@ import {
 } from "@/lib/device-plugins-client";
 import { pageIsDark } from "@/lib/page-theme";
 import { OfficialSoftware } from "./official-software";
+import type { AppScreenshot } from "@/lib/apps/app-screenshots";
+import { ScreenshotGallery } from "@/app/(app)/apps/marketplace/[appId]/screenshot-gallery";
+import { DetailBack, DetailFacts, DetailHeader, DetailReleases, DetailSection, Fact } from "@/components/store-detail";
 import { useOfficialChoice } from "./official-choice-dialog";
 import { pluginViewHeight, pluginViewHello, pluginViewUrl, readPluginViewMessage, readPluginViewReply, watchPluginViewLook, PLUGIN_VIEW_HEIGHT } from "@/lib/device-plugin-view";
 
@@ -199,37 +203,6 @@ function useInstallFlow(bridge: PluginsBridge | null, snapshot: PluginsSnapshot 
 
 function hrefOf(id: string): string {
     return `/account/plugins/${encodeURIComponent(id)}`;
-}
-
-/**
- * What the app offers to do for an installed plugin (`InstalledPlugin.actions`),
- * each one a notice with its button, in the plugin's or the app's own words.
- * The snapshot that follows says how it went: a done action is no longer listed.
- */
-function HostActions({ bridge, id, actions }: { bridge: PluginsBridge; id: string; actions: InstalledPlugin["actions"] }) {
-    const locale = useLocale();
-    const [running, setRunning] = useState<string | null>(null);
-    const run = (action: string) => {
-        setRunning(action);
-        void (bridge.runAction?.(id, action) ?? Promise.resolve(false)).catch(() => false).finally(() => setRunning(null));
-    };
-    return (
-        <>
-            {actions.map((action) => (
-                <Notice
-                    key={action.id}
-                    action={
-                        <Button size="sm" disabled={running !== null} onClick={() => run(action.id)}>
-                            {running === action.id ? <Loader2 aria-hidden className="size-4 shrink-0 animate-spin" /> : null}
-                            {pluginText(action.label, locale)}
-                        </Button>
-                    }
-                >
-                    {pluginText(action.detail ?? action.label, locale)}
-                </Notice>
-            ))}
-        </>
-    );
 }
 
 function Notice({ children, action }: { children: ReactNode; action?: ReactNode }) {
@@ -910,16 +883,31 @@ export function PluginView({ bridge, manifest, view }: { bridge: PluginsBridge; 
     );
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-    return (
-        <div className="min-w-0">
-            <dt className={settingType.hint}>{label}</dt>
-            <dd className={cn(settingType.body, "truncate")}>{children}</dd>
-        </div>
-    );
+/** Runs what the app offers to do for a plugin; one at a time, the snapshot that follows says how it went. */
+function useHostAction(bridge: PluginsBridge | null): { running: string | null; run: (id: string, action: string) => void } {
+    const [running, setRunning] = useState<string | null>(null);
+    const run = (id: string, action: string) => {
+        setRunning(action);
+        void (bridge?.runAction?.(id, action) ?? Promise.resolve(false)).catch(() => false).finally(() => setRunning(null));
+    };
+    return { running, run };
 }
 
-export function PluginPage({ id }: { id: string }) {
+/** A catalog screenshot as the store's gallery takes one: the same picture in both themes and on a phone. */
+function galleryShot(url: string): AppScreenshot {
+    const one = { desktop: url, mobile: url };
+    return { dark: one, light: one };
+}
+
+/**
+ * One plugin's page, laid out as a Polaris app's is (`components/store-detail`):
+ * the way back, the header with its status, the row of what can be done with
+ * it - install or update, its settings, what the app offers to do for it,
+ * turning it off and uninstalling it - then its screenshots, its settings,
+ * What's new one version at a time, the permissions it asks for, and the
+ * Information list.
+ */
+export function PluginPage({ id }: { id: string; }) {
     const t = useTranslations("account");
     const locale = useLocale();
     const state = usePlugins();
@@ -927,15 +915,12 @@ export function PluginPage({ id }: { id: string }) {
     const bridge = state.kind === "ready" || state.kind === "loading" ? state.bridge : null;
     const [startUninstall, confirmElement] = useUninstall(bridge);
     const [startInstall, installDialog] = useInstallFlow(bridge, state.kind === "ready" ? state.snapshot : null);
+    const hostAction = useHostAction(bridge);
 
-    const back = (
-        <Link href="/account/plugins" className={cn(settingType.body, "text-muted-foreground hover:underline")}>
-            {say(t, "page.back")}
-        </Link>
-    );
+    const back = <DetailBack href="/account/plugins">{say(t, "page.back")}</DetailBack>;
     if (state.kind === "browser" || state.kind === "old-app") {
         return (
-            <div className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 flex-col gap-6">
                 {back}
                 <NotHere state={state} />
             </div>
@@ -943,9 +928,19 @@ export function PluginPage({ id }: { id: string }) {
     }
     if (state.kind === "loading") {
         return (
-            <div className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 flex-col gap-6">
                 {back}
-                <Skeleton className="h-16 w-full" />
+                <div className="flex min-w-0 gap-4" aria-hidden>
+                    <Skeleton className="size-[72px] shrink-0 rounded-md" />
+                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                        <Skeleton className="h-7 w-48" />
+                        <Skeleton className="h-4 w-32" />
+                    </div>
+                </div>
+                <div className="flex gap-2" aria-hidden>
+                    <Skeleton className="h-9 w-28" />
+                    <Skeleton className="h-9 w-24" />
+                </div>
                 <Skeleton className="h-40 w-full" />
             </div>
         );
@@ -954,7 +949,7 @@ export function PluginPage({ id }: { id: string }) {
     const manifest = listing ? manifestOf(listing) : null;
     if (!listing || !manifest) {
         return (
-            <div className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 flex-col gap-6">
                 {back}
                 <Notice>{say(t, "detail.notFound")}</Notice>
             </div>
@@ -964,6 +959,10 @@ export function PluginPage({ id }: { id: string }) {
     const offer = pluginOffer(state.snapshot, id, entry);
     const run = installed ? runLabel(t, installed, entry, locale) : null;
     const size = entry && state.snapshot.platform ? entry.packages[state.snapshot.platform]?.size : undefined;
+    const requirements = pluginRequirements(manifest, state.snapshot.platform);
+    const releases = entry ? pluginReleases(entry) : [];
+    const actions = installed && state.bridge.runAction ? installed.actions : [];
+    const busy = offer.kind === "installing";
 
     const toggle = (enabled: boolean) => {
         void state.bridge
@@ -975,98 +974,124 @@ export function PluginPage({ id }: { id: string }) {
     };
 
     return (
-        <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-6">
             {back}
-            <header className="flex min-w-0 flex-wrap items-start gap-3">
-                <PluginIcon entry={entry} size={56} />
-                <div className="min-w-0 flex-1 basis-48">
-                    <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight" title={manifest.name}>
-                        {manifest.name}
-                    </h1>
-                    <p className={cn(settingType.body, "truncate text-muted-foreground")}>{say(t, "card.by", { publisher: manifest.publisher })}</p>
-                    {run ? (
-                        <div className="mt-1">
-                            <StatusBadge status={run.status} label={run.label} />
-                        </div>
-                    ) : null}
-                    {run?.detail ? (
-                        <p className={cn(settingType.body, "mt-1 text-muted-foreground")}>{run.detail}</p>
-                    ) : null}
-                </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
+
+            <DetailHeader mark={<PluginIcon entry={entry} size={72} />} name={manifest.name} byline={say(t, "card.by", { publisher: manifest.publisher })}>
+                <p className="break-words text-sm">{manifest.summary}</p>
+                {run ? (
+                    <div className="mt-1">
+                        <StatusBadge status={run.status} label={run.label} />
+                    </div>
+                ) : null}
+                {run?.detail ? <p className="text-muted-foreground break-words text-sm">{run.detail}</p> : null}
+            </DetailHeader>
+
+            <section className="flex min-w-0 flex-col gap-3" aria-label={say(t, "detail.actions")}>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                     {offer.kind !== "installed" ? <OfferButton offer={offer} href={hrefOf(id)} size="md" onInstall={() => entry && startInstall(entry)} /> : null}
+                    {installed?.manifest ? (
+                        <Button asChild variant="secondary">
+                            <a href="#settings">{say(t, "detail.settings")}</a>
+                        </Button>
+                    ) : null}
+                    {actions.map((action) => (
+                        <Button key={action.id} variant="secondary" disabled={hostAction.running !== null || busy} onClick={() => hostAction.run(id, action.id)}>
+                            {hostAction.running === action.id ? <Loader2 aria-hidden className="size-4 shrink-0 animate-spin" /> : null}
+                            {pluginText(action.label, locale)}
+                        </Button>
+                    ))}
                     {installed ? (
-                        <>
-                            <Switch checked={installed.enabled} onChange={toggle} aria-label={say(t, "detail.enabled")} />
-                            <Button variant="secondary" onClick={() => startUninstall(id, manifest.name)}>
-                                {say(t, "detail.uninstall")}
-                            </Button>
-                        </>
+                        <Button variant="ghost" className="hover:text-danger" disabled={busy} onClick={() => startUninstall(id, manifest.name)}>
+                            <Trash2 className="size-4" />
+                            {say(t, "detail.uninstall")}
+                        </Button>
                     ) : null}
                 </div>
-            </header>
-            <OfficialSoftware id={id} bridge={state.bridge} />
-            <p className={settingType.body}>{manifest.summary}</p>
-            {installed?.update && installed.consent.length > 0 ? (
-                <Notice
-                    action={
-                        entry ? (
-                            <Button size="sm" onClick={() => startInstall(entry)}>
-                                {say(t, "notice.review")}
-                            </Button>
-                        ) : undefined
-                    }
-                >
-                    {say(t, "notice.consent", { version: installed.update })}
-                </Notice>
-            ) : null}
-            {installed?.failed ? <Notice>{say(t, "notice.failed", { version: installed.failed })}</Notice> : null}
-            {installed && state.bridge.runAction ? <HostActions bridge={state.bridge} id={id} actions={installed.actions} /> : null}
-            {installed ? <AutoUpdateRow bridge={state.bridge} snapshot={state.snapshot} id={id} /> : null}
+                {actions.map((action) =>
+                    action.detail ? (
+                        <p key={action.id} className="text-muted-foreground break-words text-sm">
+                            {pluginText(action.detail, locale)}
+                        </p>
+                    ) : null
+                )}
+                {installed ? (
+                    <label className="flex min-w-0 items-center justify-between gap-3 sm:justify-start">
+                        <span className="min-w-0 text-sm">{say(t, "detail.enabled")}</span>
+                        <Switch checked={installed.enabled} onChange={toggle} disabled={busy} aria-label={say(t, "detail.enabled")} />
+                    </label>
+                ) : null}
+                <OfficialSoftware id={id} bridge={state.bridge} />
+                {installed?.update && installed.consent.length > 0 ? (
+                    <Notice
+                        action={
+                            entry ? (
+                                <Button size="sm" onClick={() => startInstall(entry)}>
+                                    {say(t, "notice.review")}
+                                </Button>
+                            ) : undefined
+                        }
+                    >
+                        {say(t, "notice.consent", { version: installed.update })}
+                    </Notice>
+                ) : null}
+                {installed?.failed ? <Notice>{say(t, "notice.failed", { version: installed.failed })}</Notice> : null}
+            </section>
+
+            {entry && entry.screenshots.length > 0 ? <ScreenshotGallery name={manifest.name} shots={entry.screenshots.map(galleryShot)} /> : null}
+
             {installed && installed.manifest ? (
-                <section id="settings" className="flex min-w-0 scroll-mt-4 flex-col gap-2" aria-label={say(t, "detail.settings")}>
-                    <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.settings")}</h2>
+                <DetailSection id="settings" title={say(t, "detail.settings")}>
+                    <AutoUpdateRow bridge={state.bridge} snapshot={state.snapshot} id={id} />
                     {installed.manifest.view ? <PluginView bridge={state.bridge} manifest={installed.manifest} view={installed.manifest.view} /> : null}
                     <PluginSettings bridge={state.bridge} manifest={installed.manifest} />
-                </section>
+                </DetailSection>
             ) : null}
-            {entry && entry.screenshots.length > 0 ? (
-                <div className="flex min-w-0 gap-3 overflow-x-auto">
-                    {entry.screenshots.map((url, index) => (
-                        // eslint-disable-next-line @next/next/no-img-element -- a release asset, cached by the browser
-                        <img key={url} src={url} loading="lazy" alt={say(t, "detail.screenshot", { name: manifest.name, number: index + 1 })} className="h-48 shrink-0 rounded-md border border-border" />
-                    ))}
-                </div>
+
+            {releases.length > 0 ? (
+                <DetailSection title={installed?.update ? say(t, "detail.changelogFor", { version: installed.update }) : say(t, "detail.changelog")}>
+                    <DetailReleases
+                        releases={releases}
+                        current={installed?.version ?? null}
+                        words={{
+                            version: (version) => say(t, "detail.release", { version }),
+                            earlier: say(t, "detail.releaseEarlier"),
+                            current: say(t, "detail.releaseCurrent"),
+                            showAll: (count) => say(t, "detail.releasesAll", { count }),
+                            showLess: say(t, "detail.releasesFewer")
+                        }}
+                    />
+                </DetailSection>
             ) : null}
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Fact label={say(t, "detail.version")}>{installed?.version ?? manifest.version}</Fact>
-                <Fact label={say(t, "detail.size")}>{size ? formatBytes(size) : "-"}</Fact>
-                <Fact label={say(t, "detail.published")}>{entry ? new Date(entry.published).toLocaleDateString() : "-"}</Fact>
-                <Fact label={say(t, "detail.publisher")}>{manifest.publisher}</Fact>
-            </dl>
-            <section className="flex min-w-0 flex-col gap-1" aria-label={say(t, "detail.permissions")}>
-                <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.permissions")}</h2>
-                {manifest.permissions.length === 0 && pluginRequirements(manifest, state.snapshot.platform).length === 0 ? (
-                    <p className={settingType.body}>{say(t, "install.none")}</p>
+
+            <DetailSection title={say(t, "detail.permissions")}>
+                {manifest.permissions.length === 0 && requirements.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">{say(t, "install.none")}</p>
                 ) : (
-                    <ul className={cn(settingType.body, "list-disc ps-5")}>
+                    <ul className="text-muted-foreground flex list-disc flex-col gap-1 ps-5 text-sm">
                         {manifest.permissions.map((permission) => (
-                            <li key={permission}>{say(t, `permission.${PERMISSION_KEY[permission]}`)}</li>
+                            <li key={permission} className="break-words">
+                                {say(t, `permission.${PERMISSION_KEY[permission]}`)}
+                            </li>
                         ))}
-                        {pluginRequirements(manifest, state.snapshot.platform).map((requirement) => (
-                            <li key={`requires.${requirement.key}`}>{pluginText(requirement.label, locale)}</li>
+                        {requirements.map((requirement) => (
+                            <li key={`requires.${requirement.key}`} className="break-words">
+                                {pluginText(requirement.label, locale)}
+                            </li>
                         ))}
                     </ul>
                 )}
-            </section>
-            {entry?.changelog ? (
-                <section className="flex min-w-0 flex-col gap-1" aria-label={say(t, "detail.changelog")}>
-                    <h2 className="text-sm font-medium text-muted-foreground">
-                        {installed?.update ? say(t, "detail.changelogFor", { version: installed.update }) : say(t, "detail.changelog")}
-                    </h2>
-                    <p className={cn(settingType.body, "whitespace-pre-line")}>{entry.changelog}</p>
-                </section>
-            ) : null}
+            </DetailSection>
+
+            <DetailSection title={say(t, "detail.information")}>
+                <DetailFacts>
+                    <Fact label={say(t, "detail.version")}>{installed?.version ?? manifest.version}</Fact>
+                    <Fact label={say(t, "detail.size")}>{size ? formatBytes(size) : "-"}</Fact>
+                    <Fact label={say(t, "detail.published")}>{entry ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(entry.published)) : "-"}</Fact>
+                    <Fact label={say(t, "detail.publisher")}>{manifest.publisher}</Fact>
+                    <Fact label={say(t, "detail.category")}>{say(t, `category.${manifest.category}`)}</Fact>
+                </DetailFacts>
+            </DetailSection>
             {confirmElement}
             {installDialog}
         </div>

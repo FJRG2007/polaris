@@ -12,10 +12,10 @@
  */
 
 import Link from "next/link";
-import { Fact } from "./app-detail";
 import { useId, useMemo } from "react";
 import { ReplacesRow } from "../replaces-row";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import { DetailBack, DetailFacts, DetailHeader, DetailSection, Fact } from "@/components/store-detail";
 import { Badge, Button } from "@polaris/ui";
 import { ScreenshotGallery } from "./screenshot-gallery";
 import { builtInSettingsHref } from "@/lib/apps/app-settings";
@@ -39,26 +39,17 @@ export function BuiltInAppDetail({ appId }: { appId: string }) {
     const shots = builtInScreenshots(entry.id, locale);
     return (
         <div className="flex min-w-0 flex-col gap-6">
-            <Link data-swipe-back
-                href={POLARIS_APPS_PATH}
-                className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
-            >
-                <ArrowLeft className="size-4" />
-                {t("detail.back")}
-            </Link>
+            <DetailBack href={POLARIS_APPS_PATH}>{t("detail.back")}</DetailBack>
 
-            <header className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
-                <BuiltInMark entry={entry} size={72} />
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <h1 className="break-words text-2xl font-semibold">{entry.name}</h1>
-                    <p className="text-muted-foreground break-words text-sm">
-                        {t("polaris.builtInBy")}
-                    </p>
-                    <div>
-                        <Badge>{t("polaris.builtIn")}</Badge>
-                    </div>
+            <DetailHeader
+                mark={<BuiltInMark entry={entry} size={72} />}
+                name={entry.name}
+                byline={t("polaris.builtInBy")}
+            >
+                <div>
+                    <Badge>{t("polaris.builtIn")}</Badge>
                 </div>
-            </header>
+            </DetailHeader>
 
             <section className="flex min-w-0 flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
@@ -88,24 +79,22 @@ export function BuiltInAppDetail({ appId }: { appId: string }) {
                 </div>
             )}
 
-            <section className="flex min-w-0 flex-col gap-2">
-                <h2 className="text-sm font-medium">{t("detail.about")}</h2>
+            <DetailSection title={t("detail.about")}>
                 <p className="text-muted-foreground whitespace-pre-line break-words text-sm">
                     {entry.summary}
                 </p>
-            </section>
+            </DetailSection>
 
             <ReplacesRow appId={entry.id} />
 
-            <section className="flex min-w-0 flex-col gap-2">
-                <h2 className="text-sm font-medium">{t("detail.information")}</h2>
-                <dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
+            <DetailSection title={t("detail.information")}>
+                <DetailFacts>
                     <Fact label={t("detail.developer")}>{t("polaris.developer")}</Fact>
                     <Fact label={t("detail.category")}>
                         {navLabel(switcherCategory(entry.category))}
                     </Fact>
-                </dl>
-            </section>
+                </DetailFacts>
+            </DetailSection>
         </div>
     );
 }

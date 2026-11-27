@@ -222,13 +222,28 @@ export const pluginPackageSchema = z.object({
 
 export type PluginPackage = z.infer<typeof pluginPackageSchema>;
 
+/** One version's notes, as the store lists them under What's new. */
+export const pluginReleaseSchema = z.object({
+    version: versionSchema,
+    notes: z.string().trim().min(1).max(2_000)
+});
+
+export type PluginRelease = z.infer<typeof pluginReleaseSchema>;
+
 export const pluginEntrySchema = pluginManifestSchema.extend({
     packages: perPlatform(pluginPackageSchema),
     icon: releaseUrlSchema.optional(),
     /** A photograph of the hardware, 16:10, on the store's card in place of the placeholder. */
     picture: releaseUrlSchema.optional(),
     screenshots: z.array(releaseUrlSchema).max(8).default([]),
+    /**
+     * The old way to say what changed: every version in one string, "0.1.18: ...
+     * 0.1.17: ...". Still written for the desktop apps that read only this field;
+     * `pluginReleases` splits it for an entry that carries no `releases`.
+     */
     changelog: z.string().max(4_000).default(""),
+    /** What changed, one entry per version, newest first. Read in place of `changelog` when present. */
+    releases: z.array(pluginReleaseSchema).max(50).default([]),
     published: z.string().datetime()
 });
 
@@ -310,6 +325,44 @@ export function comparePluginVersions(a: string, b: string): number {
         if (diff !== 0) return diff;
     }
     return 0;
+}
+
+/** One version's notes as the page lists them; `version` is null for text the old string had before any version. */
+export interface PluginReleaseNotes {
+    readonly version: string | null;
+    readonly notes: string;
+}
+
+/**
+ * A version where the old changelog string starts one: at the start or after a
+ * space, three numbers, an optional "v", and a colon followed by a space or the end.
+ */
+const CHANGELOG_MARKER = /(^|\s)v?(\d{1,4}\.\d{1,5}\.\d{1,6}):(?=\s|$)/g;
+
+/**
+ * The old one-string changelog ("0.1.18: ... 0.1.17: ...") as one entry per
+ * version, newest first. Text before the first version is kept as an entry
+ * without one, last; a string with no version at all is that one entry. A
+ * version written twice keeps both texts, joined, under the first place it appears.
+ */
+export function splitPluginChangelog(text: string): PluginReleaseNotes[] {
+    const marks = [...text.matchAll(CHANGELOG_MARKER)].map((match) => ({ version: match[2]!, at: match.index! + match[1]!.length, body: match.index! + match[0].length }));
+    const lead = text.slice(0, marks[0]?.at ?? text.length).trim();
+    const byVersion = new Map<string, string[]>();
+    marks.forEach((mark, index) => {
+        const notes = text.slice(mark.body, marks[index + 1]?.at ?? text.length).trim();
+        if (!notes) return;
+        byVersion.set(mark.version, [...(byVersion.get(mark.version) ?? []), notes]);
+    });
+    const versioned = [...byVersion].map(([version, notes]) => ({ version, notes: notes.join(" ") }));
+    versioned.sort((a, b) => comparePluginVersions(b.version, a.version));
+    return lead ? [...versioned, { version: null, notes: lead }] : versioned;
+}
+
+/** What changed in a catalog entry, one entry per version, newest first: its `releases`, else its old string split. */
+export function pluginReleases(entry: { readonly releases?: readonly PluginRelease[]; readonly changelog?: string }): PluginReleaseNotes[] {
+    if (entry.releases && entry.releases.length > 0) return [...entry.releases].sort((a, b) => comparePluginVersions(b.version, a.version));
+    return splitPluginChangelog(entry.changelog ?? "");
 }
 
 /** The platform name for `process.platform` and `process.arch`, or null when no plugin can run there. */

@@ -2614,7 +2614,15 @@
             "saveFailed": "No se guardó el cambio.",
             "toggleFailed": "No se pudo cambiar.",
             "view": "Editor {name}",
-            "changelogFor": "Novedades de {version}"
+            "changelogFor": "Novedades de {version}",
+            "actions": "Acciones",
+            "information": "Información",
+            "category": "Categoría",
+            "release": "Versión {version}",
+            "releaseEarlier": "Anteriores",
+            "releaseCurrent": "Instalada",
+            "releasesAll": "Ver las {count}",
+            "releasesFewer": "Ver menos"
         },
         "action": {
             "none": "Nada",

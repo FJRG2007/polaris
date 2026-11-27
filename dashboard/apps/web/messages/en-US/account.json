@@ -2614,7 +2614,15 @@
             "saveFailed": "That change was not saved.",
             "toggleFailed": "It could not be switched.",
             "view": "{name} editor",
-            "changelogFor": "What's new in {version}"
+            "changelogFor": "What's new in {version}",
+            "actions": "Actions",
+            "information": "Information",
+            "category": "Category",
+            "release": "Version {version}",
+            "releaseEarlier": "Earlier",
+            "releaseCurrent": "Installed",
+            "releasesAll": "Show all {count}",
+            "releasesFewer": "Show fewer"
         },
         "action": {
             "none": "Nothing",
