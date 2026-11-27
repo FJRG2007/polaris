@@ -1519,6 +1519,11 @@ pub(crate) fn initialize_app(
     #[cfg(target_os = "macos")]
     preview_config_migration::migrate_preview_config_dir_if_needed();
 
+    // One-time copy of a Rook install's settings and data, on the released
+    // build's first launch. Must also run before ensure_pterm_watch_roots_exist()
+    // creates the home directory whose absence it waits for.
+    pterm_core::rook_migration::migrate_from_rook_if_needed();
+
     ensure_pterm_watch_roots_exist();
     ctx.add_singleton_model(PtermManagedPathsWatcher::new);
 

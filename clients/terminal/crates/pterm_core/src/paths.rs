@@ -361,7 +361,7 @@ fn project_dirs() -> Option<directories::ProjectDirs> {
 /// and data profile.
 ///
 /// This returns [`None`] if the user's home directory could not be determined.
-fn project_dirs_for_app_id(
+pub(crate) fn project_dirs_for_app_id(
     app_id: AppId,
     data_profile: Option<&str>,
 ) -> Option<directories::ProjectDirs> {
