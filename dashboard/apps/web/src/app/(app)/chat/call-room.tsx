@@ -135,6 +135,8 @@ import {
     ImagePlus,
     Link2,
     Loader2,
+    Lock,
+    LockOpen,
     Maximize2,
     Mic,
     MicOff,
@@ -792,6 +794,26 @@ export function CallRoom({
                             )}
                         </button>
                     )}
+                    {/* Whether the call's media is end-to-end encrypted, always
+                    said: a lock that is missing is read as a lock that is there. */}
+                    <span
+                        role="status"
+                        title={t(`callRoom.lock.${call.lock}Hint`)}
+                        className={cn(
+                            "flex min-w-0 items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium",
+                            call.lock === "off" ? "border-border text-muted-foreground" : "border-border text-foreground"
+                        )}
+                    >
+                        {call.lock === "off" ? (
+                            <LockOpen aria-hidden className="size-3 shrink-0" />
+                        ) : call.lock === "pending" ? (
+                            <Loader2 aria-hidden className="size-3 shrink-0 motion-safe:animate-spin" />
+                        ) : (
+                            <Lock aria-hidden className="size-3 shrink-0" />
+                        )}
+                        <span className="truncate">{t(`callRoom.lock.${call.lock}`)}</span>
+                        <span className="sr-only">{t(`callRoom.lock.${call.lock}Hint`)}</span>
+                    </span>
                     {/* A recording running, said up here and nowhere bigger: the
                     time on the button that stops it for whoever is recording,
                     a red mark for everybody else. What it means is in its

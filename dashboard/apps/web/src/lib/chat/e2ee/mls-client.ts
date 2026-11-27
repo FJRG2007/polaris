@@ -153,6 +153,8 @@ export interface MlsMemberLike {
     encrypt(groupId: Uint8Array, plaintext: Uint8Array): Uint8Array;
     process(groupId: Uint8Array, message: Uint8Array): MlsProcessedOut;
     epoch(groupId: Uint8Array): bigint;
+    /** The MLS exporter (RFC 9420 section 8.5) at the current epoch. Optional so a test double need not have it. */
+    exportSecret?(groupId: Uint8Array, label: string, context: Uint8Array, length: number): Uint8Array;
     storeChanges(): { key: Uint8Array; value?: Uint8Array | null }[];
 }
 
@@ -1118,6 +1120,23 @@ export class MlsDevice {
     searchSegments(body: DistributiveOmit<SearchSegmentBody, "device">): Promise<Record<string, unknown>> {
         const named = body.op === "claim-index-build" || body.op === "put-index-segment" ? { ...body, device: this.options.device } : body;
         return this.send(named as MlsBody);
+    }
+
+    /**
+     * The secret one call in this conversation is bound to: the group's exporter
+     * at its current epoch, labelled for calls and bound to the room. Every
+     * member at that epoch derives the same bytes and the server never can.
+     * Null without a group, or on a member that cannot export.
+     */
+    callSecret(channelId: string, room: string): { epoch: string; secret: Uint8Array } | null {
+        try {
+            const groupId = this.requireGroup(channelId);
+            if (!this.member.exportSecret) return null;
+            const secret = this.member.exportSecret(groupId, "polaris/call/v1", new TextEncoder().encode(room), 32);
+            return { epoch: String(this.member.epoch(groupId)), secret };
+        } catch {
+            return null;
+        }
     }
 
     /** The epoch this device's copy of the conversation's group is at; null without a group. */

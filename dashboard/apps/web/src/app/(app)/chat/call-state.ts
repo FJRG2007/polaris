@@ -7,6 +7,7 @@
  * thing that carries a call here.
  */
 
+import type { CallLock } from "./call-e2ee-session";
 import type { MeetingView } from "@/lib/chat/meetings";
 import type { CallAudioReport } from "./call-diagnosis";
 import type { FilteredMic, MicFilter } from "./mic-filter";
@@ -68,6 +69,8 @@ export interface CallDevice {
 export interface CallState {
     readonly meeting: MeetingView | null;
     readonly participantId: string | null;
+    /** End-to-end encryption of this call's media: `off` only on a stage. */
+    readonly lock: CallLock;
     readonly localStream: MediaStream | null;
     /** This browser's own screen, while it is sharing one. Kept apart from the
      *  stream above so the room can put it where every other screen goes -

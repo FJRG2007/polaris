@@ -182,6 +182,9 @@
         "pickToInvite": "Pick somebody to invite",
         "notAsked": "That could not be asked",
         "callUnreachable": "The call could not be reached. Try again.",
+        "callNeedsUpdate": "This call is end-to-end encrypted. Update Polaris on this device to join it.",
+        "callE2eeUnsupported": "This device cannot join end-to-end encrypted calls. Update Polaris, or open the call in an up-to-date browser.",
+        "callE2eeFailed": "The call's encryption could not start, so it was not joined. Try again.",
         "notRead": "That could not be read",
         "writeOrAttach": "Write something, or attach a file",
         "noFilesAllowed": "You are not allowed to send files here",
@@ -455,6 +458,16 @@
         "always": "always"
     },
     "callRoom": {
+        "lock": {
+            "pending": "Securing",
+            "pendingHint": "Setting up end-to-end encryption for this call.",
+            "on": "Encrypted",
+            "onHint": "End-to-end encrypted. Keys are exchanged between the people in the call; the server never has them.",
+            "bound": "Encrypted",
+            "boundHint": "End-to-end encrypted with this conversation's own keys. The server never has them.",
+            "off": "Not encrypted",
+            "offHint": "Stage calls are not end-to-end encrypted. They are encrypted on the way to the server."
+        },
         "shareNotArriving": "{name}'s screen is not reaching you. Ask them to stop sharing and share again.",
         "yourScreen": "Your screen",
         "theirScreen": "{name} - screen",

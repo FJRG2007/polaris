@@ -48,6 +48,7 @@ import {
 } from "@/lib/chat/meeting-invites";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
 import { rememberDecline } from "@/lib/chat/declined-calls";
+import { callE2eeRefusal, callEncrypted } from "@/lib/chat/call-e2ee";
 
 /**
  * Whether this account may be in a call at all.
@@ -318,8 +319,19 @@ export async function ownVoiceAction(
  * guest waiting to be let in, and said nothing to either of them.
  */
 export async function callTokenAction(
-    meetingId: string
-): Promise<{ url?: string; token?: string; waiting?: boolean; error?: string }> {
+    meetingId: string,
+    /** The call-encryption version the browser speaks; absent from every client older than it. */
+    e2eeVersion?: number
+): Promise<{
+    url?: string;
+    token?: string;
+    waiting?: boolean;
+    error?: string;
+    /** Whether this call is end-to-end encrypted: every call but a stage's. */
+    e2ee?: boolean;
+    /** The conversation the call is in, whose MLS group the call key is bound to. */
+    channelId?: string | null;
+}> {
     const seat = await resolveSeat(meetingId);
     if (!seat) return { error: (await getTranslations("chat"))("errors.notInCall") };
     if (seat.admission !== "admitted") return { waiting: true };
@@ -332,8 +344,16 @@ export async function callTokenAction(
     const within = await guard(() => meetings.requireWithinLimit(seat));
     if (within.error) return { error: within.error };
 
+    // An encrypted call is never handed to a browser that would send into it
+    // in the clear: every client from before call encryption asks without a
+    // version, and is told to update instead of being let in unencrypted.
+    const facts = await meetings.callEncryptionFacts(meetingId);
+    if (callE2eeRefusal(facts.stage, e2eeVersion)) {
+        return { error: (await getTranslations("chat"))("errors.callNeedsUpdate") };
+    }
+
     const token = await calls.joinToken(endpoint, meetingId, seat.participantId);
-    return { url: endpoint.url, token };
+    return { url: endpoint.url, token, e2ee: callEncrypted(facts.stage), channelId: facts.channelId };
 }
 
 /**

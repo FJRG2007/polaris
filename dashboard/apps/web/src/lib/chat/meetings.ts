@@ -1272,6 +1272,22 @@ async function carriedRestriction(
     };
 }
 
+/**
+ * What a call's encryption is decided from: whether it is a stage's (the one
+ * kind not end-to-end encrypted, see `call-e2ee`) and the conversation it is in,
+ * whose MLS group the call key is bound to where there is one.
+ */
+export async function callEncryptionFacts(meetingId: string): Promise<{ stage: boolean; channelId: string | null }> {
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { channelId: true, channel: { select: { kind: true, stage: true } } }
+    });
+    return {
+        stage: meeting?.channel?.kind === "voice" && meeting.channel.stage === true,
+        channelId: meeting?.channelId ?? null
+    };
+}
+
 /** Whether a new seat in this conversation's call starts in the audience: only
  *  on a stage, and never for somebody who may moderate it. */
 export function seatStartsInAudience(

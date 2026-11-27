@@ -10,6 +10,7 @@
  */
 
 import { sendAction } from "@/lib/poll-fetch";
+import { CALL_E2EE_VERSION } from "@/lib/chat/call-e2ee";
 import type * as actions from "./meeting-actions";
 
 type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
@@ -31,7 +32,7 @@ export const joinMeeting = (meetingId: string) =>
     step<Answer<typeof actions.joinMeetingAction>>("join-meeting", { meetingId });
 
 export const callTicket = (meetingId: string) =>
-    step<Answer<typeof actions.callTokenAction>>("ticket", { meetingId });
+    step<Answer<typeof actions.callTokenAction>>("ticket", { meetingId, e2ee: String(CALL_E2EE_VERSION) });
 
 export const readCall = (meetingId: string) =>
     step<Answer<typeof actions.readCallAction>>("read", { meetingId });

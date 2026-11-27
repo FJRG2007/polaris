@@ -30,7 +30,13 @@ const STEPS: Record<string, (request: Request) => Promise<Response>> = {
     join: actionRoute(meeting, ({ meetingId }) => calls.joinCallAction(meetingId)),
     decline: actionRoute(meeting, ({ meetingId }) => calls.declineCallAction(meetingId)),
     "join-meeting": actionRoute(meeting, ({ meetingId }) => calls.joinMeetingAction(meetingId)),
-    ticket: actionRoute(meeting, ({ meetingId }) => calls.callTokenAction(meetingId), guest),
+    ticket: actionRoute(
+        // Optional, because a browser from before call encryption sends none -
+        // and is then refused an encrypted call rather than let in the clear.
+        meeting.extend({ e2ee: z.coerce.number().int().min(0).max(1000).optional() }),
+        ({ meetingId, e2ee }) => calls.callTokenAction(meetingId, e2ee),
+        guest
+    ),
     read: actionRoute(meeting, ({ meetingId }) => calls.readCallAction(meetingId), guest),
     "own-voice": actionRoute(meeting, ({ meetingId }) => calls.ownVoiceAction(meetingId), guest),
     "licensed-filter": actionRoute(

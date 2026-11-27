@@ -217,6 +217,18 @@ export async function publicUnsealed(channelId: string): Promise<boolean> {
     return (await sealingIn(channelId).catch(() => null))?.open ?? false;
 }
 
+/**
+ * The conversation's MLS secret one call is bound to, or null when this browser
+ * holds no group for it (sealed chat off, a public channel, a guest). See
+ * `lib/chat/call-e2ee`.
+ */
+export async function callBinding(channelId: string, room: string): Promise<{ epoch: string; secret: Uint8Array } | null> {
+    if (!sealedChatActive()) return null;
+    const mls = await device().catch(() => null);
+    if (!mls || !mls.hasGroup(channelId)) return null;
+    return mls.callSecret(channelId, room);
+}
+
 function device(): Promise<MlsDevice> {
     const userId = viewer;
     if (!userId) return Promise.reject(new Error("sealed chat is off"));

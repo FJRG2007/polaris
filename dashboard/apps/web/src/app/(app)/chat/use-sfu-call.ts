@@ -46,6 +46,8 @@ import { volumeFor } from "./call-volumes";
 import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
 import * as actions from "./meeting-actions";
+import * as callKeys from "./call-e2ee-session";
+import { callBinding } from "@/lib/chat/e2ee/sealed-chat";
 import * as callRequests from "./call-requests";
 import { callServerUrl } from "./call-address";
 import { holdSeat, keepSeat, leaveSeat, type VoiceState } from "./call-seat";
@@ -395,6 +397,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      *  whatever is drawing it, and this is only the nudge to go and ask. */
     const [saidAt, setSaidAt] = useState(0);
     const [error, setError] = useState("");
+    /** What the call shows about its end-to-end encryption - see `call-e2ee`. */
+    const [lock, setLock] = useState<callKeys.CallLock>("pending");
     const [microphones, setMicrophones] = useState<readonly CallDevice[]>([]);
     const [cameras, setCameras] = useState<readonly CallDevice[]>([]);
     const [microphoneId, setMicrophoneId] = useState<string | null>(null);
@@ -1700,13 +1704,39 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // Fetched now rather than imported: see `livekit` above. It is one
             // request, cached, and it happens while the browser is already
             // waiting on the ticket.
-            const { ConnectionState, ParticipantEvent, Room, RoomEvent, VideoQuality } = await livekit();
+            const lk = await livekit();
+            const { ConnectionState, ParticipantEvent, Room, RoomEvent, VideoQuality } = lk;
             if (stopped) {
                 connecting = false;
                 return;
             }
 
-            const joined = new Room(CALL_ROOM_OPTIONS);
+            // Every call but a stage's is end-to-end encrypted, and one this
+            // browser cannot encrypt is not joined at all: never in the clear,
+            // and never without saying why.
+            const encrypted = ticket.e2ee === true;
+            if (encrypted && !lk.isE2EESupported()) {
+                report(t("errors.callE2eeUnsupported"));
+                connecting = false;
+                return;
+            }
+            setLock(encrypted ? "pending" : "off");
+            const keyProvider = encrypted ? callKeys.makeKeyProvider(lk) : null;
+            const cryptor = keyProvider
+                ? new Worker(new URL("livekit-client/e2ee-worker", import.meta.url), { type: "module", name: "Call encryption" })
+                : null;
+            // `e2ee` rather than `encryption`: the second also encrypts data
+            // messages with the call key, and the key itself travels on one -
+            // a browser waiting for its key could never read it. The key
+            // messages are wrapped for their recipient on their own.
+            const joined = new Room(
+                keyProvider && cryptor ? { ...CALL_ROOM_OPTIONS, e2ee: { keyProvider, worker: cryptor } } : CALL_ROOM_OPTIONS
+            );
+            let keys: callKeys.CallKeys | null = null;
+            joined.on(RoomEvent.Disconnected, () => {
+                keys?.stop();
+                cryptor?.terminate();
+            });
             room.current = joined;
             const noteShareDrop = () => {
                 const held = shareRepair.current;
@@ -1938,6 +1968,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             } catch {
                 connecting = false;
                 room.current = null;
+                cryptor?.terminate();
                 report(
                     "This call could not reach the call server. It may be starting up, or an administrator may need to look at it."
                 );
@@ -1948,6 +1979,29 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 await joined.disconnect().catch(() => undefined);
                 room.current = null;
                 return;
+            }
+            if (keyProvider) {
+                // Before anything is published, so no frame ever leaves this
+                // browser unencrypted.
+                try {
+                    await joined.setE2EEEnabled(true);
+                    keys = await callKeys.startCallKeys({
+                        room: joined,
+                        lk,
+                        provider: keyProvider,
+                        roomName: inCall,
+                        binding: () => (ticket.channelId ? callBinding(ticket.channelId, inCall) : Promise.resolve(null)),
+                        onLock: (next) => {
+                            if (room.current === joined) setLock(next);
+                        }
+                    });
+                } catch {
+                    connecting = false;
+                    room.current = null;
+                    await joined.disconnect().catch(() => undefined);
+                    report(t("errors.callE2eeFailed"));
+                    return;
+                }
             }
             connected();
             rejoinAttempt = 0;
@@ -4332,6 +4386,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     return {
         meeting,
         participantId,
+        lock,
         localStream,
         localScreen,
         remote,

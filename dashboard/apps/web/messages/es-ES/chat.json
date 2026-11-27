@@ -182,6 +182,9 @@
         "pickToInvite": "Elige a quién invitar",
         "notAsked": "No se pudo preguntar",
         "callUnreachable": "No se pudo llegar a la llamada. Vuelve a intentarlo.",
+        "callNeedsUpdate": "Esta llamada está cifrada de extremo a extremo. Actualiza Polaris aquí para unirte.",
+        "callE2eeUnsupported": "Este dispositivo no puede unirse a llamadas cifradas. Actualiza Polaris o abre la llamada en un navegador actual.",
+        "callE2eeFailed": "No se pudo iniciar el cifrado de la llamada, así que no se unió. Vuelve a intentarlo.",
         "notRead": "No se pudo leer",
         "writeOrAttach": "Escribe algo o adjunta un archivo",
         "noFilesAllowed": "Aquí no puedes enviar archivos",
@@ -455,6 +458,16 @@
         "always": "siempre"
     },
     "callRoom": {
+        "lock": {
+            "pending": "Cifrando",
+            "pendingHint": "Preparando el cifrado de extremo a extremo de esta llamada.",
+            "on": "Cifrada",
+            "onHint": "Cifrada de extremo a extremo. Las claves se intercambian entre quienes están; el servidor nunca las tiene.",
+            "bound": "Cifrada",
+            "boundHint": "Cifrada de extremo a extremo con las claves de esta conversación. El servidor nunca las tiene.",
+            "off": "Sin cifrar",
+            "offHint": "Las llamadas de escenario no van cifradas de extremo a extremo. Sí van cifradas hasta el servidor."
+        },
         "shareNotArriving": "La pantalla de {name} no te llega. Pídele que deje de compartir y vuelva a compartir.",
         "yourScreen": "Tu pantalla",
         "theirScreen": "{name} - pantalla",
