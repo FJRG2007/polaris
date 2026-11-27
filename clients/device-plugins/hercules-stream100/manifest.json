@@ -8,7 +8,11 @@
         }
     ],
     "entries": {
+        "darwin-arm64": "main.cjs",
+        "darwin-x64": "main.cjs",
+        "linux-arm64": "main.cjs",
         "linux-x64": "main.cjs",
+        "win32-arm64": "main.cjs",
         "win32-x64": "main.cjs"
     },
     "groups": [
@@ -67,6 +71,69 @@
     ],
     "publisher": "Polaris",
     "requires": {
+        "linux-arm64": [
+            {
+                "hint": {
+                    "en-US": "Polaris adds a system rule so it can read the Stream 100 (Linux asks for your password once).",
+                    "es-ES": "Polaris añade una regla del sistema para leer el Stream 100 (Linux pide tu contraseña una vez)."
+                },
+                "key": "udevRule",
+                "label": {
+                    "en-US": "Let Polaris open the Stream 100",
+                    "es-ES": "Dejar que Polaris abra el Stream 100"
+                },
+                "missing": {
+                    "en-US": "Linux does not let Polaris open the Stream 100 yet, so its knobs and buttons do nothing.",
+                    "es-ES": "Linux aún no deja a Polaris abrir el Stream 100: sus ruedas y botones no hacen nada."
+                },
+                "restored": {
+                    "en-US": "The rule that lets Polaris open the Stream 100 was gone. Polaris put it back.",
+                    "es-ES": "Faltaba la regla que deja a Polaris abrir el Stream 100. Polaris la ha vuelto a poner."
+                }
+            }
+        ],
+        "linux-x64": [
+            {
+                "hint": {
+                    "en-US": "Polaris adds a system rule so it can read the Stream 100 (Linux asks for your password once).",
+                    "es-ES": "Polaris añade una regla del sistema para leer el Stream 100 (Linux pide tu contraseña una vez)."
+                },
+                "key": "udevRule",
+                "label": {
+                    "en-US": "Let Polaris open the Stream 100",
+                    "es-ES": "Dejar que Polaris abra el Stream 100"
+                },
+                "missing": {
+                    "en-US": "Linux does not let Polaris open the Stream 100 yet, so its knobs and buttons do nothing.",
+                    "es-ES": "Linux aún no deja a Polaris abrir el Stream 100: sus ruedas y botones no hacen nada."
+                },
+                "restored": {
+                    "en-US": "The rule that lets Polaris open the Stream 100 was gone. Polaris put it back.",
+                    "es-ES": "Faltaba la regla que deja a Polaris abrir el Stream 100. Polaris la ha vuelto a poner."
+                }
+            }
+        ],
+        "win32-arm64": [
+            {
+                "hint": {
+                    "en-US": "Polaris sets up its driver for the Stream 100 (Windows asks once).",
+                    "es-ES": "Polaris instala su driver para el Stream 100 (Windows pide permiso una vez)."
+                },
+                "key": "driver",
+                "label": {
+                    "en-US": "Install a driver for the Stream 100",
+                    "es-ES": "Instalar un driver para el Stream 100"
+                },
+                "missing": {
+                    "en-US": "Polaris' driver is not set up, so the Stream 100 works only through the Hercules software, if installed.",
+                    "es-ES": "El driver de Polaris no está instalado: el Stream 100 solo funciona con el software de Hercules, si está."
+                },
+                "restored": {
+                    "en-US": "Another driver had taken the Stream 100. Polaris put its own back.",
+                    "es-ES": "Otro driver se había quedado el Stream 100. Polaris ha vuelto a poner el suyo."
+                }
+            }
+        ],
         "win32-x64": [
             {
                 "hint": {
@@ -516,6 +583,6 @@
         }
     },
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.14",
+    "version": "0.1.15",
     "view": "view/index.html"
 }

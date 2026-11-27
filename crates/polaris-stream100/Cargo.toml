@@ -1,6 +1,6 @@
 [package]
 name = "polaris-stream100"
-version = "0.1.14"
+version = "0.1.15"
 description = "Polaris' driver for the Hercules Stream 100: its USB protocol, knob handling, display frames and per-app audio categories (docs/devices/hercules-stream100.md)."
 edition.workspace = true
 rust-version.workspace = true
@@ -21,7 +21,7 @@ usb = ["dep:nusb"]
 # HID API on Windows, `usb` elsewhere) and, on Windows, who holds the device.
 # Built only into the plugin's own binding, never into anything a machine
 # without the controller loads.
-native = ["usb", "dep:windows", "dep:pulseaudio"]
+native = ["usb", "dep:windows", "dep:pulseaudio", "dep:libusb1-sys", "dep:libc"]
 
 [dependencies]
 serde = { workspace = true }
@@ -55,3 +55,11 @@ windows = { version = "=0.62.2", optional = true, features = [
 
 [target.'cfg(target_os = "linux")'.dependencies]
 pulseaudio = { version = "=0.3.2", optional = true }
+
+# libusb, built from its vendored source into the module (nothing to install
+# on the machine): the isochronous OUT endpoint the keep-alive and the screen
+# use is not in `nusb` 0.2, and libusb is what every Linux and macOS driver
+# for this controller already talks through.
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+libusb1-sys = { version = "=0.7.0", optional = true, features = ["vendored"] }
+libc = { version = "0.2", optional = true }

@@ -2,9 +2,9 @@
 //! (`polaris-stream100.inf`: WinUSB for `USB\VID_06F8&PID_E053`, registering
 //! [`DEVICE_INTERFACE_GUID`]). No Hercules software is involved.
 //!
-//! The session follows [`crate::session`]: interface 1 to alternate setting 1,
-//! the two start-up vendor reads, then reports read from endpoint `0x81` while
-//! a keep-alive goes to endpoint `0x01` at least twice a second. WinUSB is the
+//! The session is [`crate::session::Session`], the same one Linux and macOS
+//! run; this module is only its [`Link`]: how WinUSB opens the device and
+//! moves the bytes. WinUSB is the
 //! function driver of the whole device, so interface 0 comes from
 //! `WinUsb_Initialize` and interface 1 from `WinUsb_GetAssociatedInterface`.
 //! Windows' USB stack has already selected configuration 1 by then.
@@ -13,15 +13,14 @@
 //! `nusb` 0.2 has no isochronous transfers, which is why this route talks to
 //! WinUSB directly through the `windows` crate the plugin already pins.
 
-use crate::display::{self, MAX_TRANSFER_PACKETS, PACKET_SIZE};
-use crate::report::{Report, REPORT_LEN};
-use crate::screen::{self, Painter};
+use crate::report::REPORT_LEN;
 use crate::session::{
-    DEVICE_INTERFACE_GUID_U128, DISPLAY_ALT_SETTING, DISPLAY_ENDPOINT, INIT_READS, INPUT_ENDPOINT,
+    Link, Session, Setup, DEVICE_INTERFACE_GUID_U128, DISPLAY_ALT_SETTING, DISPLAY_ENDPOINT,
+    INPUT_ENDPOINT, TRANSFER_LEN,
 };
 use crate::transport::TransportError;
 use std::ffi::c_void;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use windows::core::{GUID, PCWSTR};
 use windows::Win32::Devices::DeviceAndDriverInstallation::{
     SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInterfaces, SetupDiGetClassDevsW,
@@ -44,12 +43,6 @@ use windows::Win32::Storage::FileSystem::{
 };
 use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::Win32::System::IO::{CancelIoEx, GetOverlappedResult, OVERLAPPED};
-
-/// The registered buffer: the largest transfer the display takes.
-const TRANSFER_LEN: usize = MAX_TRANSFER_PACKETS * PACKET_SIZE;
-
-/// How long one display write may take before it is given up.
-const WRITE_WAIT_MS: u32 = 100;
 
 /// The NUL-terminated paths of every present device interface of `guid`.
 pub fn interface_paths(guid: &GUID) -> Vec<Vec<u16>> {
@@ -109,17 +102,27 @@ fn event() -> Result<HANDLE, TransportError> {
         .map_err(|error| TransportError::Io(error.message()))
 }
 
+fn millis(wait: Duration) -> u32 {
+    u32::try_from(wait.as_millis()).unwrap_or(u32::MAX - 1)
+}
+
 /// The controller, opened through Polaris' WinUSB driver.
-pub struct WinUsbInput {
+pub type WinUsbInput = Session<WinUsbLink>;
+
+/// Opens the controller, or [`TransportError::NotFound`] when Polaris' driver
+/// is not on it (no device interface of ours is present).
+pub fn open() -> Result<WinUsbInput, TransportError> {
+    WinUsbLink::open().map(Session::start)
+}
+
+/// How WinUSB carries a [`Session`].
+pub struct WinUsbLink {
     file: HANDLE,
     input: WINUSB_INTERFACE_HANDLE,
-    /// Interface 1, or null when it could not be set up: input is still read,
-    /// with no keep-alive.
+    /// Interface 1, or null when it could not be set up.
     display: WINUSB_INTERFACE_HANDLE,
     /// The registered isochronous buffer, or null.
     isoch: *mut c_void,
-    // Boxed: it holds two pages, and the input enum stays small.
-    painter: Box<Painter>,
     read_event: HANDLE,
     write_event: HANDLE,
     // Boxed: the system writes into these while a transfer is pending, so
@@ -133,12 +136,10 @@ pub struct WinUsbInput {
 
 // SAFETY: plain kernel and WinUSB handles, usable from any thread; the struct
 // is only ever used by one thread at a time (`&mut self`).
-unsafe impl Send for WinUsbInput {}
+unsafe impl Send for WinUsbLink {}
 
-impl WinUsbInput {
-    /// Opens the controller, or [`TransportError::NotFound`] when Polaris'
-    /// driver is not on it (no device interface of ours is present).
-    pub fn open() -> Result<Self, TransportError> {
+impl WinUsbLink {
+    fn open() -> Result<Self, TransportError> {
         let guid = GUID::from_u128(DEVICE_INTERFACE_GUID_U128);
         let path = interface_paths(&guid)
             .into_iter()
@@ -171,7 +172,6 @@ impl WinUsbInput {
             input: WINUSB_INTERFACE_HANDLE::default(),
             display: WINUSB_INTERFACE_HANDLE::default(),
             isoch: std::ptr::null_mut(),
-            painter: Box::default(),
             read_event: HANDLE::default(),
             write_event: HANDLE::default(),
             read_overlapped: Box::default(),
@@ -186,24 +186,47 @@ impl WinUsbInput {
         // SAFETY: `file` is an open WinUSB device handle.
         unsafe { WinUsb_Initialize(opened.file, &mut opened.input) }
             .map_err(|error| TransportError::Io(error.message()))?;
-        opened.start_display();
-        opened.start_up_reads();
         Ok(opened)
     }
+}
 
-    /// Interface 1 to its alternate setting and the keep-alive buffer
-    /// registered; on any failure the display stays off and input goes on.
-    fn start_display(&mut self) {
+impl Link for WinUsbLink {
+    type Error = TransportError;
+
+    fn control_in(&mut self, (kind, request, value, index, length): Setup) {
+        let setup = WINUSB_SETUP_PACKET {
+            RequestType: kind,
+            Request: request,
+            Value: value,
+            Index: index,
+            Length: length,
+        };
+        let mut answer = [0u8; 8];
+        let length = usize::from(length).min(answer.len());
+        let mut got = 0u32;
+        // SAFETY: a synchronous control read into a local buffer.
+        let _ = unsafe {
+            WinUsb_ControlTransfer(
+                self.input,
+                setup,
+                Some(&mut answer[..length]),
+                Some(&mut got),
+                None,
+            )
+        };
+    }
+
+    fn start_display(&mut self) -> bool {
         let mut display = WINUSB_INTERFACE_HANDLE::default();
         // SAFETY: `input` is initialized; index 0 is the interface after it.
         if unsafe { WinUsb_GetAssociatedInterface(self.input, 0, &mut display) }.is_err() {
-            return;
+            return false;
         }
         self.display = display;
         // SAFETY: `display` is a live interface handle.
         if unsafe { WinUsb_SetCurrentAlternateSetting(self.display, DISPLAY_ALT_SETTING) }.is_err()
         {
-            return;
+            return false;
         }
         let mut isoch = std::ptr::null_mut();
         // SAFETY: `packet` is boxed and outlives the registration (released in `drop`).
@@ -215,54 +238,18 @@ impl WinUsbInput {
                 &mut isoch,
             )
         }
-        .is_ok()
+        .is_err()
         {
-            self.isoch = isoch;
+            return false;
         }
+        self.isoch = isoch;
+        true
     }
 
-    /// The documented start-up reads. Their answers are not needed, and a
-    /// controller that refuses one is still read.
-    fn start_up_reads(&mut self) {
-        for read in INIT_READS {
-            let Some((kind, request, value, index, length)) = read.setup() else {
-                continue;
-            };
-            let setup = WINUSB_SETUP_PACKET {
-                RequestType: kind,
-                Request: request,
-                Value: value,
-                Index: index,
-                Length: length,
-            };
-            let mut answer = [0u8; 8];
-            let mut got = 0u32;
-            // SAFETY: a synchronous control read into a local buffer.
-            let _ = unsafe {
-                WinUsb_ControlTransfer(
-                    self.input,
-                    setup,
-                    Some(&mut answer[..usize::from(length)]),
-                    Some(&mut got),
-                    None,
-                )
-            };
-        }
-    }
-
-    /// Sends what the display is due: the keep-alive, an acknowledgement,
-    /// or the next tile of the newest page ([`Painter`]). A failed write is
-    /// left behind: input keeps being read either way.
-    fn paint(&mut self) {
+    fn write_transfer(&mut self, transfer: &[u8], wait: Duration) {
         if self.isoch.is_null() {
             return;
         }
-        if let Some(page) = screen::latest() {
-            self.painter.show(&page);
-        }
-        let Some(transfer) = self.painter.next(Instant::now()) else {
-            return;
-        };
         let length = transfer.len().min(TRANSFER_LEN);
         self.packet[..length].copy_from_slice(&transfer[..length]);
         *self.write_overlapped = OVERLAPPED {
@@ -285,7 +272,7 @@ impl WinUsbInput {
                 Err(error) if error.code() == ERROR_IO_PENDING.to_hresult() => {}
                 Err(_) => return,
             }
-            if WaitForSingleObject(self.write_event, WRITE_WAIT_MS) != WAIT_OBJECT_0 {
+            if WaitForSingleObject(self.write_event, millis(wait)) != WAIT_OBJECT_0 {
                 let _ = CancelIoEx(self.file, Some(&*self.write_overlapped));
             }
             let mut written = 0u32;
@@ -293,72 +280,58 @@ impl WinUsbInput {
         }
     }
 
-    /// Waits up to `timeout` for the next report; `Ok(None)` when none came.
-    pub fn next(&mut self, timeout: Duration) -> Result<Option<Report>, TransportError> {
-        let deadline = Instant::now() + timeout;
-        loop {
-            self.paint();
-            if !self.pending {
-                *self.read_overlapped = OVERLAPPED {
-                    hEvent: self.read_event,
-                    ..Default::default()
-                };
-                // SAFETY: buffer and overlapped are boxed and stay alive until
-                // the read completes or is cancelled in `drop`.
-                let started = unsafe {
-                    WinUsb_ReadPipe(
-                        self.input,
-                        INPUT_ENDPOINT,
-                        Some(&mut self.report[..]),
-                        None,
-                        Some(&*self.read_overlapped),
-                    )
-                };
-                match started {
-                    Ok(()) => {}
-                    Err(error) if error.code() == ERROR_IO_PENDING.to_hresult() => {}
-                    Err(error) => return Err(TransportError::Io(error.message())),
-                }
-                self.pending = true;
-            }
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            let slice = if self.isoch.is_null() {
-                remaining
-            } else {
-                remaining.min(self.painter.wait(Instant::now()))
+    fn read_report(
+        &mut self,
+        buffer: &mut [u8; REPORT_LEN],
+        wait: Duration,
+    ) -> Result<Option<usize>, TransportError> {
+        if !self.pending {
+            *self.read_overlapped = OVERLAPPED {
+                hEvent: self.read_event,
+                ..Default::default()
             };
-            let wait = u32::try_from(slice.as_millis()).unwrap_or(u32::MAX - 1);
-            // SAFETY: waits on the event this struct owns.
-            match unsafe { WaitForSingleObject(self.read_event, wait) } {
-                WAIT_OBJECT_0 => {}
-                WAIT_TIMEOUT => {
-                    if Instant::now() >= deadline {
-                        return Ok(None);
-                    }
-                    continue;
-                }
-                _ => {
-                    return Err(TransportError::Io(
-                        "waiting for the controller failed".into(),
-                    ))
-                }
+            // SAFETY: buffer and overlapped are boxed and stay alive until
+            // the read completes or is cancelled in `drop`.
+            let started = unsafe {
+                WinUsb_ReadPipe(
+                    self.input,
+                    INPUT_ENDPOINT,
+                    Some(&mut self.report[..]),
+                    None,
+                    Some(&*self.read_overlapped),
+                )
+            };
+            match started {
+                Ok(()) => {}
+                Err(error) if error.code() == ERROR_IO_PENDING.to_hresult() => {}
+                Err(error) => return Err(TransportError::Io(error.message())),
             }
-            let mut read = 0u32;
-            // SAFETY: the read has completed (its event is set).
-            let done =
-                unsafe { GetOverlappedResult(self.file, &*self.read_overlapped, &mut read, false) };
-            self.pending = false;
-            done.map_err(|error| TransportError::Io(error.message()))?;
-            let read = (read as usize).min(REPORT_LEN);
-            if display::asks_for_ack(&self.report[..read]) {
-                self.painter.acknowledge();
-            }
-            return Ok(Report::parse(&self.report[..read]));
+            self.pending = true;
         }
+        // SAFETY: waits on the event this struct owns.
+        match unsafe { WaitForSingleObject(self.read_event, millis(wait)) } {
+            WAIT_OBJECT_0 => {}
+            // The read stays pending for the next call.
+            WAIT_TIMEOUT => return Ok(None),
+            _ => {
+                return Err(TransportError::Io(
+                    "waiting for the controller failed".into(),
+                ))
+            }
+        }
+        let mut read = 0u32;
+        // SAFETY: the read has completed (its event is set).
+        let done =
+            unsafe { GetOverlappedResult(self.file, &*self.read_overlapped, &mut read, false) };
+        self.pending = false;
+        done.map_err(|error| TransportError::Io(error.message()))?;
+        let read = (read as usize).min(REPORT_LEN);
+        buffer[..read].copy_from_slice(&self.report[..read]);
+        Ok(Some(read))
     }
 }
 
-impl Drop for WinUsbInput {
+impl Drop for WinUsbLink {
     fn drop(&mut self) {
         // SAFETY: cancels this struct's own read and waits for it, so the
         // system is done with the buffers; then every handle opened in `open`

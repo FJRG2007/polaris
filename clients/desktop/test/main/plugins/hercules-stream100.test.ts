@@ -58,7 +58,7 @@ describe("Hercules Stream 100 plugin", () => {
         const manifest = readPluginManifest(JSON.parse(readFileSync(new URL("manifest.json", folder), "utf8")));
         expect(manifest?.id).toBe("hercules-stream100");
         expect(manifest?.claims).toEqual([{ vendorId: 0x06f8, productId: 0xe053, name: "Hercules Stream 100" }]);
-        expect(manifest?.entries).toEqual({ "win32-x64": "main.cjs", "linux-x64": "main.cjs" });
+        expect(manifest?.entries).toEqual(Object.fromEntries(["win32-x64", "win32-arm64", "linux-x64", "linux-arm64", "darwin-x64", "darwin-arm64"].map((platform) => [platform, "main.cjs"])));
         expect(manifest?.settings.map((setting) => setting.key)).toContain("button4");
     });
 

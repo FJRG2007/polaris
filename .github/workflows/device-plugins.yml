@@ -30,29 +30,56 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
+        # Every desktop platform the app runs on. The arm64 Windows and x64
+        # macOS modules are cross-compiled on the other architecture's runner
+        # (nothing in them needs the target's own C toolchain beyond what the
+        # runner ships); arm64 Linux builds on its native runner.
         include:
           - platform: win32-x64
             os: windows-latest
+            target: x86_64-pc-windows-msvc
+            file: polaris_stream100_node.dll
+          - platform: win32-arm64
+            os: windows-latest
+            target: aarch64-pc-windows-msvc
             file: polaris_stream100_node.dll
           - platform: linux-x64
             os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
             file: libpolaris_stream100_node.so
+          - platform: linux-arm64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            file: libpolaris_stream100_node.so
+          - platform: darwin-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            file: libpolaris_stream100_node.dylib
+          - platform: darwin-x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            file: libpolaris_stream100_node.dylib
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
       CARGO_INCREMENTAL: "0"
+      # libusb is built from its vendored source; without udev it watches
+      # hotplug over netlink, so the module needs no libudev on the machine.
+      LIBUDEV_NO_PKG_CONFIG: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
           key: device-plugins-${{ matrix.platform }}
-      - run: cargo build -p polaris-stream100-node --profile release-node --locked
+      - run: cargo build -p polaris-stream100-node --profile release-node --locked --target ${{ matrix.target }}
       - name: Stage the module
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/native/hercules-stream100/${{ matrix.platform }}"
-          cp "target/release-node/${{ matrix.file }}" "$RUNNER_TEMP/native/hercules-stream100/${{ matrix.platform }}/stream100.node"
+          cp "target/${{ matrix.target }}/release-node/${{ matrix.file }}" "$RUNNER_TEMP/native/hercules-stream100/${{ matrix.platform }}/stream100.node"
       - uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.platform }}
@@ -61,6 +88,9 @@ jobs:
 
   publish:
     needs: native
+    # A run started by hand on another branch only builds the modules: what
+    # the desktop apps download is published from main alone.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write

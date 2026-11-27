@@ -4,15 +4,19 @@
 //! - Windows: Core Audio sessions on every active output, and the Hercules
 //!   driver / Stream Control probe ([`windows`]).
 //! - Linux: the PulseAudio protocol, which PipeWire also serves ([`linux`]).
-//! - macOS: per-app volume needs process taps (macOS 14.2+) plus an audio
-//!   driver of its own; not built yet, and [`open`] says so.
+//! - macOS: the whole output through Core Audio ([`macos`]); per-app volume
+//!   there needs process taps (macOS 14.2+) and is not built yet.
 
 use crate::audio::{AudioError, AudioSessions};
 use crate::ownership::Observed;
 
 pub mod input;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub mod libusb;
 #[cfg(target_os = "linux")]
 pub mod linux;
+#[cfg(target_os = "macos")]
+pub mod macos;
 #[cfg(windows)]
 pub mod sdk;
 #[cfg(windows)]
@@ -26,7 +30,9 @@ pub fn open() -> Result<Box<dyn AudioSessions>, AudioError> {
     return Ok(Box::new(windows::CoreAudio::open()?));
     #[cfg(target_os = "linux")]
     return Ok(Box::new(linux::Pulse::open()?));
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    return Ok(Box::new(macos::CoreAudioOutput::open()?));
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     Err(AudioError::Unsupported)
 }
 
@@ -37,9 +43,11 @@ pub fn observe() -> Observed {
     return windows::observe();
     #[cfg(target_os = "linux")]
     return linux::observe();
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    return macos::observe();
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     Observed {
-        os: "macos".into(),
+        os: std::env::consts::OS.into(),
         present: true,
         ..Default::default()
     }

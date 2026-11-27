@@ -17,7 +17,7 @@ import { pluginShortcuts, sameShortcuts, type PluginShortcuts } from "./ways-in"
 import type { PluginChild, WantedPlugin } from "./supervisor";
 import { createPluginManager, type PluginManager } from "./manager";
 import { createRequirements, type EnsureReason, type Requirements } from "./requirements";
-import { answerOfficial, DRIVER_REQUIREMENT, driverRunnerFor, lookDriver, officialRequestSchema, officialRunnerFor, requirementRunnerFor } from "./official";
+import { answerOfficial, DRIVER_REQUIREMENT, driverRunnerFor, lookDriver, officialRequestSchema, officialRunnerFor, requirementRunnerFor, udevRunnerFor } from "./official";
 import { showNotice } from "../notices";
 import { newsWords } from "./updates";
 import { callPageAction, voiceStateNow, voiceWidgetAction } from "../voice-widget";
@@ -354,6 +354,9 @@ export function registerPluginIpc(
             const removed = await driver.remove();
             if (!removed.ok) return false;
         }
+        // On Linux the udev rule goes too; a declined prompt only leaves a harmless rule behind.
+        const udev = udevRunnerFor(parsed.data);
+        if (udev && (await udev.installed())) await udev.remove().catch(() => undefined);
         await ready().uninstall(parsed.data);
         await requirements?.forget(parsed.data);
         return true;

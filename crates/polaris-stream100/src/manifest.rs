@@ -8,9 +8,17 @@
 
 use serde_json::{json, Value};
 
-/// The platforms a package is built for: input is read on Windows (HID API)
-/// and Linux (USB). macOS has no input route yet, so it gets no package.
-pub const PLATFORMS: [&str; 2] = ["win32-x64", "linux-x64"];
+/// The platforms a package is built for: every desktop the app runs on. The
+/// controller is read over WinUSB (or the HID API, or the Hercules SDK) on
+/// Windows and over libusb on Linux and macOS, x64 and arm64 alike.
+pub const PLATFORMS: [&str; 6] = [
+    "win32-x64",
+    "win32-arm64",
+    "linux-x64",
+    "linux-arm64",
+    "darwin-x64",
+    "darwin-arm64",
+];
 
 /// The script each platform's package starts.
 pub const ENTRY: &str = "main.cjs";
@@ -50,10 +58,34 @@ pub fn manifest() -> Value {
         // On Windows the desktop app puts Polaris' own WinUSB driver on the
         // controller (`clients/desktop/src/main/plugins/requirements.ts`): listed
         // in the install consent, one Windows prompt, put back when another
-        // driver takes the device. Linux reads it directly, so it needs nothing.
-        "requires": { "win32-x64": [driver_requirement()] },
+        // driver takes the device. On Linux it adds the udev rule that lets the
+        // signed-in user open it (one polkit prompt). macOS needs nothing.
+        "requires": {
+            "win32-x64": [driver_requirement()],
+            "win32-arm64": [driver_requirement()],
+            "linux-x64": [udev_requirement()],
+            "linux-arm64": [udev_requirement()],
+        },
+        // The plugin's own status sentences (`code` in its status messages),
+        // in every language, so the page needs no Polaris update to say them.
+        "statusTexts": status_texts(),
         // The editor that shows the controller: its screen, knobs and buttons.
         "view": VIEW,
+    })
+}
+
+/// The sentences of the status codes only this plugin sends.
+fn status_texts() -> Value {
+    use crate::plugin::label;
+    json!({
+        "herculesApp": label(
+            "Close Hercules Stream Control to use the Stream 100 here. While it runs, it has the controller.",
+            "Cierra Hercules Stream Control para usar el Stream 100 aquí. Mientras está abierto, tiene el control.",
+        ),
+        "herculesDriver": label(
+            "Polaris could not read the Stream 100 through the Hercules software. Plug it in again, or reinstall Hercules Stream Control.",
+            "Polaris no pudo leer el Stream 100 con el software de Hercules. Vuelve a conectarlo o reinstala Hercules Stream Control.",
+        ),
     })
 }
 
@@ -74,6 +106,28 @@ fn driver_requirement() -> Value {
         "restored": label(
             "Another driver had taken the Stream 100. Polaris put its own back.",
             "Otro driver se había quedado el Stream 100. Polaris ha vuelto a poner el suyo.",
+        ),
+    })
+}
+
+/// The udev rule that lets the signed-in user open the Stream 100, as the
+/// Linux install lists it (`clients/desktop/src/main/plugins/hercules-udev.ts`).
+fn udev_requirement() -> Value {
+    use crate::plugin::label;
+    json!({
+        "key": "udevRule",
+        "label": label("Let Polaris open the Stream 100", "Dejar que Polaris abra el Stream 100"),
+        "hint": label(
+            "Polaris adds a system rule so it can read the Stream 100 (Linux asks for your password once).",
+            "Polaris añade una regla del sistema para leer el Stream 100 (Linux pide tu contraseña una vez).",
+        ),
+        "missing": label(
+            "Linux does not let Polaris open the Stream 100 yet, so its knobs and buttons do nothing.",
+            "Linux aún no deja a Polaris abrir el Stream 100: sus ruedas y botones no hacen nada.",
+        ),
+        "restored": label(
+            "The rule that lets Polaris open the Stream 100 was gone. Polaris put it back.",
+            "Faltaba la regla que deja a Polaris abrir el Stream 100. Polaris la ha vuelto a poner.",
         ),
     })
 }

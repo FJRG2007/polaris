@@ -13,6 +13,7 @@ import { access, mkdir, open, rename, writeFile } from "node:fs/promises";
 import { PLUGIN_PERMISSIONS } from "@polaris/core/device-plugins";
 import { createOfficialRunner, type OfficialHost, type OfficialRunner } from "./hercules-official-run";
 import type { RequirementRunner } from "./requirements";
+import { createUdevRunner, udevRequirement, type UdevRunner } from "./hercules-udev";
 import { createDriverRunner, type DriverFailure, type DriverRunner, type DriverState } from "./hercules-driver";
 
 /** The plugins whose device ships official software Polaris knows how to find. */
@@ -103,6 +104,14 @@ export function driverRunnerFor(id: string, pluginsDir: string, platform: NodeJS
 /** The key the Stream 100's manifest lists its driver under (`requires`, Windows only). */
 export const DRIVER_REQUIREMENT = "driver";
 
+/** The key the Stream 100's manifest lists its udev rule under (`requires`, Linux only). */
+export const UDEV_REQUIREMENT = "udevRule";
+
+/** The udev rule that lets the seat user open the Stream 100, or null off Linux or for another plugin. */
+export function udevRunnerFor(id: string, platform: NodeJS.Platform = process.platform, host: OfficialHost = nodeOfficialHost()): UdevRunner | null {
+    return platform === "linux" && id === "hercules-stream100" ? createUdevRunner(host) : null;
+}
+
 /** Polaris' driver as a requirement: met while it (or WinUSB) holds the device, missing while another driver does. */
 export function driverRequirement(driver: DriverRunner): RequirementRunner {
     return {
@@ -124,9 +133,13 @@ export function driverRequirement(driver: DriverRunner): RequirementRunner {
     };
 }
 
-/** What can set a plugin's requirement up on this machine; only the Stream 100's driver is known. */
-export function requirementRunnerFor(id: string, key: string, pluginsDir: string): RequirementRunner | null {
-    const driver = key === DRIVER_REQUIREMENT ? driverRunnerFor(id, pluginsDir) : null;
+/** What can set a plugin's requirement up on this machine; only the Stream 100's driver (Windows) and udev rule (Linux) are known. */
+export function requirementRunnerFor(id: string, key: string, pluginsDir: string, platform: NodeJS.Platform = process.platform, host: OfficialHost = nodeOfficialHost()): RequirementRunner | null {
+    if (key === UDEV_REQUIREMENT) {
+        const udev = udevRunnerFor(id, platform, host);
+        return udev ? udevRequirement(udev) : null;
+    }
+    const driver = key === DRIVER_REQUIREMENT ? driverRunnerFor(id, pluginsDir, platform, host) : null;
     return driver ? driverRequirement(driver) : null;
 }
 
