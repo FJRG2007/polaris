@@ -13,6 +13,8 @@
  * (reported as `tree`) goes up on its own in `TREE_PART_BYTES` parts.
  * Every joiner fills its blank path as the device does (`fillPath`), and the
  * run also fails when a fill, an add batch or a batch of removals is past it.
+ * Vitest may drop console output, so `POLARIS_MLS_OUT=<file>` also appends each
+ * line there.
  */
 
 import { fileURLToPath } from "node:url";
@@ -22,7 +24,7 @@ import { MLS_SUITE } from "@/lib/chat/e2ee/mls-client";
 import { MAX_TREE_PARTS, TREE_PART_BYTES } from "@/lib/chat/e2ee/schemas";
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-import { existsSync, readdirSync } from "node:fs";
+import { appendFileSync, existsSync, readdirSync } from "node:fs";
 
 type MlsMemberClass = import("@/lib/chat/e2ee/mls-client").MlsMemberClass;
 type MlsMemberLike = import("@/lib/chat/e2ee/mls-client").MlsMemberLike;
@@ -40,6 +42,8 @@ const WIRE_LIMIT = 1024 * 1024;
 const BATCH = 100;
 /** `FILL_MIN_MEMBERS` in `mls-client.ts`. */
 const FILL_MIN_MEMBERS = 32;
+/** Where each `mls-size` line is also appended, when set. */
+const outFile = process.env.POLARIS_MLS_OUT;
 /** `POLARIS_MLS_SPARSE=1` measures the group as it was before joiners filled their paths (fails past ~880 members). */
 const fillPaths = process.env.POLARIS_MLS_SPARSE !== "1";
 const encoder = new TextEncoder();
@@ -129,6 +133,7 @@ describe.skipIf(!nativeFile || sizes.length === 0)("MLS handshake size with a fu
                 wireLimit: WIRE_LIMIT
             };
             console.log(`mls-size ${JSON.stringify(line)}`);
+            if (outFile) appendFileSync(outFile, `mls-size ${JSON.stringify(line)}\n`);
             for (const fill of fills) expect(fill).toBeLessThan(WIRE_LIMIT);
             expect(line.removeBatchCommit).toBeLessThan(WIRE_LIMIT);
             expect(line.addBatchCommit).toBeLessThan(WIRE_LIMIT);
