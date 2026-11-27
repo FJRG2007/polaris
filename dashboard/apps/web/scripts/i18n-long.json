@@ -21,7 +21,8 @@
     "web/account:apiKeys.scopes.groups.tools (es-ES)",
     "web/account:appearance.decorations.cat (es-ES)",
     "web/account:details.name.last (es-ES)",
-    "web/chat:messageMenu.actions (es-ES)",
+    "web/account:plugins.card.updating (es-ES)",
+    "web/account:plugins.update.confirm (es-ES)",
     "web/accountOrgs:teams.create.title (es-ES)",
     "web/accountOrgs:teams.new (es-ES)",
     "web/accountPrivacy:blocked.unblock (es-ES)",
@@ -50,6 +51,7 @@
     "web/analytics:tracker.newKey (es-ES)",
     "web/api:errors.unknownScope (es-ES)",
     "web/api:refusals.aiKeys.pickKey (es-ES)",
+    "web/appSettings:hosts.copy (es-ES)",
     "web/auth:enroll.email.title (es-ES)",
     "web/auth:invite.codeLabel (es-ES)",
     "web/auth:invite.unavailableTitle (es-ES)",
@@ -86,6 +88,7 @@
     "web/chat:listView.poll (es-ES)",
     "web/chat:lock.newCode (es-ES)",
     "web/chat:lock.setCode (es-ES)",
+    "web/chat:messageMenu.actions (es-ES)",
     "web/code:detail.mergeCommit (es-ES)",
     "web/compliance:factors.email (es-ES)",
     "web/compliance:facts.chainHead (es-ES)",
@@ -292,7 +295,5 @@
     "web/watch:labels.metric.service (es-ES)",
     "web/watch:overview.title (es-ES)",
     "web/watch:text.buildCache (es-ES)",
-    "web/watch:text.unknownMetric (es-ES)",
-    "web/account:plugins.update.confirm (es-ES)",
-    "web/appSettings:hosts.copy (es-ES)"
+    "web/watch:text.unknownMetric (es-ES)"
 ]
