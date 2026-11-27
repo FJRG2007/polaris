@@ -254,7 +254,9 @@
             "help": "Ver todos los comandos",
             "resume": "Abrir tus chats y retomar uno",
             "stop": "Parar la respuesta actual",
-            "copy": "Copiar última respuesta"
+            "copy": "Copiar última respuesta",
+            "btw": "Preguntar aparte sin interrumpir",
+            "recap": "Un resumen breve de este chat"
         },
         "code": {
             "help": "Ver los comandos",
@@ -285,7 +287,9 @@
             "copyFailed": "No se pudo copiar. Reintenta.",
             "memory": "Ver lo que el agente recuerda de este repositorio",
             "memoryNone": "Esta sesión no tiene repositorio que recordar.",
-            "memoryClose": "Cerrar memoria"
+            "memoryClose": "Cerrar memoria",
+            "btw": "Preguntar aparte (en el chat de Polar)",
+            "btwHere": "Las preguntas aparte funcionan en el chat de Polar. Aquí el agente lleva la conversación por su cuenta, así que preguntarle sería un turno más."
         }
     },
     "context": {
@@ -2740,5 +2744,46 @@
         "ms": "{ms} ms",
         "seconds": "{seconds} s",
         "untimed": "{count, plural, one {# respuesta sin medir} other {# respuestas sin medir}}: anteriores o no de chat."
+    },
+    "btw": {
+        "title": "Pregunta aparte",
+        "copy": "Copiar",
+        "clear": "Borrar preguntas previas",
+        "dismiss": "Cerrar",
+        "older": "{count, plural, one {# pregunta anterior} other {# preguntas anteriores}}",
+        "working": "Respondiendo con este chat",
+        "note": "No se añade al chat. Sin herramientas: responde solo con lo que el chat ya contiene.",
+        "how": "Escribe tu pregunta después de /btw.",
+        "noModel": "Elige un modelo primero.",
+        "recap": "Resumen de este chat",
+        "errors": {
+            "failed": "No se pudo responder la pregunta. Inténtalo de nuevo.",
+            "no_key": "Ninguna clave responde con este modelo. Elige otro modelo.",
+            "unknown_model": "Ese modelo ya no está disponible. Elige otro.",
+            "unsupported_kind": "Este modelo no responde preguntas aparte. Elige otro.",
+            "usage_limit": "Has llegado al límite de uso de Polar por ahora.",
+            "rate_limited": "Demasiadas preguntas a la vez. Espera un momento.",
+            "invalid": "La pregunta es demasiado larga para enviarla."
+        }
+    },
+    "tips": {
+        "label": "Consejo: {tip}",
+        "btw": "Usa /btw para preguntar aparte sin interrumpir a Polar",
+        "recap": "Usa /recap para un resumen breve de este chat",
+        "stop": "Usa /stop para parar la respuesta actual",
+        "goal": "Usa /goal para que Polar siga hasta cumplir una condición",
+        "compact": "Usa /compact para resumir un chat largo y liberar sitio",
+        "context": "Usa /context para ver cuánto ocupa el contexto del chat",
+        "branch": "Usa /branch para seguir desde aquí en un chat nuevo",
+        "temp": "Usa /temp para un chat que no queda en tu historial",
+        "resume": "Usa /resume para retomar uno de tus chats",
+        "export": "Usa /export para descargar este chat en Markdown",
+        "codePlan": "Usa /plan para que el agente planifique antes de cambiar nada",
+        "codeDiff": "Usa /diff para ver los archivos y cambios hasta ahora",
+        "codeContext": "Usa /context para ver cuánto ocupa el contexto del agente",
+        "codeGoal": "Usa /goal para que el agente siga hasta cumplir una condición",
+        "codeStop": "Usa /stop para parar el turno actual del agente",
+        "codeNew": "Usa /new para empezar otra tarea mientras esta sigue",
+        "codeExport": "Usa /export para descargar la transcripción de la sesión"
     }
 }

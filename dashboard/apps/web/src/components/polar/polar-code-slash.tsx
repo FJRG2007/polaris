@@ -21,6 +21,7 @@ import {
     History,
     ListTodo,
     LogOut,
+    MessageCircleQuestion,
     Brain,
     Minimize2,
     Pencil,
@@ -69,6 +70,7 @@ const COMMAND_ICONS: Record<CodeCommand, SuggestionListItem["icon"]> = {
     plan: ListTodo,
     simplify: Scissors,
     copy: ClipboardCopy,
+    btw: MessageCircleQuestion,
     exit: LogOut
 };
 

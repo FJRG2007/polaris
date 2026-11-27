@@ -56,6 +56,7 @@ import { CodeView } from "@/components/json-view";
 import { Work } from "@/components/polar/elements/work";
 import { Shimmer } from "@/components/polar/elements/shimmer";
 import { BusyVerb } from "@/components/polar/elements/busy-verb";
+import { BusyTip } from "@/components/polar/elements/busy-tip";
 import { CodeBootLine } from "@/components/polar/polar-code-boot";
 import { ClientMessages } from "@/components/i18n/client-namespaces";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
@@ -1849,6 +1850,8 @@ function CodeThread({
         if (command === "goal") return goalCommand(rest);
         if (command === "copy") return copyAnswer(rest);
         if (command === "exit") return endSession();
+        // The CLI holds this conversation: a side question would be a turn in it.
+        if (command === "btw") return setInfo(t("slash.code.btwHere"));
         if (command === "memory") {
             if (!thread?.view.repoFullName) return setInfo(t("slash.code.memoryNone"));
             return setMemoryOpen(true);
@@ -2522,9 +2525,12 @@ function CodeThread({
                         {indicator && !draft ? (
                             <div className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
                                 <ThinkingOrb state="solving" size={20} decorative />
-                                <Shimmer>
-                                    <BusyVerb />
-                                </Shimmer>
+                                <div className="flex min-w-0 flex-col">
+                                    <Shimmer>
+                                        <BusyVerb />
+                                    </Shimmer>
+                                    <BusyTip surface="code" />
+                                </div>
                             </div>
                         ) : null}
                         {thread.entries.length === 0 && live ? (
