@@ -3081,7 +3081,13 @@ impl TerminalView {
             let start = blocks.len().saturating_sub(2);
             blocks[start..]
                 .iter()
-                .map(|block| block.contents_to_string())
+                .map(|block| {
+                    let command = block.command_to_string();
+                    let output = block.output_to_string();
+                    format!("{}\n{}", command.trim_end(), output.trim_end())
+                        .trim()
+                        .to_owned()
+                })
                 .filter(|text| !text.is_empty())
                 .collect::<Vec<_>>()
                 .join("\n")
