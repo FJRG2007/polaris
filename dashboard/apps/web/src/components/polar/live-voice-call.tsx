@@ -210,7 +210,7 @@ export function LiveVoiceCall(props: LiveVoiceCallProps) {
     if (!link || permission !== "granted") {
         return (
             <LiveShell>
-                <VoiceOrb state="idle" level={() => 0} className="size-20 sm:size-24" />
+                <VoiceOrb state="muted" level={() => 0} className="size-20 sm:size-24" />
                 {permission === "ask" ? (
                     <p className="max-w-full break-words text-center text-sm text-foreground">{t("voice.live.askMic")}</p>
                 ) : null}
