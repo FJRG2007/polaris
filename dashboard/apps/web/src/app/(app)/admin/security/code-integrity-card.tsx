@@ -8,7 +8,7 @@
  */
 
 import { useState } from "react";
-import { Badge, Button, Card, CardBody } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn, settingType } from "@polaris/ui";
 import { AfterPaint } from "@/components/after-paint";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -67,13 +67,13 @@ function CodeIntegrityResult({ initial }: { initial: SelfCheck }) {
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">{t("security.integrity.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("security.integrity.hint")}</p>
+                        <p className={settingType.hint}>{t("security.integrity.hint")}</p>
                     </div>
                     {badge}
                 </div>
-                <p className="text-sm">{detail}</p>
+                <p className={settingType.body}>{detail}</p>
                 {verdict.kind === "changed" ? (
-                    <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    <ul className={cn(settingType.hint, "flex flex-col gap-1")}>
                         {verdict.paths.slice(0, 10).map((path) => (
                             <li key={path} className="truncate font-mono" title={path}>
                                 {path}
@@ -85,7 +85,7 @@ function CodeIntegrityResult({ initial }: { initial: SelfCheck }) {
                     </ul>
                 ) : null}
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("security.integrity.checked")} <RelativeTime iso={check.checkedAt} />
                     </span>
                     <Button size="sm" variant="secondary" onClick={again} disabled={busy} aria-busy={busy}>

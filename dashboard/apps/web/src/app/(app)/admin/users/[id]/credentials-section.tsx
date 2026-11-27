@@ -17,7 +17,7 @@ import type { DirectoryUser } from "@/lib/user-admin-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CredentialOptions } from "@/lib/admin-credentials-service";
-import { Button, Card, CardBody, Checkbox, CopyButton, Input, settingType } from "@polaris/ui";
+import { Button, Card, CardBody, Checkbox, cn, CopyButton, Input, settingType } from "@polaris/ui";
 import { accountEmailSchema, temporaryPasswordSchema } from "./credential-schemas";
 import {
     changeAccountEmailAction,
@@ -131,7 +131,7 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
         return (
             <Card>
                 <CardBody>
-                    <p className="text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t("usersDetail.credentials.self")}
                     </p>
                 </CardBody>
@@ -147,17 +147,17 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                         <h2 className="text-sm font-medium">
                             {t("usersDetail.credentials.title")}
                         </h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("usersDetail.credentials.hint", { name: user.name })}
                         </p>
                     </div>
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <p className="flex items-center gap-1.5 text-sm">
+                            <p className={cn(settingType.body, "flex items-center gap-1.5")}>
                                 <Link2 className="size-4 shrink-0 text-muted-foreground" />
                                 {t("usersDetail.credentials.link.title")}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {t("usersDetail.credentials.link.hint")}
                             </p>
                         </div>
@@ -176,7 +176,7 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                                     label={t("usersDetail.credentials.link.copy")}
                                 />
                             </div>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {t("usersDetail.credentials.link.once", {
                                     time: format.dateTime(link.expiresAt)
                                 })}
@@ -185,11 +185,11 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                     ) : null}
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <p className="flex items-center gap-1.5 text-sm">
+                            <p className={cn(settingType.body, "flex items-center gap-1.5")}>
                                 <Mail className="size-4 shrink-0 text-muted-foreground" />
                                 {t("usersDetail.credentials.mail.title")}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {mailReason ??
                                     t("usersDetail.credentials.mail.hint", { email: user.email })}
                             </p>
@@ -205,11 +205,11 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                         </Button>
                     </div>
                     <form onSubmit={onTemporary} noValidate className="flex flex-col gap-2">
-                        <p className="flex items-center gap-1.5 text-sm">
+                        <p className={cn(settingType.body, "flex items-center gap-1.5")}>
                             <KeyRound className="size-4 shrink-0 text-muted-foreground" />
                             {t("usersDetail.credentials.temporary.title")}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("usersDetail.credentials.temporary.hint")}
                         </p>
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -263,7 +263,7 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                         <h2 className="text-sm font-medium">
                             {t("usersDetail.credentials.email.title")}
                         </h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("usersDetail.credentials.email.hint", { email: user.email })}
                         </p>
                     </div>
@@ -292,14 +292,14 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                             {t("usersDetail.credentials.email.invalid")}
                         </p>
                     ) : null}
-                    <label className="flex items-center gap-2 text-sm">
+                    <label className={cn(settingType.body, "flex items-center gap-2")}>
                         <Checkbox
                             checked={verified}
                             onChange={(event) => setVerified(event.target.checked)}
                         />
                         {t("usersDetail.credentials.email.verified")}
                     </label>
-                    <label className="flex items-center gap-2 text-sm">
+                    <label className={cn(settingType.body, "flex items-center gap-2")}>
                         <Checkbox
                             checked={keepOld}
                             onChange={(event) => setKeepOld(event.target.checked)}
@@ -308,8 +308,8 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                     </label>
                 </form>
 
-                {notice ? <p className="text-sm text-success">{notice}</p> : null}
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {notice ? <p className={cn(settingType.body, "text-success")}>{notice}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
             <StepUpDialog
                 open={waiting !== null}

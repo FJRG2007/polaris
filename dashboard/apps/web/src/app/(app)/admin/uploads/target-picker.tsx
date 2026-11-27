@@ -18,7 +18,7 @@
  * rather than an inconsistency.
  */
 
-import { Select } from "@polaris/ui";
+import { cn, Select, settingType } from "@polaris/ui";
 import { HardDrive, Server } from "lucide-react";
 import type { TargetOption, UploadTarget } from "@/lib/storage-target";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -35,8 +35,8 @@ export function ResolvedTarget({ resolved, automatic }: { resolved: UploadTarget
                 {resolved.id === LOCAL ? <Server className="size-5" /> : <HardDrive className="size-5" />}
             </span>
             <div className="min-w-0">
-                <p className="text-sm font-medium">{t("uploads.picker.keptOn", { name: resolved.name })}</p>
-                <p className="text-xs text-muted-foreground">{resolved.automatic ? automatic : t("uploads.picker.chosenHere")}</p>
+                <p className={cn(settingType.body, "font-medium")}>{t("uploads.picker.keptOn", { name: resolved.name })}</p>
+                <p className={settingType.hint}>{resolved.automatic ? automatic : t("uploads.picker.chosenHere")}</p>
             </div>
         </div>
     );
@@ -65,7 +65,7 @@ export function TargetPicker({
     const t = useTranslations("admin");
     return (
         <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">{label}</span>
+            <span className={cn(settingType.body, "font-medium")}>{label}</span>
             <Select
                 value={value}
                 onValueChange={onChange}
@@ -81,7 +81,7 @@ export function TargetPicker({
                 aria-label={label}
                 className="w-full"
             />
-            <span className="text-xs text-muted-foreground">{hint}</span>
+            <span className={settingType.hint}>{hint}</span>
         </label>
     );
 }

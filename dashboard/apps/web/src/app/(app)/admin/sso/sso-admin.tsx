@@ -18,6 +18,7 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    cn,
     ConfirmDeleteDialog,
     CopyButton,
     Input,
@@ -118,7 +119,7 @@ function Field({
     children: React.ReactNode;
 }) {
     return (
-        <label className="flex min-w-0 flex-col gap-1 text-sm">
+        <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
             <span className="font-medium">{label}</span>
             {children}
             {error ? <span className={settingType.error}>{error}</span> : null}
@@ -129,10 +130,10 @@ function Field({
 function Copyable({ label, value }: { label: string; value: string }) {
     return (
         <div className="flex min-w-0 flex-col gap-1">
-            <span className="text-xs text-muted-foreground">{label}</span>
+            <span className={settingType.hint}>{label}</span>
             <div className="flex min-w-0 items-center gap-2">
                 <code
-                    className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs"
+                    className={cn(settingType.small, "min-w-0 flex-1 truncate rounded bg-muted px-2 py-1")}
                     title={value}
                 >
                     {value}
@@ -215,7 +216,7 @@ function ProviderForm({
                     </Field>
                 </div>
                 <div className="flex flex-col gap-2">
-                    <span className="text-sm font-medium">{t("sso.form.source")}</span>
+                    <span className={cn(settingType.body, "font-medium")}>{t("sso.form.source")}</span>
                     <SegmentedControl
                         aria-label={t("sso.form.source")}
                         value={draft.kind}
@@ -235,11 +236,11 @@ function ProviderForm({
                         ]}
                     />
                     {provider && draft.kind !== "current" ? (
-                        <p className="text-xs text-muted-foreground">{t("sso.form.replaceHint")}</p>
+                        <p className={settingType.hint}>{t("sso.form.replaceHint")}</p>
                     ) : null}
                 </div>
                 {draft.kind === "current" ? (
-                    <p className="min-w-0 break-all text-xs text-muted-foreground">
+                    <p className={cn(settingType.hint, "min-w-0 break-all")}>
                         {provider?.entityId}
                     </p>
                 ) : draft.kind === "metadataUrl" ? (
@@ -302,7 +303,7 @@ function ProviderForm({
                     </div>
                 )}
                 <div className="flex flex-col gap-2">
-                    <span className="text-sm font-medium">{t("sso.form.mapping")}</span>
+                    <span className={cn(settingType.body, "font-medium")}>{t("sso.form.mapping")}</span>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field
                             label={`${t("sso.form.mapEmail")} *`}
@@ -344,8 +345,8 @@ function ProviderForm({
                 </div>
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("sso.form.allowSignUp")}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={cn(settingType.body, "font-medium")}>{t("sso.form.allowSignUp")}</p>
+                        <p className={settingType.hint}>
                             {t("sso.form.allowSignUpHint")}
                         </p>
                     </div>
@@ -357,8 +358,8 @@ function ProviderForm({
                 </div>
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("sso.form.enforced")}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={cn(settingType.body, "font-medium")}>{t("sso.form.enforced")}</p>
+                        <p className={settingType.hint}>
                             {t("sso.form.enforcedHint")}
                         </p>
                     </div>
@@ -368,7 +369,7 @@ function ProviderForm({
                         aria-label={t("sso.form.enforced")}
                     />
                 </div>
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 <div className="flex flex-wrap justify-end gap-2">
                     <Button
                         type="button"
@@ -435,7 +436,7 @@ function ProviderCard({
                 </div>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">{provider.domains.join(", ")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{provider.domains.join(", ")}</p>
                 <div className="grid gap-3">
                     <Copyable
                         label={t("sso.card.spEntityId")}
@@ -452,7 +453,7 @@ function ProviderCard({
                 </div>
                 {provider.domainVerified ? null : (
                     <div className="flex flex-col gap-2">
-                        <p className="text-sm">{t("sso.card.recordsIntro")}</p>
+                        <p className={settingType.body}>{t("sso.card.recordsIntro")}</p>
                         {provider.records.map((record) => (
                             <div key={record.name} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 <Copyable label={t("sso.card.recordName")} value={record.name} />
@@ -462,7 +463,7 @@ function ProviderCard({
                     </div>
                 )}
                 {checks ? (
-                    <ul className="flex flex-col gap-1 text-sm">
+                    <ul className={cn(settingType.body, "flex flex-col gap-1")}>
                         {checks.map((entry, index) => (
                             <li
                                 key={`${entry.key}-${index}`}
@@ -488,7 +489,7 @@ function ProviderCard({
                         ))}
                     </ul>
                 ) : null}
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 <div className="flex flex-wrap justify-end gap-2">
                     <Button type="button" variant="ghost" onClick={() => setConfirming(true)}>
                         {t("sso.card.remove")}
@@ -538,7 +539,7 @@ export function SsoAdmin({ providers: initial }: { providers: SamlProviderView[]
     return (
         <div className="flex max-w-3xl flex-col gap-3">
             {providers.length === 0 && editing !== "new" ? (
-                <p className="text-sm text-muted-foreground">{t("sso.empty")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("sso.empty")}</p>
             ) : null}
             {providers.map((provider) =>
                 editing === provider.providerId ? (

@@ -17,7 +17,7 @@ import { useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { saveInstanceSecurityAction } from "./actions";
-import { Button, Card, CardBody, Select, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Select, settingType, Switch } from "@polaris/ui";
 import { Feedback } from "@/app/(app)/account/security/setting-card";
 import { RiskAcceptanceDialog } from "@/components/risk-acceptance-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -111,7 +111,7 @@ export function SecurityAdmin({
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <h2 className="text-sm font-medium">{t("security.require.title")}</h2>
-                            <p className="text-xs text-muted-foreground">{t("security.require.hint")}</p>
+                            <p className={settingType.hint}>{t("security.require.hint")}</p>
                         </div>
                         <Switch
                             checked={required}
@@ -130,10 +130,10 @@ export function SecurityAdmin({
                         />
                     </div>
                     {!required ? (
-                        <p className="text-xs text-muted-foreground">{t("security.require.off")}</p>
+                        <p className={settingType.hint}>{t("security.require.off")}</p>
                     ) : null}
                     {!policy.requireSecondFactor ? (
-                        <p className="flex items-center gap-1.5 text-xs text-warning-ink">
+                        <p className={cn(settingType.small, "flex items-center gap-1.5 text-warning-ink")}>
                             <ShieldAlert className="size-3.5 shrink-0" aria-hidden />
                             {t("security.require.riskStanding")}
                         </p>
@@ -145,7 +145,7 @@ export function SecurityAdmin({
                 <CardBody className="flex flex-col gap-3">
                     <div>
                         <h2 className="text-sm font-medium">{t("security.factors.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("security.factors.hint")}</p>
+                        <p className={settingType.hint}>{t("security.factors.hint")}</p>
                     </div>
                     {SECOND_FACTOR_ENROLLMENTS.map((factor) => {
                         const label = t(`security.factors.${factor}.label`);
@@ -154,13 +154,13 @@ export function SecurityAdmin({
                         return (
                             <div key={factor} className="flex items-start justify-between gap-4 border-t border-border pt-3 first:border-0 first:pt-0">
                                 <div className="min-w-0">
-                                    <p className="text-sm">{label}</p>
-                                    <p className="text-xs text-muted-foreground">{t(`security.factors.${factor}.description`)}</p>
+                                    <p className={settingType.body}>{label}</p>
+                                    <p className={settingType.hint}>{t(`security.factors.${factor}.description`)}</p>
                                     {fixed ? (
-                                        <p className="mt-1 text-xs text-muted-foreground">{t("security.factors.fixed")}</p>
+                                        <p className={cn(settingType.hint, "mt-1")}>{t("security.factors.fixed")}</p>
                                     ) : null}
                                     {unavailable ? (
-                                        <p className="mt-1 text-xs text-danger">{t("security.factors.noMail")}</p>
+                                        <p className={cn(settingType.error, "mt-1")}>{t("security.factors.noMail")}</p>
                                     ) : null}
                                 </div>
                                 <Switch
@@ -180,7 +180,7 @@ export function SecurityAdmin({
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <h2 className="text-sm font-medium">{t("security.connection.title")}</h2>
-                            <p className="text-xs text-muted-foreground">{t("security.connection.hint")}</p>
+                            <p className={settingType.hint}>{t("security.connection.hint")}</p>
                         </div>
                         <Switch
                             checked={connectionChallenge}
@@ -192,7 +192,7 @@ export function SecurityAdmin({
                         />
                     </div>
                     {!connectionChallenge ? (
-                        <p className="text-xs text-muted-foreground">{t("security.connection.off")}</p>
+                        <p className={settingType.hint}>{t("security.connection.off")}</p>
                     ) : null}
                 </CardBody>
             </Card>
@@ -202,7 +202,7 @@ export function SecurityAdmin({
                     <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                             <h2 className="text-sm font-medium">{t("security.approval.title")}</h2>
-                            <p className="text-xs text-muted-foreground">{t("security.approval.hint")}</p>
+                            <p className={settingType.hint}>{t("security.approval.hint")}</p>
                         </div>
                         <Switch
                             checked={approval}
@@ -214,7 +214,7 @@ export function SecurityAdmin({
                         />
                     </div>
                     {!approval ? (
-                        <p className="text-xs text-muted-foreground">{t("security.approval.off")}</p>
+                        <p className={settingType.hint}>{t("security.approval.off")}</p>
                     ) : null}
                 </CardBody>
             </Card>
@@ -224,7 +224,7 @@ export function SecurityAdmin({
                     <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                             <h2 className="text-sm font-medium">{t("security.phone.title")}</h2>
-                            <p className="text-xs text-muted-foreground">{t("security.phone.hint")}</p>
+                            <p className={settingType.hint}>{t("security.phone.hint")}</p>
                         </div>
                         <Switch
                             checked={phone}
@@ -238,7 +238,7 @@ export function SecurityAdmin({
                     </div>
                     {!phoneReady ? (
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                            <p className="min-w-0 text-xs text-danger">{t("security.phone.noChannel")}</p>
+                            <p className={cn(settingType.error, "min-w-0")}>{t("security.phone.noChannel")}</p>
                             <Button asChild variant="outline" size="sm" className="w-fit shrink-0">
                                 <Link href={MESSAGING_PATH}>{t("security.phone.fix")}</Link>
                             </Button>
@@ -252,7 +252,7 @@ export function SecurityAdmin({
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                         <div className="min-w-0">
                             <h2 className="text-sm font-medium">{t("security.phishing.title")}</h2>
-                            <p className="text-xs text-muted-foreground">{t("security.phishing.hint")}</p>
+                            <p className={settingType.hint}>{t("security.phishing.hint")}</p>
                         </div>
                         <Select
                             className="sm:w-40 sm:shrink-0"

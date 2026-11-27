@@ -14,7 +14,7 @@
 import { ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { DateInput, Select, settingType, Skeleton } from "@polaris/ui";
+import { cn, DateInput, Select, settingType, Skeleton } from "@polaris/ui";
 import { RiskAcceptanceDialog } from "@/components/risk-acceptance-dialog";
 import {
     DEFAULT_SECURITY_DAILY_AT,
@@ -116,13 +116,13 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
     return (
         <div className="flex flex-col gap-2 border-t border-border pt-3">
             <div>
-                <p className="text-sm">{t("settings.security.title")}</p>
-                <p className="text-xs text-muted-foreground">{t("settings.security.description")}</p>
+                <p className={settingType.body}>{t("settings.security.title")}</p>
+                <p className={settingType.hint}>{t("settings.security.description")}</p>
             </div>
             <div className="flex flex-col gap-2">
                 {SECURITY_SEVERITIES.map((severity) => (
                     <div key={severity} className="flex min-w-0 flex-wrap items-center gap-2">
-                        <span className="w-20 min-w-0 truncate text-sm">
+                        <span className={cn(settingType.body, "w-20 min-w-0 truncate")}>
                             {t(`settings.security.severity.${severity}`)}
                         </span>
                         {policy ? (
@@ -161,7 +161,7 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
                 ))}
             </div>
             {policy?.riskAccepted ? (
-                <p className="flex items-center gap-1.5 text-xs text-warning-ink">
+                <p className={cn(settingType.small, "flex items-center gap-1.5 text-warning-ink")}>
                     <ShieldAlert className="size-3.5 shrink-0" aria-hidden />
                     {t("settings.security.riskStanding")}
                 </p>

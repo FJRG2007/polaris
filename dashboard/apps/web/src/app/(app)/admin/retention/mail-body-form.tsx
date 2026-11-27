@@ -18,7 +18,7 @@
 import { runAction } from "@/lib/run-action";
 import { MAIL_BODY_KEEP_MAX } from "@polaris/core";
 import { useEffect, useState, useTransition } from "react";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Input, settingType } from "@polaris/ui";
 import { saveMailBodyKeepAction } from "./actions";
 import { writeSnapshot } from "@/lib/snapshot-cache";
 import { useKeptSnapshot } from "@/components/use-live-resource";
@@ -92,12 +92,12 @@ export function MailBodyForm({ kept }: { kept: number }) {
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("retention.mail.title")}</h2>
-                    <p className="max-w-xl text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "max-w-xl text-muted-foreground")}>
                         {t("retention.mail.intro")}
                     </p>
                 </div>
 
-                <label className="flex max-w-[12rem] flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex max-w-[12rem] flex-col gap-1")}>
                     <span className="font-medium">
                         {t("retention.mail.label")} <span aria-hidden="true">*</span>
                     </span>
@@ -111,18 +111,18 @@ export function MailBodyForm({ kept }: { kept: number }) {
                         aria-invalid={value.trim() !== "" && !valid}
                         onChange={(event) => setValue(event.target.value)}
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {parsed === 0 && valid
                             ? t("retention.mail.zeroHint")
                             : t("retention.mail.hint")}
                     </span>
                 </label>
 
-                <p className="text-sm text-muted-foreground">{heldLine(t, held, countFailed)}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{heldLine(t, held, countFailed)}</p>
 
-                {error && <p className="text-sm text-danger">{error}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
                 {saved && !dirty && (
-                    <p className="text-sm text-muted-foreground">{t("retention.mail.saved")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("retention.mail.saved")}</p>
                 )}
 
                 <Button

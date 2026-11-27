@@ -10,7 +10,7 @@
 import { useState, useTransition } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
-import { Button, Card, CardBody, settingType, useToast } from "@polaris/ui";
+import { Button, Card, CardBody, cn, settingType, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { MigratedConversation } from "@/lib/chat/e2ee/legacy-migration";
 import { migrateChatAgainAction, rollBackChatMigrationAction } from "./chat-migration-actions";
@@ -63,11 +63,11 @@ export function ChatMigrationCard({ progress, conversations }: { progress: Progr
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("security.chatMigration.title")}</h2>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("security.chatMigration.summary", { total, cut: progress.cut.toLocaleString(), shown: total.toLocaleString() })}
                     </p>
                     {progress.waitingOnBackup && progress.remaining > 0 ? (
-                        <p className="text-xs text-warning">{t("security.chatMigration.waitingOnBackup")}</p>
+                        <p className={cn(settingType.small, "text-warning")}>{t("security.chatMigration.waitingOnBackup")}</p>
                     ) : null}
                     {progress.failed > 0 ? (
                         <p className={settingType.error}>{t("security.chatMigration.failed", { count: progress.failed, shown: progress.failed.toLocaleString() })}</p>
@@ -78,10 +78,10 @@ export function ChatMigrationCard({ progress, conversations }: { progress: Progr
                         {rows.map((row) => (
                             <li key={row.channelId} className="flex items-center gap-3 py-2">
                                 <div className="flex min-w-0 flex-1 flex-col">
-                                    <span className="truncate text-sm" title={label(row)}>
+                                    <span className={cn(settingType.body, "truncate")} title={label(row)}>
                                         {label(row)}
                                     </span>
-                                    <span className="truncate text-xs text-muted-foreground">
+                                    <span className={cn(settingType.hint, "truncate")}>
                                         {row.state === "cut"
                                             ? t("security.chatMigration.cutAt", { when: row.cutAt ? format.dateTime(row.cutAt) : "" })
                                             : row.state === "failed"

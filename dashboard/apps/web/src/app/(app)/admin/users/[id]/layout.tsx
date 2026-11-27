@@ -5,6 +5,7 @@
  * address and the badges come from the read the open section makes.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -33,7 +34,7 @@ export default async function UserRecordLayout({
                 back out of a record they opened from a list. */}
             <Link data-swipe-back
                 href="/admin/users"
-                className="mb-2 flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                className={cn(settingType.body, "mb-2 flex w-fit items-center gap-1 text-muted-foreground transition-colors hover:text-foreground")}
             >
                 <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />
                 {t("usersDetail.back")}

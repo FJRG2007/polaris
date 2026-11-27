@@ -12,7 +12,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useLiveRead } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, EmptyState, Skeleton } from "@polaris/ui";
+import { Button, Card, CardBody, cn, EmptyState, settingType, Skeleton } from "@polaris/ui";
 import type { ImageFindingRow, OwnImage } from "@/lib/security/image-findings";
 import {
     ImageScanFindings,
@@ -150,7 +150,7 @@ export function OwnImagesView() {
             <CardBody className="flex flex-col gap-1">
                 {message && (
                     <p
-                        className={`text-xs ${message.error ? "text-danger-ink" : "text-muted-foreground"}`}
+                        className={cn(settingType.small, message.error ? "text-danger-ink" : "text-muted-foreground")}
                         role="status"
                     >
                         {message.text}
@@ -188,7 +188,7 @@ export function OwnImagesView() {
                                                   {image.ref}
                                               </span>
                                               <span
-                                                  className="block truncate text-xs text-muted-foreground"
+                                                  className={cn(settingType.hint, "block truncate")}
                                                   title={[image.server, ...image.users].filter(Boolean).join(", ")}
                                               >
                                                   {image.server ? `${t("onServer", { server: image.server })} - ` : null}

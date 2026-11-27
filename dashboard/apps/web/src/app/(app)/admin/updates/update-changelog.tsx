@@ -14,7 +14,7 @@
  */
 
 import { installedChangelogAction, updateChangelogAction } from "./actions";
-import { AppLogo, Badge, Skeleton, cn, hasAppLogo } from "@polaris/ui";
+import { AppLogo, Badge, Skeleton, cn, hasAppLogo, settingType } from "@polaris/ui";
 import { aliasedAppId } from "@/lib/app-aliases";
 import type { ChangelogEntry } from "@polaris/core";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -237,7 +237,7 @@ export function UpdateChangelog({
             <h3 className="text-sm font-medium text-foreground">
                 {installed ? t("settings.changelog.installedTitle") : t("settings.changelog.title")}
             </h3>
-            <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+            <span className={cn(settingType.hint, "flex min-w-0 items-center gap-1")}>
                 {installed ? t("settings.changelog.installedLabel") : t("settings.changelog.availableLabel")}
                 {from ? (
                     <>
@@ -290,7 +290,7 @@ export function UpdateChangelog({
         return (
             <section {...sectionProps} className="flex flex-col gap-1 border-t border-border pt-3">
                 {fold}
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {installed && !read?.from
                         ? t("settings.changelog.installedUnknown")
                         : !changelog
@@ -326,7 +326,7 @@ export function UpdateChangelog({
             </div>
 
             {installed ? null : (
-                <p className="text-xs text-muted-foreground">{t("settings.changelog.availableHint")}</p>
+                <p className={settingType.hint}>{t("settings.changelog.availableHint")}</p>
             )}
 
             <div className="flex flex-col divide-y divide-border rounded-md border border-border">
@@ -341,7 +341,7 @@ export function UpdateChangelog({
                         <div key={group} className={cn("min-w-0", security && "bg-danger-soft")}>
                             <button
                                 type="button"
-                                className="flex h-8 w-full min-w-0 items-center gap-1.5 px-2.5 text-start text-[0.6875rem] font-medium uppercase tracking-wide text-foreground-subtle transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                className={cn(settingType.body, "flex h-8 w-full min-w-0 items-center gap-1.5 px-2.5 text-start font-medium uppercase tracking-wide text-foreground-subtle transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}
                                 aria-expanded={isOpen}
                                 aria-controls={listId}
                                 onClick={() => setExpanded((prev) => ({ ...prev, [group]: !isOpen }))}
@@ -372,7 +372,7 @@ export function UpdateChangelog({
                                     {entries.length > FOLDED ? (
                                         <button
                                             type="button"
-                                            className="ms-3 mt-0.5 sm:ms-8 text-xs text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            className={cn(settingType.small, "ms-3 mt-0.5 sm:ms-8 text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}
                                             onClick={() => setShowAll((prev) => ({ ...prev, [group]: !all }))}
                                         >
                                             {all
@@ -388,7 +388,7 @@ export function UpdateChangelog({
             </div>
 
             {changelog.more > 0 || changelog.hidden + elsewhere > 0 ? (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t.rich("settings.changelog.rest", {
                         more: changelog.more,
                         hidden: changelog.hidden + elsewhere,
@@ -414,7 +414,7 @@ export function UpdateChangelog({
 function ChangeRow({ entry, repo }: { entry: ChangelogEntry; repo: string }) {
     const t = useTranslations("admin");
     return (
-        <li className="flex h-7 min-w-0 items-center gap-2 ps-3 pe-2.5 sm:ps-8 text-[0.8125rem]">
+        <li className={cn(settingType.body, "flex h-7 min-w-0 items-center gap-2 ps-3 pe-2.5 sm:ps-8")}>
             {entry.security ? (
                 <Badge variant={SEVERITY_BADGE[entry.security.severity]}>
                     {t(`settings.security.severity.${entry.security.severity}`)}
@@ -427,7 +427,7 @@ function ChangeRow({ entry, repo }: { entry: ChangelogEntry; repo: string }) {
                 </span>
             ) : entry.scope ? (
                 <span
-                    className="max-w-[6rem] shrink-0 truncate sm:max-w-[9rem] rounded bg-muted px-1.5 text-[0.6875rem] leading-[18px] text-muted-foreground"
+                    className={cn(settingType.small, "max-w-[6rem] shrink-0 truncate sm:max-w-[9rem] rounded bg-muted px-1.5 leading-[18px] text-muted-foreground")}
                     title={scopeLabel(entry.scope)}
                 >
                     {scopeLabel(entry.scope)}

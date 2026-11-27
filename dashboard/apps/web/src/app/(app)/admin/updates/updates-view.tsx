@@ -51,7 +51,8 @@ import {
     Select,
     Skeleton,
     DateInput,
-    settingType
+    settingType,
+    cn
 } from "@polaris/ui";
 import {
     Bug,
@@ -764,7 +765,7 @@ export function UpdatesView({
                 <CardBody className="flex flex-col gap-3">
                     {/* A running update outranks the last check: reporting "Up to date"
                         while one is in flight is the card contradicting itself. */}
-                    <div className="flex items-center gap-2 text-sm">
+                    <div className={cn(settingType.body, "flex items-center gap-2")}>
                         {updating ? (
                             <>
                                 <RefreshCw className="size-4 animate-spin text-primary" />
@@ -846,7 +847,7 @@ export function UpdatesView({
                         <p className={settingType.error}>{t("settings.updates.checkFailed")}</p>
                     ) : null}
 
-                    <dl className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm sm:grid-cols-[max-content_minmax(0,1fr)] sm:gap-x-8">
+                    <dl className={cn(settingType.body, "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-2 sm:grid-cols-[max-content_minmax(0,1fr)] sm:gap-x-8")}>
                         <Row
                             label={t("settings.updates.runningBuild")}
                             value={status?.current ?? null}
@@ -875,7 +876,7 @@ export function UpdatesView({
 
                     <div className="flex flex-col gap-2 border-t border-border pt-3">
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm">{t("settings.source.label")}</span>
+                            <span className={settingType.body}>{t("settings.source.label")}</span>
                             <Select
                                 aria-label={t("settings.source.ariaLabel")}
                                 value={source}
@@ -885,12 +886,12 @@ export function UpdatesView({
                                 disabled={updating}
                             />
                         </div>
-                        <p className="text-xs text-muted-foreground">{sourceHint(source, t)}</p>
+                        <p className={settingType.hint}>{sourceHint(source, t)}</p>
                     </div>
 
                     <div className="flex flex-col gap-2 border-t border-border pt-3">
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm">{t("settings.schedule.label")}</span>
+                            <span className={settingType.body}>{t("settings.schedule.label")}</span>
                             <Select
                                 aria-label={t("settings.schedule.ariaLabel")}
                                 value={policy.mode}
@@ -919,7 +920,7 @@ export function UpdatesView({
                                 />
                             ) : null}
                         </div>
-                        <p className="text-xs text-muted-foreground">{scheduleHint(policy, t, quietHour, canInstall)}</p>
+                        <p className={settingType.hint}>{scheduleHint(policy, t, quietHour, canInstall)}</p>
                         {policyError ? <p className={settingType.error}>{policyError}</p> : null}
                     </div>
 
@@ -937,7 +938,7 @@ export function UpdatesView({
                     {status?.current ? <UpdateChangelog kind="installed" head={status.current} checkedAt={status.checkedAt} /> : null}
 
                     {available || updating || logText ? (
-                        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                        <div className={cn(settingType.small, "flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3 text-muted-foreground")}>
                             {available ? (
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <span>
@@ -1040,7 +1041,7 @@ function OwnVulnerabilitiesLine({ available }: { available: boolean }) {
     // with what an older image under its name had.
     const failed = found.failed ?? 0;
     return (
-        <div className="flex items-start gap-2 text-sm">
+        <div className={cn(settingType.body, "flex items-start gap-2")}>
             <ShieldAlert
                 className={`mt-0.5 size-4 shrink-0 ${serious ? "text-danger" : failed > 0 ? "text-warning" : "text-muted-foreground"}`}
                 aria-hidden

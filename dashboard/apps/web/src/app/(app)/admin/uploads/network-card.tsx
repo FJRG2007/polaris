@@ -37,13 +37,13 @@ function Outcome({
     switch (outcome.kind) {
         case "answering":
             return (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("uploads.network.answering", { address: outcome.address })}
                 </p>
             );
         case "followed":
             return (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {outcome.mac
                         ? t("uploads.network.followed", {
                               from: outcome.from,
@@ -76,7 +76,7 @@ function Outcome({
         case "candidates":
             return (
                 <div className="flex flex-col gap-1.5">
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("uploads.network.candidates")}
                     </p>
                     <ul className="flex flex-col gap-1">
@@ -93,7 +93,7 @@ function Outcome({
                                         {candidate.address}
                                     </span>
                                     <span
-                                        className="truncate text-xs text-muted-foreground"
+                                        className={cn(settingType.hint, "truncate")}
                                         title={[candidate.label, candidate.mac]
                                             .filter(Boolean)
                                             .join(" - ")}
@@ -186,10 +186,10 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
         <li className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0">
             <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="truncate text-sm font-medium" title={view.name}>
+                    <span className={cn(settingType.body, "truncate font-medium")} title={view.name}>
                         {view.name}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {known ? (
                             <>
                                 {known.label && known.mac
@@ -230,7 +230,7 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
             </div>
 
             {searching ? (
-                <p className="text-xs text-muted-foreground">{t("uploads.network.searching")}</p>
+                <p className={settingType.hint}>{t("uploads.network.searching")}</p>
             ) : view.last ? (
                 <Outcome
                     outcome={view.last.outcome}
@@ -240,7 +240,7 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
             ) : null}
 
             <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium">{t("uploads.network.address")}</span>
+                <span className={cn(settingType.body, "font-medium")}>{t("uploads.network.address")}</span>
                 <div className="flex items-start gap-2">
                     <Input
                         className="max-w-48 font-mono"
@@ -268,7 +268,7 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
                         {t("uploads.network.addressFormat")}
                     </span>
                 ) : (
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("uploads.network.addressHint")}
                     </span>
                 )}
@@ -276,7 +276,7 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
 
             {asking && (
                 <div className="flex flex-col gap-2 rounded-md bg-muted/50 p-3">
-                    <p className="text-xs">
+                    <p className={settingType.small}>
                         {t("uploads.network.unproven", {
                             device: asking.device,
                             address: asking.address,
@@ -304,9 +304,9 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
                 </div>
             )}
 
-            {error && <p className={cn("text-xs text-danger")}>{error}</p>}
+            {error && <p className={cn(settingType.error)}>{error}</p>}
             {saved && !error && (
-                <p className="text-xs text-muted-foreground">{t("uploads.saved")}</p>
+                <p className={settingType.hint}>{t("uploads.saved")}</p>
             )}
         </li>
     );
@@ -319,7 +319,7 @@ export function NetworkStorageCard({ storages }: { storages: WhereaboutsView[] }
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("uploads.network.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("uploads.network.intro")}</p>
+                    <p className={settingType.hint}>{t("uploads.network.intro")}</p>
                 </div>
                 <ul className="flex flex-col divide-y divide-border">
                     {storages.map((storage) => (

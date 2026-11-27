@@ -13,7 +13,17 @@ import type { PublicUrls } from "@/lib/legal/service";
 import { AddressList } from "@/components/address-list";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, useTransition } from "react";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, settingType, Skeleton } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    cn,
+    Input,
+    settingType,
+    Skeleton
+} from "@polaris/ui";
 
 /** The facts that come from the environment, which the server already has when
  *  it renders the page. */
@@ -46,7 +56,7 @@ export function SettingsView({
                 </CardHeader>
                 <CardBody className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-sm text-muted-foreground">
+                        <span className={cn(settingType.body, "text-muted-foreground")}>
                             {t("settings.deployment.reachableAt")}
                         </span>
                         {addresses ? (
@@ -64,7 +74,7 @@ export function SettingsView({
                             </div>
                         )}
                     </div>
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <dl className={cn(settingType.body, "grid grid-cols-2 gap-x-4 gap-y-2")}>
                         <Row
                             label={t("settings.deployment.localHostname")}
                             value={`${deployment.hostname}.local`}
@@ -143,9 +153,9 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
                 <CardTitle>{t("settings.publicPages.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">{t("settings.publicPages.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.publicPages.intro")}</p>
 
-                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                <dl className={cn(settingType.body, "grid grid-cols-[auto_1fr] gap-x-4 gap-y-2")}>
                     <Row
                         label={t("settings.publicPages.home")}
                         value={pages.home}
@@ -163,7 +173,7 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
                     />
                 </dl>
 
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     <span className="font-medium">{t("settings.publicPages.contact")}</span>
                     <div className="flex items-center gap-2">
                         <Input
@@ -177,7 +187,7 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
                             {pending ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("settings.publicPages.contactHint")}
                     </span>
                     {error ? <span className={settingType.error}>{error}</span> : null}

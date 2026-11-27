@@ -41,12 +41,14 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    settingType
 } from "@polaris/ui";
 
 /** The permissions of each area, in the order the areas were declared. */
@@ -161,7 +163,7 @@ function RoleCard({ role }: { role: RoleView }) {
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <CardTitle>{role.name}</CardTitle>
                     {role.isSystem ? <Badge>{t("roles.builtIn")}</Badge> : null}
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {t("roles.peopleCount", { count: role.memberCount })}
                     </span>
                 </div>
@@ -193,7 +195,7 @@ function RoleCard({ role }: { role: RoleView }) {
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 {locked ? (
-                    <p className="text-sm text-muted-foreground">{t("roles.locked")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("roles.locked")}</p>
                 ) : (
                     <>
                         <PermissionGrid
@@ -203,7 +205,7 @@ function RoleCard({ role }: { role: RoleView }) {
                             onChange={setHeld}
                         />
                         <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {shownHeld === 0
                                     ? t("roles.held.none")
                                     : t("roles.held.count", {
@@ -227,7 +229,7 @@ function RoleCard({ role }: { role: RoleView }) {
                         </div>
                     </>
                 )}
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
             {confirmElement}
         </Card>
@@ -304,7 +306,7 @@ function NewRoleDialog({ onOpenChange }: { onOpenChange: (open: boolean) => void
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1">
-                        <label className="text-sm" htmlFor="role-name">
+                        <label className={settingType.body} htmlFor="role-name">
                             {t("roles.create.name")}
                         </label>
                         <Input
@@ -315,7 +317,7 @@ function NewRoleDialog({ onOpenChange }: { onOpenChange: (open: boolean) => void
                         />
                     </div>
                     <PermissionGrid held={held} disabled={busy} onChange={setHeld} />
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             {tc("actions.cancel")}

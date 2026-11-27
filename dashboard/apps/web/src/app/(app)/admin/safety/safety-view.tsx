@@ -25,7 +25,7 @@ import { ShieldAlert, Flag, Check, X } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { ReportContextList } from "@/components/report-context-list";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Button, Card, CardBody, Input, Select, settingType } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn, Input, Select, settingType } from "@polaris/ui";
 import { navigateInApp } from "@/lib/keep-call";
 
 const FILTERS = ["open", "resolved", "dismissed", "all"] as const;
@@ -60,7 +60,7 @@ export function SafetyView({
                 </div>
                 {cases.length === 0 ? (
                     <Card>
-                        <CardBody className="py-8 text-center text-sm text-muted-foreground">
+                        <CardBody className={cn(settingType.body, "py-8 text-center text-muted-foreground")}>
                             {t("safety.empty")}
                         </CardBody>
                     </Card>
@@ -117,7 +117,7 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                         <Flag className="mt-0.5 size-4 shrink-0 text-warning" />
                     )}
                     <div className="min-w-0 flex-1">
-                        <p className="flex flex-wrap items-center gap-1.5 text-sm">
+                        <p className={cn(settingType.body, "flex flex-wrap items-center gap-1.5")}>
                             <span className="font-medium">
                                 {t(`safety.kinds.${entry.kind}`)}
                             </span>
@@ -142,7 +142,7 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                                 </Badge>
                             ) : null}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {entry.reporter
                                 ? t("safety.case.reportedBy", {
                                       name: entry.reporter.name,
@@ -156,11 +156,11 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                 </div>
 
                 {entry.note ? (
-                    <p className="whitespace-pre-wrap break-words rounded-md bg-muted px-3 py-2 text-sm">
+                    <p className={cn(settingType.body, "whitespace-pre-wrap break-words rounded-md bg-muted px-3 py-2")}>
                         {entry.note}
                     </p>
                 ) : (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {lockdown
                             ? t("safety.case.noNoteLockdown")
                             : t("safety.case.noNoteReport")}
@@ -198,7 +198,7 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                         </Button>
                     </div>
                 ) : (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("safety.case.settled", {
                             who: entry.handledBy ? "named" : "nobody",
                             name: entry.handledBy?.name ?? "",
@@ -215,7 +215,7 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                     against them. Saying so here stops somebody looking for a
                     button that should not exist. */}
                 {lockdown && entry.stillLocked ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("safety.case.ownerLifts")}
                     </p>
                 ) : null}

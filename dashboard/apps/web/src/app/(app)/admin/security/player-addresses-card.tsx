@@ -7,7 +7,7 @@
  * it; a save that fails puts the switch back where it was and says so.
  */
 
-import { useOptimisticToggle } from "@polaris/ui";
+import { settingType, useOptimisticToggle } from "@polaris/ui";
 import { useState } from "react";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { savePlayerAddressesSharedAction } from "./actions";
@@ -33,7 +33,7 @@ export function PlayerAddressesCard({ shared }: { shared: boolean }) {
                 <div className="flex items-start justify-between gap-4">
                     <div>
                         <h2 className="text-sm font-medium">{t("security.playerAddresses.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("security.playerAddresses.hint")}</p>
+                        <p className={settingType.hint}>{t("security.playerAddresses.hint")}</p>
                     </div>
                     <Switch
                         checked={on}

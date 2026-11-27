@@ -47,7 +47,8 @@ import {
     Select,
     Skeleton,
     Switch,
-    cn
+    cn,
+    settingType
 } from "@polaris/ui";
 import * as actions from "./actions";
 
@@ -140,7 +141,7 @@ function NasSpace({ id, t, version }: { id: string; t: T; version: number }) {
                 ) : null}
                 <p
                     className={cn(
-                        "mt-1 truncate text-xs",
+                        settingType.small, "mt-1 truncate",
                         failed ? "text-danger-ink" : "text-muted-foreground"
                     )}
                     title={text}
@@ -246,7 +247,7 @@ function AddLocationDialog({
     ) => {
         const shown = touched[key] ? message(errors[key]) : undefined;
         return (
-            <label className="flex min-w-0 flex-col gap-1 text-sm">
+            <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
                 <span className="font-medium">
                     {label}
                     {options.required ? <span aria-hidden> *</span> : null}
@@ -259,7 +260,7 @@ function AddLocationDialog({
                     aria-invalid={shown ? true : undefined}
                     onChange={(event) => set(key, event.target.value)}
                 />
-                {shown ? <span className="text-xs text-danger-ink">{shown}</span> : null}
+                {shown ? <span className={cn(settingType.small, "text-danger-ink")}>{shown}</span> : null}
             </label>
         );
     };
@@ -317,11 +318,11 @@ function AddLocationDialog({
                             })}
                         </div>
                     ) : (
-                        <p className="text-xs text-muted-foreground">{t("storage.form.nfsHint")}</p>
+                        <p className={settingType.hint}>{t("storage.form.nfsHint")}</p>
                     )}
                     {form.protocol === "smb" ? field("domain", t("storage.form.domain")) : null}
                     {error ? (
-                        <p role="alert" className="text-sm text-danger-ink">
+                        <p role="alert" className={cn(settingType.body, "text-danger-ink")}>
                             {error}
                         </p>
                     ) : null}
@@ -405,7 +406,7 @@ function MoveDialog({
                         {t("storage.move.description", { app: volume.appName })}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex flex-col gap-3 text-sm">
+                <div className={cn(settingType.body, "flex flex-col gap-3")}>
                     <p className="text-muted-foreground">
                         {t("storage.move.from", { location: serverName(volume.locationLabel) })}
                     </p>
@@ -432,7 +433,7 @@ function MoveDialog({
                                     { value: "stopped", label: t("storage.move.keepStopped") }
                                 ]}
                             />
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {parking
                                     ? t("storage.move.keepStoppedHint")
                                     : t("storage.move.keepAlwaysHint")}
@@ -556,7 +557,7 @@ function MoveRow({
                 : "neutral";
     return (
         <li className="flex flex-col gap-2 py-3">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <div className={cn(settingType.body, "flex flex-wrap items-center gap-x-2 gap-y-1")}>
                 <span
                     className="min-w-0 truncate font-medium"
                     title={`${move.volumeName} - ${move.appName}`}
@@ -579,7 +580,7 @@ function MoveRow({
             {move.state === "copying" ? (
                 <div className="flex flex-col gap-1">
                     <Meter used={move.percent ?? 0} total={100} />
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {move.totalBytes !== null && move.copiedBytes !== null
                             ? t("storage.moves.progress", {
                                   copied: formatBytes(Math.min(move.copiedBytes, move.totalBytes)),
@@ -590,7 +591,7 @@ function MoveRow({
                 </div>
             ) : null}
             {move.error && !(move.originShared && move.error.code === "originShared") ? (
-                <div className="text-xs text-danger-ink">
+                <div className={cn(settingType.small, "text-danger-ink")}>
                     <p>{errorText(t, move.error)}</p>
                     {move.error.detail ? (
                         <p className="mt-0.5 break-words font-mono opacity-80">
@@ -601,7 +602,7 @@ function MoveRow({
             ) : null}
             {move.state === "moved" ? (
                 <div className="flex flex-wrap items-center gap-2">
-                    <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                    <p className={cn(settingType.hint, "min-w-0 flex-1")}>
                         {move.originShared
                             ? t("storage.moves.sharedHint", {
                                   origin: serverName(move.originLabel)
@@ -632,13 +633,13 @@ function MoveRow({
                 </div>
             ) : null}
             {move.state === "finished" ? (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {move.originRemoved
                         ? t("storage.moves.removedHint")
                         : t("storage.moves.keptDone", { origin: serverName(move.originLabel) })}
                 </p>
             ) : null}
-            {error && !confirming ? <p className="text-xs text-danger-ink">{error}</p> : null}
+            {error && !confirming ? <p className={cn(settingType.small, "text-danger-ink")}>{error}</p> : null}
             <ConfirmDeleteDialog
                 open={confirming}
                 onOpenChange={setConfirming}
@@ -749,9 +750,9 @@ function GamePolicyCard({ t, nas }: { t: T; nas: { id: string; name: string }[] 
         <Card>
             <CardHeader>
                 <CardTitle>{t("storage.policy.title")}</CardTitle>
-                <p className="text-sm text-muted-foreground">{t("storage.policy.description")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("storage.policy.description")}</p>
             </CardHeader>
-            <CardBody className="flex flex-col gap-4 text-sm">
+            <CardBody className={cn(settingType.body, "flex flex-col gap-4")}>
                 {policy.error && !draft ? (
                     <p className="text-danger-ink">{t("storage.loadFailed")}</p>
                 ) : !draft ? (
@@ -774,12 +775,12 @@ function GamePolicyCard({ t, nas }: { t: T; nas: { id: string; name: string }[] 
                                 aria-label={t("storage.policy.default")}
                                 options={options}
                             />
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("storage.policy.defaultHint")}
                             </span>
                         </label>
                         {outOfReach.data && outOfReach.data.length > 0 ? (
-                            <p className="break-words text-xs text-warning-ink">
+                            <p className={cn(settingType.small, "break-words text-warning-ink")}>
                                 {t("storage.policy.outOfReach", {
                                     count: outOfReach.data.length,
                                     servers: outOfReach.data.join(", ")
@@ -789,7 +790,7 @@ function GamePolicyCard({ t, nas }: { t: T; nas: { id: string; name: string }[] 
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                                 <p className="font-medium">{t("storage.policy.ownersChoose")}</p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className={settingType.hint}>
                                     {draft.ownersChoose
                                         ? t("storage.policy.ownersChooseOn")
                                         : t("storage.policy.ownersChooseOff")}
@@ -827,7 +828,7 @@ function GamePolicyCard({ t, nas }: { t: T; nas: { id: string; name: string }[] 
                                 ))}
                             </fieldset>
                         ) : (
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {t("storage.policy.noNas")}
                             </p>
                         )}
@@ -838,7 +839,7 @@ function GamePolicyCard({ t, nas }: { t: T; nas: { id: string; name: string }[] 
                         ) : null}
                         <div className="flex items-center justify-end gap-3">
                             {saved ? (
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {t("storage.policy.saved")}
                                 </span>
                             ) : null}
@@ -910,7 +911,7 @@ export function StorageView() {
                             <Skeleton className="h-10 w-full" />
                         </div>
                     ) : locations.error ? (
-                        <p className="py-2 text-sm text-danger-ink">{t("storage.loadFailed")}</p>
+                        <p className={cn(settingType.body, "py-2 text-danger-ink")}>{t("storage.loadFailed")}</p>
                     ) : (
                         <>
                             {(locations.data?.servers ?? []).map((server) => (
@@ -920,10 +921,10 @@ export function StorageView() {
                                         aria-hidden
                                     />
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium">
+                                        <p className={cn(settingType.body, "truncate font-medium")}>
                                             {serverName(server.name)}
                                         </p>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className={settingType.hint}>
                                             {t("storage.locations.serverKind")}
                                         </p>
                                     </div>
@@ -939,7 +940,7 @@ export function StorageView() {
                                                       : undefined
                                             }
                                         />
-                                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                                        <p className={cn(settingType.hint, "mt-1 truncate")}>
                                             {t("storage.locations.freeOf", {
                                                 free: formatBytes(server.free),
                                                 total: formatBytes(server.total)
@@ -955,14 +956,14 @@ export function StorageView() {
                                         aria-hidden
                                     />
                                     <div className="min-w-0 flex-1">
-                                        <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                                        <p className={cn(settingType.body, "flex min-w-0 items-center gap-2 font-medium")}>
                                             <span className="truncate" title={nas.name}>
                                                 {nas.name}
                                             </span>
                                             <Badge>{protocolLabel(t, nas.kind)}</Badge>
                                         </p>
                                         <p
-                                            className="truncate text-xs text-muted-foreground"
+                                            className={cn(settingType.hint, "truncate")}
                                             title={nas.address}
                                         >
                                             {nas.address}
@@ -979,11 +980,11 @@ export function StorageView() {
                                 </div>
                             ))}
                             {(locations.data?.nas ?? []).length === 0 ? (
-                                <p className="py-3 text-sm text-muted-foreground">
+                                <p className={cn(settingType.body, "py-3 text-muted-foreground")}>
                                     {t("storage.locations.noNas")}
                                 </p>
                             ) : (
-                                <p className="pt-3 text-xs text-muted-foreground">
+                                <p className={cn(settingType.hint, "pt-3")}>
                                     {t("storage.locations.manageHint")}{" "}
                                     <Link href="/drive" className="underline">
                                         {t("storage.locations.manageLink")}
@@ -1008,9 +1009,9 @@ export function StorageView() {
                     {moves.loading ? (
                         <Skeleton className="h-12 w-full" />
                     ) : moves.error ? (
-                        <p className="text-sm text-danger-ink">{t("storage.loadFailed")}</p>
+                        <p className={cn(settingType.body, "text-danger-ink")}>{t("storage.loadFailed")}</p>
                     ) : (moves.data ?? []).length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t("storage.moves.empty")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("storage.moves.empty")}</p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-border">
                             {(moves.data ?? []).map((move) => (
@@ -1030,7 +1031,7 @@ export function StorageView() {
             <Card>
                 <CardHeader>
                     <CardTitle>{t("storage.volumes.title")}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t("storage.volumes.description")}
                     </p>
                 </CardHeader>
@@ -1042,7 +1043,7 @@ export function StorageView() {
                             <Skeleton className="h-10 w-full" />
                         </div>
                     ) : volumes.error ? (
-                        <p className="text-sm text-danger-ink">{t("storage.loadFailed")}</p>
+                        <p className={cn(settingType.body, "text-danger-ink")}>{t("storage.loadFailed")}</p>
                     ) : (volumes.data ?? []).length === 0 ? (
                         <EmptyState
                             icon={<HardDrive className="size-5" aria-hidden />}
@@ -1066,7 +1067,7 @@ export function StorageView() {
                                         className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3"
                                     >
                                         <div className="min-w-0 flex-1">
-                                            <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                                            <p className={cn(settingType.body, "flex min-w-0 items-center gap-2 font-medium")}>
                                                 <Link
                                                     href={`/apps/deploy/${volume.projectId}?service=${encodeURIComponent(volume.applicationId)}`}
                                                     className="truncate hover:underline"
@@ -1084,14 +1085,14 @@ export function StorageView() {
                                                 ) : null}
                                             </p>
                                             <p
-                                                className="truncate text-xs text-muted-foreground"
+                                                className={cn(settingType.hint, "truncate")}
                                                 title={`${volume.name} - ${volume.mountPath}`}
                                             >
                                                 {volume.name} - {volume.mountPath}
                                             </p>
                                         </div>
                                         <span
-                                            className="min-w-0 max-w-full truncate text-sm text-muted-foreground sm:max-w-[14rem]"
+                                            className={cn(settingType.body, "min-w-0 max-w-full truncate text-muted-foreground sm:max-w-[14rem]")}
                                             title={serverName(volume.locationLabel)}
                                         >
                                             {serverName(volume.locationLabel)}
@@ -1106,7 +1107,7 @@ export function StorageView() {
                                             {t("storage.volumes.move")}
                                         </Button>
                                         {blocked ? (
-                                            <p className="w-full text-xs text-muted-foreground">
+                                            <p className={cn(settingType.hint, "w-full")}>
                                                 {blocked}
                                             </p>
                                         ) : null}

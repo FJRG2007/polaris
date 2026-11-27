@@ -8,7 +8,7 @@
 
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { updateProgress } from "@/lib/update-timing";
-import { ProgressBar } from "@polaris/ui";
+import { ProgressBar, settingType } from "@polaris/ui";
 
 export interface WatchedRun {
     readonly startedAt: number;
@@ -38,7 +38,7 @@ export function UpdateProgress({ run, now }: { run: WatchedRun; now: number }) {
                 aria-valuetext={label}
                 value={percent}
             />
-            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className={settingType.hint}>{label}</p>
         </div>
     );
 }

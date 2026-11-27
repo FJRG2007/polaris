@@ -15,7 +15,18 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { SEASON_ICONS, usePreviewSeason } from "@/components/seasonal/seasonal-frame";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Select, settingType, Switch } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    cn,
+    Select,
+    settingType,
+    Switch
+} from "@polaris/ui";
 import { useOptimisticToggle } from "@polaris/ui";
 import {
     previewSeasonAction,
@@ -83,11 +94,11 @@ export function SeasonalAdminCard({
                 <CardTitle>{t("settings.seasonal.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">{t("settings.seasonal.body")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.seasonal.body")}</p>
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("settings.seasonal.label")}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={cn(settingType.body, "font-medium")}>{t("settings.seasonal.label")}</p>
+                        <p className={settingType.hint}>
                             {allowed ? t("settings.seasonal.on") : t("settings.seasonal.off")}
                         </p>
                     </div>
@@ -103,8 +114,8 @@ export function SeasonalAdminCard({
                     </p>
                 ) : null}
                 <div className="mt-2 border-t border-border pt-4">
-                    <p className="text-sm font-medium">{t("settings.seasonal.calendarTitle")}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    <p className={cn(settingType.body, "font-medium")}>{t("settings.seasonal.calendarTitle")}</p>
+                    <p className={cn(settingType.hint, "mt-0.5")}>
                         {t("settings.seasonal.calendarBody")}
                     </p>
                     <ul className="mt-3 flex flex-col divide-y divide-border">
@@ -274,7 +285,7 @@ function SeasonRow({
         const invalid = shown?.field === end;
         return (
             <div className="flex min-w-0 flex-col gap-1">
-                <span className="text-xs text-muted-foreground">{label}</span>
+                <span className={settingType.hint}>{label}</span>
                 <div className="flex min-w-0 gap-2" aria-invalid={invalid || undefined}>
                     <Select
                         value={String(draft[end].month)}
@@ -308,7 +319,7 @@ function SeasonRow({
                     />
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-sm font-medium" title={name}>
+                            <p className={cn(settingType.body, "truncate font-medium")} title={name}>
                                 {name}
                             </p>
                             {!lunar && core.crossesYearEnd(saved.window) ? (
@@ -318,7 +329,7 @@ function SeasonRow({
                                 <Badge variant="warning">{t("settings.seasonal.custom")}</Badge>
                             ) : null}
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("settings.seasonal.window", {
                                 from: dayLabel(season, saved.window.from),
                                 to: dayLabel(season, saved.window.to)

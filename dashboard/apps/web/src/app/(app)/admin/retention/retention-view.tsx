@@ -19,7 +19,7 @@ import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { grouped } from "@/app/(app)/apps/firewall/grouped";
 import { Loader2, Trash2 } from "lucide-react";
-import { Button, Card, CardBody, Select, settingType, Skeleton } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Select, settingType, Skeleton } from "@polaris/ui";
 import { useLiveResource } from "@/components/use-live-resource";
 import { saveRetentionAction, sweepRetentionAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -124,7 +124,7 @@ export function RetentionView({ policy }: { policy: RetentionPolicy }) {
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                     <h2 className="text-sm font-medium">{label}</h2>
-                                    <p className="text-muted-foreground text-xs">
+                                    <p className={settingType.hint}>
                                         {t(`retention.subjects.${subject}.note`)}
                                     </p>
                                 </div>
@@ -153,7 +153,7 @@ export function RetentionView({ policy }: { policy: RetentionPolicy }) {
                                     <Skeleton className="h-4 w-64 max-w-full" />
                                 </div>
                             ) : (
-                                <p className="text-muted-foreground border-t border-border pt-3 text-xs">
+                                <p className={cn(settingType.small, "text-muted-foreground border-t border-border pt-3")}>
                                     {keeping === 0
                                         ? t("retention.counts.forever", record)
                                         : counts.due === 0
@@ -173,8 +173,8 @@ export function RetentionView({ policy }: { policy: RetentionPolicy }) {
                 );
             })}
 
-            {error ? <p className="text-danger text-sm">{error}</p> : null}
-            {note ? <p className="text-muted-foreground text-sm">{note}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
+            {note ? <p className={cn(settingType.body, "text-muted-foreground")}>{note}</p> : null}
 
             <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" disabled={busy || !changed} onClick={() => void save()}>
@@ -198,7 +198,7 @@ export function RetentionView({ policy }: { policy: RetentionPolicy }) {
                     )}
                     {t("retention.sweep.run")}
                 </Button>
-                <p className="text-muted-foreground text-xs">{t("retention.sweep.hint")}</p>
+                <p className={settingType.hint}>{t("retention.sweep.hint")}</p>
             </div>
         </div>
     );

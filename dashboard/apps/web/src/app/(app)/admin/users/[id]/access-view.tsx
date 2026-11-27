@@ -17,7 +17,17 @@ import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { Badge, Button, Card, CardBody, Checkbox, Select, Skeleton } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Checkbox,
+    cn,
+    Select,
+    settingType,
+    Skeleton
+} from "@polaris/ui";
 import type { AccessExplanation, ResourceGrantView } from "@/lib/access-explain-service";
 import {
     removeUserGrantAction,
@@ -75,13 +85,13 @@ export function UserAccessView({
             <div className="flex flex-wrap items-center gap-2">
                 <Link
                     href={`/admin/users?user=${userId}`}
-                    className="ms-auto text-sm text-primary hover:underline"
+                    className={cn(settingType.body, "ms-auto text-primary hover:underline")}
                 >
                     {t("usersDetail.accessView.sessionsLink")}
                 </Link>
             </div>
 
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && <p className={settingType.error}>{error}</p>}
 
             <RoleCard userId={userId} role={role} roles={roles} onSaved={load} />
             <CapabilitiesCard userId={userId} onSaved={load} />
@@ -140,7 +150,7 @@ function RoleCard({
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("usersDetail.accessView.role.title")}</h2>
-                    <p className="text-sm text-muted-foreground">{t("usersDetail.accessView.role.hint")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("usersDetail.accessView.role.hint")}</p>
                 </div>
                 <div className="flex max-w-sm items-center gap-2">
                     <Select
@@ -165,8 +175,8 @@ function RoleCard({
                     />
                     {pending && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
                 </div>
-                {error && <p className="text-sm text-danger">{error}</p>}
-                <Link href="/admin/roles" className="w-fit text-sm text-primary hover:underline">
+                {error && <p className={settingType.error}>{error}</p>}
+                <Link href="/admin/roles" className={cn(settingType.body, "w-fit text-primary hover:underline")}>
                     {t("usersDetail.accessView.role.define")}
                 </Link>
             </CardBody>
@@ -222,14 +232,14 @@ function MembershipCard({
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{title}</h2>
-                    <p className="text-sm text-muted-foreground">{hint}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{hint}</p>
                 </div>
                 {items.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{emptyText}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{emptyText}</p>
                 ) : (
                     <div className="flex flex-col gap-2">
                         {items.map((item) => (
-                            <label key={item.id} className="flex items-start gap-2 text-sm">
+                            <label key={item.id} className={cn(settingType.body, "flex items-start gap-2")}>
                                 <Checkbox
                                     className="mt-0.5"
                                     checked={checked.includes(item.id)}
@@ -238,7 +248,7 @@ function MembershipCard({
                                 <span className="flex flex-col">
                                     <span>{item.name}</span>
                                     {item.description && (
-                                        <span className="text-xs text-muted-foreground">
+                                        <span className={settingType.hint}>
                                             {item.description}
                                         </span>
                                     )}
@@ -247,8 +257,8 @@ function MembershipCard({
                         ))}
                     </div>
                 )}
-                {error && <p className="text-sm text-danger">{error}</p>}
-                <Link href={manageHref} className="w-fit text-sm text-primary hover:underline">
+                {error && <p className={settingType.error}>{error}</p>}
+                <Link href={manageHref} className={cn(settingType.body, "w-fit text-primary hover:underline")}>
                     {manageLabel}
                 </Link>
             </CardBody>
@@ -305,12 +315,12 @@ function ResourcesCard({
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">{t("usersDetail.accessView.resources.title")}</h2>
-                    <p className="text-sm text-muted-foreground">{t("usersDetail.accessView.resources.hint")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("usersDetail.accessView.resources.hint")}</p>
                 </div>
                 {access === null ? (
                     <Skeleton className="h-10 w-full" />
                 ) : access.resources.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t("usersDetail.accessView.resources.empty")}
                     </p>
                 ) : (
@@ -323,7 +333,7 @@ function ResourcesCard({
                                 <div className="flex min-w-0 flex-col gap-0.5">
                                     <div className="flex min-w-0 items-center gap-2">
                                         <span
-                                            className="truncate text-sm"
+                                            className={cn(settingType.body, "truncate")}
                                             title={grant.resourceLabel}
                                         >
                                             {grant.resourceLabel}
@@ -341,7 +351,7 @@ function ResourcesCard({
                                         )}
                                         {grant.canShare && <Badge>{t("usersDetail.accessView.resources.canShare")}</Badge>}
                                     </div>
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className={settingType.hint}>
                                         {t("usersDetail.accessView.resources.detail", {
                                             actions: grant.actions.join(", "),
                                             via: grant.principalType !== "user" ? "yes" : "no",
@@ -379,7 +389,7 @@ function ResourcesCard({
                         ))}
                     </div>
                 )}
-                {error && <p className="text-sm text-danger">{error}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
             </CardBody>
             {confirmElement}
         </Card>

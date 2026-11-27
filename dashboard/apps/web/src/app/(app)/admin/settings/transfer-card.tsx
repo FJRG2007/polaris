@@ -18,7 +18,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { validationMessage } from "@/components/i18n/validation-message";
 import type { TransferSummary } from "@/lib/instance-transfer/transfer";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, settingType } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, cn, Input, settingType } from "@polaris/ui";
 import { applyImportAction, exportInstanceAction, previewImportAction } from "./transfer-actions";
 import type { KeptPick } from "@/components/file-picker/as-files";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
@@ -152,7 +152,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
             <CardHeader>
                 <CardTitle>{t("settings.transfer.title")}</CardTitle>
             </CardHeader>
-            <CardBody className="flex flex-col gap-5 text-sm">
+            <CardBody className={cn(settingType.body, "flex flex-col gap-5")}>
                 <section className="flex flex-col gap-2">
                     <p className="text-muted-foreground">{t("settings.transfer.intro")}</p>
                     <div className="flex flex-wrap gap-2">
@@ -189,7 +189,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                     </div>
                     {exportProblem && <p className={settingType.error}>{exportProblem}</p>}
                     {exported && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("settings.transfer.exported", {
                                 count: exportedRows,
                                 shown: String(exportedRows),
@@ -253,7 +253,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                         </Button>
                     </div>
                     {preview && (
-                        <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-xs">
+                        <div className={cn(settingType.small, "flex flex-col gap-2 rounded-md border border-border p-3")}>
                             <p>
                                 {t("settings.transfer.summary", {
                                     when: format.dateTime(preview.summary.exportedAt),
@@ -305,7 +305,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                         </div>
                     )}
                 </section>
-                {error && <p className="text-sm text-danger">{error}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
             </CardBody>
         </Card>
     );

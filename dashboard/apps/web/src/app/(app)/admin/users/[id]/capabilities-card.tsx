@@ -133,13 +133,13 @@ export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved:
             <CardBody className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-sm font-medium">{t("usersDetail.capabilities.title")}</h2>
-                    <p className="mt-1 text-[0.8125rem] text-muted-foreground">
+                    <p className={cn(settingType.body, "mt-1 text-muted-foreground")}>
                         {t("usersDetail.capabilities.hint")}
                     </p>
                 </div>
 
                 {isAdmin && (
-                    <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                    <p className={cn(settingType.small, "rounded-md bg-muted px-3 py-2 text-muted-foreground")}>
                         {t("usersDetail.capabilities.admin")}
                     </p>
                 )}
@@ -163,7 +163,7 @@ export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved:
                         startOpen={hasOverride}
                         keep={onlyOverridden ? isOverridden : undefined}
                         toolbar={
-                            <label className="flex cursor-pointer items-center gap-2 text-[0.8125rem]">
+                            <label className={cn(settingType.body, "flex cursor-pointer items-center gap-2")}>
                                 <Checkbox
                                     checked={onlyOverridden}
                                     disabled={overriddenTotal === 0 && !onlyOverridden}
@@ -200,7 +200,7 @@ export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved:
                                         className="flex flex-wrap items-center gap-2 px-3 py-2"
                                     >
                                         <span className="min-w-0 flex-1">
-                                            <span className="block break-words text-[0.8125rem]">
+                                            <span className={cn(settingType.body, "block break-words")}>
                                                 {capability.label}
                                             </span>
                                             <span className="block break-all font-mono text-[0.6875rem] text-foreground-subtle">
@@ -209,7 +209,7 @@ export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved:
                                         </span>
                                         <span
                                             className={cn(
-                                                "shrink-0 text-[0.6875rem]",
+                                                settingType.small, "shrink-0",
                                                 capability.inherited
                                                     ? "text-muted-foreground"
                                                     : "text-foreground-subtle"

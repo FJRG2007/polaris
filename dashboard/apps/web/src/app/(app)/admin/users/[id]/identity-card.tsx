@@ -20,7 +20,7 @@
 import { prisma } from "@polaris/db";
 import { Avatar } from "@/components/avatar";
 import { RelativeTime } from "@/components/relative-time";
-import { Badge, Card, CardBody } from "@polaris/ui";
+import { Badge, Card, CardBody, cn, settingType } from "@polaris/ui";
 import { composePersonName, CONNECTION_PROVIDERS } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -30,8 +30,8 @@ import type { NamespaceTranslator } from "@/lib/i18n/types";
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-muted-foreground">{label}</span>
-            <span className="break-words text-sm">{children}</span>
+            <span className={settingType.hint}>{label}</span>
+            <span className={cn(settingType.body, "break-words")}>{children}</span>
         </div>
     );
 }

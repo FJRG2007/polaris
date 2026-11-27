@@ -83,7 +83,7 @@ function CheckButton({ which }: { which: StorageCheck }) {
                 </Button>
             </div>
             {said && (
-                <p className={cn("text-xs", said.ok ? "text-muted-foreground" : "text-danger")}>
+                <p className={cn(settingType.small, said.ok ? "text-muted-foreground" : "text-danger")}>
                     {said.where
                         ? t("uploads.check.result", { where: said.where, detail: said.detail })
                         : said.detail}
@@ -158,7 +158,7 @@ function TidyButton() {
                 </Button>
             </div>
             {said && (
-                <p className={cn("text-xs", said.failed ? "text-danger" : "text-muted-foreground")}>
+                <p className={cn(settingType.small, said.failed ? "text-danger" : "text-muted-foreground")}>
                     {said.detail}
                 </p>
             )}
@@ -200,14 +200,14 @@ function SaveRow({
     const tc = useTranslations("common");
     return (
         <>
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && <p className={settingType.error}>{error}</p>}
             <div className="flex items-center gap-3">
                 <Button onClick={onSave} disabled={!dirty || !valid || saving}>
                     {saving && <Loader2 className="size-4 animate-spin" />}
                     {tc("actions.save")}
                 </Button>
                 {saved && !dirty && (
-                    <span className="text-xs text-muted-foreground">{t("uploads.saved")}</span>
+                    <span className={settingType.hint}>{t("uploads.saved")}</span>
                 )}
             </div>
         </>
@@ -247,7 +247,7 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("uploads.attachments.title")}</h2>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {t("uploads.attachments.intro")}
                     </p>
                 </div>
@@ -270,7 +270,7 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
                 />
 
                 <label className="flex flex-col gap-1.5">
-                    <span className="text-sm font-medium">{t("uploads.attachments.biggest")}</span>
+                    <span className={cn(settingType.body, "font-medium")}>{t("uploads.attachments.biggest")}</span>
                     <SizeField
                         value={Number(megabytes) || 0}
                         stored="MB"
@@ -334,7 +334,7 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("uploads.photos.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("uploads.photos.intro")}</p>
+                    <p className={settingType.hint}>{t("uploads.photos.intro")}</p>
                 </div>
 
                 <ResolvedTarget
@@ -356,8 +356,8 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
 
                 <label className="flex items-start justify-between gap-4">
                     <span className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium">{t("uploads.photos.gravatar")}</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className={cn(settingType.body, "font-medium")}>{t("uploads.photos.gravatar")}</span>
+                        <span className={settingType.hint}>
                             {t("uploads.photos.gravatarHint")}
                         </span>
                     </span>
@@ -427,7 +427,7 @@ function DrivesCard({ settings }: { settings: PersonalDriveSettings }) {
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("uploads.drives.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("uploads.drives.intro")}</p>
+                    <p className={settingType.hint}>{t("uploads.drives.intro")}</p>
                 </div>
 
                 <ResolvedTarget
@@ -448,7 +448,7 @@ function DrivesCard({ settings }: { settings: PersonalDriveSettings }) {
                 />
 
                 {made > 0 && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {elsewhere.length > 0
                             ? t("uploads.drives.madeElsewhere", {
                                   count: made,
@@ -502,7 +502,7 @@ function ChatCard({ settings }: { settings: ChatStorageSettings }) {
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("uploads.chat.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("uploads.chat.intro")}</p>
+                    <p className={settingType.hint}>{t("uploads.chat.intro")}</p>
                 </div>
 
                 <ResolvedTarget
@@ -576,7 +576,7 @@ function FootageCard({ settings }: { settings: FootageSettings }) {
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("uploads.footage.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("uploads.footage.intro")}</p>
+                    <p className={settingType.hint}>{t("uploads.footage.intro")}</p>
                 </div>
 
                 <ResolvedTarget
@@ -650,7 +650,7 @@ function OrganizationDrivesCard({ settings }: { settings: OrganizationDriveSetti
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("uploads.shelves.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("uploads.shelves.intro")}</p>
+                    <p className={settingType.hint}>{t("uploads.shelves.intro")}</p>
                 </div>
 
                 <ResolvedTarget
@@ -671,7 +671,7 @@ function OrganizationDrivesCard({ settings }: { settings: OrganizationDriveSetti
                 />
 
                 {made > 0 && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {elsewhere.length > 0
                             ? t("uploads.shelves.madeElsewhere", {
                                   count: made,

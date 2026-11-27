@@ -11,7 +11,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import type { DirectoryUser } from "@/lib/user-admin-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, Input, Select } from "@polaris/ui";
+import { Button, Card, CardBody, cn, Input, Select, settingType } from "@polaris/ui";
 import { banUserAction, deleteUserAction, unbanUserAction } from "../actions";
 
 export function DangerSection({ user, isSelf }: { user: DirectoryUser; isSelf: boolean }) {
@@ -46,7 +46,7 @@ export function DangerSection({ user, isSelf }: { user: DirectoryUser; isSelf: b
                 </h2>
                 {user.banned ? (
                     <div className="flex items-center justify-between gap-3">
-                        <p className="min-w-0 text-xs text-muted-foreground">
+                        <p className={cn(settingType.hint, "min-w-0")}>
                             {t("usersDetail.account.danger.status", {
                                 kind: user.bannedUntil ? "suspended" : "banned",
                                 at: user.bannedAt ? format.dateTime(user.bannedAt) : "",
@@ -97,13 +97,13 @@ export function DangerSection({ user, isSelf }: { user: DirectoryUser; isSelf: b
                                 {Number(banFor) > 0 ? t("users.ban.suspend") : t("users.ban.ban")}
                             </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("usersDetail.account.danger.hint")}
                         </p>
                     </div>
                 )}
                 <div className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 text-xs text-muted-foreground">
+                    <p className={cn(settingType.hint, "min-w-0")}>
                         {t("usersDetail.account.danger.deleteHint")}
                     </p>
                     <Button
@@ -116,7 +116,7 @@ export function DangerSection({ user, isSelf }: { user: DirectoryUser; isSelf: b
                         {t("usersDetail.account.danger.delete")}
                     </Button>
                 </div>
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 {confirmElement}
             </CardBody>
         </Card>

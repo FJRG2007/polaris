@@ -5,7 +5,7 @@
  * only: an account moves by itself at its next sign-in.
  */
 
-import { Card, CardBody } from "@polaris/ui";
+import { Card, CardBody, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function PasswordMigrationCard({ moved, total }: { moved: number; total: number }) {
@@ -14,7 +14,7 @@ export function PasswordMigrationCard({ moved, total }: { moved: number; total: 
         <Card>
             <CardBody className="flex flex-col gap-1">
                 <h2 className="text-sm font-medium">{t("security.passwordMigration.title")}</h2>
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("security.passwordMigration.summary", {
                         total,
                         moved: moved.toLocaleString(),

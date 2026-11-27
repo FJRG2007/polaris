@@ -7,7 +7,7 @@
  */
 
 import { useState, useTransition } from "react";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, cn, Input, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { saveTerminalSessionCapAction } from "./terminal-actions";
 
@@ -45,8 +45,8 @@ export function TerminalSessionsCard({ cap, max }: { cap: number; max: number })
                 <CardTitle>{t("settings.terminal.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">{t("settings.terminal.body")}</p>
-                <label className="flex max-w-[12rem] flex-col gap-1 text-sm">
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.terminal.body")}</p>
+                <label className={cn(settingType.body, "flex max-w-[12rem] flex-col gap-1")}>
                     <span className="font-medium">
                         {t("settings.terminal.label")} <span aria-hidden="true">*</span>
                     </span>
@@ -62,15 +62,15 @@ export function TerminalSessionsCard({ cap, max }: { cap: number; max: number })
                             setSaved(false);
                         }}
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className={settingType.hint}>
                         {value.trim() !== "" && !valid
                             ? t("settings.terminal.invalid", { max })
                             : t("settings.terminal.hint", { max })}
                     </span>
                 </label>
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 {saved && !dirty ? (
-                    <p className="text-sm text-muted-foreground">{t("settings.terminal.saved")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.terminal.saved")}</p>
                 ) : null}
                 <Button
                     className="self-start"
