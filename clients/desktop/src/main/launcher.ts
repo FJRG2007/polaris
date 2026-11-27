@@ -53,6 +53,8 @@ import { conflictSentence, findLaunchers, likelyHolders, type FoundLauncher } fr
 import { execFile } from "node:child_process";
 import { showNotice } from "./notices";
 import { recordLauncherUse, usageScores } from "./launcher-usage";
+import { gameKinds, setGameKind } from "./game-kinds";
+import { ACTION_KIND, kindAction, LAUNCHER_ROW_ACTIONS, treatedAsGame } from "@/shared/game-kinds";
 import { searchableCommand, systemCommands, type SystemCommand } from "@/shared/system-commands";
 import { byFrecency } from "../../../../dashboard/packages/core/src/frecency";
 import { typedUrl } from "../../../../dashboard/packages/core/src/typed-url";
@@ -252,9 +254,17 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     const uses = usageScores();
     const pageKey = (page: { path: string; }) => `page:${page.path}`;
     const appKey = (app: { path: string; }) => `app:${app.path}`;
-    const addApp = (app: ReturnType<typeof listedApps>[number]) => {
-        const store = gameStore(app);
-        add({ kind: "app", title: app.label, subtitle: appSubtitle(app), ...(store ? { game: true, store } : {}) }, () => void openListedApp(app.path), appKey(app));
+    const kinds = gameKinds();
+    // What somebody said a program is wins over what it is found to be (Raycast's Treat as Game / Treat as Application).
+    const isGame = (app: InstalledApp) => treatedAsGame(gameStore(app) !== null, kinds.get(app.path));
+    const addApp = (app: InstalledApp) => {
+        const game = isGame(app);
+        const store = game ? gameStore(app) : null;
+        add(
+            { kind: "app", title: app.label, subtitle: appSubtitle(app), ...(game ? { game: true } : {}), ...(store ? { store } : {}), actions: [kindAction(game)] },
+            () => void openListedApp(app.path),
+            appKey(app)
+        );
         paths.set(String(rows.length - 1), app);
     };
     const addPage = (page: { label: string; path: string; }) => add({ kind: "page", title: page.label, subtitle: "Open in Polaris" }, () => host?.showPolaris(page.path), pageKey(page));
@@ -302,7 +312,7 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
             );
         }
         // "games": every game and game launcher, most used first (Raycast's Game Launcher).
-        const games = isGamesQuery(query) ? byFrecency(listedApps().filter((app) => gameStore(app) || isGameLauncher(app.label)), appKey, uses).slice(0, MAX_GAMES) : [];
+        const games = isGamesQuery(query) ? byFrecency(listedApps().filter((app) => isGame(app) || isGameLauncher(app.label)), appKey, uses).slice(0, MAX_GAMES) : [];
         for (const app of games) addApp(app);
         const listedGames = new Set(games.map((app) => app.path));
         for (const app of rankedMatches(query, listedApps().map((app) => ({ ...app, context: "" })), PER_KIND, appKey, uses)) if (!listedGames.has(app.path)) addApp(app);
@@ -880,6 +890,14 @@ export function startLauncher(given: LauncherHost): void {
         const useKey = id.success ? useKeys.get(id.data) : undefined;
         if (useKey) recordLauncherUse(useKey);
         action();
+        return true;
+    });
+    ipcMain.handle(LAUNCHER_CHANNELS.act, (event, rawId: unknown, rawAction: unknown) => {
+        const id = z.string().max(10).safeParse(rawId);
+        const action = z.enum(LAUNCHER_ROW_ACTIONS).safeParse(rawAction);
+        const listed = fromLauncher(event) && id.success && action.success ? appPaths.get(id.data) : undefined;
+        if (!listed || !action.success) return false;
+        setGameKind(listed.path, ACTION_KIND[action.data], gameStore(listed) !== null ? "game" : "app");
         return true;
     });
     // Also under its name from before the rename. Removable once no supported desktop app or host predates the rename (desktop 0.1.124).

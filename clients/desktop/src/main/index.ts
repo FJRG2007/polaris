@@ -34,8 +34,9 @@ import { DeepLinks } from "./deep-links";
 import { registerMailHandler } from "./mail-handler";
 import { installContextMenu } from "./context-menu";
 import { mailtoIn, mailtoPath } from "@/shared/mailto";
-import { GameWatcher } from "./game-detect";
-import { installedGames } from "./launcher-apps";
+import { GameWatcher, gameKindRules, type GameKindRules } from "./game-detect";
+import { installedGames, lastListedApps } from "./launcher-apps";
+import { gameKinds, gameKindsRevision, onGameKindsChange } from "./game-kinds";
 import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
@@ -109,6 +110,16 @@ const games = new GameWatcher((game) => {
     if (main && !main.isDestroyed()) main.webContents.send(CHANNELS.gameActivity, game);
 }, undefined, () => installedGames());
 // Game mode: the launcher's key reaches the game while it is in front.
+// The launcher's "Treat as Game" / "Treat as Application" choices, worked
+// out again only when a choice or the program listing changes.
+let kindRules: { apps: readonly unknown[]; revision: number; rules: GameKindRules; } | null = null;
+games.setKindRules(() => {
+    const apps = lastListedApps();
+    const revision = gameKindsRevision();
+    if (!kindRules || kindRules.apps !== apps || kindRules.revision !== revision) kindRules = { apps, revision, rules: gameKindRules(apps, gameKinds()) };
+    return kindRules.rules;
+});
+onGameKindsChange(() => games.lookAgain());
 games.onForeground((busy) => {
     launcher.followGameForeground(busy);
     perfEvent("game-front", { busy });

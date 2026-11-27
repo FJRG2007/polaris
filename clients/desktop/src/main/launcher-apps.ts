@@ -358,6 +358,12 @@ export function installedGames(platform: NodeJS.Platform = process.platform): re
     return cached?.games ?? [];
 }
 
+/** The apps as last listed, from memory or disk, never starting a listing: for the game watcher's look. */
+export function lastListedApps(): readonly InstalledApp[] {
+    loadIndex();
+    return cached?.apps ?? [];
+}
+
 /** Whether `path` is one of the apps listed, so only those can be opened. */
 export function isListedApp(path: string): boolean {
     return cached?.apps.some((app) => app.path === path) ?? false;

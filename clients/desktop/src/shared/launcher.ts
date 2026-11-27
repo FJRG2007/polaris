@@ -6,6 +6,7 @@
  */
 
 import { normalizeSearchText } from "../../../../dashboard/packages/core/src/search-text";
+import type { LauncherRowAction } from "./game-kinds";
 import type { SystemCommandId } from "../../../../dashboard/packages/core/src/launcher-commands";
 
 export const LAUNCHER_CHANNELS = {
@@ -16,7 +17,8 @@ export const LAUNCHER_CHANNELS = {
     hidden: "launcher:hidden",
     clearClipboard: "launcher:clear-clipboard",
     open: "launcher:open",
-    plugins: "launcher:plugins"
+    plugins: "launcher:plugins",
+    act: "launcher:act"
 } as const;
 
 export type LauncherRowKind = "url" | "answer" | "polaris" | "page" | "system" | "app" | "polar" | "web" | "clip";
@@ -34,6 +36,8 @@ export interface LauncherRow {
     readonly game?: boolean;
     /** The store a game comes from ("Steam", "Epic Games"): a brand name, never translated. */
     readonly store?: string;
+    /** What else the row can do besides opening it (Raycast's action panel, Ctrl+K), by id; a page names each in its own words. */
+    readonly actions?: readonly LauncherRowAction[];
 }
 
 export interface LauncherAnswer {
@@ -49,6 +53,8 @@ export interface PolarisLauncher {
     /** Show a path of the instance in the main window (the dashboard's palette only). */
     open(href: string): Promise<void>;
     run(id: string): Promise<boolean>;
+    /** Do one of a listed row's `actions`; the list should be asked again after, since the row changes. Absent on desktops that predate it. */
+    act?(id: string, action: LauncherRowAction): Promise<boolean>;
     hide(): Promise<void>;
     clearClipboard(): Promise<void>;
     /** Heard on each open, with the text it opens with (empty from the key; what

@@ -45,7 +45,7 @@ Surfaces: D desktop, W web palette, E extension, M mobile, T TV.
 | Command aliases | missing | D W E | Alias per command, matched before the ranking |
 | Hotkey per command / app | missing | D | System-wide accelerator per command (desktop only; a page cannot hold a global key) |
 | Hyper key | missing | D | OS-level remap; not Polaris's to do without a driver. Hidden |
-| Action panel (more than one action per row) | partial | D W | Web rows have secondary actions (copy link, forget recent); desktop rows have one |
+| Action panel (more than one action per row) | partial | D W | Web rows have secondary actions (copy link, forget recent); the desktop's own panel opens a program row's actions with Ctrl+K (Cmd+K) |
 | Fallback commands (when nothing matches) | have | D | "Ask Polar" and "Search the web" close every list; engine chosen in Settings |
 | Applications (launch, search) | have | D | `launcher-apps.ts` and store games (`launcher-stores.ts`), with icons |
 | Auto quit apps | missing | D | Would need a timer watching foreground apps; against "stays light". Not planned |
@@ -87,7 +87,7 @@ Surfaces: D desktop, W web palette, E extension, M mobile, T TV.
 | Teams: shared quicklinks and snippets | missing | W | Org-scoped quicklinks and snippets once those exist |
 | Deeplinks to commands | partial | D | `polaris://` opens pages; not commands |
 | iOS keyboard, widgets, share extension | missing | M | Mobile shell; out of the launcher's scope until the mobile app carries native surfaces |
-| Games | have | D | Store games and game mode (the key goes to the game) |
+| Games | have | D | Store games and game mode (the key goes to the game); Treat as Game / Treat as Application on a program row (desktop panel; the web palette does not offer it yet) |
 
 ## Ranked gaps
 

@@ -214,6 +214,70 @@ export function matchGame(
     return null;
 }
 
+/** A listed program, as much of it as tells which file it runs and where it lives. */
+export interface ListedProgram {
+    readonly label: string;
+    readonly path: string;
+    readonly launch?: { readonly kind: string; readonly path?: string; };
+    readonly target?: string;
+    readonly folder?: string;
+}
+
+/** What the launcher's "Treat as Game" / "Treat as Application" choices mean to the watcher. */
+export interface GameKindRules {
+    /** Programs somebody said are games, matched like their own additions. */
+    readonly games: readonly CustomGame[];
+    /** Program names that are never a game, nor what puts a game in front. */
+    readonly notPrograms: ReadonlySet<string>;
+    /** Store game folders whose programs are never a game (`storeGameFolders` form). */
+    readonly notFolders: readonly string[];
+}
+
+export const NO_KIND_RULES: GameKindRules = { games: [], notPrograms: new Set(), notFolders: [] };
+
+/** The program file a listed program starts, when the listing knows it. */
+function programFile(listed: ListedProgram): string | null {
+    const candidates = [listed.launch?.kind === "exe" ? listed.launch.path : undefined, listed.target, listed.path];
+    return candidates.find((file): file is string => typeof file === "string" && /\.exe$/i.test(file.trim())) ?? null;
+}
+
+/**
+ * The watcher's rules from the choices made in the launcher (`kinds`, by
+ * listed path) and the programs listed. A program treated as a game is known by
+ * its own file and its listed name; one treated as an application drops its
+ * file and, for a store game, everything started from its folder. A choice for
+ * a program no longer listed, or one whose file is not known, changes nothing.
+ */
+export function gameKindRules(listed: readonly ListedProgram[], kinds: ReadonlyMap<string, "game" | "app">): GameKindRules {
+    if (kinds.size === 0) return NO_KIND_RULES;
+    const games: CustomGame[] = [];
+    const notPrograms = new Set<string>();
+    const notFolders: string[] = [];
+    for (const program of listed) {
+        const kind = kinds.get(program.path);
+        if (!kind) continue;
+        const exe = programFile(program);
+        if (kind === "game") {
+            if (exe) games.push({ executable: programKey(exe), name: program.label });
+            continue;
+        }
+        if (exe) notPrograms.add(programKey(exe));
+        // Through the same filter as a store record, so a choice can never take a whole drive or library out.
+        if (program.folder) notFolders.push(...storeGameFolders([{ name: program.label, folder: program.folder }]).map((game) => game.folder));
+    }
+    return { games, notPrograms, notFolders };
+}
+
+/** The programs the watcher may count, without those treated as applications. */
+export function withoutApplications(seen: readonly RunningProcess[], rules: GameKindRules): RunningProcess[] {
+    if (rules.notPrograms.size === 0 && rules.notFolders.length === 0) return [...seen];
+    return seen.filter((entry) => {
+        if (rules.notPrograms.has(programKey(entry.name))) return false;
+        const file = entry.path ? folderKey(entry.path) : null;
+        return !file || !rules.notFolders.some((folder) => file.startsWith(`${folder}\\`));
+    });
+}
+
 function run(command: string, args: readonly string[]): Promise<string> {
     return new Promise((resolve, reject) => {
         execFile(
@@ -427,6 +491,7 @@ export class GameWatcher {
     private folders: readonly StoreGame[] = [];
     private inFront = false;
     private frontListener: ((busy: boolean) => void) | null = null;
+    private kindRules: () => GameKindRules = () => NO_KIND_RULES;
 
     constructor(
         private readonly onChange: (game: RunningGame | null) => void,
@@ -454,6 +519,17 @@ export class GameWatcher {
         if (this.timer) void this.check();
     }
 
+    /** The launcher's game and application choices, asked on each look; the answer is expected from memory. */
+    setKindRules(rules: () => GameKindRules): void {
+        this.kindRules = rules;
+        this.lookAgain();
+    }
+
+    /** Look now rather than at the next tick, when watching: a choice made in the launcher counts the moment it is made. */
+    lookAgain(): void {
+        if (this.timer) void this.check();
+    }
+
     /** What is running now, as last seen. */
     running(): RunningGame | null {
         return this.current;
@@ -478,8 +554,10 @@ export class GameWatcher {
         } catch {
             return;
         }
-        const found = matchGame(programs, this.custom, KNOWN_GAMES, this.storeFolders());
-        this.followFront(programs, found?.key ?? null);
+        const rules = this.kindRules();
+        const counted = withoutApplications(programs.map((entry): RunningProcess => (typeof entry === "string" ? { name: entry } : entry)), rules);
+        const found = matchGame(counted, [...this.custom, ...rules.games], KNOWN_GAMES, this.storeFolders());
+        this.followFront(counted, found?.key ?? null);
         const same = found && this.current && found.key === this.current.key && found.name === this.current.name && found.store === this.current.store;
         if (same) {
             if (now - this.said >= REPEAT_MS) this.say(this.current, now);
