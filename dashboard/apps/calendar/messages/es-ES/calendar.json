@@ -693,7 +693,8 @@
         "list": "Lista",
         "month": "Mes",
         "week": "Semana",
-        "year": "Año"
+        "year": "Año",
+        "schedule": "Agenda"
     },
     "zonePicker": {
         "floating": "Sin zona (flotante)",
@@ -711,5 +712,11 @@
         "keepMine": "Dejar el mío",
         "drop": "Quitar",
         "kept": "Guardado aquí. Se hará cuando vuelva Polaris."
+    },
+    "phone": {
+        "dayCell": "{day}, {count, plural, =0 {nada previsto} one {# evento} other {# eventos}}",
+        "emptyRange": "Nada previsto para estos días.",
+        "from": "Desde las {time}",
+        "until": "Hasta las {time}"
     }
 }

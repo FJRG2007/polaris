@@ -185,7 +185,7 @@ export function CalendarSearch({
                 <Button
                     size="icon-sm"
                     variant="ghost"
-                    className="sm:hidden"
+                    className="max-md:size-11 sm:hidden"
                     aria-label={t("search.label")}
                     title={t("search.label")}
                     onClick={() => {
