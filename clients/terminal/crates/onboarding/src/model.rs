@@ -282,6 +282,12 @@ impl OnboardingStateModel {
         }
     }
 
+    /// The choices made so far, or `None` while the welcome slide is still
+    /// showing and nothing has been chosen.
+    pub(crate) fn choices_so_far(&self) -> Option<SelectedSettings> {
+        (self.step != OnboardingStep::Intro).then(|| self.settings())
+    }
+
     pub(crate) fn step(&self) -> OnboardingStep {
         self.step
     }

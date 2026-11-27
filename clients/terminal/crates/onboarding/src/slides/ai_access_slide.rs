@@ -27,7 +27,6 @@ use crate::slides::{bottom_nav, layout, slide_content};
 pub enum AiAccessSlideAction {
     SelectSubscription,
     SelectSetUpLater,
-    CopyUpgradeUrlClicked,
     PasteAuthTokenFromClipboardClicked,
     BackClicked,
     NextClicked,
@@ -38,7 +37,6 @@ pub enum AiAccessSlideAction {
 /// reference them directly.
 #[derive(Debug, Clone)]
 pub enum AiAccessSlideEvent {
-    CopyUpgradeUrlRequested,
     PasteAuthTokenFromClipboardRequested,
 }
 
@@ -53,7 +51,6 @@ pub struct AiAccessSlide {
     next_button: button::Button,
     scroll_state: ClippedScrollStateHandle,
     show_auth_prompt_bar: bool,
-    copy_url_mouse_state: MouseStateHandle,
     paste_token_mouse_state: MouseStateHandle,
 }
 
@@ -67,7 +64,6 @@ impl AiAccessSlide {
             next_button: button::Button::default(),
             scroll_state: ClippedScrollStateHandle::new(),
             show_auth_prompt_bar: false,
-            copy_url_mouse_state: MouseStateHandle::default(),
             paste_token_mouse_state: MouseStateHandle::default(),
         }
     }
@@ -418,11 +414,7 @@ impl View for AiAccessSlide {
         // users a manual fallback when the upgrade browser does not launch.
         let auth_prompt_bar = render_upgrade_auth_prompt_bar(
             appearance,
-            self.copy_url_mouse_state.clone(),
             self.paste_token_mouse_state.clone(),
-            Box::new(|ctx| {
-                ctx.dispatch_typed_action(AiAccessSlideAction::CopyUpgradeUrlClicked);
-            }),
             Box::new(|ctx| {
                 ctx.dispatch_typed_action(AiAccessSlideAction::PasteAuthTokenFromClipboardClicked);
             }),
@@ -501,9 +493,6 @@ impl TypedActionView for AiAccessSlide {
             }
             AiAccessSlideAction::SelectSetUpLater => {
                 self.select_choice(AiAccessChoice::SetUpLater, ctx);
-            }
-            AiAccessSlideAction::CopyUpgradeUrlClicked => {
-                ctx.emit(AiAccessSlideEvent::CopyUpgradeUrlRequested);
             }
             AiAccessSlideAction::PasteAuthTokenFromClipboardClicked => {
                 ctx.emit(AiAccessSlideEvent::PasteAuthTokenFromClipboardRequested);

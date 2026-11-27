@@ -143,7 +143,6 @@ pub enum OfferSlideAction {
     SelectSetUpLater,
     Back,
     GetPterming,
-    CopyUpgradeUrl,
     PasteAuthTokenFromClipboard,
 }
 
@@ -157,7 +156,6 @@ enum OfferChoice {
 #[derive(Clone, Debug)]
 pub enum OfferSlideEvent {
     SetUpLaterSelected { variant: OfferVariant },
-    CopyUpgradeUrlRequested,
     PasteAuthTokenFromClipboardRequested,
 }
 
@@ -170,7 +168,6 @@ pub struct OfferSlide {
     selected_choice: OfferChoice,
     scroll_state: ClippedScrollStateHandle,
     show_auth_prompt_bar: bool,
-    copy_url_mouse_state: MouseStateHandle,
     paste_token_mouse_state: MouseStateHandle,
 }
 
@@ -188,7 +185,6 @@ impl OfferSlide {
             selected_choice: OfferChoice::default(),
             scroll_state: ClippedScrollStateHandle::new(),
             show_auth_prompt_bar: false,
-            copy_url_mouse_state: MouseStateHandle::default(),
             paste_token_mouse_state: MouseStateHandle::default(),
         }
     }
@@ -557,11 +553,7 @@ impl View for OfferSlide {
 
         let auth_prompt_bar = render_upgrade_auth_prompt_bar(
             appearance,
-            self.copy_url_mouse_state.clone(),
             self.paste_token_mouse_state.clone(),
-            Box::new(|ctx| {
-                ctx.dispatch_typed_action(OfferSlideAction::CopyUpgradeUrl);
-            }),
             Box::new(|ctx| {
                 ctx.dispatch_typed_action(OfferSlideAction::PasteAuthTokenFromClipboard);
             }),
@@ -598,9 +590,6 @@ impl TypedActionView for OfferSlide {
             }
             OfferSlideAction::Back => self.back(ctx),
             OfferSlideAction::GetPterming => self.get_pterming(ctx),
-            OfferSlideAction::CopyUpgradeUrl => {
-                ctx.emit(OfferSlideEvent::CopyUpgradeUrlRequested);
-            }
             OfferSlideAction::PasteAuthTokenFromClipboard => {
                 ctx.emit(OfferSlideEvent::PasteAuthTokenFromClipboardRequested);
             }

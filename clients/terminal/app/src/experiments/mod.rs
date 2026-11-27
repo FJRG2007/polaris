@@ -20,7 +20,7 @@ pub use block_onboarding_layer::{BLOCK_ONBOARDING_LAYER, BlockOnboarding};
 use dashmap::DashMap;
 pub use improved_palette_search_layer::{IMPROVED_PALETTE_SEARCH_LAYER, ImprovedPaletteSearch};
 use lazy_static::lazy_static;
-pub use login_layer::{AuthFlowInstructions, LOGIN_LAYER};
+pub use login_layer::LOGIN_LAYER;
 use pterm_core::user_preferences::GetUserPreferences as _;
 use pterm_errors::report_error;
 use ptermui::{AppContext, SingletonEntity};

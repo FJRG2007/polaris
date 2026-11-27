@@ -64,7 +64,7 @@ pub enum AgentOnboardingEvent {
     /// rely on that to select the right visual / back-routing behavior.
     PrivacySettingsFromTerminalThemeSlideRequested,
     UpgradeRequested,
-    UpgradeCopyUrlRequested,
+    /// The person wants the plan they have to reach this app: Polaris sign-in.
     UpgradePasteTokenFromClipboardRequested,
     OfferSetUpLaterSelected {
         variant: OfferVariant,
@@ -244,9 +244,6 @@ impl AgentOnboardingView {
 
         if let Some(ai_access_slide) = &ai_access_slide {
             ctx.subscribe_to_view(ai_access_slide, |_me, _view, event, ctx| match event {
-                AiAccessSlideEvent::CopyUpgradeUrlRequested => {
-                    ctx.emit(AgentOnboardingEvent::UpgradeCopyUrlRequested);
-                }
                 AiAccessSlideEvent::PasteAuthTokenFromClipboardRequested => {
                     ctx.emit(AgentOnboardingEvent::UpgradePasteTokenFromClipboardRequested);
                 }
@@ -259,9 +256,6 @@ impl AgentOnboardingView {
             ctx.subscribe_to_view(&offer_slide, |_me, _view, event, ctx| match event {
                 OfferSlideEvent::SetUpLaterSelected { variant } => {
                     ctx.emit(AgentOnboardingEvent::OfferSetUpLaterSelected { variant: *variant });
-                }
-                OfferSlideEvent::CopyUpgradeUrlRequested => {
-                    ctx.emit(AgentOnboardingEvent::UpgradeCopyUrlRequested);
                 }
                 OfferSlideEvent::PasteAuthTokenFromClipboardRequested => {
                     ctx.emit(AgentOnboardingEvent::UpgradePasteTokenFromClipboardRequested);
@@ -404,6 +398,12 @@ impl AgentOnboardingView {
             .as_ref(ctx)
             .ui_customization()
             .use_vertical_tabs
+    }
+
+    /// The choices made so far, for leaving onboarding before it finishes;
+    /// `None` on the welcome slide.
+    pub fn choices_so_far(&self, ctx: &AppContext) -> Option<SelectedSettings> {
+        self.onboarding_state.as_ref(ctx).choices_so_far()
     }
 
     pub fn start_onboarding(&self, ctx: &mut ViewContext<Self>) {
