@@ -312,7 +312,9 @@
         "colValue": "Value",
         "overridden": "Overridden by a later layer",
         "secret": "Secret",
-        "hidden": "Hidden"
+        "hidden": "Hidden",
+        "newGroup": "New group",
+        "cancel": "Cancel"
     },
     "tags": {
         "title": "Search tags",
@@ -324,6 +326,10 @@
         "readOnly": "You cannot change these tags.",
         "filter": "Filter by tag",
         "all": "All tags",
-        "clear": "Clear tag filter"
+        "clear": "Clear tag filter",
+        "addTitle": "Add a new tag",
+        "name": "Tag name",
+        "taken": "Already tagged.",
+        "cancel": "Cancel"
     }
 }

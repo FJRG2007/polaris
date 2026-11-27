@@ -161,7 +161,8 @@ describe("the private networking panel", () => {
         const user = userEvent.setup();
         await mountReady();
 
-        const aliasInput = screen.getByPlaceholderText("e.g. api");
+        await user.click(screen.getByRole("button", { name: "Add a name" }));
+        const aliasInput = await screen.findByPlaceholderText("e.g. api");
         await user.type(aliasInput, "legacy-api");
 
         // The server is not asked to resolve yet, so the optimistic add and its
@@ -177,6 +178,8 @@ describe("the private networking panel", () => {
         await act(async () => resolveSave({ error: "A service can have up to 5 other names." }));
         expect(await screen.findByText("A service can have up to 5 other names.")).toBeTruthy();
         expect(screen.queryByText("legacy-api")).toBeNull();
+        // The refusal reopens the dialog on what was typed.
+        expect((screen.getByPlaceholderText("e.g. api") as HTMLInputElement).value).toBe("legacy-api");
     });
 
     it("opens the cross-project picker and allows a candidate from another project", async () => {

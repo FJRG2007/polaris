@@ -557,7 +557,9 @@
             "addHint": "Point the name at this server first. Polaris then routes it, orders a certificate for it, and accepts sign-ins on it.",
             "notADomain": "That is not a domain name.",
             "known": "Already on the list.",
-            "addFailed": "Could not add the domain"
+            "addFailed": "Could not add the domain",
+            "domain": "Domain",
+            "cancel": "Cancel"
         },
         "certificate": {
             "title": "Trust this device (polaris.local)",

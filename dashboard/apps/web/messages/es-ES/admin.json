@@ -557,7 +557,9 @@
             "addHint": "Primero apunta el nombre a este servidor. Después Polaris lo enruta, pide un certificado para él y acepta inicios de sesión en él.",
             "notADomain": "Eso no es un nombre de dominio.",
             "known": "Ya está en la lista.",
-            "addFailed": "No se añadió el dominio"
+            "addFailed": "No se añadió el dominio",
+            "domain": "Dominio",
+            "cancel": "Cancelar"
         },
         "certificate": {
             "title": "Confiar en este dispositivo (polaris.local)",

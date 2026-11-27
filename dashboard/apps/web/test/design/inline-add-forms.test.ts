@@ -11,12 +11,13 @@
  * `PhoneInput`, `Textarea`, or a `...Fields` component) in the 30 lines before
  * that button, also outside them. A field that is a search or a filter (its tag
  * mentions search, find, filter or match) is the toolbar API keys has, not an
- * add form, and is skipped. It is a heuristic: it errs toward flagging, and
- * each file it flags is listed below with how many and why.
+ * add form, and is skipped. It is a heuristic: it errs toward flagging.
  *
- * The list is a ratchet. A new file, or more sites in a listed one, fails; so
- * does a listed file with fewer, so the entry is lowered as each is converted.
- * Entries marked PENDING are the ones still to convert.
+ * Every screen has been converted, so this is a hard rule: any site fails. The
+ * only files below are ones the heuristic cannot tell apart - a form that is
+ * already inside a dialog drawn by another component, or a multi-value field
+ * that is not a list of records - each with its exact count and why. Nothing
+ * may be listed as still to convert.
  */
 
 import { describe, expect, it } from "vitest";
@@ -26,15 +27,12 @@ import { readdirSync, readFileSync } from "node:fs";
 const APPS = resolve(import.meta.dirname, "../../..");
 const ROOTS = [join(APPS, "web", "src"), join(APPS, "..", "packages", "ui", "src")];
 
-/** Files allowed to keep a site, by path under `apps/`, with the exact count. */
+/** Sites that are not inline add forms, by path under `apps/`, with the exact count. */
 const KNOWN: Record<string, { count: number; why: string }> = {
-    "web/src/app/(app)/admin/domains/domains-view.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
     "web/src/app/(app)/admin/domains/setup-wizard.tsx": { count: 1, why: "a setup wizard step, not a list screen" },
     "web/src/app/(app)/analytics/sites/new/add-site-flow.tsx": { count: 1, why: "a creation page of its own" },
-    "web/src/app/(app)/apps/deploy/database-panel.tsx": { count: 3, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/apps/deploy/deploy-view.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/apps/deploy/private-network-panel.tsx": { count: 1, why: "PENDING: convert to a header button and a dialog" },
-    "web/src/app/(app)/apps/deploy/variable-groups.tsx": { count: 2, why: "PENDING: convert to a header button and a dialog" },
+    "web/src/app/(app)/apps/deploy/deploy-view.tsx": { count: 1, why: "the database form of the New service dialog, drawn in a component of its own" },
+    "web/src/app/(app)/apps/deploy/variable-groups.tsx": { count: 1, why: "inside the variable groups dialog: New group swaps the form in for the list, one modal at a time" },
     "web/src/app/(app)/automations/code-review/repo-schedules-section.tsx": { count: 1, why: "inside the repository dialog: the form swaps in for the list, one modal at a time" },
     "web/src/app/(app)/automations/[id]/alert-fields.tsx": { count: 1, why: "one generated address inside an automation form" },
     "web/src/app/(app)/automations/[id]/flow-fields.tsx": { count: 1, why: "value rows inside an automation step form" },
@@ -44,7 +42,6 @@ const KNOWN: Record<string, { count: number; why: string }> = {
     "web/src/app/(app)/tasks/planning-view.tsx": { count: 2, why: "quick-add inside a task board, the task-app standard" },
     "web/src/app/(app)/tasks/space-view.tsx": { count: 3, why: "quick-add inside a task board, the task-app standard" },
     "web/src/app/(app)/tasks/task-subwork.tsx": { count: 1, why: "quick-add of sub-work inside one task, the task-app standard" },
-    "web/src/app/(app)/vault/vaults/vaults-view.tsx": { count: 2, why: "PENDING: convert to a header button and a dialog" },
     "web/src/components/agents/review-output-fields.tsx": { count: 1, why: "output rows inside an agent form" },
     "web/src/components/rule-list-input.tsx": { count: 1, why: "a multi-value form field" },
     "web/src/components/rules/chip-list.tsx": { count: 1, why: "a multi-value form field" },
@@ -53,7 +50,7 @@ const KNOWN: Record<string, { count: number; why: string }> = {
 
 const OVERLAY = /<(DialogContent|SheetContent|PopoverContent|AlertDialogContent|DropdownMenuContent)\b/g;
 const OVERLAY_END = /<\/(DialogContent|SheetContent|PopoverContent|AlertDialogContent|DropdownMenuContent)>/g;
-const ADD = /<Plus\b|t\("[\w.]*\.(add|create|new)(?![a-z])\w*"\)|t\("[\w.]*(Add|Create)\w*"\)/;
+const ADD = /<Plus\b|t\("[\w.]*\.(add|create|new)(?![a-z])\w*"\)|t\("[\w.]*(Add|Create)(?![a-z])\w*"\)/;
 const FIELD = /<(Input|PhoneInput|Textarea|[A-Z]\w*Fields)\b/;
 const LOOKUP = /search|find|filter|match/i;
 const LIST = /<table\b|<ul\b|<tbody\b|\.map\(/;
@@ -164,5 +161,9 @@ describe("adding to a list", () => {
 
     it("lists only files that still have a site", () => {
         expect(Object.keys(KNOWN).filter((file) => !counts.has(file))).toEqual([]);
+    });
+
+    it("leaves nothing listed as still to convert", () => {
+        expect(Object.entries(KNOWN).filter(([, entry]) => /pending|convert/i.test(entry.why))).toEqual([]);
     });
 });

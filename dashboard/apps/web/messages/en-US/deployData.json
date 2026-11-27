@@ -241,7 +241,15 @@
             "replicate": "Replicate...",
             "noCandidates": "No bucket in another store on this server. Create a second object store here first.",
             "replicateInto": "Replicate into...",
-            "deleteTitle": "Delete bucket"
+            "deleteTitle": "Delete bucket",
+            "addBucket": "New bucket",
+            "create": "Create",
+            "name": "Name",
+            "newKeyTitle": "New access key",
+            "keyName": "Key name",
+            "access": "Access",
+            "prefix": "Prefix",
+            "deleteAfter": "Delete after"
         },
         "fullScreen": "Full screen",
         "exitFullScreen": "Exit full screen",

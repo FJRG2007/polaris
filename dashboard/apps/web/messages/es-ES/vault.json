@@ -555,7 +555,16 @@
         "leave": "Salir",
         "theWholeVault": "La bóveda entera",
         "nothingToPick": "No hay colecciones que elegir. Crea una primero.",
-        "readOnly": "Solo lectura"
+        "readOnly": "Solo lectura",
+        "addMember": "Añadir miembro",
+        "cancel": "Cancelar",
+        "invalidEmail": "Escribe un email válido.",
+        "columns": {
+            "name": "Nombre",
+            "member": "Miembro",
+            "access": "Acceso",
+            "actions": "Acciones"
+        }
     },
     "settings": {
         "pbkdf2": "PBKDF2: funciona en todas partes",

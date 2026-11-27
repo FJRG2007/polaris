@@ -241,7 +241,15 @@
             "replicate": "Replicar...",
             "noCandidates": "No hay ningún bucket en otro almacén de este servidor. Crea antes un segundo almacén de objetos aquí.",
             "replicateInto": "Replicar hacia...",
-            "deleteTitle": "Borrar bucket"
+            "deleteTitle": "Borrar bucket",
+            "addBucket": "Nuevo bucket",
+            "create": "Crear",
+            "name": "Nombre",
+            "newKeyTitle": "Nueva clave",
+            "keyName": "Nombre",
+            "access": "Acceso",
+            "prefix": "Prefijo",
+            "deleteAfter": "Borrar tras"
         },
         "fullScreen": "Ampliar",
         "exitFullScreen": "Ventana normal",

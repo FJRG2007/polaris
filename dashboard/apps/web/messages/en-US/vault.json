@@ -555,7 +555,16 @@
         "leave": "Leave it",
         "theWholeVault": "The whole vault",
         "nothingToPick": "There are no collections to pick. Make one first.",
-        "readOnly": "Read only"
+        "readOnly": "Read only",
+        "addMember": "Add a member",
+        "cancel": "Cancel",
+        "invalidEmail": "Enter a valid email.",
+        "columns": {
+            "name": "Name",
+            "member": "Member",
+            "access": "Access",
+            "actions": "Actions"
+        }
     },
     "settings": {
         "pbkdf2": "PBKDF2 - works everywhere",

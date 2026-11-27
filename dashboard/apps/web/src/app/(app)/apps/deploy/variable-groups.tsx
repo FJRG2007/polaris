@@ -11,7 +11,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { normalizeTag, TAGS_MAX } from "@polaris/core/variable-groups";
+import { normalizeTag, TAGS_MAX, variableGroupInputSchema } from "@polaris/core/variable-groups";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import {
     ArrowLeft,
@@ -78,6 +78,7 @@ export function VariableGroupsManager() {
     const [error, setError] = useState<string | null>(null);
     const [selected, setSelected] = useState<string | null>(null);
     const [name, setName] = useState("");
+    const [creating, setCreating] = useState(false);
     const [pending, startTransition] = useTransition();
 
     const load = useCallback(() => {
@@ -94,11 +95,14 @@ export function VariableGroupsManager() {
             const result = await groupActions.createVariableGroupAction({ name });
             if (result.error) return setError(result.error);
             setName("");
+            setCreating(false);
             load();
             if (result.id) setSelected(result.id);
         });
     }
 
+    // The rule the server applies, so the form cannot be sent with a name it refuses.
+    const nameValid = variableGroupInputSchema.safeParse({ name }).success;
     const group = view?.groups.find((one) => one.id === selected) ?? null;
     if (group)
         return (
@@ -114,34 +118,69 @@ export function VariableGroupsManager() {
     return (
         <div className="flex min-w-0 flex-col gap-4">
             <DialogHeader>
-                <DialogTitle>{t("groups.title")}</DialogTitle>
+                <div className="flex items-start justify-between gap-3 pe-8">
+                    <DialogTitle>{t("groups.title")}</DialogTitle>
+                    {view?.canCreate && !creating ? (
+                        <Button size="sm" className="shrink-0" onClick={() => setCreating(true)}>
+                            <Plus className="size-4" /> {t("groups.newGroup")}
+                        </Button>
+                    ) : null}
+                </div>
                 <p className="text-sm text-muted-foreground">{t("groups.intro")}</p>
             </DialogHeader>
-            {view?.canCreate ? (
+            {view && !view.canCreate ? (
+                <p className="text-xs text-muted-foreground">{t("groups.cannotCreate")}</p>
+            ) : null}
+            {creating ? (
+                // One modal at a time: the form takes the list's place in this dialog.
                 <form
-                    className="flex gap-2"
+                    className="flex flex-col gap-3"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        if (name.trim()) create();
+                        if (nameValid && !pending) create();
                     }}
                 >
-                    <Input
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder={t("groups.namePlaceholder")}
-                        aria-label={t("groups.name")}
-                        maxLength={60}
-                        className="h-8"
-                    />
-                    <Button type="submit" size="sm" disabled={pending || !name.trim()}>
-                        <Plus className="size-4" /> {t("groups.create")}
-                    </Button>
+                    <label className="flex flex-col gap-1 text-sm font-medium">
+                        {t("groups.name")}
+                        <Input
+                            autoFocus
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder={t("groups.namePlaceholder")}
+                            maxLength={60}
+                        />
+                    </label>
+                    {error && (
+                        <p role="alert" className="text-sm text-danger-ink">
+                            {error}
+                        </p>
+                    )}
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={pending}
+                            onClick={() => {
+                                setCreating(false);
+                                setName("");
+                                setError(null);
+                            }}
+                        >
+                            {t("groups.cancel")}
+                        </Button>
+                        <Button
+                            type="submit"
+                            aria-disabled={!nameValid}
+                            disabled={pending}
+                            aria-busy={pending}
+                        >
+                            {t("groups.create")}
+                        </Button>
+                    </div>
                 </form>
-            ) : (
-                view && <p className="text-xs text-muted-foreground">{t("groups.cannotCreate")}</p>
-            )}
-            {error && <p className="text-sm text-danger-ink">{error}</p>}
-            {view === null ? (
+            ) : null}
+            {error && !creating && <p className="text-sm text-danger-ink">{error}</p>}
+            {creating ? null : view === null ? (
                 <div className="flex flex-col gap-2" aria-busy="true">
                     {[0, 1, 2].map((one) => (
                         <div key={one} className="h-12 animate-pulse rounded-md bg-muted" />
@@ -643,11 +682,12 @@ export function TagsEditor({
     const t = useTranslations("deployConfig");
     const [current, setCurrent] = useState(tags);
     const [draft, setDraft] = useState("");
+    const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     useEffect(() => setCurrent(tags), [tags]);
 
-    function commit(next: string[]): void {
+    function commit(next: string[], typed?: string): void {
         const previous = current;
         setCurrent(next);
         setError(null);
@@ -656,15 +696,25 @@ export function TagsEditor({
             if (result.error) {
                 setCurrent(previous);
                 setError(result.error);
+                // An addition that was refused reopens on what was typed.
+                if (typed !== undefined) {
+                    setDraft(typed);
+                    setAdding(true);
+                }
             } else if (result.tags) setCurrent(result.tags);
         });
     }
 
+    const candidate = normalizeTag(draft);
+    const taken = Boolean(candidate) && current.includes(candidate);
+    const full = current.length >= TAGS_MAX;
+
     function add(): void {
-        const tag = normalizeTag(draft);
+        if (!candidate || taken || full) return;
+        const typed = draft;
         setDraft("");
-        if (!tag || current.includes(tag) || current.length >= TAGS_MAX) return;
-        commit([...current, tag]);
+        setAdding(false);
+        commit([...current, candidate], typed);
     }
 
     return (
@@ -695,40 +745,74 @@ export function TagsEditor({
                 ))}
             </div>
             {canEdit ? (
-                <form
-                    className="flex gap-2"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        add();
-                    }}
-                >
-                    <Input
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value)}
-                        placeholder={t("tags.placeholder")}
-                        aria-label={t("tags.add")}
-                        maxLength={32}
-                        disabled={current.length >= TAGS_MAX}
-                        className="h-8 max-w-xs"
-                    />
+                <div>
                     <Button
-                        type="submit"
                         size="sm"
                         variant="outline"
-                        disabled={pending || !normalizeTag(draft) || current.length >= TAGS_MAX}
-                        title={
-                            current.length >= TAGS_MAX
-                                ? t("tags.full", { max: TAGS_MAX })
-                                : undefined
-                        }
+                        aria-disabled={full}
+                        title={full ? t("tags.full", { max: TAGS_MAX }) : undefined}
+                        onClick={() => !full && setAdding(true)}
                     >
-                        {t("tags.add")}
+                        <Plus className="size-4" /> {t("tags.add")}
                     </Button>
-                </form>
+                </div>
             ) : (
                 <p className="text-xs text-muted-foreground">{t("tags.readOnly")}</p>
             )}
-            {error && <p className="text-sm text-danger-ink">{error}</p>}
+            {error && !adding && <p className="text-sm text-danger-ink">{error}</p>}
+            <Dialog
+                open={adding}
+                onOpenChange={(open) => {
+                    setAdding(open);
+                    if (!open) {
+                        setDraft("");
+                        setError(null);
+                    }
+                }}
+            >
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>{t("tags.addTitle")}</DialogTitle>
+                    </DialogHeader>
+                    <form
+                        className="flex flex-col gap-3"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            add();
+                        }}
+                    >
+                        <label className="flex flex-col gap-1 text-sm font-medium">
+                            {t("tags.name")}
+                            <Input
+                                autoFocus
+                                value={draft}
+                                onChange={(event) => setDraft(event.target.value)}
+                                placeholder={t("tags.placeholder")}
+                                maxLength={32}
+                                aria-invalid={taken}
+                            />
+                        </label>
+                        {taken && <p className="text-xs text-danger-ink">{t("tags.taken")}</p>}
+                        {error && (
+                            <p role="alert" className="text-sm text-danger-ink">
+                                {error}
+                            </p>
+                        )}
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" onClick={() => setAdding(false)}>
+                                {t("tags.cancel")}
+                            </Button>
+                            <Button
+                                type="submit"
+                                aria-disabled={!candidate || taken || full}
+                                disabled={pending}
+                            >
+                                {t("tags.add")}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

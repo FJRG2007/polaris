@@ -417,6 +417,8 @@ function VaultPanel({
     const { collections, reload: reloadCollections } = useVaultCollections(vault.vaultId);
     const [newCollection, setNewCollection] = useState("");
     const [invitee, setInvitee] = useState("");
+    const [adding, setAdding] = useState<"collection" | "member" | null>(null);
+    const [addError, setAddError] = useState<string | null>(null);
     const [renaming, setRenaming] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [access, setAccess] = useState<MemberRow | null>(null);
@@ -498,18 +500,26 @@ function VaultPanel({
         await reload();
     }
 
+    // An organization vault picks from its roster; a personal one takes an address,
+    // checked with the same rule the server applies to it.
+    const inviteValid = vault.organizationId
+        ? Boolean(invitee)
+        : core.emailField.safeParse(invitee).success;
+    const inviteWrong = !vault.organizationId && invitee.trim() !== "" && !inviteValid;
+
     async function onInvite(): Promise<void> {
         const email = invitee.trim();
         if (!email) return;
         setPending(true);
-        onError(null);
+        setAddError(null);
         const result = await share.inviteVaultMemberAction(vaultId, email, core.ORG_ROLE_USER);
         setPending(false);
         if (result.error) {
-            onError(result.error);
+            setAddError(result.error);
             return;
         }
         setInvitee("");
+        setAdding(null);
         await reload();
     }
 
@@ -533,7 +543,7 @@ function VaultPanel({
         const name = newCollection.trim();
         if (!name || !vaultKey) return;
         setPending(true);
-        onError(null);
+        setAddError(null);
         const result = await share.saveVaultCollectionAction(
             vaultId,
             null,
@@ -541,10 +551,11 @@ function VaultPanel({
         );
         setPending(false);
         if (result.error) {
-            onError(result.error);
+            setAddError(result.error);
             return;
         }
         setNewCollection("");
+        setAdding(null);
         await reload();
     }
 
@@ -621,74 +632,85 @@ function VaultPanel({
                 </Card>
             ) : (
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
+                    <CardHeader className="flex flex-row items-center justify-between gap-3">
+                        <CardTitle className="flex min-w-0 items-center gap-2">
                             {vault.organizationId ? (
-                                <Building2 className="size-4" />
+                                <Building2 className="size-4 shrink-0" />
                             ) : (
-                                <User className="size-4" />
+                                <User className="size-4 shrink-0" />
                             )}
                             {t("vaults.collections")}
                         </CardTitle>
+                        {vault.mayAdminister ? (
+                            <Button
+                                size="sm"
+                                className="shrink-0"
+                                onClick={() => setAdding("collection")}
+                            >
+                                <FolderPlus className="size-4" />
+                                {t("vaults.newCollection")}
+                            </Button>
+                        ) : null}
                     </CardHeader>
                     <CardBody className="flex flex-col gap-2">
                         <p className="text-sm text-muted-foreground">
                             {t("vaults.collectionsIntro")}
                         </p>
-                        {vault.mayAdminister ? (
-                            <form
-                                className="flex items-center gap-2"
-                                onSubmit={(event) => {
-                                    event.preventDefault();
-                                    void onAddCollection();
-                                }}
-                            >
-                                <Input
-                                    value={newCollection}
-                                    onChange={(event) => setNewCollection(event.target.value)}
-                                    placeholder={t("vaults.newCollection")}
-                                    aria-label={t("vaults.newCollectionName")}
-                                />
-                                <Button
-                                    type="submit"
-                                    size="sm"
-                                    disabled={pending || !newCollection.trim()}
-                                >
-                                    <FolderPlus className="size-4" />
-                                    {t("vaults.add")}
-                                </Button>
-                            </form>
-                        ) : null}
                         {collections.length === 0 ? (
                             <p className="py-2 text-sm text-muted-foreground">
                                 {t("vaults.noCollections")}
                             </p>
                         ) : (
-                            <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
-                                {collections.map((collection) => (
-                                    <li
-                                        key={collection.id}
-                                        className="flex items-center gap-2 p-2 text-sm"
-                                    >
-                                        <span className="min-w-0 flex-1 truncate">
-                                            {collection.name}
-                                        </span>
-                                        {vault.mayAdminister ? (
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                title={t("vaults.delete")}
-                                                aria-label={t("vaults.deleteNamed", {
-                                                    name: collection.name
-                                                })}
-                                                onClick={() => void onDeleteCollection(collection)}
+                            <div className="overflow-x-auto rounded-md border border-border">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-surface/60 text-xs text-muted-foreground">
+                                        <tr>
+                                            <th
+                                                scope="col"
+                                                className="w-full max-w-0 px-3 py-2 text-start font-medium"
                                             >
-                                                <Trash2 className="size-4" />
-                                            </Button>
-                                        ) : null}
-                                    </li>
-                                ))}
-                            </ul>
+                                                {t("vaults.columns.name")}
+                                            </th>
+                                            <th scope="col" className="px-3 py-2">
+                                                <span className="sr-only">
+                                                    {t("vaults.columns.actions")}
+                                                </span>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {collections.map((collection) => (
+                                            <tr key={collection.id} className="border-t border-border">
+                                                <td className="max-w-0 px-3 py-2 align-middle">
+                                                    <span
+                                                        className="block truncate"
+                                                        title={collection.name}
+                                                    >
+                                                        {collection.name}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-1 text-end align-middle">
+                                                    {vault.mayAdminister ? (
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            title={t("vaults.delete")}
+                                                            aria-label={t("vaults.deleteNamed", {
+                                                                name: collection.name
+                                                            })}
+                                                            onClick={() =>
+                                                                void onDeleteCollection(collection)
+                                                            }
+                                                        >
+                                                            <Trash2 className="size-4" />
+                                                        </Button>
+                                                    ) : null}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         )}
                     </CardBody>
                 </Card>
@@ -696,19 +718,172 @@ function VaultPanel({
 
             {vault.mayAdminister ? (
                 <Card>
-                    <CardHeader>
-                        <CardTitle>{t("vaults.members")}</CardTitle>
+                    <CardHeader className="flex flex-row items-center justify-between gap-3">
+                        <CardTitle className="min-w-0">{t("vaults.members")}</CardTitle>
+                        <Button size="sm" className="shrink-0" onClick={() => setAdding("member")}>
+                            <Plus className="size-4" />
+                            {t("vaults.addMember")}
+                        </Button>
                     </CardHeader>
                     <CardBody className="flex flex-col gap-2">
                         <p className="text-sm text-muted-foreground">{t("vaults.membersIntro")}</p>
-                        <div className="flex items-center gap-2">
-                            {vault.organizationId ? (
+                        <div className="overflow-x-auto rounded-md border border-border">
+                            <table className="w-full text-sm">
+                                <thead className="bg-surface/60 text-xs text-muted-foreground">
+                                    <tr>
+                                        <th
+                                            scope="col"
+                                            className="w-full max-w-0 px-3 py-2 text-start font-medium"
+                                        >
+                                            {t("vaults.columns.member")}
+                                        </th>
+                                        <th scope="col" className="px-3 py-2 text-start font-medium">
+                                            {t("vaults.columns.access")}
+                                        </th>
+                                        <th scope="col" className="px-3 py-2">
+                                            <span className="sr-only">{t("vaults.columns.actions")}</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {members.map((member) => (
+                                        <tr key={member.id} className="border-t border-border">
+                                            <td className="max-w-0 px-3 py-2 align-middle">
+                                                <p
+                                                    className="truncate text-sm"
+                                                    title={member.name || member.email}
+                                                >
+                                                    {member.name || member.email}
+                                                </p>
+                                                <p
+                                                    className="truncate text-xs text-muted-foreground"
+                                                    title={member.email}
+                                                >
+                                                    {member.email}
+                                                </p>
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-2 align-middle">
+                                                <div className="flex items-center gap-1.5">
+                                                    {member.status === core.ORG_USER_CONFIRMED ? (
+                                                        <>
+                                                            <Badge variant="neutral">
+                                                                {member.accessAll
+                                                                    ? t("vaults.wholeVault")
+                                                                    : t("vaults.collectionCount", {
+                                                                          count: member.collections.length
+                                                                      })}
+                                                            </Badge>
+                                                            <Badge variant="success">
+                                                                {t("vaults.holdsKey")}
+                                                            </Badge>
+                                                        </>
+                                                    ) : (
+                                                        <Badge variant="neutral">{t("vaults.notLetIn")}</Badge>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-1 text-end align-middle">
+                                                <div className="flex items-center justify-end">
+                                                    {member.status === core.ORG_USER_CONFIRMED ? (
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            title={t("vaults.changeScope")}
+                                                            aria-label={t("vaults.changeScopeNamed", {
+                                                                email: member.name || member.email
+                                                            })}
+                                                            onClick={() => setAccess(member)}
+                                                        >
+                                                            <Pencil className="size-4" />
+                                                        </Button>
+                                                    ) : (
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            title={t("vaults.letIn")}
+                                                            aria-label={t("vaults.letInNamed", {
+                                                                email: member.name || member.email
+                                                            })}
+                                                            disabled={pending || !vaultKey}
+                                                            onClick={() => setAccess(member)}
+                                                        >
+                                                            {pending ? (
+                                                                <Loader2 className="size-4 animate-spin" />
+                                                            ) : (
+                                                                <ShieldCheck className="size-4" />
+                                                            )}
+                                                        </Button>
+                                                    )}
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        title={t("vaults.remove")}
+                                                        aria-label={t("vaults.removeNamed", {
+                                                            email: member.name || member.email
+                                                        })}
+                                                        onClick={() => void onRemove(member)}
+                                                    >
+                                                        <X className="size-4" />
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardBody>
+                </Card>
+            ) : null}
+
+            <Dialog
+                open={adding !== null}
+                onOpenChange={(open) => {
+                    if (pending || open) return;
+                    setAdding(null);
+                    setNewCollection("");
+                    setInvitee("");
+                    setAddError(null);
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {adding === "member" ? t("vaults.addMember") : t("vaults.newCollection")}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {adding === "member"
+                                ? t("vaults.membersIntro")
+                                : t("vaults.collectionsIntro")}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="flex flex-col gap-3"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            if (pending) return;
+                            if (adding === "collection" && newCollection.trim()) void onAddCollection();
+                            if (adding === "member" && inviteValid) void onInvite();
+                        }}
+                    >
+                        {adding === "collection" ? (
+                            <label className="flex flex-col gap-1 text-sm font-medium">
+                                {t("vaults.newCollectionName")}
+                                <Input
+                                    autoFocus
+                                    value={newCollection}
+                                    onChange={(event) => setNewCollection(event.target.value)}
+                                    placeholder={t("vaults.newCollection")}
+                                />
+                            </label>
+                        ) : vault.organizationId ? (
+                            <div className="flex flex-col gap-1 text-sm font-medium">
+                                {t("vaults.addWho")}
                                 <Select
                                     value={invitee}
                                     onValueChange={setInvitee}
                                     aria-label={t("vaults.addWho")}
                                     placeholder={t("vaults.everybodyHere")}
-                                    className="min-w-0 flex-1"
                                     options={candidates.map((person) => ({
                                         value: person.userId,
                                         label: person.hasVault
@@ -719,93 +894,57 @@ function VaultPanel({
                                         disabled: !person.hasVault
                                     }))}
                                 />
-                            ) : (
+                            </div>
+                        ) : (
+                            <label className="flex flex-col gap-1 text-sm font-medium">
+                                {t("vaults.addWho")}
                                 <Input
+                                    autoFocus
                                     type="email"
                                     value={invitee}
                                     onChange={(event) => setInvitee(event.target.value)}
                                     placeholder={t("vaults.theirEmail")}
-                                    aria-label={t("vaults.addWho")}
-                                    className="min-w-0 flex-1"
+                                    aria-invalid={inviteWrong}
                                 />
-                            )}
-                            <Button size="sm" onClick={onInvite} disabled={pending || !invitee}>
-                                <Plus className="size-4" />
+                            </label>
+                        )}
+                        {adding === "member" && inviteWrong ? (
+                            <p className="text-xs text-danger">{t("vaults.invalidEmail")}</p>
+                        ) : null}
+                        {addError ? (
+                            <p role="alert" className="text-xs text-danger">
+                                {addError}
+                            </p>
+                        ) : null}
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                disabled={pending}
+                                onClick={() => {
+                                    setAdding(null);
+                                    setNewCollection("");
+                                    setInvitee("");
+                                    setAddError(null);
+                                }}
+                            >
+                                {t("vaults.cancel")}
+                            </Button>
+                            <Button
+                                type="submit"
+                                aria-disabled={
+                                    adding === "member" ? !inviteValid : !newCollection.trim()
+                                }
+                                disabled={pending}
+                                aria-busy={pending}
+                            >
+                                {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                                 {t("vaults.add")}
                             </Button>
-                        </div>
-                        <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
-                            {members.map((member) => (
-                                <li key={member.id} className="flex items-center gap-2 p-2">
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm">
-                                            {member.name || member.email}
-                                        </p>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                            {member.email}
-                                        </p>
-                                    </div>
-                                    {member.status === core.ORG_USER_CONFIRMED ? (
-                                        <>
-                                            <Badge variant="neutral">
-                                                {member.accessAll
-                                                    ? t("vaults.wholeVault")
-                                                    : t("vaults.collectionCount", {
-                                                          count: member.collections.length
-                                                      })}
-                                            </Badge>
-                                            <Badge variant="success">{t("vaults.holdsKey")}</Badge>
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                title={t("vaults.changeScope")}
-                                                aria-label={t("vaults.changeScopeNamed", {
-                                                    email: member.name || member.email
-                                                })}
-                                                onClick={() => setAccess(member)}
-                                            >
-                                                <Pencil className="size-4" />
-                                            </Button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Badge variant="neutral">{t("vaults.notLetIn")}</Badge>
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                title={t("vaults.letIn")}
-                                                aria-label={t("vaults.letInNamed", {
-                                                    email: member.name || member.email
-                                                })}
-                                                disabled={pending || !vaultKey}
-                                                onClick={() => setAccess(member)}
-                                            >
-                                                {pending ? (
-                                                    <Loader2 className="size-4 animate-spin" />
-                                                ) : (
-                                                    <ShieldCheck className="size-4" />
-                                                )}
-                                            </Button>
-                                        </>
-                                    )}
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        title={t("vaults.remove")}
-                                        aria-label={t("vaults.removeNamed", {
-                                            email: member.name || member.email
-                                        })}
-                                        onClick={() => void onRemove(member)}
-                                    >
-                                        <X className="size-4" />
-                                    </Button>
-                                </li>
-                            ))}
-                        </ul>
-                    </CardBody>
-                </Card>
-            ) : null}
-
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
             {vault.mine ? (
                 <Card>
                     <CardHeader>

@@ -89,5 +89,8 @@
         "unreachable": "Their server did not answer, so the link is still open. Try again once it is online.",
         "tooMany": "One of the two services already has as many links to other projects as it can take. Remove one first.",
         "unsupported": "This server runs Swarm, which links between projects do not support."
-    }
+    },
+    "addAliasButton": "Add a name",
+    "addAliasTitle": "Add another name",
+    "aliasName": "Name"
 }

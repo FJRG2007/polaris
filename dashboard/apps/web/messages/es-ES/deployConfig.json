@@ -312,7 +312,9 @@
         "colValue": "Valor",
         "overridden": "Sustituida por una capa posterior",
         "secret": "Secreto",
-        "hidden": "Oculto"
+        "hidden": "Oculto",
+        "newGroup": "Nuevo grupo",
+        "cancel": "Cancelar"
     },
     "tags": {
         "title": "Etiquetas",
@@ -324,6 +326,10 @@
         "readOnly": "No puedes cambiar estas etiquetas.",
         "filter": "Filtrar etiqueta",
         "all": "Todas",
-        "clear": "Quitar filtro"
+        "clear": "Quitar filtro",
+        "addTitle": "Nueva etiqueta",
+        "name": "Etiqueta",
+        "taken": "Ya la tiene.",
+        "cancel": "Cancelar"
     }
 }

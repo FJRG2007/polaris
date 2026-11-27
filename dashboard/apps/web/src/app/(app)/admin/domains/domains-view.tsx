@@ -40,7 +40,19 @@ import { baseDomainField, duckSubdomainField, siteAddressField } from "@/lib/dom
 import type { NetworkMode, NetworkStatus } from "@/lib/network-service";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { domainSuggestions, type DomainSuggestions } from "@/lib/domain-suggestions";
-import { Badge, Button, DnsRecordTable, Input, Select, Skeleton } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DnsRecordTable,
+    Input,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 import {
     CheckCircle2,
     ChevronDown,
@@ -48,6 +60,7 @@ import {
     Download,
     Link2,
     Loader2,
+    Plus,
     RefreshCw,
     TriangleAlert
 } from "lucide-react";
@@ -469,6 +482,7 @@ function DashboardDomains({
     const t = useTranslations("admin");
     const [draft, setDraft] = useState("");
     const [adding, setAdding] = useState(false);
+    const [open, setOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const candidate = draft
@@ -494,6 +508,7 @@ function DashboardDomains({
             const result = await saveExtraDomainsAction([...config.extraDomains, candidate]);
             onConfig(result.config);
             setDraft("");
+            setOpen(false);
             onAddresses(await deploymentAddressesAction());
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : t("domains.answers.addFailed"));
@@ -503,41 +518,85 @@ function DashboardDomains({
     }
 
     return (
-        <PageSection title={t("domains.answers.title")} wide>
+        <PageSection
+            title={t("domains.answers.title")}
+            wide
+            actions={
+                <Button size="sm" onClick={() => setOpen(true)}>
+                    <Plus className="size-4 shrink-0" />
+                    {t("domains.answers.addLabel")}
+                </Button>
+            }
+        >
             <AddressList addresses={addresses} onChanged={onAddresses} />
 
-            <div className="flex max-w-2xl flex-col gap-1 text-sm">
-                {t("domains.answers.addLabel")}
-                <div className="flex gap-2">
-                    <Input
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value)}
-                        onKeyDown={(event) => event.key === "Enter" && void add()}
-                        // Not the app domain's example: two fields on one page
-                        // showing the same name reads as the same field twice.
-                        placeholder="another.example.com"
-                        autoComplete="off"
-                        aria-invalid={draft.trim() !== "" && !valid}
-                    />
-                    <Button onClick={() => void add()} disabled={adding || !valid || known}>
-                        {adding ? <Loader2 className="size-4 animate-spin" /> : null}{" "}
-                        {t("domains.answers.add")}
-                    </Button>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                    {t("domains.answers.addHint")}
-                </span>
-                {draft.trim() !== "" && !valid ? (
-                    <span className="text-xs text-danger">{t("domains.answers.notADomain")}</span>
-                ) : null}
-                {known ? (
-                    <span className="text-xs text-muted-foreground">
-                        {t("domains.answers.known")}
-                    </span>
-                ) : null}
-            </div>
-
-            {error ? <ErrorNote message={error} /> : null}
+            <Dialog
+                open={open}
+                onOpenChange={(next) => {
+                    if (adding) return;
+                    setOpen(next);
+                    if (!next) {
+                        setDraft("");
+                        setError(null);
+                    }
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t("domains.answers.addLabel")}</DialogTitle>
+                        <DialogDescription>{t("domains.answers.addHint")}</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="flex flex-col gap-3"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            void add();
+                        }}
+                    >
+                        <label className="flex flex-col gap-1 text-sm">
+                            {t("domains.answers.domain")}
+                            <Input
+                                autoFocus
+                                value={draft}
+                                onChange={(event) => setDraft(event.target.value)}
+                                // Not the app domain's example: two fields on one page
+                                // showing the same name reads as the same field twice.
+                                placeholder="another.example.com"
+                                autoComplete="off"
+                                aria-invalid={draft.trim() !== "" && !valid}
+                            />
+                        </label>
+                        {draft.trim() !== "" && !valid ? (
+                            <span className="text-xs text-danger">{t("domains.answers.notADomain")}</span>
+                        ) : null}
+                        {known ? (
+                            <span className="text-xs text-muted-foreground">
+                                {t("domains.answers.known")}
+                            </span>
+                        ) : null}
+                        {error ? <ErrorNote message={error} /> : null}
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                disabled={adding}
+                                onClick={() => setOpen(false)}
+                            >
+                                {t("domains.answers.cancel")}
+                            </Button>
+                            <Button
+                                type="submit"
+                                aria-disabled={!valid || known}
+                                disabled={adding}
+                                aria-busy={adding}
+                            >
+                                {adding ? <Loader2 className="size-4 animate-spin" /> : null}
+                                {t("domains.answers.add")}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </PageSection>
     );
 }

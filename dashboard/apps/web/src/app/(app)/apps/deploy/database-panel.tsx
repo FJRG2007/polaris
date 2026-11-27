@@ -376,20 +376,100 @@ type Ask = (confirmation: Confirmation) => void;
 function Section({
     title,
     hint,
+    actions,
     children
 }: {
     title: string;
     hint?: ReactNode;
+    /** Controls for the whole section, beside its heading. */
+    actions?: ReactNode;
     children: ReactNode;
 }) {
     return (
         <section className="flex flex-col gap-2">
-            <div>
-                <h3 className="text-sm font-medium">{title}</h3>
-                {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+            <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                    <h3 className="text-sm font-medium">{title}</h3>
+                    {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+                </div>
+                {actions ? <div className="flex shrink-0 gap-2">{actions}</div> : null}
             </div>
             {children}
         </section>
+    );
+}
+
+/**
+ * The dialog a header "add" button opens: the form, its error, and Cancel beside
+ * the submit. It stays open while the request runs and until it succeeds, so a
+ * refusal is read where the values were typed.
+ */
+function AddDialog({
+    open,
+    onOpenChange,
+    title,
+    description,
+    submitLabel,
+    canSubmit,
+    busy,
+    error,
+    onSubmit,
+    children
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    title: string;
+    description?: ReactNode;
+    submitLabel: string;
+    canSubmit: boolean;
+    busy: boolean;
+    error: string | null;
+    onSubmit: () => void;
+    children: ReactNode;
+}) {
+    const t = useTranslations("deployData");
+    return (
+        <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{title}</DialogTitle>
+                    {description ? <DialogDescription>{description}</DialogDescription> : null}
+                </DialogHeader>
+                <form
+                    className="flex flex-col gap-3"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        if (canSubmit && !busy) onSubmit();
+                    }}
+                >
+                    {children}
+                    {error ? (
+                        <p role="alert" className="text-xs text-danger">
+                            {error}
+                        </p>
+                    ) : null}
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => onOpenChange(false)}
+                        >
+                            {t("database.cancel")}
+                        </Button>
+                        <Button
+                            type="submit"
+                            aria-disabled={!canSubmit}
+                            disabled={busy}
+                            aria-busy={busy}
+                        >
+                            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                            {submitLabel}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -1360,6 +1440,7 @@ function BucketsSection({ storeId, manage, ask }: { storeId: string; manage: boo
     const [list, setList] = useState<BucketList | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [name, setName] = useState("");
+    const [adding, setAdding] = useState(false);
     const [pending, startTransition] = useTransition();
     const [removing, setRemoving] = useState<Bucket | null>(null);
 
@@ -1383,7 +1464,10 @@ function BucketsSection({ storeId, manage, ask }: { storeId: string; manage: boo
         startTransition(async () => {
             const result = await actions.createBucketAction({ storeId, name: name.trim() });
             if (result.error) setError(result.error);
-            else setName("");
+            else {
+                setName("");
+                setAdding(false);
+            }
             await load();
         });
     }
@@ -1399,30 +1483,44 @@ function BucketsSection({ storeId, manage, ask }: { storeId: string; manage: boo
                 </Section>
             ) : null}
             {manage ? (
-                <div className="flex flex-wrap items-start gap-2">
-                    <div className="min-w-48 flex-1">
-                        <Input
-                            value={name}
-                            onChange={(event) => setName(event.target.value)} // i18n-ignore: an example bucket name
-                            placeholder="new-bucket"
-                        />
-                        {name.trim() && !valid.success ? (
-                            <p className="mt-1 text-xs text-warning">
-                                {valid.error.issues[0]?.message}
-                            </p>
-                        ) : null}
-                    </div>
-                    <Button size="sm" disabled={!valid.success || pending} onClick={create}>
-                        {pending ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <Plus className="size-4" />
-                        )}{" "}
-                        {t("database.buckets.add")}
+                <div className="flex justify-end">
+                    <Button size="sm" onClick={() => setAdding(true)}>
+                        <Plus className="size-4 shrink-0" />
+                        {t("database.buckets.addBucket")}
                     </Button>
                 </div>
             ) : null}
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {error && !adding ? <p className="text-sm text-danger">{error}</p> : null}
+            <AddDialog
+                open={adding}
+                onOpenChange={(open) => {
+                    setAdding(open);
+                    if (!open) {
+                        setName("");
+                        setError(null);
+                    }
+                }}
+                title={t("database.buckets.addBucket")}
+                submitLabel={t("database.buckets.create")}
+                canSubmit={valid.success}
+                busy={pending}
+                error={error}
+                onSubmit={create}
+            >
+                <label className="flex flex-col gap-1 text-xs">
+                    <span className="font-medium">{t("database.buckets.name")}</span>
+                    <Input
+                        autoFocus
+                        value={name}
+                        onChange={(event) => setName(event.target.value)} // i18n-ignore: an example bucket name
+                        placeholder="new-bucket"
+                        aria-invalid={name.trim() !== "" && !valid.success}
+                    />
+                </label>
+                {name.trim() && !valid.success ? (
+                    <p className="text-xs text-warning">{valid.error.issues[0]?.message}</p>
+                ) : null}
+            </AddDialog>
             {list === null && !error ? <Skeleton className="h-24 w-full" /> : null}
             {list?.buckets?.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t("database.buckets.empty")}</p>
@@ -1482,6 +1580,7 @@ function BucketCard({
     const t = useTranslations("deployData");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    const [dialog, setDialog] = useState<"key" | "rule" | null>(null);
     const [keyName, setKeyName] = useState("");
     const [access, setAccess] = useState<core.BucketAccess>("readwrite");
     const [secret, setSecret] = useState<{ accessKey: string; secretKey: string } | null>(null);
@@ -1538,9 +1637,20 @@ function BucketCard({
                     </Button>
                 ) : null}
             </div>
-            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {error && !dialog ? <p className="text-xs text-danger">{error}</p> : null}
 
-            <Section title={t("database.buckets.keys")} hint={t("database.buckets.keysHint")}>
+            <Section
+                title={t("database.buckets.keys")}
+                hint={t("database.buckets.keysHint")}
+                actions={
+                    manage ? (
+                        <Button size="sm" variant="secondary" onClick={() => setDialog("key")}>
+                            <Plus className="size-4 shrink-0" />
+                            {t("database.buckets.newKey")}
+                        </Button>
+                    ) : null
+                }
+            >
                 {bucket.keys.length === 0 ? (
                     <p className="text-xs text-muted-foreground">{t("database.buckets.noKeys")}</p>
                 ) : null}
@@ -1597,55 +1707,20 @@ function BucketCard({
                         </Button>
                     </div>
                 ) : null}
-                {manage ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Input
-                            value={keyName}
-                            onChange={(event) => setKeyName(event.target.value)} // i18n-ignore: an example key name
-                            placeholder="key-name"
-                            className="w-40"
-                        />
-                        <div className="w-40">
-                            <Select
-                                value={access}
-                                onValueChange={(value) => setAccess(value as core.BucketAccess)}
-                                options={[
-                                    { value: "readwrite", label: t("database.buckets.readWrite") },
-                                    { value: "readonly", label: t("database.buckets.readOnly") }
-                                ]}
-                            />
-                        </div>
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={!keyValid.success || pending}
-                            onClick={() =>
-                                run(
-                                    async () => {
-                                        const result = await actions.createBucketKeyAction({
-                                            bucketId: bucket.id,
-                                            name: keyName.trim(),
-                                            access
-                                        });
-                                        if (result.accessKey && result.secretKey) {
-                                            setSecret({
-                                                accessKey: result.accessKey,
-                                                secretKey: result.secretKey
-                                            });
-                                        }
-                                        return result;
-                                    },
-                                    () => setKeyName("")
-                                )
-                            }
-                        >
-                            {t("database.buckets.newKey")}
-                        </Button>
-                    </div>
-                ) : null}
             </Section>
 
-            <Section title={t("database.buckets.expiry")} hint={t("database.buckets.expiryHint")}>
+            <Section
+                title={t("database.buckets.expiry")}
+                hint={t("database.buckets.expiryHint")}
+                actions={
+                    manage ? (
+                        <Button size="sm" variant="secondary" onClick={() => setDialog("rule")}>
+                            <Plus className="size-4 shrink-0" />
+                            {t("database.buckets.addRule")}
+                        </Button>
+                    ) : null
+                }
+            >
                 {bucket.lifecycle.map((rule) => (
                     <div key={rule.prefix} className="flex items-center gap-2 text-xs">
                         <code className="font-mono">
@@ -1676,45 +1751,127 @@ function BucketCard({
                         ) : null}
                     </div>
                 ))}
-                {manage ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Input
-                            value={prefix}
-                            onChange={(event) => setPrefix(event.target.value)}
-                            placeholder={t("database.buckets.prefixPlaceholder")}
-                            className="w-44"
-                        />
-                        <div className="w-36">
-                            <Select
-                                value={days}
-                                onValueChange={setDays}
-                                options={core.LIFECYCLE_DAYS.map((value) => ({
-                                    value: String(value),
-                                    label: t("database.buckets.afterDaysOption", { count: value })
-                                }))}
-                            />
-                        </div>
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={!ruleValid.success || pending}
-                            onClick={() =>
-                                run(
-                                    () =>
-                                        actions.setLifecycleRuleAction({
-                                            bucketId: bucket.id,
-                                            prefix: prefix.trim(),
-                                            days: Number(days)
-                                        }),
-                                    () => setPrefix("")
-                                )
-                            }
-                        >
-                            {t("database.buckets.addRule")}
-                        </Button>
-                    </div>
-                ) : null}
             </Section>
+
+            <AddDialog
+                open={dialog === "key"}
+                onOpenChange={(open) => {
+                    setDialog(open ? "key" : null);
+                    if (!open) {
+                        setKeyName("");
+                        setError(null);
+                    }
+                }}
+                title={t("database.buckets.newKeyTitle")}
+                description={t("database.buckets.keysHint")}
+                submitLabel={t("database.buckets.create")}
+                canSubmit={keyValid.success}
+                busy={pending}
+                error={error}
+                onSubmit={() =>
+                    run(
+                        async () => {
+                            const result = await actions.createBucketKeyAction({
+                                bucketId: bucket.id,
+                                name: keyName.trim(),
+                                access
+                            });
+                            if (result.accessKey && result.secretKey) {
+                                setSecret({
+                                    accessKey: result.accessKey,
+                                    secretKey: result.secretKey
+                                });
+                            }
+                            return result;
+                        },
+                        () => {
+                            setKeyName("");
+                            setDialog(null);
+                        }
+                    )
+                }
+            >
+                <label className="flex flex-col gap-1 text-xs">
+                    <span className="font-medium">{t("database.buckets.keyName")}</span>
+                    <Input
+                        autoFocus
+                        value={keyName}
+                        onChange={(event) => setKeyName(event.target.value)} // i18n-ignore: an example key name
+                        placeholder="key-name"
+                        aria-invalid={keyName.trim() !== "" && !keyValid.success}
+                    />
+                </label>
+                {keyName.trim() && !keyValid.success ? (
+                    <p className="text-xs text-warning">{keyValid.error.issues[0]?.message}</p>
+                ) : null}
+                <div className="flex flex-col gap-1 text-xs">
+                    <span className="font-medium">{t("database.buckets.access")}</span>
+                    <Select
+                        value={access}
+                        onValueChange={(value) => setAccess(value as core.BucketAccess)}
+                        options={[
+                            { value: "readwrite", label: t("database.buckets.readWrite") },
+                            { value: "readonly", label: t("database.buckets.readOnly") }
+                        ]}
+                    />
+                </div>
+            </AddDialog>
+
+            <AddDialog
+                open={dialog === "rule"}
+                onOpenChange={(open) => {
+                    setDialog(open ? "rule" : null);
+                    if (!open) {
+                        setPrefix("");
+                        setError(null);
+                    }
+                }}
+                title={t("database.buckets.addRule")}
+                description={t("database.buckets.expiryHint")}
+                submitLabel={t("database.buckets.addRule")}
+                canSubmit={ruleValid.success}
+                busy={pending}
+                error={error}
+                onSubmit={() =>
+                    run(
+                        () =>
+                            actions.setLifecycleRuleAction({
+                                bucketId: bucket.id,
+                                prefix: prefix.trim(),
+                                days: Number(days)
+                            }),
+                        () => {
+                            setPrefix("");
+                            setDialog(null);
+                        }
+                    )
+                }
+            >
+                <label className="flex flex-col gap-1 text-xs">
+                    <span className="font-medium">{t("database.buckets.prefix")}</span>
+                    <Input
+                        autoFocus
+                        value={prefix}
+                        onChange={(event) => setPrefix(event.target.value)}
+                        placeholder={t("database.buckets.prefixPlaceholder")}
+                        aria-invalid={prefix.trim() !== "" && !ruleValid.success}
+                    />
+                </label>
+                {prefix.trim() && !ruleValid.success ? (
+                    <p className="text-xs text-warning">{ruleValid.error.issues[0]?.message}</p>
+                ) : null}
+                <div className="flex flex-col gap-1 text-xs">
+                    <span className="font-medium">{t("database.buckets.deleteAfter")}</span>
+                    <Select
+                        value={days}
+                        onValueChange={setDays}
+                        options={core.LIFECYCLE_DAYS.map((value) => ({
+                            value: String(value),
+                            label: t("database.buckets.afterDaysOption", { count: value })
+                        }))}
+                    />
+                </div>
+            </AddDialog>
 
             {manage ? (
                 <Section

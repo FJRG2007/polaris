@@ -617,6 +617,7 @@ function AliasEditor({
     const t = useTranslations("deployPrivateNet");
     const [aliases, setAliases] = useState(view.aliases);
     const [draft, setDraft] = useState("");
+    const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, start] = useTransition();
 
@@ -627,16 +628,19 @@ function AliasEditor({
     const duplicate = name === view.name || aliases.includes(name);
     const draftMessage = problem && problem !== "empty" ? t(PROBLEM_KEYS[problem]) : null;
 
-    function save(next: string[]) {
+    function save(next: string[], added = false) {
         const previous = aliases;
-        // Shown at once, put back if the server refuses.
+        // Shown at once, put back if the server refuses - with the dialog open
+        // again on what was typed when it was an addition.
         setAliases(next);
         setError(null);
+        if (added) setAdding(false);
         start(async () => {
             const result = await setPrivateAliasesAction(kind, id, next);
             if (result.error) {
                 setAliases(previous);
                 setError(result.error);
+                if (added) setAdding(true);
                 return;
             }
             setDraft("");
@@ -647,8 +651,22 @@ function AliasEditor({
     if (!canEdit && aliases.length === 0) return null;
     return (
         <div className="flex flex-col gap-1.5">
-            <h4 className="text-xs font-medium">{t("aliases")}</h4>
-            <p className="text-xs text-muted-foreground">{t("aliasesHint")}</p>
+            <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                    <h4 className="text-xs font-medium">{t("aliases")}</h4>
+                    <p className="text-xs text-muted-foreground">{t("aliasesHint")}</p>
+                </div>
+                {canEdit && (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => setAdding(true)}
+                    >
+                        <Plus /> {t("addAliasButton")}
+                    </Button>
+                )}
+            </div>
             {aliases.length > 0 && (
                 <ul className="flex flex-wrap gap-1.5">
                     {aliases.map((alias) => (
@@ -672,38 +690,65 @@ function AliasEditor({
                     ))}
                 </ul>
             )}
-            {canEdit && (
-                <form
-                    className="flex items-center gap-2"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        if (!problem && !duplicate) save([...aliases, name]);
-                    }}
-                >
-                    <Input
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value)}
-                        placeholder={t("aliasPlaceholder")}
-                        maxLength={63}
-                        spellCheck={false}
-                        autoCapitalize="none"
-                        aria-label={t("aliases")}
-                        aria-invalid={Boolean(draftMessage)}
-                        className="h-7 w-48 font-mono"
-                    />
-                    <Button
-                        type="submit"
-                        size="sm"
-                        variant="outline"
-                        aria-disabled={Boolean(problem) || duplicate || pending}
-                        disabled={pending}
+            {error && !adding && <p className="text-xs text-danger-ink">{error}</p>}
+            <Dialog
+                open={adding}
+                onOpenChange={(open) => {
+                    setAdding(open);
+                    if (!open) {
+                        setDraft("");
+                        setError(null);
+                    }
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t("addAliasTitle")}</DialogTitle>
+                        <DialogDescription>{t("aliasesHint")}</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="flex flex-col gap-3"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            if (!problem && !duplicate && !pending) save([...aliases, name], true);
+                        }}
                     >
-                        {pending ? <Loader2 className="animate-spin" /> : <Plus />} {t("addAlias")}
-                    </Button>
-                </form>
-            )}
-            {draftMessage && <p className="text-xs text-danger-ink">{draftMessage}</p>}
-            {error && <p className="text-xs text-danger-ink">{error}</p>}
+                        <label className="flex flex-col gap-1 text-xs font-medium">
+                            {t("aliasName")}
+                            <Input
+                                autoFocus
+                                value={draft}
+                                onChange={(event) => setDraft(event.target.value)}
+                                placeholder={t("aliasPlaceholder")}
+                                maxLength={63}
+                                spellCheck={false}
+                                autoCapitalize="none"
+                                aria-invalid={Boolean(draftMessage)}
+                                className="font-mono"
+                            />
+                        </label>
+                        {draftMessage && <p className="text-xs text-danger-ink">{draftMessage}</p>}
+                        {error && (
+                            <p role="alert" className="text-xs text-danger-ink">
+                                {error}
+                            </p>
+                        )}
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setAdding(false)}>
+                                {t("cancel")}
+                            </Button>
+                            <Button
+                                type="submit"
+                                aria-disabled={Boolean(problem) || duplicate || pending}
+                                disabled={pending}
+                            >
+                                {pending && <Loader2 className="animate-spin" />}
+                                {t("addAlias")}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
