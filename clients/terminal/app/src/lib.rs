@@ -56,6 +56,8 @@ mod persistence;
 mod platform;
 #[cfg(feature = "local_fs")]
 mod polaris_account;
+#[cfg(feature = "local_fs")]
+mod polaris_sign_in;
 mod prefix;
 #[cfg(target_os = "macos")]
 mod preview_config_migration;
@@ -2646,6 +2648,8 @@ pub(crate) fn initialize_app(
             http_server::HttpServer::new(routers, ctx)
         });
     }
+    #[cfg(feature = "local_fs")]
+    ctx.add_singleton_model(polaris_sign_in::PolarisSignIn::new);
     #[cfg(feature = "local_fs")]
     if matches!(
         launch_mode,
