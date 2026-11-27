@@ -4,8 +4,9 @@
 
 use polaris_stream100::audio::Session;
 use polaris_stream100::display::{
-    self, IndexedFrame, Sequence, ACK, CHUNK_COUNT, CUSTOM_BACKGROUND, END, HEIGHT, HOST_KEEPALIVE,
-    MAX_TRANSFER_PACKETS, PACKET_SIZE, SCREEN_OFF, SCREEN_ON, TILE_OFFSETS, WIDTH, CHUNK_SIZE, TILE_BLOCKS,
+    self, IndexedFrame, Sequence, ACK, CHUNK_COUNT, CHUNK_SIZE, CUSTOM_BACKGROUND, END, HEIGHT,
+    HOST_KEEPALIVE, MAX_TRANSFER_PACKETS, PACKET_SIZE, SCREEN_OFF, SCREEN_ON, TILE_BLOCKS,
+    TILE_OFFSETS, WIDTH,
 };
 use polaris_stream100::engine::{Command, Engine, Output};
 use polaris_stream100::plugin::Locale;
@@ -357,8 +358,7 @@ fn a_coarse_tile_is_never_sent_after_a_finer_one_inside_its_block() {
     for (tile, (width, height)) in TILE_BLOCKS.iter().enumerate() {
         let (dx, dy) = TILE_OFFSETS[tile];
         assert!(usize::from(dx + width) <= 8 && usize::from(dy + height) <= 4);
-        for earlier in 0..tile {
-            let (ex, ey) = TILE_OFFSETS[earlier];
+        for (earlier, (ex, ey)) in TILE_OFFSETS.iter().copied().enumerate().take(tile) {
             let inside = (dx..dx + width).contains(&ex) && (dy..dy + height).contains(&ey);
             assert!(!inside, "tile {tile} covers tile {earlier}");
         }
@@ -397,7 +397,11 @@ fn a_new_volume_sends_only_the_tiles_that_changed_and_ends_right() {
 
     // The first tile of the change goes out within one tile period.
     painter.show(&page(44));
-    let soon = run(&mut painter, later + TILE_EVERY * 41, TILE_EVERY);
+    let soon = run(
+        &mut painter,
+        later + TILE_EVERY * 41,
+        TILE_EVERY - Duration::from_millis(1),
+    );
     assert_eq!(draws(&soon).len(), 1);
 }
 
