@@ -588,7 +588,7 @@ const tvGallery = tvGallerySources({
     themesReadme: read(join(tvDir, "themes", "README.md")),
     addonsReadme: read(join(tvDir, "addons", "README.md")),
     launcherGradle: readIf(join(tvDir, "launcher", "app", "build.gradle")),
-    plugin: (id) => ({
+    addon: (id) => ({
         gradle:
             readIf(join(tvDir, "addons", id, "app", "build.gradle")) ??
             readIf(join(tvDir, "addons", id, "app", "build.gradle.kts")),
