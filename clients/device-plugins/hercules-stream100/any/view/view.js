@@ -9,8 +9,10 @@
  * Above the preview, on Windows, a line about Polaris' own WinUSB driver: where
  * it stands, and why its last setup did not go through (`driver.look`,
  * answered by the desktop app's `plugins/official.ts`). The driver is set up by
- * the app as the plugin's requirement (`requires` in the manifest); the page
- * offers setting it up again. Text only, like the rest of the view. Nothing is
+ * the app as the plugin's requirement (`requires` in the manifest), by itself:
+ * a missing one is being set up, and only one whose setup was declined or
+ * failed has the page's "Set up the driver" action next to it. The view never
+ * asks for a manual step. Text only, like the rest of the view. Nothing is
  * drawn where the app answers null (another system, or an older app).
  */
 
@@ -45,19 +47,19 @@ const WORDS = {
         nowPlayingNote: "What is playing shows here.",
         offNote: "The screen is off.",
         driver: {
-            needed: "Polaris' driver is not on the Stream 100 yet. Install it from this page; Windows asks once.",
-            neededHercules: "The Hercules driver holds the Stream 100, so it works only through the Hercules software. Install Polaris' driver from this page.",
-            repair: "Another driver took the Stream 100. Polaris puts its own back; Windows asks once.",
-            unplugged: "Plug in the Stream 100 to set up its driver.",
+            settingUp: "Setting up the Polaris driver for the Stream 100. Windows asks once; choose Yes.",
+            repair: "Another driver took the Stream 100. Polaris is putting its own back; Windows asks once.",
+            stopped: "Polaris' driver is not on the Stream 100 yet, so its knobs and buttons do nothing here.",
+            unplugged: "Polaris sets up its driver when the Stream 100 is plugged in.",
             installed: "Stream 100 driver is set up on this PC.",
             failed: {
-                declined: "Windows' permission was not given. Install the driver again from this page and choose Yes.",
-                unplugged: "The Stream 100 was unplugged. Plug it in and try again.",
-                certificate: "Windows did not create the driver's certificate. Try again.",
-                signing: "Windows did not accept the driver's signature. Try again.",
-                binding: "Windows did not put the driver on the Stream 100. Unplug it, plug it back in and try again.",
-                removing: "The driver could not be removed. Try again.",
-                failed: "The driver change did not finish. Try again."
+                declined: "Windows' permission was not given. Choose Set up the driver, then Yes.",
+                unplugged: "The Stream 100 was unplugged. Plug it in and choose Set up the driver.",
+                certificate: "Windows did not create the driver's certificate. Choose Set up the driver to try again.",
+                signing: "Windows did not accept the driver's signature. Choose Set up the driver to try again.",
+                binding: "Windows did not put the driver on the Stream 100. Plug it in again and choose Set up the driver.",
+                removing: "The driver could not be removed. Choose Set up the driver to try again.",
+                failed: "The driver setup did not finish. Choose Set up the driver to try again."
             }
         },
         categories: { calls: "Calls", music: "Music", games: "Games", browser: "Browser", system: "System sounds", other: "Other apps", output: "Whole output", none: "Nothing" },
@@ -71,19 +73,19 @@ const WORDS = {
         nowPlayingNote: "Aquí aparece lo que suena.",
         offNote: "La pantalla está apagada.",
         driver: {
-            needed: "El driver de Polaris aún no está en el Stream 100. Instálalo desde esta página; Windows pide permiso una vez.",
-            neededHercules: "El driver de Hercules tiene el Stream 100: solo funciona con el software de Hercules. Instala el driver de Polaris desde esta página.",
-            repair: "Otro driver se quedó el Stream 100. Polaris vuelve a poner el suyo; Windows pide permiso una vez.",
-            unplugged: "Conecta el Stream 100 para configurar su driver.",
+            settingUp: "Configurando el driver de Polaris para el Stream 100. Windows pide permiso una vez; elige Sí.",
+            repair: "Otro driver se quedó el Stream 100. Polaris está poniendo el suyo; Windows pide permiso una vez.",
+            stopped: "El driver de Polaris aún no está en el Stream 100: sus ruedas y botones no hacen nada aquí.",
+            unplugged: "Polaris configura su driver en cuanto conectes el Stream 100.",
             installed: "El driver del Stream 100 está configurado en este PC.",
             failed: {
-                declined: "No se dio el permiso de Windows. Vuelve a instalar el driver desde esta página y elige Sí.",
-                unplugged: "Se desconectó el Stream 100. Conéctalo y vuelve a probar.",
-                certificate: "Windows no creó el certificado del driver. Vuelve a probar.",
-                signing: "Windows no aceptó la firma del driver. Vuelve a probar.",
-                binding: "Windows no puso el driver en el Stream 100. Desconéctalo, vuelve a conectarlo y prueba otra vez.",
-                removing: "No se pudo quitar el driver. Vuelve a probar.",
-                failed: "El cambio del driver no terminó. Vuelve a probar."
+                declined: "No se dio el permiso de Windows. Elige Configurar el driver y luego Sí.",
+                unplugged: "Se desconectó el Stream 100. Conéctalo y elige Configurar el driver.",
+                certificate: "Windows no creó el certificado del driver. Elige Configurar el driver para reintentar.",
+                signing: "Windows no aceptó la firma del driver. Elige Configurar el driver para reintentar.",
+                binding: "Windows no puso el driver en el Stream 100. Reconéctalo y elige Configurar el driver.",
+                removing: "No se pudo quitar el driver. Elige Configurar el driver para reintentar.",
+                failed: "La configuración del driver no terminó. Elige Configurar el driver para reintentar."
             }
         },
         categories: { calls: "Llamadas", music: "Música", games: "Juegos", browser: "Navegador", system: "Sonidos del sistema", other: "Otras apps", output: "Toda la salida", none: "Nada" },
@@ -132,14 +134,19 @@ function readDriver(value) {
     return { state: value.state, hercules: value.hercules === true, installed: value.installed === true, failure };
 }
 
-/** The key under `driver` of the line to show, or null for none. */
+/**
+ * The key under `driver` of the line to show, or null for none. A missing
+ * driver with no failure is one the app is setting up by itself; after a
+ * declined or failed setup the line says what does not work, and the failure
+ * line beside it points at the page's action.
+ */
 function driverSentence(driver) {
     if (!driver) return null;
     switch (driver.state) {
         case "needed":
-            return driver.hercules ? "neededHercules" : "needed";
+            return driver.failure ? "stopped" : "settingUp";
         case "repair":
-            return "repair";
+            return driver.failure ? "stopped" : "repair";
         case "unplugged":
             return driver.installed ? null : "unplugged";
         case "installed":

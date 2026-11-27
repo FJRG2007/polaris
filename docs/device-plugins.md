@@ -180,14 +180,17 @@ own words (`label`, `hint`, `missing`, `restored`). The install and update
 consent lists each one beside the permissions, and the install sends the keys
 it listed (`plugins.install(id, accepted, requires)`); that is the consent.
 The desktop app (`plugins/requirements.ts`) sets each one up right after the
-install, puts it back by itself on start and on a USB change when something
-else undid it, and never sets up one that was not consented to. One that is
-missing and will not be set up by itself (never consented to, or its last
-setup was declined or failed) is listed in the snapshot as a host action
+install and after an update, and puts it back by itself on start and on a USB
+change when something else undid it. One the install never consented to (an
+install from before the plugin needed it, or an older page that sent no keys)
+is set up by itself too, on the next start or update: the system's own prompt
+(Windows' UAC, Linux's password, macOS' permission) is the consent, and a
+setup that goes through is kept as consented. Only one whose last setup was
+declined or failed is listed in the snapshot as a host action
 (`InstalledPlugin.actions`: id, label, detail), which the page draws next to
-Uninstall and runs through `plugins.runAction(id, action)`. Both fields are
-optional: an older client drops `requires` and lists no actions, an older page
-draws neither and sends no keys, so nothing is set up without a consent.
+Uninstall and runs through `plugins.runAction(id, action)`; it is not asked
+again by itself until the next start. Both fields are optional: an older
+client drops `requires` and lists no actions.
 
 ## Ways in
 

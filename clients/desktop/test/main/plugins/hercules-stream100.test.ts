@@ -114,7 +114,7 @@ describe("Hercules Stream 100 plugin", () => {
 
         for (const message of sent) expect(pluginMessageSchema.safeParse(message).success).toBe(true);
         expect(sent[0]).toEqual({ type: "ready" });
-        expect(sent).toContainEqual({ type: "status", state: "busy", code: "herculesDriver", detail: "Polaris could not read the Stream 100 through the Hercules software. Plug it in again, or reinstall Hercules Stream Control." });
+        expect(sent).toContainEqual({ type: "status", state: "busy", code: "herculesDriver", detail: "The Stream 100 still has the Hercules driver. It works here once Polaris' driver is on it." });
         expect(sent).toContainEqual({ type: "status", state: "connected" });
         expect(fake.feed).toHaveBeenCalledWith(report, 1_000);
         const calls = sent.filter((message) => (message as { type: string; }).type === "call") as { id: number; params: unknown; }[];
@@ -237,9 +237,13 @@ describe("Hercules Stream 100 plugin", () => {
         it("says where the driver stands only where the app says it is needed, in both languages", () => {
             expect(view.readDriver(null)).toBeNull();
             expect(view.readDriver({ state: "other" })).toBeNull();
-            expect(view.driverSentence(view.readDriver({ state: "needed", hercules: true }))).toBe("neededHercules");
-            expect(view.driverSentence(view.readDriver({ state: "needed", hercules: false }))).toBe("needed");
+            // Missing with no failure: the app is setting it up by itself, Hercules driver or not.
+            expect(view.driverSentence(view.readDriver({ state: "needed", hercules: true }))).toBe("settingUp");
+            expect(view.driverSentence(view.readDriver({ state: "needed", hercules: false }))).toBe("settingUp");
             expect(view.driverSentence(view.readDriver({ state: "repair" }))).toBe("repair");
+            // Declined or failed: what does not work, beside the reason and the page's action.
+            expect(view.driverSentence(view.readDriver({ state: "needed", hercules: true, failure: "declined" }))).toBe("stopped");
+            expect(view.driverSentence(view.readDriver({ state: "repair", failure: "binding" }))).toBe("stopped");
             expect(view.driverSentence(view.readDriver({ state: "installed" }))).toBe("installed");
             expect(view.driverSentence(view.readDriver({ state: "notNeeded" }))).toBeNull();
             expect(view.driverSentence(view.readDriver({ state: "unplugged", installed: true }))).toBeNull();
@@ -252,6 +256,18 @@ describe("Hercules Stream 100 plugin", () => {
             expect(Object.keys(es).sort()).toEqual(Object.keys(en).sort());
             expect(Object.keys(en.failed).sort()).toEqual([...view.DRIVER_FAILURES].sort());
             expect(Object.keys(es.failed).sort()).toEqual([...view.DRIVER_FAILURES].sort());
+        });
+
+        it("never asks for a manual install, and names the page's action as the manifest labels it", () => {
+            const label = manifest.requires["win32-x64"]!.find((item) => item.key === "driver")!.label;
+            const texts = (driver: Record<string, unknown> & { failed: Record<string, string> }) => [...Object.values(driver).filter((value): value is string => typeof value === "string"), ...Object.values(driver.failed)];
+            const statuses = Object.values(manifest.statusTexts ?? {});
+            const missing = manifest.requires["win32-x64"]!.map((item) => item.missing!);
+            for (const [locale, driver] of [["en-US", view.wordsFor("en-US").driver], ["es-ES", view.wordsFor("es-ES").driver]] as const) {
+                const all = [...texts(driver), ...statuses.map((text) => text[locale]!), ...missing.map((text) => text[locale]!)];
+                for (const text of all) expect(text, text).not.toMatch(/from this page|desde esta página|reinstall|reinstala|install it|instálalo/i);
+                for (const text of Object.values(driver.failed)) expect(text, text).toContain(label[locale]!);
+            }
         });
 
         it("reads what is stored field by field", () => {

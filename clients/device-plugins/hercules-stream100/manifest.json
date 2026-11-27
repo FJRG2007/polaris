@@ -163,12 +163,12 @@
                 },
                 "key": "driver",
                 "label": {
-                    "en-US": "Install a driver for the Stream 100",
-                    "es-ES": "Instalar un driver para el Stream 100"
+                    "en-US": "Set up the driver",
+                    "es-ES": "Configurar el driver"
                 },
                 "missing": {
-                    "en-US": "Polaris' driver is not set up, so the Stream 100 works only through the Hercules software, if installed.",
-                    "es-ES": "El driver de Polaris no está instalado: el Stream 100 solo funciona con el software de Hercules, si está."
+                    "en-US": "Polaris' driver is not on the Stream 100 yet, so its knobs and buttons do nothing here.",
+                    "es-ES": "El driver de Polaris aún no está en el Stream 100: sus ruedas y botones no hacen nada aquí."
                 },
                 "restored": {
                     "en-US": "Another driver had taken the Stream 100. Polaris put its own back.",
@@ -184,12 +184,12 @@
                 },
                 "key": "driver",
                 "label": {
-                    "en-US": "Install a driver for the Stream 100",
-                    "es-ES": "Instalar un driver para el Stream 100"
+                    "en-US": "Set up the driver",
+                    "es-ES": "Configurar el driver"
                 },
                 "missing": {
-                    "en-US": "Polaris' driver is not set up, so the Stream 100 works only through the Hercules software, if installed.",
-                    "es-ES": "El driver de Polaris no está instalado: el Stream 100 solo funciona con el software de Hercules, si está."
+                    "en-US": "Polaris' driver is not on the Stream 100 yet, so its knobs and buttons do nothing here.",
+                    "es-ES": "El driver de Polaris aún no está en el Stream 100: sus ruedas y botones no hacen nada aquí."
                 },
                 "restored": {
                     "en-US": "Another driver had taken the Stream 100. Polaris put its own back.",
@@ -624,8 +624,8 @@
             "es-ES": "Cierra Hercules Stream Control para usar el Stream 100 aquí. Mientras está abierto, tiene el control."
         },
         "herculesDriver": {
-            "en-US": "Polaris could not read the Stream 100 through the Hercules software. Plug it in again, or reinstall Hercules Stream Control.",
-            "es-ES": "Polaris no pudo leer el Stream 100 con el software de Hercules. Vuelve a conectarlo o reinstala Hercules Stream Control."
+            "en-US": "The Stream 100 still has the Hercules driver. It works here once Polaris' driver is on it.",
+            "es-ES": "El Stream 100 aún tiene el driver de Hercules. Funciona aquí en cuanto tenga el driver de Polaris."
         },
         "perAppNeedsMacos": {
             "en-US": "Knobs for calls, music, games or the browser need macOS 14.2 or later. Whole output works here.",
@@ -637,6 +637,6 @@
         }
     },
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.17",
+    "version": "0.1.18",
     "view": "view/index.html"
 }
