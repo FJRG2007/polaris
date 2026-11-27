@@ -99,6 +99,7 @@ export const POLARIS_ROUTE_ROOTS: readonly string[] = [
     "u",
     "vault",
     "video",
+    "voice-widget",
     "vpn",
     "vs",
     "wall",

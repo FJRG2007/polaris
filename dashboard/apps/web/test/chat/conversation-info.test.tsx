@@ -134,7 +134,7 @@ vi.mock("@/app/(app)/chat/report-dialog", () => ({ ReportDialog: () => null }));
 vi.mock("@/app/(app)/chat/person-card", () => ({
     PersonCardProvider: ({ children }: { children: import("react").ReactNode }) => children
 }));
-vi.mock("@/app/(app)/chat/game-link-badge", () => ({ GameLinkChips: () => null }));
+vi.mock("@/app/(app)/chat/game-link-badge", () => ({ GameLinkChips: () => null, GameBridgeRow: () => null }));
 
 function info(channel: typeof DIRECT, entries: Record<string, unknown> = {}) {
     render(

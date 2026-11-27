@@ -24,7 +24,7 @@ import {
     POLAR_USAGE_RANGES,
     type PolarUsageRange,
     type PolarUsageReport
-} from "@/lib/polar/usage-report";
+} from "@/lib/polar/usage-report-shape";
 import { loadUsageReportAction } from "./routing-actions";
 
 type Load = { state: "loading" } | { state: "failed" } | { state: "ready"; report: PolarUsageReport };

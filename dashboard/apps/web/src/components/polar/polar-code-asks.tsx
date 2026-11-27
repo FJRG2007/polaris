@@ -301,7 +301,7 @@ export function AskCard({
                 <div
                     aria-label={t("code.ask.preview")}
                     role="region"
-                    className="max-h-72 min-w-0 overflow-auto rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    className="max-h-72 min-w-0 overflow-auto overscroll-contain rounded-md border border-border bg-background px-2 py-1.5 text-sm"
                 >
                     <MessageResponse>{shown}</MessageResponse>
                 </div>

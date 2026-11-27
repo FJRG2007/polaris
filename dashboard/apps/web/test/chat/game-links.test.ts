@@ -157,7 +157,8 @@ describe("the badge", () => {
                 game: "Minecraft",
                 logo: "/logos/minecraft.webp",
                 href: null,
-                commands: LINK.commands
+                commands: LINK.commands,
+                shows: false
             }
         ]);
         fake.opens = new Set(["survival"]);
