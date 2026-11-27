@@ -16,7 +16,7 @@
  */
 
 import { useState } from "react";
-import { settingType, useOptimisticToggle, useOptimisticValue } from "@polaris/ui";
+import { cn, settingType, useOptimisticToggle, useOptimisticValue } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -119,7 +119,7 @@ export function SettingsView({
             {error && (
                 <p
                     role="alert"
-                    className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                    className={cn(settingType.body, "bg-danger-soft text-danger-ink rounded-md px-3 py-2")}
                 >
                     {error}
                 </p>
@@ -198,8 +198,8 @@ function ChatCard({ orgId, isolated, onRun }: { orgId: string; isolated: boolean
             <CardBody>
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("settings.chat.label")}</p>
-                        <p className="text-muted-foreground text-xs">{t("settings.chat.hint")}</p>
+                        <p className={cn(settingType.body, "font-medium")}>{t("settings.chat.label")}</p>
+                        <p className={settingType.hint}>{t("settings.chat.hint")}</p>
                     </div>
                     <Switch
                         checked={on}
@@ -243,13 +243,13 @@ function SealedDevicesCard({ orgId, days, instance }: { orgId: string; days: num
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium">{t("settings.sealedDevices.label")}</p>
-                        <p id="org-sealed-devices" className="text-muted-foreground text-xs">
+                        <p className={cn(settingType.body, "font-medium")}>{t("settings.sealedDevices.label")}</p>
+                        <p id="org-sealed-devices" className={settingType.hint}>
                             {t("settings.sealedDevices.hint")}
                         </p>
                     </div>
                     <Select
-                        className="h-8 w-full shrink-0 text-xs sm:w-56"
+                        className={cn(settingType.body, "h-8 w-full shrink-0 sm:w-56")}
                         aria-label={t("settings.sealedDevices.label")}
                         aria-describedby="org-sealed-devices"
                         value={value === null ? "instance" : String(value)}
@@ -305,11 +305,11 @@ function ProfileCard({ org, onRun }: { org: OrgDetail; onRun: Runner }) {
                         await onRun(() => updateOrgAction(org.id, parsed.data));
                     }}
                 >
-                    <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                    <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                         {t("form.name")}
                         <Input value={name} onChange={(event) => setName(event.target.value)} />
                     </label>
-                    <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                    <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                         {t("form.description")}
                         <Textarea
                             value={description}
@@ -319,7 +319,7 @@ function ProfileCard({ org, onRun }: { org: OrgDetail; onRun: Runner }) {
                         />
                     </label>
                     <div className="flex items-center justify-between gap-2">
-                        <p className="text-danger text-xs">
+                        <p className={settingType.error}>
                             {changed && !parsed.success
                                 ? orgValidationMessage(t, tv, parsed.error.issues[0]?.message)
                                 : ""}
@@ -382,7 +382,7 @@ function HandleCard({
                         router.replace(`/account/organizations/${result.slug}/settings`);
                     }}
                 >
-                    <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">
+                    <label className={cn(settingType.hint, "flex min-w-48 flex-1 flex-col gap-1")}>
                         {t("form.handle")}
                         <Input
                             value={slug}
@@ -398,7 +398,7 @@ function HandleCard({
                     >
                         {t("settings.handle.change")}
                     </Button>
-                    <p className="text-muted-foreground w-full text-xs">
+                    <p className={cn(settingType.hint, "w-full")}>
                         {changed && !parsed.success
                             ? orgValidationMessage(t, tv, parsed.error.issues[0]?.message)
                             : t("settings.handle.hint")}
@@ -428,9 +428,9 @@ function TransferCard({
             </CardHeader>
             <CardBody>
                 {candidates.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">{t("settings.transfer.nobody")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.transfer.nobody")}</p>
                 ) : (
-                    <label className="text-muted-foreground flex max-w-sm flex-col gap-1 text-xs">
+                    <label className={cn(settingType.hint, "flex max-w-sm flex-col gap-1")}>
                         {t("settings.transfer.to")}
                         <Select
                             value=""
@@ -494,7 +494,7 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: OrgDeletionImpact
                 <CardTitle>{t("settings.danger.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-muted-foreground text-xs">
+                <p className={settingType.hint}>
                     {t("settings.danger.body", counts)}
                     {impact.projects > 0 &&
                         ` ${t("settings.danger.projects", { count: impact.projects })}`}

@@ -33,6 +33,7 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -84,7 +85,7 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
             </CardHeader>
             <CardBody className="flex flex-col gap-2">
                 {lists.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">{t("lists.empty")}</p>
+                    <p className={settingType.hint}>{t("lists.empty")}</p>
                 ) : (
                     <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
                         {lists.map((list) => (
@@ -94,18 +95,18 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                             >
                                 <span className="min-w-0 flex-1">
                                     <span
-                                        className="block truncate text-[0.8125rem]"
+                                        className={cn(settingType.body, "block truncate")}
                                         title={list.name}
                                     >
                                         {list.name}
                                     </span>
-                                    <span className="block text-[0.6875rem] text-foreground-subtle">
+                                    <span className={cn(settingType.hint, "block")}>
                                         {list.members.length === 0
                                             ? t("lists.nobodyOnIt")
                                             : list.members.map((member) => member.name).join(", ")}
                                     </span>
                                     {list.usedBy.length > 0 && (
-                                        <span className="block text-[0.6875rem] text-muted-foreground">
+                                        <span className={cn(settingType.hint, "block")}>
                                             {t("lists.usedBy", {
                                                 fields: list.usedBy
                                                     .map((field) =>
@@ -226,7 +227,7 @@ function ListDialog({
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                         {t("lists.name")}
                         <Input
                             autoFocus

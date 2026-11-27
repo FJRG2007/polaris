@@ -25,7 +25,7 @@ import { unblockPersonAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { BlockedPerson } from "@/lib/blocks";
 import { PersonName, PersonRow, RealNames } from "@/components/person-name";
-import { Button, Card, CardBody, CardHeader, CardTitle, settingType } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, cn, settingType } from "@polaris/ui";
 
 export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
     const router = useRouter();
@@ -55,10 +55,10 @@ export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
                 this way. See `contact-names` for where a nickname does belong. */}
             <RealNames>
                 <CardBody className="flex flex-col gap-3 p-3">
-                    <p className="text-xs text-muted-foreground">{t("blocked.description")}</p>
+                    <p className={settingType.hint}>{t("blocked.description")}</p>
 
                     {people.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("blocked.empty")}
                         </p>
                     ) : (
@@ -72,7 +72,7 @@ export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
                                 >
                                     <Avatar person={person} size={24} />
                                     <span
-                                        className="min-w-0 flex-1 truncate text-sm"
+                                        className={cn(settingType.body, "min-w-0 flex-1 truncate")}
                                         title={person.name}
                                     >
                                         <PersonName id={person.id} name={person.name} />

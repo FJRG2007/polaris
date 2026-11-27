@@ -29,6 +29,7 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -36,6 +37,7 @@ import {
     DialogTitle,
     Input,
     Select,
+    settingType,
     useToast
 } from "@polaris/ui";
 import {
@@ -128,7 +130,7 @@ export function PeopleView({
         <PlainNames>
             <div className="flex flex-col gap-4">
                 {error && (
-                    <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
+                    <p role="alert" className={cn(settingType.body, "bg-danger-soft text-danger-ink rounded-md px-3 py-2")}>
                         {error}
                     </p>
                 )}
@@ -137,7 +139,7 @@ export function PeopleView({
                     <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
                         <CardTitle className="flex items-center gap-2">
                             <Users className="size-4 shrink-0" /> {t("people.title")}
-                            <span className="text-muted-foreground text-xs font-normal">
+                            <span className={cn(settingType.hint, "font-normal")}>
                                 {memberLimit > 0
                                     ? t("form.ofLimit", { count: members.length, limit: memberLimit })
                                     : members.length}
@@ -150,7 +152,7 @@ export function PeopleView({
                                     value={query}
                                     placeholder={t("people.search")}
                                     aria-label={t("people.search")}
-                                    className="h-8 ps-7 text-xs"
+                                    className={cn(settingType.body, "h-8 ps-7")}
                                     onChange={(event) => setQuery(event.target.value)}
                                 />
                             </label>
@@ -163,8 +165,8 @@ export function PeopleView({
                             and a stack of cards turns every one of those into a
                             search instead of a glance. */}
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="bg-surface/60 text-muted-foreground text-start text-xs">
+                            <table className={cn(settingType.body, "w-full")}>
+                                <thead className={cn(settingType.small, "bg-surface/60 text-muted-foreground text-start")}>
                                     <tr>
                                         <th className="px-3 py-2 font-medium">{t("people.columns.person")}</th>
                                         <th className="hidden px-3 py-2 font-medium sm:table-cell">
@@ -222,7 +224,7 @@ export function PeopleView({
                                                                     </PersonName>
                                                                 </span>
                                                                 <span
-                                                                    className="text-muted-foreground truncate text-xs"
+                                                                    className={cn(settingType.hint, "truncate")}
                                                                     title={member.contact}
                                                                 >
                                                                     {member.contact}
@@ -231,14 +233,14 @@ export function PeopleView({
                                                         </span>
                                                     </td>
                                                     <td
-                                                        className="text-muted-foreground hidden max-w-0 truncate px-3 py-2 text-xs sm:table-cell"
+                                                        className={cn(settingType.hint, "hidden max-w-0 truncate px-3 py-2 sm:table-cell")}
                                                         title={member.teams.join(", ")}
                                                     >
                                                         {member.teams.length > 0
                                                             ? member.teams.join(", ")
                                                             : t("people.noTeams")}
                                                     </td>
-                                                    <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 text-xs lg:table-cell">
+                                                    <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 lg:table-cell")}>
                                                         {member.joinedAt
                                                             ? format.date(member.joinedAt)
                                                             : ""}
@@ -255,7 +257,7 @@ export function PeopleView({
                                                                 value={member.role}
                                                                 options={options}
                                                                 aria-label={t("form.roleFor", { name: member.name })}
-                                                                className="h-8 w-32 text-xs"
+                                                                className={cn(settingType.body, "h-8 w-32")}
                                                                 onValueChange={(next) =>
                                                                     void run(() =>
                                                                         setOrgMemberRoleAction(
@@ -325,7 +327,7 @@ export function PeopleView({
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <MailQuestion className="size-4 shrink-0" /> {t("people.waiting")}
-                                <span className="text-muted-foreground text-xs font-normal">
+                                <span className={cn(settingType.hint, "font-normal")}>
                                     {waiting}
                                 </span>
                             </CardTitle>
@@ -340,16 +342,16 @@ export function PeopleView({
                                         <Mail className="size-4 shrink-0" aria-hidden />
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm" title={invite.email}>
+                                        <p className={cn(settingType.body, "truncate")} title={invite.email}>
                                             {invite.email}
                                         </p>
-                                        <p className="text-muted-foreground truncate text-xs">
+                                        <p className={cn(settingType.hint, "truncate")}>
                                             {invite.sentAt
                                                 ? t("people.emailedBy", { name: invite.invitedBy })
                                                 : t("people.notEmailed", { name: invite.invitedBy })}
                                         </p>
                                     </div>
-                                    <span className="text-muted-foreground hidden min-w-0 max-w-full shrink-0 truncate text-xs lg:inline" title={t("people.until", { date: format.date(invite.expiresAt) })}>
+                                    <span className={cn(settingType.hint, "hidden min-w-0 max-w-full shrink-0 truncate lg:inline")} title={t("people.until", { date: format.date(invite.expiresAt) })}>
                                         {t("people.until", { date: format.date(invite.expiresAt) })}
                                     </span>
                                     <Badge variant="neutral">{invite.roleName}</Badge>
@@ -411,13 +413,13 @@ export function PeopleView({
                                         size={32}
                                     />
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm" title={invitation.name}>
+                                        <p className={cn(settingType.body, "truncate")} title={invitation.name}>
                                             <PersonName
                                                 id={invitation.userId}
                                                 name={invitation.name}
                                             />
                                         </p>
-                                        <p className="text-muted-foreground truncate text-xs">
+                                        <p className={cn(settingType.hint, "truncate")}>
                                             {invitation.contact
                                                 ? t("people.invitedByWithContact", {
                                                       name: invitation.invitedBy,
@@ -426,7 +428,7 @@ export function PeopleView({
                                                 : t("people.invitedBy", { name: invitation.invitedBy })}
                                         </p>
                                     </div>
-                                    <span className="text-muted-foreground hidden min-w-0 max-w-full shrink-0 truncate text-xs lg:inline" title={t("people.until", { date: format.date(invitation.expiresAt) })}>
+                                    <span className={cn(settingType.hint, "hidden min-w-0 max-w-full shrink-0 truncate lg:inline")} title={t("people.until", { date: format.date(invitation.expiresAt) })}>
                                         {t("people.until", { date: format.date(invitation.expiresAt) })}
                                     </span>
                                     <Badge variant="neutral">{invitation.roleName}</Badge>
@@ -537,7 +539,7 @@ function InvitePerson({
 
                 {lastLink ? (
                     <div className="border-border flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
-                        <span className="text-muted-foreground w-full text-xs">
+                        <span className={cn(settingType.hint, "w-full")}>
                             {t("people.invite.linkHint")}
                         </span>
                         <code className="min-w-0 flex-1 truncate text-xs" title={lastLink}>
@@ -559,7 +561,7 @@ function InvitePerson({
                     </div>
                 ) : null}
 
-                <label className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+                <label className={cn(settingType.hint, "flex flex-wrap items-center gap-2")}>
                     {t.rich("people.invite.defaultRole", {
                         picker: (
                             <Select
@@ -615,7 +617,7 @@ function InvitePerson({
                             }
                         }}
                     >
-                        <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                        <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                             {t("form.identifier")}
                             <Input
                                 autoFocus
@@ -634,7 +636,7 @@ function InvitePerson({
                             className="h-9"
                             onValueChange={setRole}
                         />
-                        <p className="text-muted-foreground w-full text-xs">
+                        <p className={cn(settingType.hint, "w-full")}>
                             {full
                                 ? t("people.invite.full", { limit: memberLimit })
                                 : hint ||
@@ -650,7 +652,7 @@ function InvitePerson({
                                       )
                                   })}
                         </p>
-                        <p className="text-muted-foreground w-full text-xs">
+                        <p className={cn(settingType.hint, "w-full")}>
                             {canInviteNewPeople ? t("people.invite.newPeople") : t("people.invite.existingOnly")}
                         </p>
                         <div className="flex justify-end gap-2">

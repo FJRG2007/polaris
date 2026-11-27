@@ -6,6 +6,7 @@
  * which takes a count per dimension, is read after it.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { LimitsView } from "./limits-view";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireOrgPage } from "@/lib/orgs/page-access";
@@ -25,7 +26,7 @@ export default async function OrganizationLimitsPage({
         <div className="flex flex-col gap-4">
             <div>
                 <h2 className="text-base font-semibold">{t("quotas.title")}</h2>
-                <p className="text-muted-foreground text-sm">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {t("quotas.intro", { org: org.name })}
                 </p>
             </div>

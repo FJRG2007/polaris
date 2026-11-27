@@ -22,12 +22,14 @@ import type { PrivacyListView } from "@/lib/privacy-service";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Select
+    Select,
+    settingType
 } from "@polaris/ui";
 
 /** The answer to "where do these people come from". */
@@ -86,7 +88,7 @@ export function AudienceDialog({
 
                 <div className="flex flex-col gap-3">
                     {lists.length > 0 && (
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                             {t("dialog.whoToUse")}
                             <Select
                                 aria-label={t("dialog.whoToUse")}
@@ -119,20 +121,20 @@ export function AudienceDialog({
                         />
                     ) : (
                         <div className="flex flex-col gap-1 rounded-md border border-border p-2">
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {list?.members.length ? t("dialog.everybodyOnList") : t("dialog.emptyList")}
                             </p>
                             <ul className="flex flex-wrap gap-1">
                                 {list?.members.map((member) => (
                                     <li
                                         key={member.id}
-                                        className="max-w-[10rem] truncate rounded-full bg-muted px-2 py-0.5 text-[0.6875rem]"
+                                        className={cn(settingType.small, "max-w-[10rem] truncate rounded-full bg-muted px-2 py-0.5")}
                                     >
                                         {member.name}
                                     </li>
                                 ))}
                             </ul>
-                            <p className="text-[0.6875rem] text-foreground-subtle">
+                            <p className={settingType.hint}>
                                 {t("dialog.changeUnderLists")}
                             </p>
                         </div>

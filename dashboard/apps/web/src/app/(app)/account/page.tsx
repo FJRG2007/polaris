@@ -20,6 +20,7 @@
  * views.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { prisma } from "@polaris/db";
@@ -114,7 +115,7 @@ export default async function AccountPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("profile.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("profile.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("profile.page.intro")}</p>
             </div>
             <ProfileView
                 name={user?.name ?? session.name}

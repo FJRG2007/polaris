@@ -28,12 +28,14 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
     Input,
+    settingType,
     Textarea
 } from "@polaris/ui";
 
@@ -75,7 +77,7 @@ function Invitations({ invitations }: { invitations: readonly OrgInvitationView[
     return (
         <Card>
             <CardBody className="flex flex-col gap-2">
-                <p className="text-sm font-medium">
+                <p className={cn(settingType.body, "font-medium")}>
                     {t("list.invitations.heading", { count: invitations.length })}
                 </p>
                 <ul className="flex flex-col gap-2">
@@ -89,10 +91,10 @@ function Invitations({ invitations }: { invitations: readonly OrgInvitationView[
                                 size={32}
                             />
                             <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm" title={invitation.orgName}>
+                                <span className={cn(settingType.body, "block truncate")} title={invitation.orgName}>
                                     {invitation.orgName}
                                 </span>
-                                <span className="text-muted-foreground block truncate text-xs">
+                                <span className={cn(settingType.hint, "block truncate")}>
                                     {t("list.invitations.askedBy", {
                                         name: invitation.invitedBy,
                                         role: invitation.roleName.toLowerCase()
@@ -119,7 +121,7 @@ function Invitations({ invitations }: { invitations: readonly OrgInvitationView[
                     ))}
                 </ul>
                 {error && (
-                    <p role="alert" className="text-danger text-sm">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 )}
@@ -160,12 +162,12 @@ function RestrictedOrgRow({ org }: { org: OrgSummary }) {
             <OrgAvatar org={org} size={36} />
             <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium" title={org.name}>
+                    <span className={cn(settingType.body, "truncate font-medium")} title={org.name}>
                         {org.name}
                     </span>
                     <Badge variant="neutral">{org.roleName}</Badge>
                 </span>
-                <span className="text-muted-foreground block truncate text-xs">
+                <span className={cn(settingType.hint, "block truncate")}>
                     {t("list.restricted.hint")}
                 </span>
             </span>
@@ -173,7 +175,7 @@ function RestrictedOrgRow({ org }: { org: OrgSummary }) {
                 {t("form.leave")}
             </Button>
             {error ? (
-                <p role="alert" className="text-danger w-full text-xs">
+                <p role="alert" className={cn(settingType.error, "w-full")}>
                     {error}
                 </p>
             ) : null}
@@ -244,7 +246,7 @@ export function OrganizationsView({
             <Invitations invitations={invitations} />
 
             <div className="flex items-center justify-between gap-3">
-                <p className="text-muted-foreground text-sm">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {orgs.length === 0 ? t("list.none") : t("list.count", { count: orgs.length })}
                 </p>
                 {canCreate ? (
@@ -252,7 +254,7 @@ export function OrganizationsView({
                         <Plus className="size-4" /> {t("list.new")}
                     </Button>
                 ) : (
-                    <span className="text-muted-foreground text-xs">{blockedReason}</span>
+                    <span className={settingType.hint}>{blockedReason}</span>
                 )}
             </div>
 
@@ -260,8 +262,8 @@ export function OrganizationsView({
                 <Card>
                     <CardBody className="flex flex-col items-center gap-2 py-10 text-center">
                         <Building2 className="text-muted-foreground size-6" />
-                        <p className="text-sm">{t("list.emptyTitle")}</p>
-                        <p className="text-muted-foreground max-w-sm text-xs">{t("list.emptyBody")}</p>
+                        <p className={settingType.body}>{t("list.emptyTitle")}</p>
+                        <p className={cn(settingType.hint, "max-w-sm")}>{t("list.emptyBody")}</p>
                     </CardBody>
                 </Card>
             ) : (
@@ -282,7 +284,7 @@ export function OrganizationsView({
                                 <span className="min-w-0 flex-1">
                                     <span className="flex items-center gap-2">
                                         <span
-                                            className="truncate text-sm font-medium"
+                                            className={cn(settingType.body, "truncate font-medium")}
                                             title={org.name}
                                         >
                                             {org.name}
@@ -293,12 +295,12 @@ export function OrganizationsView({
                                             {org.roleName}
                                         </Badge>
                                     </span>
-                                    <span className="text-muted-foreground block truncate text-xs">
+                                    <span className={cn(settingType.hint, "block truncate")}>
                                         @{org.slug}
                                         {org.description ? ` - ${org.description}` : ""}
                                     </span>
                                 </span>
-                                <span className="text-muted-foreground hidden shrink-0 items-center gap-3 text-xs sm:flex">
+                                <span className={cn(settingType.hint, "hidden shrink-0 items-center gap-3 sm:flex")}>
                                     <span className="flex items-center gap-1">
                                         <Users className="size-3.5 shrink-0" /> {org.memberCount}
                                     </span>
@@ -329,7 +331,7 @@ export function OrganizationsView({
                         </DialogDescription>
                     </DialogHeader>
                     <form className="flex flex-col gap-3" onSubmit={submit}>
-                        <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                        <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                             {t("form.name")}
                             <Input
                                 value={name}
@@ -341,7 +343,7 @@ export function OrganizationsView({
                                 }}
                             />
                         </label>
-                        <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                        <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                             {t("form.handle")}
                             <Input
                                 value={slug}
@@ -351,11 +353,11 @@ export function OrganizationsView({
                                     setSlug(event.target.value);
                                 }}
                             />
-                            <span className="text-muted-foreground text-xs">
+                            <span className={settingType.hint}>
                                 {t("list.create.handleHint")}
                             </span>
                         </label>
-                        <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                        <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                             {t("form.description")}
                             <Textarea
                                 value={description}
@@ -367,7 +369,7 @@ export function OrganizationsView({
                         {(issue || error) && (
                             <p
                                 role="alert"
-                                className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                                className={cn(settingType.body, "bg-danger-soft text-danger-ink rounded-md px-3 py-2")}
                             >
                                 {error || issue}
                             </p>

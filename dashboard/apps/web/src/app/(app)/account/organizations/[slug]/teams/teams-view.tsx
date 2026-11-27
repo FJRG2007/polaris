@@ -25,6 +25,7 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -32,6 +33,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    settingType,
     Textarea
 } from "@polaris/ui";
 
@@ -62,7 +64,7 @@ export function TeamsView({
     return (
         <div className="flex flex-col gap-4">
             {error && (
-                <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
+                <p role="alert" className={cn(settingType.body, "bg-danger-soft text-danger-ink rounded-md px-3 py-2")}>
                     {error}
                 </p>
             )}
@@ -71,7 +73,7 @@ export function TeamsView({
                 <CardHeader className="flex-row items-center justify-between">
                     <CardTitle>
                         {t("teams.title")}
-                        <span className="text-muted-foreground ms-2 text-xs font-normal">
+                        <span className={cn(settingType.hint, "ms-2 font-normal")}>
                             {teamLimit > 0 ? t("form.ofLimit", { count: teams.length, limit: teamLimit }) : teams.length}
                         </span>
                     </CardTitle>
@@ -92,8 +94,8 @@ export function TeamsView({
                         are read down a column, and a stack of cards makes each
                         of those a search rather than a glance. */}
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-surface/60 text-muted-foreground text-start text-xs">
+                        <table className={cn(settingType.body, "w-full")}>
+                            <thead className={cn(settingType.small, "bg-surface/60 text-muted-foreground text-start")}>
                                 <tr>
                                     <th className="px-3 py-2 font-medium">{t("teams.columns.team")}</th>
                                     <th className="px-3 py-2 font-medium">{t("teams.columns.people")}</th>
@@ -124,19 +126,19 @@ export function TeamsView({
                                         onClick={() => setOpen(team)}
                                     >
                                         <span className="flex min-w-0 flex-col leading-tight">
-                                            <span className="truncate text-sm" title={team.name}>
+                                            <span className={cn(settingType.body, "truncate")} title={team.name}>
                                                 {team.name}
                                             </span>
-                                            <span className="text-muted-foreground truncate text-xs">
+                                            <span className={cn(settingType.hint, "truncate")}>
                                                 @{team.slug}
                                             </span>
                                         </span>
                                     </button>
                                 </td>
-                                <td className="text-muted-foreground whitespace-nowrap px-3 py-2 text-xs tabular-nums">
+                                <td className={cn(settingType.hint, "whitespace-nowrap px-3 py-2 tabular-nums")}>
                                     {team.memberCount}
                                 </td>
-                                <td className="text-muted-foreground whitespace-nowrap px-3 py-2 text-xs">
+                                <td className={cn(settingType.hint, "whitespace-nowrap px-3 py-2")}>
                                     {team.spaceCount + team.folderCount === 0
                                         ? t("teams.noGrants")
                                         : t("teams.grants", { count: team.spaceCount + team.folderCount })}
@@ -174,7 +176,7 @@ export function TeamsView({
                         </table>
                     </div>
                     {full && (
-                        <p className="text-muted-foreground text-xs">
+                        <p className={settingType.hint}>
                             {t("teams.full", { limit: teamLimit })}
                         </p>
                     )}
@@ -260,7 +262,7 @@ function NewTeamDialog({
                         onCreated();
                     }}
                 >
-                    <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                    <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                         {t("form.name")}
                         <Input
                             value={name}
@@ -272,7 +274,7 @@ function NewTeamDialog({
                             }}
                         />
                     </label>
-                    <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                    <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                         {t("form.handle")}
                         <Input
                             value={slug}
@@ -283,7 +285,7 @@ function NewTeamDialog({
                             }}
                         />
                     </label>
-                    <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                    <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                         {t("form.description")}
                         <Textarea
                             value={description}
@@ -295,7 +297,7 @@ function NewTeamDialog({
                     {error && (
                         <p
                             role="alert"
-                            className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                            className={cn(settingType.body, "bg-danger-soft text-danger-ink rounded-md px-3 py-2")}
                         >
                             {error}
                         </p>

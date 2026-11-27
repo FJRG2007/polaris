@@ -14,7 +14,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Card, CardBody, LanguageSelect } from "@polaris/ui";
+import { Card, CardBody, cn, LanguageSelect, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { isLocale, type Locale } from "@polaris/core";
 import { localeChoices } from "@/lib/i18n/language-choices";
@@ -54,9 +54,9 @@ export function LanguageCard({
         <Card>
             <CardBody className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <div className="min-w-0">
-                    <p className="text-sm font-medium">{t("language.title")}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{t("language.hint")}</p>
-                    {error ? <p className="mt-1 text-xs text-danger">{error}</p> : null}
+                    <p className={cn(settingType.body, "font-medium")}>{t("language.title")}</p>
+                    <p className={cn(settingType.hint, "mt-0.5")}>{t("language.hint")}</p>
+                    {error ? <p className={cn(settingType.error, "mt-1")}>{error}</p> : null}
                 </div>
                 <LanguageSelect
                     value={chosen}

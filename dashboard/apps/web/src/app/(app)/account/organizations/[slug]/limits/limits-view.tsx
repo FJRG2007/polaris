@@ -17,7 +17,17 @@ import { runAction } from "@/lib/run-action";
 import { Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, Input, ProgressBar, Skeleton, cn, useToast } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    Input,
+    ProgressBar,
+    Skeleton,
+    cn,
+    settingType,
+    useToast
+} from "@polaris/ui";
 import { loadOrgQuotaAction, saveOrgQuotaAction, type OrgQuotaView } from "./actions";
 
 type Drafts = Record<quotas.OrgQuotaDimension, string>;
@@ -141,7 +151,7 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
         <Card>
             <CardBody className="flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-3">
-                    <p className="text-muted-foreground min-w-0 flex-1 text-xs">
+                    <p className={cn(settingType.hint, "min-w-0 flex-1")}>
                         {canEdit ? t("quotas.blankHint") : t("quotas.adminsOnly")}
                     </p>
                     <Button
@@ -165,7 +175,7 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
                         if (!view) {
                             return (
                                 <li key={dimension} className="flex flex-col gap-1.5">
-                                    <span className="text-sm font-medium">{label}</span>
+                                    <span className={cn(settingType.body, "font-medium")}>{label}</span>
                                     <Skeleton className="h-2 w-full rounded-full" />
                                 </li>
                             );
@@ -187,10 +197,10 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
                         return (
                             <li key={dimension} className="flex flex-col gap-1.5">
                                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                                    <span className="text-sm font-medium">{label}</span>
+                                    <span className={cn(settingType.body, "font-medium")}>{label}</span>
                                     <span
                                         className={cn(
-                                            "min-w-0 text-sm tabular-nums",
+                                            settingType.body, "min-w-0 tabular-nums",
                                             over
                                                 ? "text-danger"
                                                 : full
@@ -254,7 +264,7 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
                                         {problem ? (
                                             <p
                                                 id={`${fieldId}-error`}
-                                                className="text-danger text-xs"
+                                                className={settingType.error}
                                             >
                                                 {problem}
                                             </p>
@@ -280,7 +290,7 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
                     </div>
                 ) : null}
 
-                {error ? <p className="text-danger text-sm">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

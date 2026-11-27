@@ -21,7 +21,7 @@ import { DeviceCacheCard } from "@/components/device-cache-card";
 import { SeasonalCard } from "@/components/seasonal/seasonal-card";
 import { getSeasonalChoice, seasonCalendar, seasonsAllowed } from "@/lib/seasonal-service";
 import { AccessibilityForm } from "@/components/accessibility-form";
-import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, cn, settingType } from "@polaris/ui";
 import { LanguageCard } from "./language-card";
 import { SidebarPresetCard } from "@/components/setup/sidebar-preset-card";
 import { getLocale, getTranslations } from "@/lib/i18n/request";
@@ -68,7 +68,7 @@ export default async function PreferencesPage() {
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                         {t("preferences.title")}
                     </h1>
-                    <p className="text-sm text-muted-foreground">{t("preferences.intro")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("preferences.intro")}</p>
                 </div>
                 <LanguageCard current={locale} save={setLocaleAction} />
                 <DisplayPreferencesForm
@@ -100,7 +100,7 @@ export default async function PreferencesPage() {
                         <CardTitle>{t("apps.title")}</CardTitle>
                     </CardHeader>
                     <CardBody className="flex flex-col items-start gap-3">
-                        <p className="text-sm text-muted-foreground">{t("apps.body")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("apps.body")}</p>
                         <Button asChild size="sm" variant="secondary">
                             <Link href="/account/downloads">{t("apps.downloads")}</Link>
                         </Button>

@@ -10,7 +10,18 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { pluginRequirements, pluginText, type PluginEntry, type PluginPlatform } from "@polaris/core/device-plugins";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, useToast } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    settingType,
+    useToast
+} from "@polaris/ui";
 import { lookOfficial, readOfficialChoice, PERMISSION_KEY, type PluginsBridge, type OfficialControl, type OfficialLook } from "@/lib/device-plugins-client";
 
 type Choice = "stop" | "uninstall" | "keep";
@@ -45,11 +56,11 @@ const FATE_TONE: Record<Fate, string> = {
 
 function ImportSummary({ look, say }: { look: OfficialLook; say: Say }) {
     const controls = look.imported?.controls ?? [];
-    if (controls.length === 0) return <p className="text-sm text-muted-foreground">{say("official.importNone")}</p>;
+    if (controls.length === 0) return <p className={cn(settingType.body, "text-muted-foreground")}>{say("official.importNone")}</p>;
     const count = (fate: Fate) => controls.filter((control) => fateOf(control) === fate).length;
     return (
         <div className="flex min-w-0 flex-col gap-2">
-            <p className="text-sm">{say("official.importCounts", { mapped: count("mapped"), kept: count("kept"), dropped: count("dropped") })}</p>
+            <p className={settingType.body}>{say("official.importCounts", { mapped: count("mapped"), kept: count("kept"), dropped: count("dropped") })}</p>
             <div className="flex max-h-56 min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain rounded-md border border-border p-3">
                 {controlsByPage(controls).map(([page, list]) => (
                     <section key={page} className="flex min-w-0 flex-col gap-1" aria-label={say("official.page", { number: page })}>
@@ -59,12 +70,12 @@ function ImportSummary({ look, say }: { look: OfficialLook; say: Say }) {
                                 const fate = fateOf(control);
                                 const what = control.name || control.official;
                                 return (
-                                    <li key={`${control.control}-${control.slot}`} className="flex min-w-0 items-baseline justify-between gap-3 text-sm">
+                                    <li key={`${control.control}-${control.slot}`} className={cn(settingType.body, "flex min-w-0 items-baseline justify-between gap-3")}>
                                         <span className={`min-w-0 truncate ${FATE_TONE[fate]}`} title={`${control.official}${control.name ? ` - ${control.name}` : ""}`}>
                                             {say(`official.control.${control.control}`, { number: control.slot })}
                                             {what ? `: ${what}` : ""}
                                         </span>
-                                        <span className="shrink-0 text-xs text-muted-foreground">{say(`official.fate.${fate}`)}</span>
+                                        <span className={cn(settingType.hint, "shrink-0")}>{say(`official.fate.${fate}`)}</span>
                                     </li>
                                 );
                             })}
@@ -134,17 +145,17 @@ export function useOfficialChoice(bridge: PluginsBridge | null, platform: Plugin
                                     onClick={() => void choose(choice)}
                                 >
                                     <span className="font-medium">{say(`official.choice.${choice}`)}</span>
-                                    <span className="text-xs font-normal opacity-80">{say(`official.choiceHint.${choice}`, { app })}</span>
+                                    <span className={cn(settingType.small, "font-normal opacity-80")}>{say(`official.choiceHint.${choice}`, { app })}</span>
                                 </Button>
                             ))}
-                            <p className="text-xs text-muted-foreground">{say("official.adminNote")}</p>
+                            <p className={settingType.hint}>{say("official.adminNote")}</p>
                         </div>
                         <section className="flex min-w-0 flex-col gap-1" aria-label={say("official.permissions")}>
                             <h3 className="text-sm font-medium">{say("official.permissions")}</h3>
                             {open.entry.permissions.length === 0 && pluginRequirements(open.entry, platform).length === 0 ? (
-                                <p className="text-sm text-muted-foreground">{say("install.none")}</p>
+                                <p className={cn(settingType.body, "text-muted-foreground")}>{say("install.none")}</p>
                             ) : (
-                                <ul className="list-disc ps-5 text-sm">
+                                <ul className={cn(settingType.body, "list-disc ps-5")}>
                                     {open.entry.permissions.map((permission) => (
                                         <li key={permission}>{say(`permission.${PERMISSION_KEY[permission]}`)}</li>
                                     ))}

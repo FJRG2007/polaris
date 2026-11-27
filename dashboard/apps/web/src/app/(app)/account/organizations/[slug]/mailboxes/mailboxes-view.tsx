@@ -30,7 +30,9 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    cn,
     Select,
+    settingType,
     useToast
 } from "@polaris/ui";
 
@@ -101,7 +103,7 @@ export function MailboxesView({
             <CardHeader className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                     <CardTitle>{t("mailboxes.title")}</CardTitle>
-                    <p className="mt-1 text-[13px] text-muted-foreground">{t("mailboxes.intro")}</p>
+                    <p className={cn(settingType.body, "mt-1 text-muted-foreground")}>{t("mailboxes.intro")}</p>
                 </div>
                 <Button
                     size="sm"
@@ -115,7 +117,7 @@ export function MailboxesView({
             </CardHeader>
             <CardBody>
                 {rows.length === 0 ? (
-                    <p className="text-[13px] text-muted-foreground">{t("mailboxes.empty")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("mailboxes.empty")}</p>
                 ) : (
                     <ul className="flex flex-col gap-1">
                         {rows.map((row) => {
@@ -131,12 +133,12 @@ export function MailboxesView({
                                     />
                                     <div className="min-w-0 flex-1">
                                         <p
-                                            className="truncate text-sm font-medium"
+                                            className={cn(settingType.body, "truncate font-medium")}
                                             title={row.address}
                                         >
                                             {row.address}
                                         </p>
-                                        <p className="truncate text-[12px] text-muted-foreground">
+                                        <p className={cn(settingType.hint, "truncate")}>
                                             {row.stateDetail
                                                 ? t("mailboxes.holderDetail", {
                                                       holder: row.holderName,
@@ -177,7 +179,7 @@ export function MailboxesView({
                     canSetDomain={false}
                     lead={
                         <label className="block">
-                            <span className="mb-1 block text-[12px] text-muted-foreground">
+                            <span className={cn(settingType.hint, "mb-1 block")}>
                                 {t("mailboxes.whoFor")} <span aria-hidden>*</span>
                             </span>
                             <Select

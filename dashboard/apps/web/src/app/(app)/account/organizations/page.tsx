@@ -6,6 +6,7 @@
  * with one happens in Tasks, through the teams it hands spaces to.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
@@ -31,7 +32,7 @@ export default async function OrganizationsPage() {
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("list.title")}</h1>
-                <p className="text-muted-foreground text-sm">{t("list.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("list.intro")}</p>
             </div>
             <Messages namespaces={["accountOrgs", "validation"]}>
                 <OrganizationsView

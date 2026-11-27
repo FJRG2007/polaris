@@ -3,6 +3,7 @@
  * or listen, source by source, and the games Polaris has seen you run.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { listConnections } from "@/lib/connections/store";
@@ -29,7 +30,7 @@ export default async function ActivityPrivacyPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("activity.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("activity.description")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("activity.description")}</p>
             </div>
             <ActivitySharingCard
                 settings={activity.settings}

@@ -7,7 +7,7 @@
  */
 
 import Link from "next/link";
-import { Card, CardBody } from "@polaris/ui";
+import { Card, CardBody, cn, settingType } from "@polaris/ui";
 import { hasOrgPermission } from "@polaris/core";
 import { orgTotals } from "@/lib/orgs/org-service";
 import { listOrgActivity } from "@/lib/audit-service";
@@ -72,7 +72,7 @@ export default async function OrganizationOverviewPage({ params }: { params: Pro
                             href={tile.href}
                             className="border-border bg-surface/40 hover:bg-muted flex flex-col gap-1 rounded-lg border p-3 transition-colors"
                         >
-                            <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                            <span className={cn(settingType.hint, "flex items-center gap-1.5")}>
                                 <tile.icon className="size-3.5 shrink-0" />
                                 {tile.label}
                             </span>
@@ -88,24 +88,24 @@ export default async function OrganizationOverviewPage({ params }: { params: Pro
                             <h2 className="flex items-center gap-2 text-sm font-medium">
                                 <History className="size-4 shrink-0" /> {t("overview.recently")}
                             </h2>
-                            <Link href={`${base}/activity`} className="text-muted-foreground hover:text-foreground text-xs">
+                            <Link href={`${base}/activity`} className={cn(settingType.small, "text-muted-foreground hover:text-foreground")}>
                                 {t("overview.allActivity")}
                             </Link>
                         </div>
                         {recent.length === 0 ? (
-                            <p className="text-muted-foreground text-sm">{t("overview.nothingYet")}</p>
+                            <p className={cn(settingType.body, "text-muted-foreground")}>{t("overview.nothingYet")}</p>
                         ) : (
                             <ul className="flex flex-col">
                                 {recent.map((entry) => (
                                     <li
                                         key={entry.id}
-                                        className="border-border flex items-center justify-between gap-3 border-b py-1.5 text-sm last:border-0"
+                                        className={cn(settingType.body, "border-border flex items-center justify-between gap-3 border-b py-1.5 last:border-0")}
                                     >
                                         <span className="min-w-0 truncate">
                                             <span className="font-medium">{entry.actorName}</span>{" "}
                                             <span className="text-muted-foreground">{entry.action}</span>
                                         </span>
-                                        <span className="text-muted-foreground shrink-0 text-xs">
+                                        <span className={cn(settingType.hint, "shrink-0")}>
                                             <RelativeTime iso={entry.at} />
                                         </span>
                                     </li>
@@ -116,7 +116,7 @@ export default async function OrganizationOverviewPage({ params }: { params: Pro
                 </Card>
             )}
 
-            <p className="text-muted-foreground text-xs">
+            <p className={settingType.hint}>
                 {t("overview.started", { year: String(new Date(org.createdAt).getFullYear()), name: org.ownerName })}
             </p>
         </div>

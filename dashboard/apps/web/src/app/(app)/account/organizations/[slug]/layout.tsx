@@ -13,7 +13,7 @@
  */
 
 import Link from "next/link";
-import { Badge } from "@polaris/ui";
+import { Badge, cn, settingType } from "@polaris/ui";
 import type { ReactNode } from "react";
 import { OrgAvatar } from "@/components/avatar";
 import { Messages } from "@/components/i18n/messages";
@@ -42,7 +42,7 @@ export default async function OrganizationLayout({
                         </span>
                         <Badge variant={access.isOwner ? "primary" : "neutral"}>{access.roleName}</Badge>
                     </h1>
-                    <p className="text-muted-foreground truncate text-sm">
+                    <p className={cn(settingType.body, "text-muted-foreground truncate")}>
                         {/* The handle is what a link to this organization is built
                             from, so it is shown rather than only lived in the URL. */}
                         <Link href={`/account/organizations/${org.slug}`} className="hover:text-foreground">

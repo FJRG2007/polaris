@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { SquareCheckBig } from "lucide-react";
-import { ProductMark, Badge, Card, CardBody } from "@polaris/ui";
+import { ProductMark, Badge, Card, CardBody, settingType, cn } from "@polaris/ui";
 import { listOrgSpaces } from "@/lib/orgs/org-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireOrgPage } from "@/lib/orgs/page-access";
@@ -28,11 +28,11 @@ export default async function OrganizationSpacesPage({ params }: { params: Promi
             <Card>
                 <CardBody className="flex flex-col items-center gap-2 py-10 text-center">
                     <SquareCheckBig className="text-muted-foreground size-6 shrink-0" />
-                    <p className="text-sm font-medium">{t("spaces.emptyTitle", { org: org.name })}</p>
-                    <p className="text-muted-foreground max-w-md text-sm">{t("spaces.emptyBody", { org: org.name })}</p>
+                    <p className={cn(settingType.body, "font-medium")}>{t("spaces.emptyTitle", { org: org.name })}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground max-w-md")}>{t("spaces.emptyBody", { org: org.name })}</p>
                     <Link
                         href="/tasks"
-                        className="inline-flex items-center gap-1.5 text-sm underline"
+                        className={cn(settingType.body, "inline-flex items-center gap-1.5 underline")}
                     >
                         <ProductMark app="tasks" />
                         {t("spaces.openTasks")}
@@ -57,11 +57,11 @@ export default async function OrganizationSpacesPage({ params }: { params: Promi
                     />
                     <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-2">
-                            <span className="truncate text-sm font-medium" title={space.name}>{space.name}</span>
-                            <span className="text-muted-foreground text-xs">{space.prefix}</span>
+                            <span className={cn(settingType.body, "truncate font-medium")} title={space.name}>{space.name}</span>
+                            <span className={settingType.hint}>{space.prefix}</span>
                             {space.archived && <Badge variant="neutral">{t("spaces.archived")}</Badge>}
                         </span>
-                        <span className="text-muted-foreground block truncate text-xs">
+                        <span className={cn(settingType.hint, "block truncate")}>
                             {space.teams.length > 0
                                 ? t("spaces.reachedBy", { count: space.taskCount, teams: space.teams.join(", ") })
                                 : space.visibility === "internal"
@@ -71,7 +71,7 @@ export default async function OrganizationSpacesPage({ params }: { params: Promi
                     </span>
                 </Link>
             ))}
-            <p className="text-muted-foreground text-xs">{t("spaces.footer")}</p>
+            <p className={settingType.hint}>{t("spaces.footer")}</p>
         </div>
     );
 }

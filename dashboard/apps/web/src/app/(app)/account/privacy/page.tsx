@@ -36,7 +36,7 @@ export default async function PrivacyPage() {
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("page.title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("page.intro")}</p>
             </div>
             {/* A guided walk through the same settings, step by step. */}
             <Card>

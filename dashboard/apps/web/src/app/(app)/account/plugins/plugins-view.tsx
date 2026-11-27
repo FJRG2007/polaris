@@ -18,7 +18,18 @@ import { StoreCard, StatusBadge, StorePreview } from "@polaris/ui/store-card";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { OverflowMenu, StoreCardSkeletons, StoreFilters, StoreNoMatch, StoreSection, type OverflowEntry } from "@polaris/ui/store-layout";
-import { Badge, Button, ControlSlider, SegmentedControl, Select, Skeleton, Switch, useToast } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    cn,
+    ControlSlider,
+    SegmentedControl,
+    Select,
+    settingType,
+    Skeleton,
+    Switch,
+    useToast
+} from "@polaris/ui";
 import {
     PLUGIN_ACTIONS,
     PLUGIN_CATEGORIES,
@@ -217,7 +228,7 @@ function HostActions({ bridge, id, actions }: { bridge: PluginsBridge; id: strin
 
 function Notice({ children, action }: { children: ReactNode; action?: ReactNode }) {
     return (
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+        <div className={cn(settingType.body, "flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-muted-foreground")}>
             <span className="min-w-0">{children}</span>
             {action}
         </div>
@@ -369,7 +380,7 @@ function CheckForUpdates({ bridge }: { bridge: PluginsBridge }) {
         check.kind === "failed" ? say(t, "check.failed") : check.kind === "done" ? (check.count > 0 ? say(t, "check.found", { count: check.count }) : say(t, "check.none")) : "";
     return (
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span className="min-w-0 text-sm text-muted-foreground" role="status" aria-live="polite">
+            <span className={cn(settingType.body, "min-w-0 text-muted-foreground")} role="status" aria-live="polite">
                 {result}
             </span>
             <Button size="sm" variant="secondary" onClick={run} disabled={checking} aria-busy={checking}>
@@ -611,8 +622,8 @@ function AutoUpdateRow({ bridge, snapshot, id }: { bridge: PluginsBridge; snapsh
     return (
         <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{label}</p>
-                <p className="text-sm text-muted-foreground">{say(t, "auto.hint")}</p>
+                <p className={cn(settingType.body, "truncate font-medium")}>{label}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{say(t, "auto.hint")}</p>
             </div>
             <Switch checked={checked} onChange={change} aria-label={label} />
         </div>
@@ -676,10 +687,10 @@ function SettingRow(props: SettingProps) {
     return (
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 py-2">
             <div className="min-w-0 flex-1 basis-48">
-                <p className="truncate text-sm font-medium" title={label}>
+                <p className={cn(settingType.body, "truncate font-medium")} title={label}>
                     {label}
                 </p>
-                {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+                {hint ? <p className={settingType.hint}>{hint}</p> : null}
             </div>
             <SettingControl {...props} width="w-full sm:w-48" />
         </div>
@@ -705,7 +716,7 @@ function SettingTile({ look, ...props }: SettingProps & { look: "dials" | "butto
     return (
         <div id={pluginSettingAnchor(props.setting.key)} className="flex min-w-0 scroll-mt-24 flex-col items-center gap-2 rounded-md border border-border p-3">
             <TileShape look={look} lit={lit} />
-            <p className="max-w-full truncate text-xs text-muted-foreground" title={label}>
+            <p className={cn(settingType.hint, "max-w-full truncate")} title={label}>
                 {label}
             </p>
             <SettingControl {...props} width="w-full" />
@@ -722,7 +733,7 @@ function SettingGroup({ group, locale, children }: { group: PluginSettingGroup |
         <section id={pluginGroupAnchor(group.key)} className="flex min-w-0 scroll-mt-24 flex-col gap-2" aria-label={pluginText(group.label, locale)}>
             <div className="min-w-0">
                 <h3 className="truncate text-sm font-medium">{pluginText(group.label, locale)}</h3>
-                {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+                {hint ? <p className={settingType.hint}>{hint}</p> : null}
             </div>
             <div className={tiles ? "grid min-w-0 grid-cols-2 gap-2 md:grid-cols-4" : "flex min-w-0 flex-col divide-y divide-border"}>{children}</div>
         </section>
@@ -757,7 +768,7 @@ function PluginSettings({ bridge, manifest }: { bridge: PluginsBridge; manifest:
         if (id) document.getElementById(id)?.scrollIntoView({ block: "center" });
     }, [loaded]);
 
-    if (manifest.settings.length === 0) return <p className="text-sm text-muted-foreground">{say(t, "detail.noSettings")}</p>;
+    if (manifest.settings.length === 0) return <p className={cn(settingType.body, "text-muted-foreground")}>{say(t, "detail.noSettings")}</p>;
     if (!values) return <Skeleton className="h-24 w-full" />;
 
     const change = (key: string, value: PluginSettingValue) => {
@@ -896,8 +907,8 @@ export function PluginView({ bridge, manifest, view }: { bridge: PluginsBridge; 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="min-w-0">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="truncate text-sm">{children}</dd>
+            <dt className={settingType.hint}>{label}</dt>
+            <dd className={cn(settingType.body, "truncate")}>{children}</dd>
         </div>
     );
 }
@@ -912,7 +923,7 @@ export function PluginPage({ id }: { id: string }) {
     const [startInstall, installDialog] = useInstallFlow(bridge, state.kind === "ready" ? state.snapshot : null);
 
     const back = (
-        <Link href="/account/plugins" className="text-sm text-muted-foreground hover:underline">
+        <Link href="/account/plugins" className={cn(settingType.body, "text-muted-foreground hover:underline")}>
             {say(t, "page.back")}
         </Link>
     );
@@ -966,14 +977,14 @@ export function PluginPage({ id }: { id: string }) {
                     <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight" title={manifest.name}>
                         {manifest.name}
                     </h1>
-                    <p className="truncate text-sm text-muted-foreground">{say(t, "card.by", { publisher: manifest.publisher })}</p>
+                    <p className={cn(settingType.body, "truncate text-muted-foreground")}>{say(t, "card.by", { publisher: manifest.publisher })}</p>
                     {run ? (
                         <div className="mt-1">
                             <StatusBadge status={run.status} label={run.label} />
                         </div>
                     ) : null}
                     {run?.detail ? (
-                        <p className="mt-1 text-sm text-muted-foreground">{run.detail}</p>
+                        <p className={cn(settingType.body, "mt-1 text-muted-foreground")}>{run.detail}</p>
                     ) : null}
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -989,7 +1000,7 @@ export function PluginPage({ id }: { id: string }) {
                 </div>
             </header>
             <OfficialSoftware id={id} bridge={state.bridge} />
-            <p className="text-sm">{manifest.summary}</p>
+            <p className={settingType.body}>{manifest.summary}</p>
             {installed?.update && installed.consent.length > 0 ? (
                 <Notice
                     action={
@@ -1030,9 +1041,9 @@ export function PluginPage({ id }: { id: string }) {
             <section className="flex min-w-0 flex-col gap-1" aria-label={say(t, "detail.permissions")}>
                 <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.permissions")}</h2>
                 {manifest.permissions.length === 0 && pluginRequirements(manifest, state.snapshot.platform).length === 0 ? (
-                    <p className="text-sm">{say(t, "install.none")}</p>
+                    <p className={settingType.body}>{say(t, "install.none")}</p>
                 ) : (
-                    <ul className="list-disc ps-5 text-sm">
+                    <ul className={cn(settingType.body, "list-disc ps-5")}>
                         {manifest.permissions.map((permission) => (
                             <li key={permission}>{say(t, `permission.${PERMISSION_KEY[permission]}`)}</li>
                         ))}
@@ -1047,7 +1058,7 @@ export function PluginPage({ id }: { id: string }) {
                     <h2 className="text-sm font-medium text-muted-foreground">
                         {installed?.update ? say(t, "detail.changelogFor", { version: installed.update }) : say(t, "detail.changelog")}
                     </h2>
-                    <p className="whitespace-pre-line text-sm">{entry.changelog}</p>
+                    <p className={cn(settingType.body, "whitespace-pre-line")}>{entry.changelog}</p>
                 </section>
             ) : null}
             {confirmElement}

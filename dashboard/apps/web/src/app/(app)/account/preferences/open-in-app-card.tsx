@@ -10,7 +10,7 @@
  */
 
 import { useState, useTransition } from "react";
-import { Card, CardBody, Switch, useToast } from "@polaris/ui";
+import { Card, CardBody, cn, settingType, Switch, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function OpenInAppCard({
@@ -40,8 +40,8 @@ export function OpenInAppCard({
         <Card id="open-in-app">
             <CardBody className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <p className="text-sm font-medium">{t("openInApp.title")}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{t("openInApp.body")}</p>
+                    <p className={cn(settingType.body, "font-medium")}>{t("openInApp.title")}</p>
+                    <p className={cn(settingType.hint, "mt-0.5")}>{t("openInApp.body")}</p>
                 </div>
                 <Switch checked={on} aria-label={t("openInApp.title")} onChange={flip} />
             </CardBody>

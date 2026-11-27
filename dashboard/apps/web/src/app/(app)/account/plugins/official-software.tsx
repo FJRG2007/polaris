@@ -6,7 +6,7 @@
  * uninstalled it. Draws nothing for a plugin with none, or an older app.
  */
 
-import { Button, useToast } from "@polaris/ui";
+import { Button, cn, settingType, useToast } from "@polaris/ui";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { lookOfficial, readOfficialRestore, type PluginsBridge, type OfficialLook } from "@/lib/device-plugins-client";
@@ -51,7 +51,7 @@ export function OfficialSoftware({ id, bridge }: { id: string; bridge: PluginsBr
     };
 
     return (
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm">
+        <div className={cn(settingType.body, "flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2")}>
             <span className="min-w-0 text-muted-foreground">{restorable ? say(`official.backup.${look.backup?.choice ?? "stop"}`) : say("official.installed", { app: app?.displayName ?? say("official.appName") })}</span>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
                 {app ? (

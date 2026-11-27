@@ -38,11 +38,13 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogFooter,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    settingType
 } from "@polaris/ui";
 
 export interface OrgSuccessorPerson {
@@ -81,7 +83,7 @@ export function OrgSuccessorCard({
                         <h2 className="flex items-center gap-2 text-sm font-medium">
                             <HeartHandshake className="size-4 shrink-0" /> {t("successor.title")}
                         </h2>
-                        <p className="text-muted-foreground text-xs">{t("successor.intro")}</p>
+                        <p className={settingType.hint}>{t("successor.intro")}</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
                         <Button size="sm" variant="secondary" onClick={() => setMode("set")}>
@@ -109,24 +111,24 @@ export function OrgSuccessorCard({
                     <div className="border-border flex items-center gap-3 rounded-md border px-3 py-2">
                         <Avatar person={{ id: successor.userId, name: successor.name }} size={32} />
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm" title={successor.name}>
+                            <p className={cn(settingType.body, "truncate")} title={successor.name}>
                                 {successor.name}
                             </p>
                             <p
-                                className="text-muted-foreground truncate text-xs"
+                                className={cn(settingType.hint, "truncate")}
                                 title={successor.contact}
                             >
                                 {successor.contact}
                             </p>
                         </div>
                         {successor.inherited ? (
-                            <span className="text-muted-foreground min-w-0 max-w-full shrink-0 truncate text-[0.6875rem]" title={t("successor.fromAccount")}>
+                            <span className={cn(settingType.hint, "min-w-0 max-w-full shrink-0 truncate")} title={t("successor.fromAccount")}>
                                 {t("successor.fromAccount")}
                             </span>
                         ) : null}
                     </div>
                 ) : (
-                    <p className="border-border text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center text-xs">
+                    <p className={cn(settingType.small, "border-border text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center")}>
                         {t("successor.nobody")}
                     </p>
                 )}
@@ -213,12 +215,12 @@ function OrgSuccessorDialog({
                     }}
                 >
                     {clearing ? (
-                        <p className="text-muted-foreground text-sm">
+                        <p className={cn(settingType.body, "text-muted-foreground")}>
                             {t("successor.dialog.removeBody", { name: current?.name ?? "", org: orgName })}
                         </p>
                     ) : (
                         <>
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className={cn(settingType.body, "flex flex-col gap-1")}>
                                 {t("successor.dialog.who")}
                                 <AccountInput
                                     autoFocus
@@ -232,14 +234,14 @@ function OrgSuccessorDialog({
                             {/* Said before the button rather than behind a tick
                                 box: the press is the consent, and a box beside it
                                 is one more thing to tick without reading. */}
-                            <p className="text-muted-foreground text-xs">
+                            <p className={settingType.hint}>
                                 {t("successor.dialog.warning", { org: orgName })}
                             </p>
                         </>
                     )}
 
                     <StepUpFields open={open} purpose="organization-successor" onChange={setProof} />
-                    {error ? <p className="text-danger text-sm">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
 
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={close}>

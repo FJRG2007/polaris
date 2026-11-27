@@ -38,6 +38,7 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -45,6 +46,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    settingType,
     Textarea
 } from "@polaris/ui";
 
@@ -124,7 +126,7 @@ export function RolesView({
         <Listed.Provider value={shown}>
             <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-muted-foreground text-sm">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t.rich("roles.intro", {
                             people: (chunks) => (
                                 <a
@@ -191,12 +193,12 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                         <IdCard className="size-4 shrink-0" />
                         {role.name}
                     </CardTitle>
-                    <span className="text-muted-foreground text-xs">@{role.slug}</span>
+                    <span className={settingType.hint}>@{role.slug}</span>
                     {role.system ? <Badge>{t("roles.builtIn")}</Badge> : null}
                     {role.restricted ? (
                         <Badge variant="neutral">{t("roles.noImplicitAccess")}</Badge>
                     ) : null}
-                    <span className="text-muted-foreground text-xs">
+                    <span className={settingType.hint}>
                         {t("roles.people", { count: role.memberCount })}
                     </span>
                 </div>
@@ -226,10 +228,10 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 {role.description && (
-                    <p className="text-muted-foreground text-sm">{role.description}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{role.description}</p>
                 )}
                 {locked ? (
-                    <p className="text-muted-foreground text-sm">{t("roles.locked")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("roles.locked")}</p>
                 ) : (
                     <>
                         <PermissionGrid
@@ -239,7 +241,7 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                             onChange={setHeld}
                         />
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-muted-foreground text-xs">
+                            <p className={settingType.hint}>
                                 {role.restricted
                                     ? shownHeld === 0
                                         ? t("roles.restrictedNone")
@@ -273,7 +275,7 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                     </>
                 )}
                 {error && (
-                    <p role="alert" className="text-danger text-sm">
+                    <p role="alert" className={settingType.error}>
                         {error}
                     </p>
                 )}
@@ -401,7 +403,7 @@ function NewRoleDialog({
                     }}
                 >
                     <div className="flex flex-wrap gap-3">
-                        <label className="text-muted-foreground flex min-w-40 flex-1 flex-col gap-1 text-xs">
+                        <label className={cn(settingType.hint, "flex min-w-40 flex-1 flex-col gap-1")}>
                             {t("form.name")}
                             <Input
                                 value={name}
@@ -413,7 +415,7 @@ function NewRoleDialog({
                                 }}
                             />
                         </label>
-                        <label className="text-muted-foreground flex min-w-40 flex-1 flex-col gap-1 text-xs">
+                        <label className={cn(settingType.hint, "flex min-w-40 flex-1 flex-col gap-1")}>
                             {t("form.handle")}
                             <Input
                                 value={slug}
@@ -425,7 +427,7 @@ function NewRoleDialog({
                             />
                         </label>
                     </div>
-                    <label className="text-muted-foreground flex flex-col gap-1 text-xs">
+                    <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                         {t("form.description")}
                         <Textarea
                             value={description}
@@ -438,7 +440,7 @@ function NewRoleDialog({
                     {error && (
                         <p
                             role="alert"
-                            className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                            className={cn(settingType.body, "bg-danger-soft text-danger-ink rounded-md px-3 py-2")}
                         >
                             {error}
                         </p>

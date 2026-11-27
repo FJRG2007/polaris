@@ -23,6 +23,7 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -212,9 +213,9 @@ export function PhoneCard({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0 flex-1 basis-64">
                         <h2 className="text-sm font-medium">{t("phone.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("phone.description")}</p>
+                        <p className={settingType.hint}>{t("phone.description")}</p>
                         {enforced ? (
-                            <p className="mt-1 text-xs text-muted-foreground">{t("phone.requiredByAdmin")}</p>
+                            <p className={cn(settingType.hint, "mt-1")}>{t("phone.requiredByAdmin")}</p>
                         ) : null}
                     </div>
                     <Button
@@ -254,10 +255,10 @@ export function PhoneCard({
                         ))}
                     </ul>
                 ) : (
-                    <p className="text-sm text-muted-foreground">{t("phone.empty")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("phone.empty")}</p>
                 )}
 
-                {full ? <p className="text-xs text-muted-foreground">{t("phone.limitReached")}</p> : null}
+                {full ? <p className={settingType.hint}>{t("phone.limitReached")}</p> : null}
 
                 <Feedback error={error} />
             </CardBody>
@@ -270,7 +271,7 @@ export function PhoneCard({
                     </DialogHeader>
                     <form onSubmit={askToAdd} noValidate className="flex min-w-0 flex-col gap-3">
                         <div className="flex min-w-0 flex-col gap-1">
-                            <label htmlFor={addId} className="text-sm">
+                            <label htmlFor={addId} className={settingType.body}>
                                 {t("phone.number")} *
                             </label>
                             <PhoneInput
@@ -351,7 +352,7 @@ function PhoneRow({
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <div className="flex min-w-0 flex-1 basis-48 items-center gap-2">
                     <Smartphone className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="truncate text-sm tabular-nums" title={number}>
+                    <span className={cn(settingType.body, "truncate tabular-nums")} title={number}>
                         {number}
                     </span>
                 </div>
@@ -397,7 +398,7 @@ function PhoneRow({
                                     <span className="flex min-w-0 flex-col">
                                         {t("phone.makePrimary")}
                                         {entry.verified ? null : (
-                                            <span className="text-xs text-muted-foreground">
+                                            <span className={settingType.hint}>
                                                 {t("phone.needsConfirm")}
                                             </span>
                                         )}
@@ -421,7 +422,7 @@ function PhoneRow({
                                 <span className="flex min-w-0 flex-col">
                                     {t("phone.remove")}
                                     {locked ? (
-                                        <span className="text-xs text-muted-foreground">{t("phone.lastRequired")}</span>
+                                        <span className={settingType.hint}>{t("phone.lastRequired")}</span>
                                     ) : null}
                                 </span>
                             </DropdownMenuItem>
@@ -430,7 +431,7 @@ function PhoneRow({
                 </div>
             </div>
             {entry.reconfirm && !open ? (
-                <p className="text-xs text-muted-foreground">{t("phone.reconfirmHint")}</p>
+                <p className={settingType.hint}>{t("phone.reconfirmHint")}</p>
             ) : null}
             {open ? (
                 <ConfirmPhoneForm
@@ -504,7 +505,7 @@ function ConfirmPhoneForm({
 
     return (
         <form onSubmit={onSubmit} className="flex flex-col gap-1 rounded-md bg-muted/40 p-2">
-            <label htmlFor={codeId} className="text-xs font-medium">
+            <label htmlFor={codeId} className={cn(settingType.small, "font-medium")}>
                 {t("phone.codeSentTo", { phone: number })}
             </label>
             <div className="flex min-w-0 flex-wrap items-start gap-2">
@@ -530,7 +531,7 @@ function ConfirmPhoneForm({
                     {t("phone.resend")}
                 </Button>
             </div>
-            <p id={hintId} className="text-xs text-muted-foreground">
+            <p id={hintId} className={settingType.hint}>
                 {t("phone.codeHint")}
             </p>
             <Feedback error={error} />
@@ -571,7 +572,7 @@ function PasswordDialog({
                     <DialogDescription>{t("phone.setDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("emails.currentPassword")}
                         <Input
                             name="password"
@@ -644,7 +645,7 @@ function RemovePhoneDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("emails.currentPassword")}
                         <Input name="password" type="password" required autoFocus autoComplete="current-password" />
                     </label>

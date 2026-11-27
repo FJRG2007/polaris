@@ -84,7 +84,7 @@ export function CheckupView({
                     <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight">
                         {t("checkup.title")}
                     </h1>
-                    <p className="text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t("checkup.progress", {
                             step: step + 1,
                             total: SECURITY_STEP + 1
@@ -121,7 +121,7 @@ export function CheckupView({
                                             </span>
                                         </span>
                                         <Select
-                                            className="h-8 w-full shrink-0 text-xs sm:w-64"
+                                            className={cn(settingType.body, "h-8 w-full shrink-0 sm:w-64")}
                                             aria-label={t(`fields.${field}.label` as const)}
                                             value={draft[field].audience}
                                             disabled={locked.includes(field) || saving}
@@ -147,7 +147,7 @@ export function CheckupView({
                     ) : (
                         <>
                             <h2 className="text-sm font-medium">{t("checkup.security.title")}</h2>
-                            <p className="text-[0.8125rem] text-muted-foreground">
+                            <p className={cn(settingType.body, "text-muted-foreground")}>
                                 {t("checkup.security.intro")}
                             </p>
                             <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">

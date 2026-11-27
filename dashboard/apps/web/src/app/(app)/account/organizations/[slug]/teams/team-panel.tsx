@@ -22,13 +22,15 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TeamGrantView, TeamMemberView, TeamView } from "@/lib/orgs/org-service";
 import {
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    settingType
 } from "@polaris/ui";
 import {
     addTeamMemberAction,
@@ -158,7 +160,7 @@ export function TeamPanel({
                 {error && (
                     <p
                         role="alert"
-                        className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                        className={cn(settingType.body, "bg-danger-soft text-danger-ink rounded-md px-3 py-2")}
                     >
                         {error}
                     </p>
@@ -168,7 +170,7 @@ export function TeamPanel({
                     <>
                         <div className="flex flex-col gap-1">
                             {members.length === 0 ? (
-                                <p className="border-border text-muted-foreground rounded-md border border-dashed px-3 py-5 text-center text-sm">
+                                <p className={cn(settingType.body, "border-border text-muted-foreground rounded-md border border-dashed px-3 py-5 text-center")}>
                                     {t("teams.panel.nobody")}
                                 </p>
                             ) : (
@@ -179,7 +181,7 @@ export function TeamPanel({
                                         className="hover:bg-muted flex items-center gap-3 rounded-md px-2 py-1.5"
                                     >
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm">
+                                            <p className={cn(settingType.body, "truncate")}>
                                                 <PersonName id={member.userId} name={member.name}>
                                                     {member.userId === currentUserId ? (
                                                         <span className="text-muted-foreground">
@@ -190,7 +192,7 @@ export function TeamPanel({
                                                 </PersonName>
                                             </p>
                                             <p
-                                                className="text-muted-foreground truncate text-xs"
+                                                className={cn(settingType.hint, "truncate")}
                                                 title={member.contact}
                                             >
                                                 {member.contact}
@@ -201,7 +203,7 @@ export function TeamPanel({
                                                 value={member.role}
                                                 options={roleOptions}
                                                 aria-label={t("form.roleFor", { name: member.name })}
-                                                className="h-8 w-32 text-xs"
+                                                className={cn(settingType.body, "h-8 w-32")}
                                                 onValueChange={async (next) => {
                                                     if (!teamId) return;
                                                     await runAction(
@@ -217,7 +219,7 @@ export function TeamPanel({
                                                 }}
                                             />
                                         ) : (
-                                            <span className="text-muted-foreground text-xs">
+                                            <span className={settingType.hint}>
                                                 {t(`teams.roles.${member.role}`)}
                                             </span>
                                         )}
@@ -276,7 +278,7 @@ export function TeamPanel({
                                     await reload();
                                 }}
                             >
-                                <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">
+                                <label className={cn(settingType.hint, "flex min-w-48 flex-1 flex-col gap-1")}>
                                     {t("form.identifier")}
                                     <Input
                                         value={identifier}
@@ -295,16 +297,16 @@ export function TeamPanel({
                                 <Button type="submit" size="sm" disabled={!identifier.trim()}>
                                     <UserPlus className="size-4 shrink-0" /> {t("teams.panel.add")}
                                 </Button>
-                                <p className="text-muted-foreground w-full text-xs">
+                                <p className={cn(settingType.hint, "w-full")}>
                                     {t("teams.panel.addHint", { hint: t(`teams.roleHints.${role}`) })}
                                 </p>
                             </form>
                         )}
 
                         <div className="border-border border-t pt-3">
-                            <p className="mb-1 text-xs font-medium">{t("teams.panel.reaches")}</p>
+                            <p className={cn(settingType.small, "mb-1 font-medium")}>{t("teams.panel.reaches")}</p>
                             {grants.length === 0 ? (
-                                <p className="text-muted-foreground text-xs">
+                                <p className={settingType.hint}>
                                     {t("teams.panel.nothing")}
                                 </p>
                             ) : (
@@ -312,7 +314,7 @@ export function TeamPanel({
                                     {grants.map((grant) => (
                                         <li
                                             key={`${grant.spaceId}:${grant.folderId ?? "space"}`}
-                                            className="flex items-center justify-between gap-2 text-sm"
+                                            className={cn(settingType.body, "flex items-center justify-between gap-2")}
                                         >
                                             <span className="min-w-0 truncate">
                                                 {grant.spaceName}
@@ -323,7 +325,7 @@ export function TeamPanel({
                                                     </span>
                                                 ) : null}
                                             </span>
-                                            <span className="text-muted-foreground min-w-0 max-w-full shrink-0 truncate text-xs" title={t(`teams.spaceRoles.${grant.role}`)}>
+                                            <span className={cn(settingType.hint, "min-w-0 max-w-full shrink-0 truncate")} title={t(`teams.spaceRoles.${grant.role}`)}>
                                                 {t(`teams.spaceRoles.${grant.role}`)}
                                             </span>
                                         </li>

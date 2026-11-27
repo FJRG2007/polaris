@@ -239,13 +239,13 @@ export function ActivitySharingCard({
                                 gameId={playing?.gameId ?? null}
                             />
                             <span className="min-w-0 flex-1">
-                                <span className="block text-[0.6875rem] uppercase tracking-[0.04em] text-foreground-subtle">
+                                <span className={cn(settingType.hint, "block uppercase tracking-[0.04em]")}>
                                     {playing
                                         ? t("activity.registered.nowPlaying")
                                         : t("activity.registered.noneDetected")}
                                 </span>
                                 <span
-                                    className="block truncate text-[0.8125rem]"
+                                    className={cn(settingType.body, "block truncate")}
                                     title={playing?.name}
                                 >
                                     {playing ? playing.name : t("activity.registered.addHint")}
@@ -259,7 +259,7 @@ export function ActivitySharingCard({
                             {t("activity.registered.added")}
                         </h3>
                         {games.size === 0 ? (
-                            <p className="rounded-md border border-dashed border-border px-3 py-3 text-[0.6875rem] text-muted-foreground">
+                            <p className={cn(settingType.small, "rounded-md border border-dashed border-border px-3 py-3 text-muted-foreground")}>
                                 {t("activity.noGames")}
                             </p>
                         ) : (
@@ -273,13 +273,13 @@ export function ActivitySharingCard({
                                             <GameMark name={name} gameId={null} />
                                             <span className="min-w-0 flex-1">
                                                 <span
-                                                    className="block truncate text-[0.8125rem]"
+                                                    className={cn(settingType.body, "block truncate")}
                                                     title={name}
                                                 >
                                                     {name}
                                                 </span>
                                                 <span
-                                                    className="block truncate text-[0.6875rem] text-foreground-subtle"
+                                                    className={cn(settingType.hint, "block truncate")}
                                                     title={key}
                                                 >
                                                     {hidden
@@ -477,7 +477,7 @@ function OwnGames({
                         <DialogDescription>{t("ownGames.description")}</DialogDescription>
                     </DialogHeader>
                     <form className="flex flex-col gap-3" onSubmit={add}>
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                             {t("ownGames.program")}
                             <Input
                                 autoFocus
@@ -490,7 +490,7 @@ function OwnGames({
                             running ? (
                                 <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
                                     {running.length === 0 ? (
-                                        <span className="text-[0.6875rem] text-muted-foreground">
+                                        <span className={settingType.hint}>
                                             {t("ownGames.nothingListed")}
                                         </span>
                                     ) : (
@@ -499,7 +499,7 @@ function OwnGames({
                                                 key={entry}
                                                 type="button"
                                                 onClick={() => setProgram(entry)}
-                                                className="max-w-[14rem] truncate rounded-full bg-muted px-2 py-0.5 text-[0.6875rem] transition-colors hover:bg-card-hover"
+                                                className={cn(settingType.small, "max-w-[14rem] truncate rounded-full bg-muted px-2 py-0.5 transition-colors hover:bg-card-hover")}
                                                 title={entry}
                                             >
                                                 {entry}
@@ -515,13 +515,13 @@ function OwnGames({
                                             .then(setRunning)
                                             .catch(() => setRunning([]))
                                     }
-                                    className="self-start rounded text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                                    className={cn(settingType.small, "self-start rounded text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground")}
                                 >
                                     {t("ownGames.chooseRunning")}
                                 </button>
                             )
                         ) : null}
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        <label className={cn(settingType.hint, "flex flex-col gap-1")}>
                             {t("ownGames.name")}
                             <Input
                                 value={name}
