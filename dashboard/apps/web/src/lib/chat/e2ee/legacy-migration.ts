@@ -30,6 +30,7 @@
  * again under a fresh key. Repeating a finished conversation changes nothing.
  */
 
+import { openChannelWhere } from "./encryption-policy";
 import * as core from "@polaris/core";
 import { chatE2eeEnabled } from "./flag";
 import { prisma, Prisma } from "@polaris/db";
@@ -377,13 +378,15 @@ export async function backupReady(now = new Date()): Promise<boolean> {
 
 /** Conversations with plain history the migrator has not cut, a page at a time. */
 async function nextConversations(after: string | null, take: number): Promise<string[]> {
+    const open = openChannelWhere();
     const rows = await prisma.chatChannel.findMany({
         where: {
             ...(after ? { id: { gt: after } } : {}),
             messages: { some: { kind: "text", body: { not: "" }, e2eeCiphertext: null } },
             // A cut conversation's history key is gone; one kept with stragglers is reported, not retried.
             // One rolled back stays plain until an admin migrates it again.
-            NOT: { migration: { state: { in: ["cut", "rolledBack"] } } }
+            // A public channel is not sealed at all (`encryption-policy.ts`), so its history stays as it is.
+            NOT: [{ migration: { state: { in: ["cut", "rolledBack"] } } }, ...(open ? [open] : [])]
         },
         select: { id: true },
         orderBy: { id: "asc" },

@@ -158,10 +158,18 @@ export async function registerNode(): Promise<void> {
     void whenAlone(async () => {
         const { runLegacyMigration } = await import("./lib/chat/e2ee/legacy-migration");
         const { runAnnotationSweep } = await import("./lib/chat/e2ee/annotation-sweep");
+        const { sweepEncryptionModes } = await import("./lib/chat/e2ee/encryption-policy");
         let running = false;
         const pass = async () => {
             if (running) return;
             running = true;
+            // First every conversation's encryption mode from its join rule, once each, so a public
+            // channel is never migrated to sealed (a no-op while the public mode is held).
+            try {
+                await sweepEncryptionModes();
+            } catch (error) {
+                console.error("polaris: the chat encryption mode sweep failed:", error);
+            }
             try {
                 await runLegacyMigration();
             } catch (error) {

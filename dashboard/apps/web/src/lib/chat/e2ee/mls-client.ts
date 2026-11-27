@@ -402,9 +402,21 @@ export class MlsDevice {
      * sealed chat is held, where only a sealed conversation takes sealed sends.
      */
     async sealedAlready(channelId: string): Promise<boolean> {
-        if (this.groupOf(channelId)) return true;
+        return (await this.sealingOf(channelId)).sealed;
+    }
+
+    /**
+     * What the server says of the conversation's sealing (`encryption-policy.ts`):
+     * `sealed`, whether it is sealed already (a public channel that sealed before
+     * is not: it seals nothing new); `seals`, whether a new send is sealed while
+     * sealed chat is on (not in a public channel, nor in one too large to seal);
+     * `open`, whether it is a public channel, labelled as not end-to-end encrypted.
+     */
+    async sealingOf(channelId: string): Promise<{ sealed: boolean; seals: boolean; open: boolean }> {
         const answer = await this.send({ op: "group", channelId });
-        return Boolean(answer.group) || answer.sealed === true;
+        const open = answer.open === true;
+        const sealed = open ? false : Boolean(answer.group) || answer.sealed === true || (this.groupOf(channelId) !== null && answer.sealed !== false);
+        return { sealed, seals: typeof answer.seals === "boolean" ? answer.seals : !open, open };
     }
 
     /** Whether this device is in the conversation's group (as far as it has read). */

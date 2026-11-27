@@ -26,6 +26,8 @@ import * as delivery from "./mls-delivery";
 import * as sealed from "./sealed-messages";
 import * as segments from "./search-segments-service";
 import { conversationSealed } from "./sealed-conversation";
+import { SEALED_MEMBER_CAP } from "./encryption-mode";
+import { channelEncryptionMode, sealedHeadcount } from "./encryption-policy";
 import { backgroundUser } from "@/lib/session";
 import { sealedAppOutdated } from "./client-version";
 import { mlsBody, type MlsBody } from "./schemas";
@@ -75,6 +77,12 @@ async function ownDevice(userId: string, device: string): Promise<boolean> {
 }
 
 const REFUSED = { error: "refused" } as const;
+
+/** Whether a conversation's people fit in a sealed group (`SEALED_MEMBER_CAP`); one that is not sealed at all fits. */
+async function fitsCap(channelId: string): Promise<boolean> {
+    const count = await sealedHeadcount({ channelId });
+    return count === null || count <= SEALED_MEMBER_CAP;
+}
 
 export async function handleMls(request: Request): Promise<Response> {
     if (!sealedChatServed()) return json({ error: "Not found" }, 404);
@@ -225,10 +233,17 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
             });
         }
         case "group": {
-            const group = await delivery.groupState(body.channelId);
+            const [group, mode] = await Promise.all([delivery.groupState(body.channelId), channelEncryptionMode(body.channelId)]);
             return json({
                 // Sealed with no group yet (the migration cut it): a send into it is sealed, also while held.
-                sealed: group ? true : await conversationSealed(body.channelId),
+                // A public channel keeps its group for what it sealed before, but seals nothing new.
+                sealed: mode === "open" ? false : group ? true : await conversationSealed(body.channelId),
+                // The join rule's answer (`encryption-policy.ts`): an open channel is labelled and sends in the clear.
+                open: mode === "open",
+                // Whether a new send is sealed while sealed chat is on: never in a public channel, and a
+                // conversation with no group yet only while it fits the cap - one too large stays as it was,
+                // never sealed and then frozen (a newcomer past the tree would be left out of the group).
+                seals: mode === "open" ? false : group ? true : await fitsCap(body.channelId),
                 group: group && {
                     groupId: text(group.groupId),
                     ciphersuite: group.ciphersuite,
@@ -258,6 +273,9 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
         case "create-group":
             // Held (the kill switch): nothing new becomes sealed - only a conversation sealed already gets its group.
             if (!chatE2eeEnabled() && !(await conversationSealed(body.channelId))) return json({ error: "held" }, 409);
+            // A public channel is not end-to-end encrypted (`encryption-policy.ts`): nobody makes it a group.
+            if ((await channelEncryptionMode(body.channelId)) === "open") return json({ error: "openChannel" }, 409);
+            if (!(await fitsCap(body.channelId))) return json({ error: "sealedGroupFull", cap: SEALED_MEMBER_CAP }, 409);
             await delivery.createGroup(body.channelId, bytes(body.groupId), body.ciphersuite, bytes(body.groupInfo));
             return json({ ok: true });
         case "commit": {

@@ -7,7 +7,10 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const device = vi.hoisted(() => ({ sealedAlready: vi.fn(async (channelId: string) => channelId === "sealed") }));
+// What the server answers of a conversation: "sealed" has its group, "open" is a public channel, "plain" neither.
+const device = vi.hoisted(() => ({
+    sealingOf: vi.fn(async (channelId: string) => ({ sealed: channelId === "sealed", seals: channelId !== "open", open: channelId === "open" }))
+}));
 
 vi.mock("@/lib/chat/e2ee/mls-browser", () => ({ openBrowserDevice: async () => device }));
 vi.mock("@/lib/chat/e2ee/account-key-client", () => ({ deviceAccountHpke: async () => null }));
@@ -16,7 +19,7 @@ import { configureSealedChat, sealsSendsIn } from "@/lib/chat/e2ee/sealed-chat";
 
 afterEach(() => {
     configureSealedChat(null, { held: false });
-    device.sealedAlready.mockClear();
+    device.sealingOf.mockClear();
 });
 
 describe("sealsSendsIn", () => {
@@ -24,7 +27,8 @@ describe("sealsSendsIn", () => {
         expect(await sealsSendsIn("plain")).toBe(false);
         configureSealedChat("viewer-1", { held: false });
         expect(await sealsSendsIn("plain")).toBe(true);
-        expect(device.sealedAlready).not.toHaveBeenCalled();
+        // A public channel (encryption-policy.ts) seals nothing new, also while sealed chat is on.
+        expect(await sealsSendsIn("open")).toBe(false);
     });
 
     it("while held, seals only into a conversation sealed already, asking once", async () => {
@@ -32,7 +36,7 @@ describe("sealsSendsIn", () => {
         expect(await sealsSendsIn("sealed")).toBe(true);
         expect(await sealsSendsIn("plain")).toBe(false);
         expect(await sealsSendsIn("sealed")).toBe(true);
-        expect(device.sealedAlready).toHaveBeenCalledTimes(2);
+        expect(device.sealingOf).toHaveBeenCalledTimes(2);
     });
 
     it("keeps the held state for a caller that does not name it", async () => {
@@ -43,7 +47,7 @@ describe("sealsSendsIn", () => {
 
     it("throws rather than answering plain when it cannot tell", async () => {
         configureSealedChat("viewer-1", { held: true });
-        device.sealedAlready.mockRejectedValueOnce(new Error("offline"));
+        device.sealingOf.mockRejectedValueOnce(new Error("offline"));
         await expect(sealsSendsIn("sealed")).rejects.toThrow("offline");
         expect(await sealsSendsIn("sealed")).toBe(true);
     });

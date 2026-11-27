@@ -10936,6 +10936,11 @@ model ChatChannel {
     /// A voice channel run as a stage: whoever walks in listens, and speaks
     /// once a moderator invites them. Only read for a voice channel.
     stage         Boolean   @default(false)
+    /// The end-to-end encryption mode last applied from its join rule
+    /// (`lib/chat/e2ee/encryption-policy.ts`): "sealed" or "open". Null until
+    /// the sweep decides it. Only a record of what was applied, so a change of
+    /// rule writes its line once; the rule itself is always read live.
+    e2eeMode      String?
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
 

@@ -11,14 +11,18 @@
 
 import { prisma } from "@polaris/db";
 import { sealedChatServed } from "./flag";
+import { channelEncryptionMode, openChannelWhere } from "./encryption-policy";
 
 /**
  * Whether a conversation is sealed: sealed chat is on, and its MLS group exists
  * or the migration cut it (its history sealed, `legacy-migration.ts`) - a cut
- * conversation is sealed only before any browser has made its group.
+ * conversation is sealed only before any browser has made its group - and its
+ * join rule keeps it sealed: a channel made public stops sealing what is sent
+ * next, while what it sealed before stays sealed (`encryption-policy.ts`).
  */
 export async function conversationSealed(channelId: string): Promise<boolean> {
     if (!sealedChatServed()) return false;
+    if ((await channelEncryptionMode(channelId)) === "open") return false;
     const [group, cut] = await Promise.all([
         prisma.mlsGroup.count({ where: { channelId }, take: 1 }),
         prisma.chatMigration.count({ where: { channelId, state: "cut" }, take: 1 })
@@ -34,5 +38,9 @@ export async function sealedConversations(channelIds: readonly string[]): Promis
         prisma.mlsGroup.findMany({ where: { channelId: { in: ids } }, select: { channelId: true } }),
         prisma.chatMigration.findMany({ where: { channelId: { in: ids }, state: "cut" }, select: { channelId: true } })
     ]);
-    return new Set([...groups, ...cuts].map((row) => row.channelId));
+    const open = openChannelWhere();
+    const unsealed = open
+        ? new Set((await prisma.chatChannel.findMany({ where: { id: { in: ids }, ...open }, select: { id: true } })).map((row) => row.id))
+        : new Set<string>();
+    return new Set([...groups, ...cuts].map((row) => row.channelId).filter((id) => !unsealed.has(id)));
 }

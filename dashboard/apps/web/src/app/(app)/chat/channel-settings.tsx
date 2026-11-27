@@ -19,6 +19,8 @@
  * section in the address changes.
  */
 
+import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
+import { PUBLIC_CHANNELS_OPEN } from "@/lib/chat/e2ee/encryption-mode";
 import Link from "next/link";
 import { ForumSettings } from "./forum-settings";
 import * as actions from "./actions";
@@ -763,6 +765,9 @@ function Permissions({
                             ? t("channelSettings.privateHint")
                             : t("channelSettings.publicNote")}
                     </p>
+                    {PUBLIC_CHANNELS_OPEN && sealedChatActive() && (
+                        <p className="mt-1 text-xs text-muted-foreground">{t("channelSettings.privateSealedNote")}</p>
+                    )}
                     {!channel.mayChangePrivacy && (
                         <p id="privacy-locked" className="mt-1 text-xs text-muted-foreground">
                             {t("channelSettings.privacySpaceAdminOnly")}

@@ -42,7 +42,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PolarMemberRow } from "./polar-member-row";
 import { GameBridgeRow } from "./game-link-badge";
 import { SafetyNumberView, usePeerVerified } from "./safety-number";
-import { useConversationSealed } from "./sealed-notice";
+import { useConversationPublic, useConversationSealed } from "./sealed-notice";
 import { sealedChatActive } from "@/lib/chat/e2ee/sealed-chat";
 import { useTypingIn } from "./typing-everywhere";
 import { useState, type ReactNode } from "react";
@@ -72,6 +72,7 @@ import {
     ShieldCheck,
     KeyRound,
     LockKeyhole,
+    LockKeyholeOpen,
     ShieldOff,
     Star,
     Timer,
@@ -229,6 +230,7 @@ function InfoBody({
     const safetyVerified = usePeerVerified(viewerId, safetyPeer?.id ?? "", null);
     // Any other sealed conversation says so in its own row; a one-to-one says it on the number's.
     const sealedGroup = useConversationSealed(channel.id) && !safetyPeer;
+    const publicChannel = useConversationPublic(channel.id);
     // A group with one other person in it is still drawn as the group here.
     const face = direct ? person : channel.self ? conversationFace(channel, { id: viewerId, name: viewerName }) : null;
     // Somebody else on the other end: the one person a block can be about.
@@ -605,6 +607,15 @@ function InfoBody({
                         checked={vanishRules.linkPreviews}
                         onChange={entries.vanish.onLinkPreviews}
                     />
+                ) : null}
+                {publicChannel ? (
+                    <div className="flex min-w-0 items-start gap-3 px-3 py-2">
+                        <LockKeyholeOpen className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium">{t("sealedNotice.publicLabel")}</p>
+                            <p className="text-xs text-muted-foreground">{t("sealedNotice.publicBody")}</p>
+                        </div>
+                    </div>
                 ) : null}
                 {sealedGroup ? (
                     <SettingRow

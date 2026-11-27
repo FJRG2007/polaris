@@ -8,6 +8,7 @@
  * volume changes by two orders of magnitude.
  */
 
+import * as policy from "./e2ee/encryption-policy";
 import { requireUnrestricted } from "./spam-restriction";
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
@@ -355,6 +356,11 @@ export async function updateSpace(
             ...(input.archived !== undefined ? { archived: input.archived } : {})
         }
     });
+    // Whether its channels are public (not end-to-end encrypted) follows who may join the space.
+    if (input.visibility !== undefined) {
+        const channels = await prisma.chatChannel.findMany({ where: { spaceId: input.spaceId }, select: { id: true } });
+        await policy.applyEncryptionModes(channels.map((row) => row.id), actor.id);
+    }
 }
 
 /**
@@ -482,11 +488,14 @@ export async function addSpaceMembers(
         ).map((row) => row.userId)
     );
     const fresh = wanted.filter((userId) => !already.has(userId));
+    // A space joined by invitation seals its channels, and a sealed conversation holds at most so many.
+    const filling = await policy.refuseSealedPastCap({ spaceId }, fresh.length);
 
     await prisma.chatSpaceMember.createMany({
         data: wanted.map((userId) => ({ spaceId, userId })),
         skipDuplicates: true
     });
+    if (filling) await policy.warnFillingUp({ spaceId }, actor.id);
     for (const userId of fresh) {
         await postSpaceNotice(spaceId, "added", { subjectId: userId, byId: actor.id });
     }
@@ -1485,6 +1494,8 @@ export async function updateChannel(
             });
         }
     });
+    // Opening or closing the room decides whether what is sent next is end-to-end encrypted.
+    if (privacyChanges) await policy.applyEncryptionModes([input.channelId], actor.id);
     publishChatChange({ channelId: input.channelId, kind: "channels", actorId: actor.id });
 }
 
@@ -1787,11 +1798,15 @@ export async function addChannelMembers(
         }
     }
     if (wanted.length === 0) return { invited };
+    // A group or a private channel is its member rows; one open to its space is counted where the space is joined.
+    const sealedRoom = group || access.kind === "dm" || Boolean((await prisma.chatChannel.findUnique({ where: { id: channelId }, select: { private: true } }))?.private);
+    const filling = sealedRoom ? await policy.refuseSealedPastCap({ channelId }, wanted.filter((id) => !already.has(id)).length) : false;
 
     await prisma.chatChannelMember.createMany({
         data: wanted.map((userId) => ({ channelId, userId })),
         skipDuplicates: true
     });
+    if (filling) await policy.warnFillingUp({ channelId }, actor.id);
     // Said in a group and nowhere else. A channel in a space announces its
     // arrivals where the space does; adding somebody to a room the whole space
     // could already read is a change to their list rather than to the room, and

@@ -11,6 +11,7 @@
  * person per space: asking twice is the same request.
  */
 
+import * as policy from "./e2ee/encryption-policy";
 import { prisma } from "@polaris/db";
 import { chatWordsFor } from "./text";
 import { publishChatChange } from "./live";
@@ -139,6 +140,9 @@ export async function answerJoinRequest(
     if (!request) throw new ChatAccessError({ key: "errors.joinRequestGone" });
     await requireSpace(actor, request.spaceId, "admin");
 
+    // A full sealed space refuses before the request is claimed, so it stays waiting for a seat.
+    const filling = accept ? await policy.refuseSealedPastCap({ spaceId: request.spaceId }, 1) : false;
+
     // Claimed by deleting it, so two people answering the same request at once
     // do not both act on it.
     const claimed = await prisma.chatSpaceJoinRequest.deleteMany({ where: { id: request.id } });
@@ -160,5 +164,6 @@ export async function answerJoinRequest(
         data: { spaceId: request.spaceId, userId: request.userId, role: "member" }
     });
     await postSpaceNotice(request.spaceId, "joined", { subjectId: request.userId });
+    if (filling) await policy.warnFillingUp({ spaceId: request.spaceId }, actor.id);
     publishChatChange({ channelId: "", kind: "channels", actorId: "", audience: [request.userId] });
 }

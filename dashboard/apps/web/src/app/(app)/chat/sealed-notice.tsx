@@ -16,11 +16,11 @@
  * question that cannot be answered leaves the mark off rather than claiming it.
  */
 
-import { LockKeyhole } from "lucide-react";
+import { LockKeyhole, LockKeyholeOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SafetyNumberView } from "./safety-number";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { sealedChatActive, sealsSendsIn } from "@/lib/chat/e2ee/sealed-chat";
+import { publicUnsealed, sealedChatActive, sealsSendsIn } from "@/lib/chat/e2ee/sealed-chat";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 
 /** The one other person of a one-to-one conversation, when it is one. */
@@ -45,6 +45,27 @@ export function useConversationSealed(channelId: string): boolean {
     }, [channelId]);
 
     return sealedChatActive() && answer?.channelId === channelId && answer.sealed;
+}
+
+/**
+ * Whether `channelId` is a public channel, not end-to-end encrypted
+ * (`encryption-policy.ts`); false while it is being told, and when it cannot be.
+ */
+export function useConversationPublic(channelId: string): boolean {
+    const [answer, setAnswer] = useState<{ readonly channelId: string; readonly open: boolean } | null>(null);
+
+    useEffect(() => {
+        if (!sealedChatActive()) return;
+        let live = true;
+        void publicUnsealed(channelId).then((open) => {
+            if (live) setAnswer({ channelId, open });
+        });
+        return () => {
+            live = false;
+        };
+    }, [channelId]);
+
+    return sealedChatActive() && answer?.channelId === channelId && answer.open;
 }
 
 /** The explainer the notice and the lock open: what is sealed, and the safety number in a one-to-one. */
@@ -112,7 +133,16 @@ export function SealedNotice({ channelId, peer }: { channelId: string; peer: Sea
 export function SealedMark({ channelId, peer }: { channelId: string; peer: SealedPeer }) {
     const t = useTranslations("chat");
     const sealed = useConversationSealed(channelId);
+    const unsealed = useConversationPublic(channelId);
     const [open, setOpen] = useState(false);
+    // A public channel says it is not end-to-end encrypted, where the lock would be.
+    if (unsealed)
+        return (
+            <span title={t("sealedNotice.publicBody")} className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                <LockKeyholeOpen className="size-3.5 shrink-0" aria-hidden />
+                <span className="truncate">{t("sealedNotice.publicLabel")}</span>
+            </span>
+        );
     if (!sealed) return null;
     return (
         <>

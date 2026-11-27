@@ -311,7 +311,8 @@
             "filesNotPublished": "Messages with files cannot be published yet."
         },
         "pollAnonymous": "The votes on that poll are anonymous",
-        "pollVotersHidden": "Who picked what shows once the poll closes"
+        "pollVotersHidden": "Who picked what shows once the poll closes",
+        "sealedGroupFull": "This private conversation is full. An end-to-end encrypted one holds {cap} people, so someone has to leave first."
     },
     "media": {
         "refused": {
@@ -1255,7 +1256,8 @@
         "newcomerHistoryDefault": "Server default: new members see earlier messages",
         "newcomerHistoryDefaultHint": "Applies to every channel that uses the server default.",
         "newcomerHistoryDefaultLocked": "Only server admins can change the default.",
-        "webhookPicture": "Change picture"
+        "webhookPicture": "Change picture",
+        "privateSealedNote": "Private channels are end-to-end encrypted. Making it public stops encrypting new messages; earlier ones stay encrypted."
     },
     "callMenus": {
         "volume": "Volume",
@@ -3166,6 +3168,8 @@
         "body": "Messages, files and polls you send here are locked on your device and open only on the devices of the people in this chat. Polaris carries them but cannot read them.",
         "verify": "Verify {name}",
         "groupVerify": "To check someone's key, open your one-to-one chat with them and compare the safety number.",
-        "infoRow": "Encryption"
+        "infoRow": "Encryption",
+        "publicLabel": "Public channel - not end-to-end encrypted",
+        "publicBody": "Anyone here can join this channel, so its messages are encrypted in transit and on the server, not end to end. Moderation and search keep working."
     }
 }

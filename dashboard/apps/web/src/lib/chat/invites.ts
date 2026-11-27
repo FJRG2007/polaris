@@ -24,6 +24,7 @@
  * where it goes.
  */
 
+import * as policy from "./e2ee/encryption-policy";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { randomBytes } from "node:crypto";
@@ -305,6 +306,9 @@ export async function acceptInvite(
         return { spaceId: invite.spaceId, channelId: null, pending: true };
     }
 
+    // A full sealed space refuses before the link's use is spent, so it still works once someone leaves.
+    const filling = invite.space.requireApproval ? false : await policy.refuseSealedPastCap({ spaceId: invite.spaceId }, 1);
+
     const claimed = await prisma.chatSpaceInvite.updateMany({
         where: {
             id: invite.id,
@@ -329,6 +333,7 @@ export async function acceptInvite(
     // link. Who made the link is not part of it - an invitation can pass through
     // several hands before it is used.
     await postSpaceNotice(invite.spaceId, "joined", { subjectId: actor.id });
+    if (filling) await policy.warnFillingUp({ spaceId: invite.spaceId }, actor.id);
     // The rail is what changes for them, and nothing else would tell it.
     publishChatChange({
         channelId: "",

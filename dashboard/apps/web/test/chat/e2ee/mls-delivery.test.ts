@@ -115,7 +115,7 @@ describe("/api/e2ee/mls", () => {
     it("held by the kill switch: no new group, and a sealed conversation keeps every op", async () => {
         await device(ALICE, "alice-laptop");
         process.env.POLARIS_INTERNAL_CHAT_E2EE = "0";
-        expect((await call({ op: "group", channelId: CHANNEL })).body).toEqual({ sealed: false, group: null });
+        expect((await call({ op: "group", channelId: CHANNEL })).body).toEqual({ sealed: false, open: false, seals: true, group: null });
         const refused = await call({ op: "create-group", channelId: CHANNEL, groupId: blob(1, 16), ciphersuite: 0x004f, groupInfo: blob(2) });
         expect(refused).toEqual({ status: 409, body: { error: "held" } });
         process.env.POLARIS_INTERNAL_CHAT_E2EE = "1";
@@ -131,7 +131,7 @@ describe("/api/e2ee/mls", () => {
         await device(ALICE, "alice-laptop");
         state.tables.chatMigration = [{ channelId: CHANNEL, state: "cut" }];
         process.env.POLARIS_INTERNAL_CHAT_E2EE = "0";
-        expect((await call({ op: "group", channelId: CHANNEL })).body).toEqual({ sealed: true, group: null });
+        expect((await call({ op: "group", channelId: CHANNEL })).body).toEqual({ sealed: true, open: false, seals: true, group: null });
         expect((await call({ op: "create-group", channelId: CHANNEL, groupId: blob(1, 16), ciphersuite: 0x004f, groupInfo: blob(2) })).status).toBe(200);
     });
 

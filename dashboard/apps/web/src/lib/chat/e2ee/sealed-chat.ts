@@ -134,7 +134,6 @@ let viewer: string | null = null;
 /** The kill switch is set (`chatE2eeState()` is `held`): only a conversation sealed already takes sealed sends. */
 let held = false;
 /** While held, which conversations are sealed already; nothing new becomes sealed then, so an answer stays true. */
-const sealedAlready = new Map<string, boolean>();
 let opening: Promise<MlsDevice> | null = null;
 let indexing: Promise<SealedSearchIndex> | null = null;
 let sharing: Promise<SegmentReader> | null = null;
@@ -163,10 +162,10 @@ const refId = (ref: SealedRef): string => (typeof ref === "string" ? ref : ref.i
 export function configureSealedChat(viewerId: string | null, options?: { readonly held?: boolean }): void {
     if (options?.held !== undefined && options.held !== held) {
         held = options.held;
-        sealedAlready.clear();
+        sealing.clear();
     }
     if (viewer === viewerId) return;
-    sealedAlready.clear();
+    sealing.clear();
     viewer = viewerId;
     opening = null;
     void indexing?.then((index) => index.close()).catch(() => undefined);
@@ -190,12 +189,32 @@ export function sealedChatActive(): boolean {
  */
 export async function sealsSendsIn(channelId: string): Promise<boolean> {
     if (viewer === null) return false;
-    if (!held) return true;
-    const known = sealedAlready.get(channelId);
-    if (known !== undefined) return known;
-    const answer = await (await device()).sealedAlready(channelId);
-    if (viewer !== null) sealedAlready.set(channelId, answer);
+    const sealing = await sealingIn(channelId);
+    return held ? sealing.sealed : sealing.seals;
+}
+
+/** How long a conversation's sealing answer is kept: a channel made public or private is followed within it. */
+const SEALING_TTL_MS = 60_000;
+const sealing = new Map<string, { readonly at: number; readonly answer: Promise<{ sealed: boolean; seals: boolean; open: boolean }> }>();
+
+function sealingIn(channelId: string): Promise<{ sealed: boolean; seals: boolean; open: boolean }> {
+    const kept = sealing.get(channelId);
+    if (kept && Date.now() - kept.at < SEALING_TTL_MS) return kept.answer;
+    const answer = device().then((mls) => mls.sealingOf(channelId));
+    sealing.set(channelId, { at: Date.now(), answer });
+    // A question that could not be answered is asked again next time, never kept.
+    answer.catch(() => sealing.delete(channelId));
     return answer;
+}
+
+/**
+ * Whether `channelId` is a public channel, not end-to-end encrypted
+ * (`encryption-policy.ts`): what its header and info say. False while sealed
+ * chat is off and when it cannot be told.
+ */
+export async function publicUnsealed(channelId: string): Promise<boolean> {
+    if (viewer === null) return false;
+    return (await sealingIn(channelId).catch(() => null))?.open ?? false;
 }
 
 function device(): Promise<MlsDevice> {

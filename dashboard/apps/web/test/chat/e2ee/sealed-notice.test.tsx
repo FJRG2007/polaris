@@ -19,6 +19,7 @@ const sealed = vi.hoisted(() => ({
 
 vi.mock("@/lib/chat/e2ee/sealed-chat", () => ({
     sealedChatActive: () => sealed.active,
+    publicUnsealed: async () => false,
     sealsSendsIn: async (channelId: string) => {
         sealed.asked.push(channelId);
         if (sealed.answer instanceof Error) throw sealed.answer;
