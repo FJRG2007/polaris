@@ -11,6 +11,7 @@
 //! instance (`DELETE /api/terminal/session`) before forgetting it here.
 
 mod desktop;
+mod device_identity;
 
 use std::time::Duration;
 
@@ -326,6 +327,15 @@ struct AuthorizeBody {
     device_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     client_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    device: Option<DeviceBody>,
+}
+
+/// The hashed machine id, so the instance groups this terminal with the
+/// computer's other Polaris clients.
+#[derive(Serialize)]
+struct DeviceBody {
+    id: String,
 }
 
 #[derive(Deserialize)]
@@ -429,6 +439,9 @@ async fn open_request(origin: String) -> Result<Opened, String> {
         .json(&AuthorizeBody {
             device_name: device_name(),
             client_version: client_version(),
+            device: device_identity::device_id()
+                .await
+                .map(|id| DeviceBody { id }),
         })
         .timeout(REQUEST_TIMEOUT)
         .send()
