@@ -351,7 +351,7 @@ function HostRow({
     const name = shownName(row);
     return (
         <tr className="border-t border-border hover:bg-card-hover">
-            <td className="max-w-0 px-3 py-2 align-top">
+            <td className="max-w-0 px-3 py-2 align-middle">
                 <span className="block truncate font-medium" title={name}>
                     {name}
                 </span>
@@ -362,10 +362,10 @@ function HostRow({
                     <HostState status={status} active={row.active} />
                 </span>
             </td>
-            <td className="hidden whitespace-nowrap px-3 py-2 align-top sm:table-cell">
+            <td className="hidden whitespace-nowrap px-3 py-2 align-middle sm:table-cell">
                 <HostState status={status} active={row.active} />
             </td>
-            <td className="px-3 py-2 align-top">
+            <td className="px-3 py-2 align-middle">
                 <span className="flex justify-end">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>

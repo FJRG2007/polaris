@@ -172,7 +172,7 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
 function EmailBadges({ entry }: { entry: UserEmailView; }) {
     const t = useTranslations("account");
     return (
-        <span className="flex flex-wrap items-center gap-1.5">
+        <span className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap">
             {entry.primary ? <Badge variant="primary">{t("emails.primary")}</Badge> : null}
             {entry.recovery ? <Badge>{t("emails.recovery")}</Badge> : null}
             {entry.verified ? (
@@ -206,7 +206,7 @@ function EmailRow({
     const hasMenu = !entry.primary || !entry.verified;
     return (
         <tr className="border-t border-border">
-            <td className="max-w-0 px-3 py-2 align-top">
+            <td className="max-w-0 px-3 py-2 align-middle">
                 <span className="flex min-w-0 items-center gap-2">
                     <Mail className="size-4 shrink-0 text-muted-foreground" />
                     <span className="truncate" title={entry.email}>
@@ -217,10 +217,10 @@ function EmailRow({
                     <EmailBadges entry={entry} />
                 </span>
             </td>
-            <td className="hidden whitespace-nowrap px-3 py-2 align-top sm:table-cell">
+            <td className="hidden whitespace-nowrap px-3 py-2 align-middle sm:table-cell">
                 <EmailBadges entry={entry} />
             </td>
-            <td className="px-3 py-2 align-top">
+            <td className="px-3 py-2 align-middle">
                 <span className="flex justify-end">
                     {hasMenu ? (
                         <DropdownMenu>
