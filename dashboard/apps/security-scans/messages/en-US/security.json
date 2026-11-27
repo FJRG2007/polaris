@@ -388,7 +388,7 @@
         "keepsNone": "No account has a key.",
         "polarisKey": "Polaris",
         "polarisKeyHint": "The key Polaris signs in with",
-        "noComment": "No comment",
+        "noComment": "No key comment",
         "loses": "Stop signing in over SSH",
         "losesHint": "These accounts only have a password.",
         "blocked": {

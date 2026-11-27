@@ -75,7 +75,7 @@
         "restartAt": "Se reinicia el {when}.",
         "restart": "Reiniciar 04:30",
         "restartCancel": "Cancelar reinicio",
-        "restartNow": "Reiniciar ahora",
+        "restartNow": "Reiniciar ya",
         "restartNowTitle": "¿Reiniciar este servidor ahora?",
         "restartNowBody": "Se reinicia en un minuto para terminar las actualizaciones. Lo que se ejecuta en él se detiene hasta que vuelve, normalmente unos minutos. Cancelar reinicio lo anula dentro de ese minuto.",
         "restartNowKeep": "Ahora no",
@@ -272,7 +272,7 @@
             "title": "{server} se reinició y ha vuelto",
             "body": "Las actualizaciones de seguridad terminaron de instalarse."
         },
-        "reasonPlayers": "jugadores en un servidor de juegos",
+        "reasonPlayers": "jugadores en un servidor",
         "reasonDeploy": "un despliegue en curso",
         "reasonBoth": "jugadores en un servidor de juegos y un despliegue en curso"
     },

@@ -817,7 +817,7 @@
             "notFound": "El SAI ya no está en el USB de esa máquina. Revisa el cable o edita la conexión.",
             "noAnswer": "El SAI no respondió. Comprueba que está encendido y que la dirección y el nombre son correctos."
         },
-        "lastHeard": "Sin respuesta desde",
+        "lastHeard": "Sin señal desde",
         "found": {
             "title": "Quitado, sigue conectado",
             "add": "Añadir",

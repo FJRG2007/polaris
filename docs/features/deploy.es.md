@@ -126,7 +126,7 @@ gestiona Polaris, sin que lo pidas:
   eligiera. Cuando una necesita reiniciar, Polaris lo programa a las 04:30 hora
   del servidor. Si hubo jugadores en un servidor de juegos el último día, o hay
   un despliegue en marcha, te pregunta antes.
-- **Reiniciar ahora.** En la pestaña **Sistema**, **Reiniciar ahora** reinicia el
+- **Reiniciar ya.** En la pestaña **Sistema**, **Reiniciar ya** reinicia el
   servidor un minuto después para terminar las actualizaciones; **Cancelar
   reinicio** aún lo anula en ese minuto. El aviso se cierra solo cuando el
   servidor vuelve.
