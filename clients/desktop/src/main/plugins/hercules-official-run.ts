@@ -168,20 +168,34 @@ const SIGNATURE_SCRIPT = [
     "$ErrorActionPreference='Stop'; $s = Get-AuthenticodeSignature -LiteralPath $env:POLARIS_TARGET;",
     "[pscustomobject]@{ Status = $s.Status.ToString(); Subject = [string]$s.SignerCertificate.Subject } | ConvertTo-Json -Compress"
 ].join(" ");
-/** Starts a program through Windows' administrator prompt and answers its exit code; 1223 when the prompt was declined. */
+/**
+ * Starts a program through Windows' administrator prompt and answers its exit
+ * code; 1223 when the prompt was declined. The elevated program starts with
+ * its window hidden (`ShellExecuteEx` with `SW_HIDE`, what `-WindowStyle
+ * Hidden` with `-Verb RunAs` asks for), so a console program such as
+ * PowerShell shows nothing but the prompt: the same launch sudo-prompt's
+ * Windows path uses (`Start-Process ... -WindowStyle hidden -Verb runAs`), and
+ * `vpn-helper-client.ts` here. `POLARIS_WINDOW=Normal` keeps the window, for
+ * a program whose own window is the point (the vendor's uninstaller).
+ */
 const ELEVATED_SCRIPT = [
-    "try { $a = @{ FilePath = $env:POLARIS_FILE; Verb = 'RunAs'; Wait = $true; PassThru = $true };",
+    "try { $w = if ($env:POLARIS_WINDOW -eq 'Normal') { 'Normal' } else { 'Hidden' };",
+    "$a = @{ FilePath = $env:POLARIS_FILE; Verb = 'RunAs'; Wait = $true; PassThru = $true; WindowStyle = $w };",
     "if ($env:POLARIS_ARGS) { $a.ArgumentList = $env:POLARIS_ARGS }; $p = Start-Process @a; exit $p.ExitCode }",
     "catch { if ($_.Exception.InnerException.NativeErrorCode -eq 1223 -or $_.Exception.NativeErrorCode -eq 1223) { exit 1223 }; exit 1 }"
 ].join(" ");
+
+/** How the elevated program's window starts: hidden (every tool and script), or shown for a program the person uses (an uninstaller). */
+export type ElevatedWindow = "hidden" | "shown";
 
 /**
  * Runs `file` with `args` through Windows' administrator prompt and answers
  * its exit code; [`DECLINED`] when the prompt was declined. The file and its
  * arguments travel in the environment, never in a command line built here.
+ * Its window is hidden unless `window` is "shown".
  */
-export async function runElevated(host: Pick<OfficialHost, "run">, systemRoot: string, file: string, args: readonly string[]): Promise<number> {
-    const env: Record<string, string> = { POLARIS_FILE: file };
+export async function runElevated(host: Pick<OfficialHost, "run">, systemRoot: string, file: string, args: readonly string[], window: ElevatedWindow = "hidden"): Promise<number> {
+    const env: Record<string, string> = { POLARIS_FILE: file, POLARIS_WINDOW: window === "shown" ? "Normal" : "Hidden" };
     if (args.length) env.POLARIS_ARGS = args.map(quoteWindowsArg).join(" ");
     return (await host.run(powershell({ systemRoot }), ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ELEVATED_SCRIPT], env)).code;
 }
@@ -225,7 +239,7 @@ export interface RestoreResult {
 export function createOfficialRunner(host: OfficialHost, paths: OfficialPaths, now: () => Date = () => new Date()) {
     const reg = (args: readonly string[]) => host.run(tool(paths, "reg.exe"), args);
 
-    const elevated = (file: string, args: readonly string[]) => runElevated(host, paths.systemRoot, file, args);
+    const elevated = (file: string, args: readonly string[], window: "hidden" | "shown" = "hidden") => runElevated(host, paths.systemRoot, file, args, window);
 
     async function running(): Promise<boolean> {
         const out = await host.run(tool(paths, "tasklist.exe"), ["/fo", "csv", "/nh", "/fi", `IMAGENAME eq ${official.STREAM_CONTROL_IMAGE}`]);
@@ -317,7 +331,8 @@ export function createOfficialRunner(host: OfficialHost, paths: OfficialPaths, n
                 return removeAutostart(item.entry, item.elevated);
             case "runUninstaller": {
                 if (!(await host.exists(item.file)) || !(await signed(item.file))) return "unsigned";
-                const code = await elevated(item.file, item.args);
+                // The vendor's uninstaller is a window the person answers: it stays shown.
+                const code = await elevated(item.file, item.args, "shown");
                 return code === DECLINED ? "declined" : code === 0 ? null : "uninstaller";
             }
         }

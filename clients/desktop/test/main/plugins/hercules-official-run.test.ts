@@ -131,6 +131,9 @@ describe("the uninstaller's signature", () => {
         expect(check?.args.join(" ")).not.toContain("InstallShield");
         const elevated = calls.find((c) => c.env?.POLARIS_FILE === SETUP);
         expect(splitCommandLine(elevated?.env?.POLARIS_ARGS ?? "")).toEqual(["-runfromtemp", "-l0x0409", "-removeonly"]);
+        // The uninstaller is a window the person answers; every tool and script elevated here starts hidden.
+        expect(elevated?.env?.POLARIS_WINDOW).toBe("Normal");
+        for (const call of calls.filter((c) => c.env?.POLARIS_FILE && c.env.POLARIS_FILE !== SETUP)) expect(call.env?.POLARIS_WINDOW).toBe("Hidden");
     });
 });
 

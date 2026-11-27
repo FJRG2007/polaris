@@ -255,7 +255,7 @@ export function handToShell(url: string, env: NodeJS.ProcessEnv = process.env): 
             reject(new ShellUnavailable(`${explorer} is not there`));
             return;
         }
-        const child = spawn(explorer, [`"${url}"`], { detached: true, stdio: "ignore", windowsVerbatimArguments: true, env: browserEnvironment(env) });
+        const child = spawn(explorer, [`"${url}"`], { detached: true, stdio: "ignore", windowsHide: false, windowsVerbatimArguments: true, env: browserEnvironment(env) });
         child.once("error", (error) => reject(error));
         child.once("spawn", () => {
             child.unref();

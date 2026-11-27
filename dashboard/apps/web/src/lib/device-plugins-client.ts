@@ -241,7 +241,9 @@ export const officialLookSchema = z.object({
                 .max(2_000)
         })
         .nullable(),
-    backup: z.object({ choice: z.enum(["stop", "uninstall", "keep"]), at: z.string().max(100), restored: z.boolean() }).nullable()
+    backup: z.object({ choice: z.enum(["stop", "uninstall", "keep"]), at: z.string().max(100), restored: z.boolean() }).nullable(),
+    /** Polaris' own driver holds the device, so the official app is not needed for it. False from an app older than it. */
+    driverInUse: z.boolean().catch(false)
 });
 
 export type OfficialLook = z.infer<typeof officialLookSchema>;

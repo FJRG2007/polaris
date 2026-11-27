@@ -2692,6 +2692,7 @@
                 "failed": "That did not work. Try again."
             },
             "installed": "{app} is installed on this computer.",
+            "notNeeded": "Polaris' driver is in use, so {app} is not needed.",
             "backup": {
                 "stop": "Polaris stopped the official app. You can put it back as it was.",
                 "uninstall": "Polaris uninstalled the official app. You can put its settings back.",

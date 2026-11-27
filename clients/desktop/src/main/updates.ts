@@ -202,7 +202,7 @@ export function watchForUpdates(found: (update: Update) => void, failed?: (updat
         });
         return () => {
             try {
-                spawn(path, ["--silent"], { detached: true, stdio: "ignore" }).unref();
+                spawn(path, ["--silent"], { detached: true, stdio: "ignore", windowsHide: false }).unref();
             } catch (caught) {
                 console.error(`Polaris ${release.version}: the installer did not start: ${String(caught)}`);
                 return;

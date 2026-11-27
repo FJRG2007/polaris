@@ -3,7 +3,9 @@
 /**
  * A plugin page's line about its device's official software: open it while
  * it is installed, and put it back as it was after Polaris stopped or
- * uninstalled it. Draws nothing for a plugin with none, or an older app.
+ * uninstalled it. While Polaris' own driver holds the device the official app
+ * cannot reach it, so the line says it is not needed and offers no Open.
+ * Draws nothing for a plugin with none, or an older app.
  */
 
 import { Button, cn, settingType, useToast } from "@polaris/ui";
@@ -33,6 +35,7 @@ export function OfficialSoftware({ id, bridge }: { id: string; bridge: PluginsBr
     const app = look.found?.app ?? null;
     const restorable = look.backup !== null && !look.backup.restored;
     if (!app && !restorable) return null;
+    const unneeded = look.driverInUse && app !== null;
 
     const restore = async () => {
         if (!bridge.official) return;
@@ -52,9 +55,9 @@ export function OfficialSoftware({ id, bridge }: { id: string; bridge: PluginsBr
 
     return (
         <div className={cn(settingType.body, "flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2")}>
-            <span className="min-w-0 text-muted-foreground">{restorable ? say(`official.backup.${look.backup?.choice ?? "stop"}`) : say("official.installed", { app: app?.displayName ?? say("official.appName") })}</span>
+            <span className="min-w-0 text-muted-foreground">{unneeded ? say("official.notNeeded", { app: app.displayName }) : restorable ? say(`official.backup.${look.backup?.choice ?? "stop"}`) : say("official.installed", { app: app?.displayName ?? say("official.appName") })}</span>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {app ? (
+                {app && !unneeded ? (
                     <Button size="sm" variant="secondary" disabled={busy !== null} aria-busy={busy === "launch"} onClick={() => void launch()}>
                         {say("official.launch", { app: app.displayName })}
                     </Button>

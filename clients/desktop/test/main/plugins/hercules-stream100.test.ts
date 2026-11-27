@@ -186,6 +186,21 @@ describe("Hercules Stream 100 plugin", () => {
         expect(sent.some((message) => (message as { method?: string; }).method === "polaris.state")).toBe(false);
     });
 
+    it("finds the controller once its new driver comes up: not found while it re-enumerates, then connected", async () => {
+        const fake = fakeNative([{ error: "notFound" }, { error: "notFound" }, { report: new Uint8Array(11) }]);
+        fake.native.ownershipJson = () => JSON.stringify({ observed: {}, ownership: { state: "direct" } });
+        const { port, deliver, sent } = fakePort();
+        const sleep = vi.fn(() => Promise.resolve());
+        entry.run({ port, native: fake.native, now: () => 5, sleep, exit: vi.fn() });
+        deliver({ type: "start", id: "hercules-stream100", version: "0.1.0", permissions: [], devices: [], settings: {} });
+        for (let i = 0; i < 5; i++) await flush();
+        const statuses = sent.filter((message) => (message as { type: string }).type === "status").map((message) => (message as { state: string; code?: string }).code ?? (message as { state: string }).state);
+        expect(statuses).toEqual(["noControls", "connected"]);
+        // It kept trying between the reads, and fed the report that came.
+        expect(sleep).toHaveBeenCalledTimes(2);
+        expect(fake.feed).toHaveBeenCalledTimes(1);
+    });
+
     it("forgets the knobs' baseline when the controller goes away", async () => {
         const fake = fakeNative([{ report: new Uint8Array(11) }, { error: "io" }]);
         const { port, deliver } = fakePort();
@@ -245,6 +260,10 @@ describe("Hercules Stream 100 plugin", () => {
             expect(view.driverSentence(view.readDriver({ state: "needed", hercules: true, failure: "declined" }))).toBe("stopped");
             expect(view.driverSentence(view.readDriver({ state: "repair", failure: "binding" }))).toBe("stopped");
             expect(view.driverSentence(view.readDriver({ state: "installed" }))).toBe("installed");
+            // On the device, but Windows starts it only after a restart; an old failure no longer applies once it is on.
+            expect(view.driverSentence(view.readDriver({ state: "installed", pending: true }))).toBe("pending");
+            expect(view.readDriver({ state: "installed", failure: "restart" })?.failure).toBeNull();
+            expect(view.readDriver({ state: "needed", failure: "restart" })?.failure).toBe("restart");
             expect(view.driverSentence(view.readDriver({ state: "notNeeded" }))).toBeNull();
             expect(view.driverSentence(view.readDriver({ state: "unplugged", installed: true }))).toBeNull();
             expect(view.driverSentence(view.readDriver({ state: "unplugged", installed: false }))).toBe("unplugged");

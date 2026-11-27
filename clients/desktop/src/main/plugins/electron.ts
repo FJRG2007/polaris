@@ -264,7 +264,11 @@ export function startDevicePlugins(showPolaris: (path?: string) => void): Plugin
     const keptAt = join(pluginsDir(), "requirements.json");
     requirements = createRequirements({
         platform: pluginPlatform(process.platform, process.arch),
-        runnerFor: (id, key) => requirementRunnerFor(id, key, pluginsDir()),
+        runnerFor: (id, key) => {
+            const runner = requirementRunnerFor(id, key, pluginsDir());
+            // The driver swap needs the device free: the plugin lets it go meanwhile and starts again after.
+            return runner && key === DRIVER_REQUIREMENT ? { look: () => runner.look(), setUp: () => created.whileStopped(id, () => runner.setUp()) } : runner;
+        },
         read: async () => JSON.parse(await readFile(keptAt, "utf8")),
         async write(value) {
             const temp = `${keptAt}.${process.pid}.${Date.now()}.tmp`;
@@ -422,7 +426,8 @@ export function registerPluginIpc(
                     await mkdir(dataDir, { recursive: true });
                     await writeFile(join(dataDir, name), text, "utf8");
                 },
-                (requires) => installedWith(parsedId.data, requires)
+                (requires) => installedWith(parsedId.data, requires),
+                async () => (await driverRunnerFor(parsedId.data, pluginsDir())?.state())?.state === "installed"
             );
         } catch (error) {
             console.error(`[plugin ${parsedId.data}] official software: ${error instanceof Error ? error.message : String(error)}`);

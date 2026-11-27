@@ -163,6 +163,33 @@ describe("plugin manager", () => {
         expect((await manager.snapshot()).installed[0]?.run).toEqual({ state: "sleeping" });
     });
 
+    it("keeps a plugin stopped while its driver goes on, through a plug event, and starts it again after", async () => {
+        const { manager, forks, plug } = await setup();
+        await manager.snapshot();
+        await manager.refresh();
+        plug([DEVICE]);
+        await manager.install("fixture-mixer", ["usb", "polaris-actions"]);
+        expect(forks).toHaveLength(1);
+        const seen = await manager.whileStopped("fixture-mixer", async () => {
+            // The driver swap re-enumerates the device: the plug event must not start the plugin on the half-swapped device.
+            await manager.devicesChanged([DEVICE]);
+            return (await manager.snapshot()).installed[0]?.run;
+        });
+        expect(seen).toMatchObject({ state: "missing" });
+        expect(forks).toHaveLength(2);
+        expect((await manager.snapshot()).installed[0]?.run).toMatchObject({ state: "starting" });
+    });
+
+    it("starts the plugin again when the work in between fails", async () => {
+        const { manager, forks, plug } = await setup();
+        await manager.snapshot();
+        await manager.refresh();
+        plug([DEVICE]);
+        await manager.install("fixture-mixer", ["usb", "polaris-actions"]);
+        await expect(manager.whileStopped("fixture-mixer", async () => Promise.reject(new Error("boom")))).rejects.toThrow("boom");
+        expect(forks).toHaveLength(2);
+    });
+
     it("reports an install that went in as installed when starting it fails", async () => {
         const { manager, dir, breakDeviceList } = await setup();
         await manager.refresh();

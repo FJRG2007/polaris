@@ -177,12 +177,14 @@ export async function lookDriver(driver: DriverRunner | null, failure: string | 
  * official app are then put on the plugin, and the pages it had are kept
  * beside them (`layout.json`) for the plugin to take as it learns each one.
  */
-export async function answerOfficial(runner: OfficialRunner, manager: Pick<PluginManager, "install" | "setSetting">, id: string, request: OfficialRequest, write: (name: string, text: string) => Promise<void>, installed: (requires: readonly string[]) => Promise<void> = async () => undefined): Promise<unknown> {
+export async function answerOfficial(runner: OfficialRunner, manager: Pick<PluginManager, "install" | "setSetting">, id: string, request: OfficialRequest, write: (name: string, text: string) => Promise<void>, installed: (requires: readonly string[]) => Promise<void> = async () => undefined, driverInUse: () => Promise<boolean> = async () => false): Promise<unknown> {
     switch (request.kind) {
         case "look": {
-            const [{ found, imported }, backup] = await Promise.all([runner.look(), runner.readBackup()]);
+            const [{ found, imported }, backup, driver] = await Promise.all([runner.look(), runner.readBackup(), driverInUse().catch(() => false)]);
             return {
                 found,
+                // Polaris' own driver holds the device: the official app is not needed for it (and cannot reach it).
+                driverInUse: driver,
                 imported: imported ? { pages: imported.pages, controls: imported.controls } : null,
                 backup: backup ? { choice: backup.choice, at: backup.at, restored: backup.restored } : null
             };

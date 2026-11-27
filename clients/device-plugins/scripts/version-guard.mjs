@@ -54,9 +54,9 @@ function main() {
     if (!base || /^0+$/.test(base)) return console.log("version guard: no base commit to compare with");
     // A shallow checkout has only HEAD: fetch the base too (its tree is all a diff needs).
     try {
-        execFileSync("git", ["cat-file", "-e", `${base}^{commit}`], { stdio: "ignore" });
+        execFileSync("git", ["cat-file", "-e", `${base}^{commit}`], { stdio: "ignore", windowsHide: true });
     } catch {
-        execFileSync("git", ["fetch", "--quiet", "--no-tags", "--depth=1", "origin", base], { stdio: "inherit" });
+        execFileSync("git", ["fetch", "--quiet", "--no-tags", "--depth=1", "origin", base], { stdio: "inherit", windowsHide: true });
     }
     const changed = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { windowsHide: true, encoding: "utf8" }).split("\n").filter(Boolean);
     const plugins = readdirSync(source)
