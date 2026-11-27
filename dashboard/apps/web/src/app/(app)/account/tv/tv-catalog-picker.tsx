@@ -8,7 +8,7 @@
  */
 
 import { useState } from "react";
-import { Button, Skeleton } from "@polaris/ui";
+import { Button, cn, settingType, Skeleton } from "@polaris/ui";
 import type { TvRow } from "@/lib/tv/update-requests";
 import { tvTakesCatalog } from "@/lib/tv/version-order";
 import type { TvCatalogEntry } from "@/lib/tv/catalog-picks";
@@ -107,13 +107,13 @@ export function TvCatalogPicker({
         <div className="flex min-w-0 flex-col gap-2">
             <div className="flex min-w-0 items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm">{t("tv.catalog.title")}</span>
+                    <span className={cn(settingType.body, "truncate")}>{t("tv.catalog.title")}</span>
                     <span
                         id={statusId}
                         className={
                             problem
-                                ? "text-xs text-warning-ink"
-                                : "truncate text-xs text-muted-foreground"
+                                ? cn(settingType.small, "text-warning-ink")
+                                : cn(settingType.hint, "truncate")
                         }
                     >
                         {t(`tv.catalog.status.${status}`)}
@@ -155,7 +155,7 @@ export function TvCatalogPicker({
                     </div>
                 ) : items === "unreachable" ? (
                     <div className="flex min-w-0 flex-wrap items-center gap-3">
-                        <p role="alert" className="min-w-0 text-sm text-warning-ink">
+                        <p role="alert" className={cn(settingType.body, "min-w-0 text-warning-ink")}>
                             {t("tv.catalog.errors.unreachable")}
                         </p>
                         <Button size="sm" variant="outline" onClick={fetchItems}>
@@ -163,7 +163,7 @@ export function TvCatalogPicker({
                         </Button>
                     </div>
                 ) : !items || items.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("tv.catalog.none")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("tv.catalog.none")}</p>
                 ) : (
                     <TvGallery
                         items={items}

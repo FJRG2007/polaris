@@ -13,7 +13,7 @@
  */
 
 import { Suspense } from "react";
-import { Card, CardBody } from "@polaris/ui";
+import { Card, CardBody, cn, settingType } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { StandingView } from "./standing-view";
@@ -39,7 +39,7 @@ export default async function AccountStandingPage() {
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("standing.page.title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("standing.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("standing.page.intro")}</p>
             </div>
             {/* A record about this account, so it is drawn as one: the face here
                 wears no ring and the name no gradient. What the page is telling

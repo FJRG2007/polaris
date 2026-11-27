@@ -12,7 +12,7 @@
 import { useTransition } from "react";
 import { verifyAuditChainAction } from "./actions";
 import type { ChainStatus } from "@/lib/audit-chain";
-import { Button, Skeleton, useToast } from "@polaris/ui";
+import { Button, cn, settingType, Skeleton, useToast } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -56,8 +56,8 @@ export function AuditIntegrity() {
         <div
             className={
                 broken
-                    ? "flex flex-wrap items-center gap-3 rounded-lg border border-danger-edge bg-danger-soft px-3 py-2.5 text-sm"
-                    : "flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm"
+                    ? cn(settingType.body, "flex flex-wrap items-center gap-3 rounded-lg border border-danger-edge bg-danger-soft px-3 py-2.5")
+                    : cn(settingType.body, "flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5")
             }
         >
             <Icon className={broken ? "size-4 shrink-0 text-danger" : "size-4 shrink-0 text-success"} aria-hidden />

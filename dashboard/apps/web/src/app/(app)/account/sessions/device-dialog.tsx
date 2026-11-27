@@ -31,11 +31,13 @@ import type { SessionView, TrustedDeviceDetail, TrustedDeviceRow } from "@/lib/s
 import {
     Badge,
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    settingType,
     Skeleton
 } from "@polaris/ui";
 import {
@@ -189,11 +191,11 @@ export function DeviceDialog({
                         </DialogDescription>
                     </DialogHeader>
 
-                    {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={cn(settingType.error, "mb-3")}>{error}</p> : null}
 
                     {device ? (
                         <div className="flex flex-col gap-4">
-                            <div className="rounded-lg border border-border px-3 py-1 text-sm">
+                            <div className={cn(settingType.body, "rounded-lg border border-border px-3 py-1")}>
                                 <Fact label={t("sessions.trusted.columns.address")}>
                                     <DeviceAddress address={device} />
                                 </Fact>
@@ -227,7 +229,7 @@ export function DeviceDialog({
                             ) : null}
 
                             {detail && !detail.identified ? (
-                                <p className="text-sm text-muted-foreground">
+                                <p className={cn(settingType.body, "text-muted-foreground")}>
                                     {t("sessions.device.unidentified")}
                                 </p>
                             ) : null}
@@ -239,7 +241,7 @@ export function DeviceDialog({
                                             <h3 className="text-sm font-medium">
                                                 {t("sessions.device.signedIn")}
                                             </h3>
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className={settingType.hint}>
                                                 {t("sessions.device.signedInHint")}
                                             </p>
                                         </div>
@@ -257,12 +259,12 @@ export function DeviceDialog({
                                             <h3 className="text-sm font-medium">
                                                 {t("passkeys.title")}
                                             </h3>
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className={settingType.hint}>
                                                 {t("sessions.device.passkeysHint")}
                                             </p>
                                         </div>
                                         {detail.passkeys.length === 0 ? (
-                                            <p className="rounded-lg border border-border px-3 py-4 text-center text-sm text-muted-foreground">
+                                            <p className={cn(settingType.body, "rounded-lg border border-border px-3 py-4 text-center text-muted-foreground")}>
                                                 {t("sessions.device.noPasskeys")}
                                             </p>
                                         ) : (
@@ -274,14 +276,14 @@ export function DeviceDialog({
                                                     >
                                                         <div className="flex min-w-0 items-center gap-2">
                                                             <KeyRound className="size-4 shrink-0 text-muted-foreground" />
-                                                            <span className="truncate text-sm">
+                                                            <span className={cn(settingType.body, "truncate")}>
                                                                 {passkey.name}
                                                             </span>
                                                             <code className="shrink-0 rounded bg-muted px-1 text-xs text-muted-foreground">
                                                                 {passkey.host}
                                                             </code>
                                                         </div>
-                                                        <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("sessions.device.added", {
+                                                        <span className={cn(settingType.hint, "min-w-0 max-w-full shrink-0 truncate")} title={t("sessions.device.added", {
                                                                 date: format.date(passkey.addedAt)
                                                             })}>
                                                             {t("sessions.device.added", {

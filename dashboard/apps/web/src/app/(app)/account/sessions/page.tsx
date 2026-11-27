@@ -10,6 +10,7 @@
  * the devices are.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { getUserSecurity } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
@@ -72,7 +73,7 @@ export default async function SessionsPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("sessions.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("sessions.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("sessions.page.intro")}</p>
             </div>
             {/* First, because it answers the question somebody with two accounts
                 comes here with: which of them is this browser signed in to. */}

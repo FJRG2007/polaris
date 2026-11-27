@@ -11,6 +11,7 @@ import { MoreHorizontal, Pencil, Share2, SquareTerminal, Trash2, Eye } from "luc
 import {
     Badge,
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -20,7 +21,8 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-    Input
+    Input,
+    settingType
 } from "@polaris/ui";
 import { TerminalViewer } from "./terminal-viewer";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -96,7 +98,7 @@ export function TerminalsView({ initial, openId }: { initial: Lists; openId: str
                         <Badge>{terminal.access === "control" ? t("terminals.list.canControl") : t("terminals.list.canView")}</Badge>
                     ) : null}
                 </div>
-                <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                <div className={cn(settingType.hint, "flex min-w-0 flex-wrap gap-x-3 gap-y-0.5")}>
                     {terminal.ownerName ? <span className="truncate">{t("terminals.list.owner", { name: terminal.ownerName })}</span> : null}
                     {terminal.os ? <span className="truncate" title={terminal.os}>{terminal.os}</span> : null}
                     {terminal.version ? <span>{t("terminals.list.version", { version: terminal.version })}</span> : null}
@@ -111,7 +113,7 @@ export function TerminalsView({ initial, openId }: { initial: Lists; openId: str
                     ) : null}
                 </div>
                 {!terminal.online ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {terminal.access === "owner"
                             ? t("terminals.list.offlineHint")
                             : terminal.ownerName
@@ -155,12 +157,12 @@ export function TerminalsView({ initial, openId }: { initial: Lists; openId: str
     return (
         <div className="flex min-w-0 flex-col gap-3">
             {error ? (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             ) : null}
             {lists.owned.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+                <p className={cn(settingType.body, "rounded-md border border-dashed border-border px-3 py-6 text-center text-muted-foreground")}>
                     {t("terminals.list.empty")}
                 </p>
             ) : (
@@ -266,7 +268,7 @@ function RenameDialog({
                         autoFocus
                     />
                     {error ? (
-                        <p role="alert" className="text-sm text-destructive">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}

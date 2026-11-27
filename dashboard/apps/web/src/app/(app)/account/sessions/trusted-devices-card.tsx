@@ -33,7 +33,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DeviceDialog } from "./device-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
-import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn, settingType } from "@polaris/ui";
 import type { TrustedDeviceRow } from "@/lib/session-directory";
 import { addressLine, DeviceAddress } from "@/components/device-address";
 import { forgetTrustedDeviceAction, forgetTrustedDevicesAction } from "./actions";
@@ -98,7 +98,7 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                 <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">{t("sessions.trusted.title")}</h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("sessions.trusted.description")}
                         </p>
                     </div>
@@ -115,11 +115,11 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                     ) : null}
                 </div>
 
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
 
                 <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full text-sm">
-                        <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                    <table className={cn(settingType.body, "w-full")}>
+                        <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                             {/* Each column waits for the width that holds it, and nothing
                                 arrives at md: that is where the navigation rail appears, so
                                 the content area is narrower there than a breakpoint
@@ -195,7 +195,7 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                                 </Badge>
                                                             ) : null}
                                                         </p>
-                                                        <p className="truncate text-xs text-muted-foreground lg:hidden">
+                                                        <p className={cn(settingType.hint, "truncate lg:hidden")}>
                                                             {origin(
                                                                 device,
                                                                 t,
@@ -205,22 +205,22 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                            <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 lg:table-cell")}>
                                                 <DeviceAddress address={device} />
                                             </td>
-                                            <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
+                                            <td className={cn(settingType.hint, "hidden max-w-[12rem] px-3 py-2 xl:table-cell")}>
                                                 <span className="block truncate">
                                                     {device.host ?? t("passkeys.notRecorded")}
                                                 </span>
                                             </td>
-                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
+                                            <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 2xl:table-cell")}>
                                                 {device.rememberedAt ? (
                                                     <RelativeTime iso={device.rememberedAt} />
                                                 ) : (
                                                     t("passkeys.notRecorded")
                                                 )}
                                             </td>
-                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
+                                            <td className={cn(settingType.hint, "hidden whitespace-nowrap px-3 py-2 2xl:table-cell")}>
                                                 <RelativeTime
                                                     iso={device.expiresAt}
                                                     tense="future"

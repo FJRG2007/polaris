@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { PageHeader } from "@polaris/ui";
+import { cn, PageHeader, settingType } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import { ChatAdminSettings, type ChatAdminScreen } from "./chat-settings";
 
@@ -18,7 +18,7 @@ export async function ChatSettingsPage({ screen }: { screen: ChatAdminScreen }) 
         <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4">
             <Link data-swipe-back
                 href="/admin/apps"
-                className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
+                className={cn(settingType.body, "text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1")}
             >
                 <ArrowLeft className="size-4" />
                 {t("polaris.title")}

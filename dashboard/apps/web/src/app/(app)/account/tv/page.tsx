@@ -7,7 +7,7 @@
  */
 
 import { Suspense } from "react";
-import { Skeleton } from "@polaris/ui";
+import { cn, settingType, Skeleton } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { tvUpdatesAction } from "./actions";
 import { TvUpdatesView } from "./tv-updates-view";
@@ -30,7 +30,7 @@ export default async function TvPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("tv.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("tv.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("tv.page.intro")}</p>
             </div>
             <CliApproveView
                 kind="tv"

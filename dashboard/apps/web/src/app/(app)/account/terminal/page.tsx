@@ -6,6 +6,7 @@
  * terminal's words, finding only a terminal's requests.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { CliApproveView } from "../cli/cli-approve-view";
@@ -21,7 +22,7 @@ export default async function TerminalSignInPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("terminal.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("terminal.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("terminal.page.intro")}</p>
             </div>
             <CliApproveView
                 kind="terminal"

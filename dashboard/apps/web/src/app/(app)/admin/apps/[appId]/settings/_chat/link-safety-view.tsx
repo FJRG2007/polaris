@@ -11,7 +11,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Checkbox, settingType, Switch, useOptimisticValue } from "@polaris/ui";
+import { Checkbox, cn, settingType, Switch, useOptimisticValue } from "@polaris/ui";
 import { setLinkSafetyAction } from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -61,8 +61,8 @@ export function LinkSafetyView({ initial }: { initial: Overview }) {
         <div className="flex flex-col gap-3">
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <p className="text-sm font-medium">{t("chat.linkSafety.label")}</p>
-                    <p className="text-xs text-muted-foreground">{t("chat.linkSafety.hint")}</p>
+                    <p className={cn(settingType.body, "font-medium")}>{t("chat.linkSafety.label")}</p>
+                    <p className={settingType.hint}>{t("chat.linkSafety.hint")}</p>
                 </div>
                 <Switch
                     checked={enabled}
@@ -87,7 +87,7 @@ export function LinkSafetyView({ initial }: { initial: Overview }) {
                                     }
                                 />
                                 <label htmlFor={id} className="flex min-w-0 flex-col">
-                                    <span className="flex items-center gap-2 text-sm">
+                                    <span className={cn(settingType.body, "flex items-center gap-2")}>
                                         <IntegrationLogo
                                             slug={entry.provider}
                                             className="size-4 shrink-0"
@@ -96,7 +96,7 @@ export function LinkSafetyView({ initial }: { initial: Overview }) {
                                             {name}
                                         </span>
                                     </span>
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className={settingType.hint}>
                                         {entry.configured
                                             ? t(`chat.linkSafety.${entry.provider}`)
                                             : t("chat.linkSafety.notSetUp")}
@@ -108,7 +108,7 @@ export function LinkSafetyView({ initial }: { initial: Overview }) {
                 </ul>
             )}
             {enabled && !anyConfigured && (
-                <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-warning-ink">
+                <p className={cn(settingType.small, "rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-warning-ink")}>
                     {t("chat.linkSafety.nothingSetUp")}{" "}
                     <Link
                         href="/admin/integrations"

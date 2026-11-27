@@ -47,11 +47,13 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    settingType
 } from "@polaris/ui";
 
 function Origin({ session }: { session: SessionView }) {
@@ -59,7 +61,7 @@ function Origin({ session }: { session: SessionView }) {
     const tc = useTranslations("components");
     return (
         <>
-            <p className="text-xs text-muted-foreground">
+            <p className={settingType.hint}>
                 {t.rich("sessions.origin", {
                     origin: sessionOrigin(
                         session,
@@ -73,7 +75,7 @@ function Origin({ session }: { session: SessionView }) {
                 a sign-in that already answered a code is a different thing to
                 allow than one that only had the password. */}
             {signInParts(tc, session.signIn).length > 0 ? (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("sessions.signedInWith", { summary: signInText(tc, session.signIn) })}
                 </p>
             ) : null}
@@ -298,14 +300,14 @@ export function SessionsView({
 
     return (
         <div className="flex flex-col gap-4">
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
 
             {pending.length > 0 ? (
                 <Card className="border-warning-edge">
                     <CardBody className="flex flex-col gap-3">
                         <div>
                             <h2 className="text-sm font-medium">{t("sessions.pending.title")}</h2>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {t("sessions.pending.hint")}
                             </p>
                         </div>
@@ -315,7 +317,7 @@ export function SessionsView({
                                 className="flex flex-col gap-2 rounded-md border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
                             >
                                 <div className="min-w-0">
-                                    <p className="text-sm">{session.device}</p>
+                                    <p className={settingType.body}>{session.device}</p>
                                     <Origin session={session} />
                                 </div>
                                 <div className="flex shrink-0 gap-2">
@@ -399,7 +401,7 @@ export function SessionsView({
                     {extensions.length === 0 &&
                     clients.length === 0 &&
                     deviceSessions.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t.rich("sessions.active.nothingElse", {
                                 link: (chunks) => (
                                     <Link
@@ -500,7 +502,7 @@ export function ApproveSignInDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("sessions.approve.pin")}
                         <QuickPinInput
                             ref={box}
@@ -512,7 +514,7 @@ export function ApproveSignInDialog({
                             required
                         />
                     </label>
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             {tc("actions.cancel")}

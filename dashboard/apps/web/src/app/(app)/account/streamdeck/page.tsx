@@ -6,6 +6,7 @@
  * uses, in a deck's words, finding only a deck's requests.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { CliApproveView } from "../cli/cli-approve-view";
@@ -21,7 +22,7 @@ export default async function StreamDeckPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("streamdeck.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("streamdeck.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("streamdeck.page.intro")}</p>
             </div>
             <CliApproveView
                 kind="streamdeck"

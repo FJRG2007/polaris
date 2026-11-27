@@ -18,7 +18,14 @@ import {
     setDmRuleModeAction,
     setStartingRulesAction
 } from "./actions";
-import { Select, SegmentedControl, Switch, useOptimisticToggle, settingType } from "@polaris/ui";
+import {
+    Select,
+    SegmentedControl,
+    Switch,
+    useOptimisticToggle,
+    settingType,
+    cn
+} from "@polaris/ui";
 
 export function DirectRulesView({
     mode,
@@ -121,8 +128,8 @@ export function DirectRulesView({
         <div className="mt-6 flex flex-col gap-4">
             <div className="flex flex-col gap-2">
                 <div>
-                    <p className="text-sm font-medium">{t("chat.directRules.title")}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={cn(settingType.body, "font-medium")}>{t("chat.directRules.title")}</p>
+                    <p className={settingType.hint}>
                         {chosen === "open"
                             ? t("chat.directRules.open.hint")
                             : t("chat.directRules.agreement.hint")}
@@ -141,15 +148,15 @@ export function DirectRulesView({
             </div>
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <p className="text-sm font-medium">{t("chat.directRules.line.label")}</p>
-                    <p className="text-xs text-muted-foreground">{t("chat.directRules.line.hint")}</p>
+                    <p className={cn(settingType.body, "font-medium")}>{t("chat.directRules.line.label")}</p>
+                    <p className={settingType.hint}>{t("chat.directRules.line.hint")}</p>
                 </div>
                 <Switch checked={shown} onChange={toggle} aria-label={t("chat.directRules.line.label")} />
             </div>
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <p className="text-sm font-medium">{t("chat.directRules.threads.label")}</p>
-                    <p className="text-xs text-muted-foreground">{t("chat.directRules.threads.hint")}</p>
+                    <p className={cn(settingType.body, "font-medium")}>{t("chat.directRules.threads.label")}</p>
+                    <p className={settingType.hint}>{t("chat.directRules.threads.hint")}</p>
                 </div>
                 <Switch
                     checked={threadsOn}
@@ -159,15 +166,15 @@ export function DirectRulesView({
             </div>
             <div className="flex flex-col gap-2">
                 <div>
-                    <p className="text-sm font-medium">{t("chat.directRules.starting.title")}</p>
-                    <p className="text-xs text-muted-foreground">{t("chat.directRules.starting.hint")}</p>
+                    <p className={cn(settingType.body, "font-medium")}>{t("chat.directRules.starting.title")}</p>
+                    <p className={settingType.hint}>{t("chat.directRules.starting.hint")}</p>
                 </div>
                 <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
                     {startRows.map((row) => (
                         <li key={row.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2">
-                            <span className="min-w-0 flex-1 text-[0.8125rem] sm:min-w-[12rem]">{row.label}</span>
+                            <span className={cn(settingType.body, "min-w-0 flex-1 sm:min-w-[12rem]")}>{row.label}</span>
                             <Select
-                                className="h-8 w-full shrink-0 text-xs sm:w-64"
+                                className={cn(settingType.body, "h-8 w-full shrink-0 sm:w-64")}
                                 aria-label={row.label}
                                 value={row.value}
                                 disabled={savingStart === row.key}

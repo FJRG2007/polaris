@@ -13,7 +13,7 @@
 import { RefreshCw } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
-import { Button, Card, CardBody, settingType, Switch, useOptimisticToggle } from "@polaris/ui";
+import { Button, Card, CardBody, cn, settingType, Switch, useOptimisticToggle } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { refreshModelCatalogAction, setInstanceKeySharingAction } from "./agent-actions";
@@ -49,8 +49,8 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
             <CardBody className="space-y-3">
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-medium">{t("agents.keySharing.label")}</p>
-                        <p className="text-muted-foreground text-xs">
+                        <p className={cn(settingType.body, "font-medium")}>{t("agents.keySharing.label")}</p>
+                        <p className={settingType.hint}>
                             {on
                                 ? t("agents.keySharing.on")
                                 : t("agents.keySharing.off")}
@@ -111,8 +111,8 @@ export function CatalogCard({
             <CardBody className="space-y-3">
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-medium">{t("agents.catalog.title")}</p>
-                        <p className="text-muted-foreground text-xs">
+                        <p className={cn(settingType.body, "font-medium")}>{t("agents.catalog.title")}</p>
+                        <p className={settingType.hint}>
                             {count === 0
                                 ? t("agents.catalog.empty")
                                 : t("agents.catalog.count", { count, shown: String(count) })}
@@ -124,7 +124,7 @@ export function CatalogCard({
                     </Button>
                 </div>
                 {at ? (
-                    <p className="text-muted-foreground text-xs">
+                    <p className={settingType.hint}>
                         {t.rich("agents.catalog.lastRead", {
                             when: format.dateTime(at),
                             time: (chunks) => (
@@ -136,7 +136,7 @@ export function CatalogCard({
                     </p>
                 ) : null}
                 {indexState?.refreshedAt ? (
-                    <p className="text-muted-foreground text-xs">
+                    <p className={settingType.hint}>
                         {t.rich("agents.catalog.indexRead", {
                             count: indexState.providers,
                             shown: String(indexState.providers),
@@ -150,7 +150,7 @@ export function CatalogCard({
                     </p>
                 ) : null}
                 {indexState?.lastError ? (
-                    <p className="text-xs text-warning break-words">
+                    <p className={cn(settingType.small, "text-warning break-words")}>
                         {t("agents.catalog.indexFailed", { error: indexState.lastError })}
                     </p>
                 ) : null}

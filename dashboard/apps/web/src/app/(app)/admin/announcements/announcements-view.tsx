@@ -20,6 +20,7 @@ import {
     Card,
     CardBody,
     Checkbox,
+    cn,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -30,6 +31,7 @@ import {
     EmptyState,
     Input,
     Select,
+    settingType,
     useToast
 } from "@polaris/ui";
 import { useLiveRead } from "@/components/use-live-resource";
@@ -123,7 +125,7 @@ function Chips({
     if (items.length === 0) return null;
     return (
         <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">{label}</span>
+            <span className={cn(settingType.hint, "font-medium")}>{label}</span>
             <div className="flex flex-wrap gap-1.5">
                 {items.map((item) => {
                     const on = picked.includes(item.id);
@@ -136,8 +138,8 @@ function Chips({
                             title={item.name}
                             className={
                                 on
-                                    ? "max-w-56 truncate rounded-full border border-primary bg-primary/10 px-2.5 py-0.5 text-xs font-medium"
-                                    : "max-w-56 truncate rounded-full border px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-muted"
+                                    ? cn(settingType.small, "max-w-56 truncate rounded-full border border-primary bg-primary/10 px-2.5 py-0.5 font-medium")
+                                    : cn(settingType.small, "max-w-56 truncate rounded-full border px-2.5 py-0.5 text-muted-foreground hover:bg-muted")
                             }
                         >
                             {item.name}
@@ -389,11 +391,11 @@ export function AnnouncementsView({
             <Card>
                 <CardBody className="flex flex-col gap-4">
                     {editing ? (
-                        <p className="text-sm font-medium">{t("admin.compose.editTitle")}</p>
+                        <p className={cn(settingType.body, "font-medium")}>{t("admin.compose.editTitle")}</p>
                     ) : null}
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <label className="flex min-w-0 flex-col gap-1 text-sm">
-                            <span className="text-xs font-medium text-muted-foreground">
+                        <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
+                            <span className={cn(settingType.hint, "font-medium")}>
                                 {t("admin.compose.kind")}
                             </span>
                             <Select
@@ -412,8 +414,8 @@ export function AnnouncementsView({
                                 ]}
                             />
                         </label>
-                        <label className="flex min-w-0 flex-col gap-1 text-sm">
-                            <span className="text-xs font-medium text-muted-foreground">
+                        <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
+                            <span className={cn(settingType.hint, "font-medium")}>
                                 {t("admin.compose.template")}
                             </span>
                             <Select
@@ -426,8 +428,8 @@ export function AnnouncementsView({
                                 }))}
                             />
                         </label>
-                        <label className="flex min-w-0 flex-col gap-1 text-sm">
-                            <span className="text-xs font-medium text-muted-foreground">
+                        <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
+                            <span className={cn(settingType.hint, "font-medium")}>
                                 {t("admin.compose.severity")}
                             </span>
                             <Select
@@ -444,8 +446,8 @@ export function AnnouncementsView({
                         </label>
                     </div>
 
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-xs font-medium text-muted-foreground">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("admin.compose.titleLabel")} *
                         </span>
                         <Input
@@ -455,8 +457,8 @@ export function AnnouncementsView({
                             aria-invalid={fieldError("title") ? true : undefined}
                         />
                     </label>
-                    <div className="flex flex-col gap-1 text-sm">
-                        <span className="text-xs font-medium text-muted-foreground">
+                    <div className={cn(settingType.body, "flex flex-col gap-1")}>
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("admin.compose.bodyLabel")}
                         </span>
                         <RichTextEditor
@@ -472,8 +474,8 @@ export function AnnouncementsView({
                         <span
                             className={
                                 form.body.length > BODY_MAX
-                                    ? "text-xs text-destructive"
-                                    : "text-xs text-muted-foreground"
+                                    ? settingType.error
+                                    : settingType.hint
                             }
                         >
                             {form.body.length > BODY_MAX
@@ -483,14 +485,14 @@ export function AnnouncementsView({
                                   })
                                 : t("admin.compose.bodyHint")}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {form.localized
                                 ? t("admin.compose.translated")
                                 : t("admin.compose.edited")}
                         </span>
                     </div>
-                    <div className="flex flex-col gap-1 text-sm">
-                        <span className="text-xs font-medium text-muted-foreground">
+                    <div className={cn(settingType.body, "flex flex-col gap-1")}>
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("admin.compose.detailsLabel")}
                         </span>
                         <RichTextEditor
@@ -501,8 +503,8 @@ export function AnnouncementsView({
                         <span
                             className={
                                 form.details.length > DETAILS_MAX
-                                    ? "text-xs text-destructive"
-                                    : "text-xs text-muted-foreground"
+                                    ? settingType.error
+                                    : settingType.hint
                             }
                         >
                             {form.details.length > DETAILS_MAX
@@ -514,8 +516,8 @@ export function AnnouncementsView({
                         </span>
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <label className="flex min-w-0 flex-col gap-1 text-sm">
-                            <span className="text-xs font-medium text-muted-foreground">
+                        <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
+                            <span className={cn(settingType.hint, "font-medium")}>
                                 {t("admin.compose.linkUrl")}
                             </span>
                             <Input
@@ -524,12 +526,12 @@ export function AnnouncementsView({
                                 onChange={(event) => set("linkUrl", event.target.value)}
                                 aria-invalid={fieldError("linkUrl") ? true : undefined}
                             />
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {fieldError("linkUrl") ?? t("admin.compose.linkHint")}
                             </span>
                         </label>
-                        <label className="flex min-w-0 flex-col gap-1 text-sm">
-                            <span className="text-xs font-medium text-muted-foreground">
+                        <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
+                            <span className={cn(settingType.hint, "font-medium")}>
                                 {t("admin.compose.linkLabel")}
                             </span>
                             <Input
@@ -542,8 +544,8 @@ export function AnnouncementsView({
 
                     {form.kind === "maintenance" ? (
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                <span className="text-xs font-medium text-muted-foreground">
+                            <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
+                                <span className={cn(settingType.hint, "font-medium")}>
                                     {t("admin.compose.windowStart")} *
                                 </span>
                                 <Input
@@ -555,8 +557,8 @@ export function AnnouncementsView({
                                     aria-invalid={fieldError("windowStart") ? true : undefined}
                                 />
                             </label>
-                            <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                <span className="text-xs font-medium text-muted-foreground">
+                            <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
+                                <span className={cn(settingType.hint, "font-medium")}>
                                     {t("admin.compose.windowEnd")} *
                                 </span>
                                 <Input
@@ -568,8 +570,8 @@ export function AnnouncementsView({
                                     aria-invalid={fieldError("windowEnd") ? true : undefined}
                                 />
                             </label>
-                            <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                <span className="text-xs font-medium text-muted-foreground">
+                            <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
+                                <span className={cn(settingType.hint, "font-medium")}>
                                     {t("admin.compose.lead")}
                                 </span>
                                 <Select
@@ -584,19 +586,19 @@ export function AnnouncementsView({
                                     }))}
                                 />
                             </label>
-                            <label className="flex min-w-0 flex-col gap-1 text-sm sm:col-span-2">
-                                <span className="text-xs font-medium text-muted-foreground">
+                            <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1 sm:col-span-2")}>
+                                <span className={cn(settingType.hint, "font-medium")}>
                                     {t("admin.compose.affected")}
                                 </span>
                                 <Input
                                     value={affectedText}
                                     onChange={(event) => setAffectedText(event.target.value)}
                                 />
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {t("admin.compose.affectedHint")}
                                 </span>
                             </label>
-                            <label className="flex items-center gap-2 self-center text-sm">
+                            <label className={cn(settingType.body, "flex items-center gap-2 self-center")}>
                                 <Checkbox
                                     checked={form.notifySteps}
                                     onChange={(event) => set("notifySteps", event.target.checked)}
@@ -606,8 +608,8 @@ export function AnnouncementsView({
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                <span className="text-xs font-medium text-muted-foreground">
+                            <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
+                                <span className={cn(settingType.hint, "font-medium")}>
                                     {t("admin.compose.startsAt")}
                                 </span>
                                 <Input
@@ -617,12 +619,12 @@ export function AnnouncementsView({
                                         set("startsAt", fromLocalInput(event.target.value))
                                     }
                                 />
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {t("admin.compose.startsNow")}
                                 </span>
                             </label>
-                            <label className="flex min-w-0 flex-col gap-1 text-sm">
-                                <span className="text-xs font-medium text-muted-foreground">
+                            <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
+                                <span className={cn(settingType.hint, "font-medium")}>
                                     {t("admin.compose.endsAt")}
                                 </span>
                                 <Input
@@ -633,7 +635,7 @@ export function AnnouncementsView({
                                     }
                                     aria-invalid={fieldError("endsAt") ? true : undefined}
                                 />
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {fieldError("endsAt") ?? t("admin.compose.noEnd")}
                                 </span>
                             </label>
@@ -641,10 +643,10 @@ export function AnnouncementsView({
                     )}
 
                     <fieldset className="flex flex-col gap-3">
-                        <legend className="mb-1 text-sm font-medium">
+                        <legend className={cn(settingType.body, "mb-1 font-medium")}>
                             {t("admin.compose.audience")}
                         </legend>
-                        <label className="flex items-center gap-2 text-sm">
+                        <label className={cn(settingType.body, "flex items-center gap-2")}>
                             <Checkbox
                                 checked={form.audience.everyone}
                                 onChange={(event) =>
@@ -687,61 +689,61 @@ export function AnnouncementsView({
                                 />
                             </>
                         )}
-                        <p className="text-sm font-medium" aria-live="polite">
+                        <p className={cn(settingType.body, "font-medium")} aria-live="polite">
                             {reach === null
                                 ? t("admin.compose.counting")
                                 : t("admin.compose.reaches", { count: reach })}
                         </p>
                         {fieldError("audience") ? (
-                            <p className="text-xs text-destructive">{fieldError("audience")}</p>
+                            <p className={settingType.error}>{fieldError("audience")}</p>
                         ) : null}
                     </fieldset>
 
                     <fieldset className="flex flex-col gap-2">
-                        <legend className="mb-1 text-sm font-medium">
+                        <legend className={cn(settingType.body, "mb-1 font-medium")}>
                             {t("admin.compose.delivery")}
                         </legend>
-                        <label className="flex items-start gap-2 text-sm">
+                        <label className={cn(settingType.body, "flex items-start gap-2")}>
                             <Checkbox
                                 checked={form.sendNotice}
                                 onChange={(event) => set("sendNotice", event.target.checked)}
                             />
                             <span className="min-w-0">
                                 {t("admin.compose.sendNotice")}
-                                <span className="block text-xs text-muted-foreground">
+                                <span className={cn(settingType.hint, "block")}>
                                     {t("admin.compose.sendNoticeHint")}
                                 </span>
                             </span>
                         </label>
-                        <label className="flex items-start gap-2 text-sm">
+                        <label className={cn(settingType.body, "flex items-start gap-2")}>
                             <Checkbox
                                 checked={form.showBanner}
                                 onChange={(event) => set("showBanner", event.target.checked)}
                             />
                             <span className="min-w-0">
                                 {t("admin.compose.showBanner")}
-                                <span className="block text-xs text-muted-foreground">
+                                <span className={cn(settingType.hint, "block")}>
                                     {t("admin.compose.showBannerHint")}
                                 </span>
                             </span>
                         </label>
                         {fieldError("showBanner") ? (
-                            <p className="text-xs text-destructive">{fieldError("showBanner")}</p>
+                            <p className={settingType.error}>{fieldError("showBanner")}</p>
                         ) : null}
                     </fieldset>
 
                     <div className="flex flex-col gap-1 rounded-lg border border-dashed p-3">
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className={cn(settingType.hint, "font-medium")}>
                             {t("admin.compose.preview")}
                         </span>
-                        <p className="break-words text-sm font-medium">
+                        <p className={cn(settingType.body, "break-words font-medium")}>
                             {fillPlaceholders(input.title, values) || "-"}
                         </p>
                         <AnnouncementMarkdown
                             source={fillPlaceholders(input.body, values)}
-                            className="text-xs"
+                            className={settingType.small}
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("admin.compose.previewHint")}
                         </span>
                     </div>
@@ -751,9 +753,9 @@ export function AnnouncementsView({
                     !["audience", "showBanner", "linkUrl", "endsAt"].includes(
                         String(issue?.path[0])
                     ) ? (
-                        <p className="text-sm text-destructive">{t(`admin.errors.${issueKey}`)}</p>
+                        <p className={settingType.error}>{t(`admin.errors.${issueKey}`)}</p>
                     ) : null}
-                    {serverError ? <p className="text-sm text-destructive">{serverError}</p> : null}
+                    {serverError ? <p className={settingType.error}>{serverError}</p> : null}
                     <div className="flex flex-wrap justify-end gap-2">
                         {editing ? (
                             <Button variant="ghost" onClick={reset} disabled={pending}>
@@ -801,12 +803,12 @@ export function AnnouncementsView({
                                 >
                                     <div className="min-w-0 grow basis-64">
                                         <p
-                                            className="truncate text-sm font-medium"
+                                            className={cn(settingType.body, "truncate font-medium")}
                                             title={row.title}
                                         >
                                             {row.title}
                                         </p>
-                                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                        <div className={cn(settingType.hint, "mt-1 flex flex-wrap items-center gap-1.5")}>
                                             <Badge variant="neutral">
                                                 {t(`admin.phase.${row.phase}`)}
                                             </Badge>
@@ -960,7 +962,7 @@ export function AnnouncementsView({
                             setUpdateError(null);
                         }}
                     />
-                    {updateError ? <p className="text-xs text-destructive">{updateError}</p> : null}
+                    {updateError ? <p className={settingType.error}>{updateError}</p> : null}
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setUpdating(null)}>
                             {t("admin.compose.cancel")}

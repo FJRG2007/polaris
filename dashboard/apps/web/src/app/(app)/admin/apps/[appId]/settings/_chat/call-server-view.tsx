@@ -19,7 +19,7 @@ import * as actions from "./actions";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Input, Skeleton } from "@polaris/ui";
+import { Button, cn, Input, settingType, Skeleton } from "@polaris/ui";
 import { CircleAlert, CircleCheck, Loader2 } from "lucide-react";
 import * as polls from "@/app/(app)/admin/admin-polls";
 
@@ -153,7 +153,7 @@ export function CallServerView() {
                 <h2 className="text-[0.8125rem] font-semibold text-foreground">
                     {t("chat.calls.title")}
                 </h2>
-                <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
+                <p className={cn(settingType.hint, "mt-0.5 leading-relaxed")}>
                     {t("chat.calls.intro")}
                 </p>
             </div>
@@ -163,7 +163,7 @@ export function CallServerView() {
             ) : (
                 <>
                     <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
-                        <p className="flex items-center gap-1.5 text-[0.75rem] text-foreground">
+                        <p className={cn(settingType.small, "flex items-center gap-1.5 text-foreground")}>
                             {settings.answering ? (
                                 <CircleCheck className="size-3.5 shrink-0 text-success" />
                             ) : waited ||
@@ -186,7 +186,7 @@ export function CallServerView() {
                                         ? t("chat.calls.status.notAnswering", { where })
                                         : t("chat.calls.status.starting", { where })}
                         </p>
-                        <p className="text-[0.6875rem] text-foreground-subtle">
+                        <p className={settingType.hint}>
                             {!settings.ready
                                 ? t("chat.calls.detail.unprepared")
                                 : missing
@@ -248,14 +248,14 @@ export function CallServerView() {
                         // while that is set is saved and then never used. Said
                         // here rather than left to be discovered on a call that
                         // keeps going somewhere else.
-                        <p className="text-[0.6875rem] text-warning">
+                        <p className={cn(settingType.small, "text-warning")}>
                             {t("chat.calls.unused.environment")}
                         </p>
                     ) : settings.unused === "incomplete" ? (
                         // Half a pairing signs nothing, so it is skipped. Nothing
                         // on the screen said so: the address sat there looking
                         // like the one calls were going to.
-                        <p className="text-[0.6875rem] text-warning">
+                        <p className={cn(settingType.small, "text-warning")}>
                             {settings.key
                                 ? t("chat.calls.unused.noSecret")
                                 : settings.hasSecret
@@ -267,7 +267,7 @@ export function CallServerView() {
                     {manual ? (
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[0.75rem] font-medium text-muted-foreground">
+                                <span className={cn(settingType.hint, "font-medium")}>
                                     {t("chat.calls.fields.address")}
                                 </span>
                                 <Input
@@ -279,7 +279,7 @@ export function CallServerView() {
                                 />
                             </label>
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[0.75rem] font-medium text-muted-foreground">
+                                <span className={cn(settingType.hint, "font-medium")}>
                                     {t("chat.calls.fields.key")}
                                 </span>
                                 <Input
@@ -292,7 +292,7 @@ export function CallServerView() {
                                 />
                             </label>
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[0.75rem] font-medium text-muted-foreground">
+                                <span className={cn(settingType.hint, "font-medium")}>
                                     {t("chat.calls.fields.secret")}
                                 </span>
                                 {/* enigma:allow-no-breach-check - this is a secret
@@ -331,7 +331,7 @@ export function CallServerView() {
                                 {tc("actions.save")}
                             </Button>
                             {saved ? (
-                                <span className="flex items-center gap-1.5 pb-2 text-[0.75rem] text-muted-foreground">
+                                <span className={cn(settingType.hint, "flex items-center gap-1.5 pb-2")}>
                                     <CircleCheck className="size-3.5 shrink-0 text-success" />
                                     {t("chat.calls.saved")}
                                 </span>
@@ -350,7 +350,7 @@ export function CallServerView() {
                 </>
             )}
 
-            {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
         </section>
     );
 }

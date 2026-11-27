@@ -22,7 +22,7 @@
  * would have said. Only a well-formed, free, changed handle earns a yes.
  */
 
-import { Input, cn } from "@polaris/ui";
+import { Input, cn, settingType } from "@polaris/ui";
 import { usernameField } from "@polaris/core";
 import { checkUsernameAction } from "./actions";
 import { knownMessage } from "./security/known-sentences";
@@ -130,7 +130,7 @@ export function UsernameField({
     const taken = verdict.kind === "taken";
 
     return (
-        <label className="flex flex-col gap-1 text-sm">
+        <label className={cn(settingType.body, "flex flex-col gap-1")}>
             {t("profile.username")}
             <div className="relative">
                 <Input
@@ -160,7 +160,7 @@ export function UsernameField({
             </div>
             <span
                 id="username-hint"
-                className={cn("text-xs", taken ? "text-danger" : "text-muted-foreground")}
+                className={cn(settingType.small, taken ? "text-danger" : "text-muted-foreground")}
             >
                 {locked
                     ? lockedNote
@@ -172,13 +172,13 @@ export function UsernameField({
             </span>
             {taken && verdict.suggestions.length > 0 ? (
                 <span className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                    <span className="text-muted-foreground text-xs">{t("profile.try")}</span>
+                    <span className={settingType.hint}>{t("profile.try")}</span>
                     {verdict.suggestions.map((suggestion) => (
                         <button
                             key={suggestion}
                             type="button"
                             onClick={() => onChange(suggestion)}
-                            className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-xs transition-colors hover:border-border-strong hover:bg-card-hover"
+                            className={cn(settingType.small, "rounded-full border border-border bg-muted/40 px-2 py-0.5 transition-colors hover:border-border-strong hover:bg-card-hover")}
                         >
                             {suggestion}
                         </button>

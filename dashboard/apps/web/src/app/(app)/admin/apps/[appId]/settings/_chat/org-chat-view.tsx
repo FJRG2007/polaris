@@ -14,7 +14,7 @@
  */
 
 import { useState } from "react";
-import { Switch } from "@polaris/ui";
+import { cn, settingType, Switch } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { useOptimisticToggle } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -36,8 +36,8 @@ export function OrgChatView({ offered }: { offered: boolean }) {
         <div className="flex flex-col gap-2">
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <p className="text-sm font-medium">{t("chat.orgChat.label")}</p>
-                    <p className="text-muted-foreground text-xs">{t("chat.orgChat.hint")}</p>
+                    <p className={cn(settingType.body, "font-medium")}>{t("chat.orgChat.label")}</p>
+                    <p className={settingType.hint}>{t("chat.orgChat.hint")}</p>
                 </div>
                 <Switch
                     checked={on}
@@ -46,7 +46,7 @@ export function OrgChatView({ offered }: { offered: boolean }) {
                 />
             </div>
             {error && (
-                <p role="alert" className="text-danger text-xs">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             )}

@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -20,6 +21,7 @@ import {
     DialogTitle,
     Input,
     Select,
+    settingType,
     Skeleton
 } from "@polaris/ui";
 import { openTerminalAction } from "./actions";
@@ -203,7 +205,7 @@ export function TerminalViewer({
             {state === "connecting" ? <Skeleton className="h-80 w-full" /> : null}
             {state === "failed" ? (
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
-                    <p role="alert" className="min-w-0 text-sm text-muted-foreground">
+                    <p role="alert" className={cn(settingType.body, "min-w-0 text-muted-foreground")}>
                         {problem ?? t("terminals.viewer.failed")}
                     </p>
                     <Button
@@ -239,7 +241,7 @@ export function TerminalViewer({
                         />
                     ) : null}
                     {panes && panes.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t("terminals.viewer.noPanes")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("terminals.viewer.noPanes")}</p>
                     ) : (
                         pane ? (
                             <TerminalView
@@ -251,7 +253,7 @@ export function TerminalViewer({
                         ) : null
                     )}
                     {problem ? (
-                        <p role="status" className="text-sm text-muted-foreground">
+                        <p role="status" className={cn(settingType.body, "text-muted-foreground")}>
                             {problem}
                         </p>
                     ) : null}
@@ -279,7 +281,7 @@ export function TerminalViewer({
                             </Button>
                         </form>
                     ) : null}
-                    {sent ? <p className="text-xs text-muted-foreground">{sent}</p> : null}
+                    {sent ? <p className={settingType.hint}>{sent}</p> : null}
                 </>
             ) : null}
         </div>
@@ -292,7 +294,7 @@ export function TerminalViewer({
                     <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight" title={name}>
                         {name}
                     </h1>
-                    <p className="text-sm text-muted-foreground">{intro}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{intro}</p>
                 </div>
                 {body}
             </section>

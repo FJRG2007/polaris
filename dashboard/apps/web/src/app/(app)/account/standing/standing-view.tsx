@@ -15,7 +15,7 @@
 
 import { Check } from "lucide-react";
 import { Avatar } from "@/components/avatar";
-import { Card, CardBody, cn } from "@polaris/ui";
+import { Card, CardBody, cn, settingType } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -86,11 +86,11 @@ export function StandingView({
                                     standing: t(`standing.words.${standing}` as const)
                                 })}
                             </h2>
-                            <p className="text-sm text-muted-foreground">
+                            <p className={cn(settingType.body, "text-muted-foreground")}>
                                 {t(`standing.notes.${standing}` as const)}
                             </p>
                             {upheld > 0 && (
-                                <p className="text-xs text-muted-foreground">
+                                <p className={settingType.hint}>
                                     {t("standing.countedSince", { date: format.date(since) })}
                                 </p>
                             )}
@@ -171,10 +171,10 @@ export function StandingView({
                 <CardBody className="flex flex-col gap-3">
                     <div>
                         <h2 className="text-sm font-medium">{t("standing.inForce.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("standing.inForce.description")}</p>
+                        <p className={settingType.hint}>{t("standing.inForce.description")}</p>
                     </div>
                     {restrictions.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
+                        <p className={cn(settingType.body, "text-muted-foreground")}>
                             {t("standing.inForce.none")}
                         </p>
                     ) : (
@@ -182,7 +182,7 @@ export function StandingView({
                             {restrictions.map((restriction, index) => (
                                 <li
                                     key={`${restriction.kind}-${restriction.where}-${index}`}
-                                    className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
+                                    className={cn(settingType.body, "flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2")}
                                 >
                                     <span className="min-w-0 truncate">
                                         {restriction.kind === "spam"
@@ -196,7 +196,7 @@ export function StandingView({
                                             place: restriction.where
                                         })}
                                     </span>
-                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                    <span className={cn(settingType.hint, "shrink-0")}>
                                         {restriction.until
                                             ? t("standing.inForce.until", { time: format.dateTime(restriction.until) })
                                             : t("standing.inForce.untilLifted")}

@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Input, Select, Switch } from "@polaris/ui";
+import { cn, Input, Select, settingType, Switch } from "@polaris/ui";
 import { setModerationPolicyAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -56,7 +56,7 @@ export function ModerationPolicyView({ initial }: { initial: ModerationPolicy })
         const invalid = draft.trim() === "" || !parsed.success;
         return (
             <label className="flex items-center justify-between gap-3">
-                <span className="min-w-0 text-sm">{t(`chat.moderation.${field}`)}</span>
+                <span className={cn(settingType.body, "min-w-0")}>{t(`chat.moderation.${field}`)}</span>
                 <Input
                     type="number"
                     inputMode="numeric"
@@ -78,12 +78,12 @@ export function ModerationPolicyView({ initial }: { initial: ModerationPolicy })
         <section className="mt-8 flex flex-col gap-4">
             <div>
                 <h2 className="text-base font-semibold">{t("chat.moderation.title")}</h2>
-                <p className="text-sm text-muted-foreground">{t("chat.moderation.description")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("chat.moderation.description")}</p>
             </div>
             <label className="flex items-start justify-between gap-3">
                 <span className="flex min-w-0 flex-col">
-                    <span className="text-sm font-medium">{t("chat.moderation.keep")}</span>
-                    <span className="text-xs text-muted-foreground">{t("chat.moderation.keepHint")}</span>
+                    <span className={cn(settingType.body, "font-medium")}>{t("chat.moderation.keep")}</span>
+                    <span className={settingType.hint}>{t("chat.moderation.keepHint")}</span>
                 </span>
                 <Switch
                     checked={shown.keep === "allowed"}
@@ -93,8 +93,8 @@ export function ModerationPolicyView({ initial }: { initial: ModerationPolicy })
             </label>
             <label className="flex items-start justify-between gap-3">
                 <span className="flex min-w-0 flex-col">
-                    <span className="text-sm font-medium">{t("chat.moderation.restriction")}</span>
-                    <span className="text-xs text-muted-foreground">{t("chat.moderation.restrictionHint")}</span>
+                    <span className={cn(settingType.body, "font-medium")}>{t("chat.moderation.restriction")}</span>
+                    <span className={settingType.hint}>{t("chat.moderation.restrictionHint")}</span>
                 </span>
                 <Switch
                     checked={shown.restriction.enabled}
@@ -107,11 +107,11 @@ export function ModerationPolicyView({ initial }: { initial: ModerationPolicy })
             {number("hours")}
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-sm font-medium">{t("chat.moderation.autoDownload")}</span>
-                    <span className="text-xs text-muted-foreground">{t("chat.moderation.autoDownloadHint")}</span>
+                    <span className={cn(settingType.body, "font-medium")}>{t("chat.moderation.autoDownload")}</span>
+                    <span className={settingType.hint}>{t("chat.moderation.autoDownloadHint")}</span>
                 </span>
                 <Select
-                    className="h-8 w-full shrink-0 text-xs sm:w-48"
+                    className={cn(settingType.body, "h-8 w-full shrink-0 sm:w-48")}
                     aria-label={t("chat.moderation.autoDownload")}
                     value={shown.autoDownload}
                     options={AUTO_DOWNLOAD_CHOICES.map((choice) => ({
@@ -123,7 +123,7 @@ export function ModerationPolicyView({ initial }: { initial: ModerationPolicy })
                     }
                 />
             </div>
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
         </section>
     );
 }

@@ -12,7 +12,7 @@ import { useState, type FormEvent } from "react";
 import type { TvRow } from "@/lib/tv/update-requests";
 import type { TvFilterReach } from "@/lib/tv/filter-reach";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Button, Input, Skeleton, Switch } from "@polaris/ui";
+import { Badge, Button, cn, Input, settingType, Skeleton, Switch } from "@polaris/ui";
 import type { TvBlockingReport } from "@/lib/tv/preferences";
 import { TV_NAME_MAX, tvNameSchema } from "@/lib/tv/tv-name";
 import { tvTakesBlocking } from "@/lib/tv/version-order";
@@ -91,13 +91,13 @@ export function TvPreferences({
         <div className="flex min-w-0 flex-col gap-1.5">
             <div className="flex min-w-0 items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm">{t("tv.prefs.blocking")}</span>
+                    <span className={cn(settingType.body, "truncate")}>{t("tv.prefs.blocking")}</span>
                     <span
                         id={statusId}
                         className={
                             problem
-                                ? "text-xs text-warning-ink"
-                                : "truncate text-xs text-muted-foreground"
+                                ? cn(settingType.small, "text-warning-ink")
+                                : cn(settingType.hint, "truncate")
                         }
                     >
                         {t(STATUS_WORDS[status])}
@@ -160,7 +160,7 @@ export function TvName({
     if (!editing) {
         return (
             <span className="flex min-w-0 items-center gap-1">
-                <span className="truncate text-sm font-medium" title={row.name}>
+                <span className={cn(settingType.body, "truncate font-medium")} title={row.name}>
                     {row.name}
                 </span>
                 <Button

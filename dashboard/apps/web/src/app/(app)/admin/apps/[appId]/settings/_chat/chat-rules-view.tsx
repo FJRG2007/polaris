@@ -88,7 +88,7 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                 }))}
             />
 
-            <p className="text-sm text-muted-foreground">{t(`chat.rules.scopes.${scope}.note`)}</p>
+            <p className={cn(settingType.body, "text-muted-foreground")}>{t(`chat.rules.scopes.${scope}.note`)}</p>
 
             <Card>
                 {/* Keyed by scope, which is what makes the fields belong to the
@@ -192,7 +192,7 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                             rules.maxAttachments === 0 && "opacity-50"
                         )}
                     >
-                        <span className="text-sm font-medium">
+                        <span className={cn(settingType.body, "font-medium")}>
                             {t("chat.rules.fields.maxAttachmentMib.label")}
                         </span>
                         <SizeField
@@ -204,7 +204,7 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                             aria-label={t("chat.rules.fields.maxAttachmentMib.label")}
                             onChange={(value) => set("maxAttachmentMib", value)}
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("chat.rules.fields.maxAttachmentMib.hint")}
                         </span>
                     </label>
@@ -246,7 +246,7 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                             {t(`chat.rules.scopes.${scope}.save`)}
                         </Button>
                         {!dirty && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("chat.rules.saved")}
                             </span>
                         )}
@@ -293,7 +293,7 @@ function Limit({
 
     return (
         <label className={cn("flex flex-col gap-1.5", disabled && "opacity-50")}>
-            <span className="text-sm font-medium">{label}</span>
+            <span className={cn(settingType.body, "font-medium")}>{label}</span>
             <div className="flex items-center gap-2">
                 <Input
                     type="number"
@@ -309,12 +309,12 @@ function Limit({
                         if (Number.isInteger(next) && next >= min && next <= max) onChange(next);
                     }}
                 />
-                <span className="text-sm text-muted-foreground">{suffix}</span>
+                <span className={cn(settingType.body, "text-muted-foreground")}>{suffix}</span>
                 {value === 0 && zeroLabel && (
-                    <span className="text-xs text-muted-foreground">{zeroLabel}</span>
+                    <span className={settingType.hint}>{zeroLabel}</span>
                 )}
             </div>
-            <span className={cn("text-xs", valid ? "text-muted-foreground" : "text-danger")}>
+            <span className={cn(settingType.small, valid ? "text-muted-foreground" : "text-danger")}>
                 {valid ? hint : t("chat.rules.range", { min: String(min), max: String(max) })}
             </span>
         </label>
@@ -335,8 +335,8 @@ function Toggle({
     return (
         <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-                <p className="text-sm font-medium">{label}</p>
-                <p className="text-xs text-muted-foreground">{hint}</p>
+                <p className={cn(settingType.body, "font-medium")}>{label}</p>
+                <p className={settingType.hint}>{hint}</p>
             </div>
             <Switch checked={checked} onChange={onChange} aria-label={label} />
         </div>

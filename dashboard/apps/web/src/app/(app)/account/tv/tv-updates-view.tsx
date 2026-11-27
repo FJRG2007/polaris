@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { RelativeTime } from "@/components/relative-time";
 import { compareTvVersions, tvTakesUpdates } from "@/lib/tv/version-order";
-import { Badge, Button, Card, CardBody } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TvFilterReach } from "@/lib/tv/filter-reach";
 import type { TvRow, TvUpdateState } from "@/lib/tv/update-requests";
@@ -226,7 +226,7 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
                     <h2 id="tv-updates-title" className="text-sm font-semibold">
                         {t("tv.updates.title")}
                     </h2>
-                    <p className="text-xs text-muted-foreground">
+                    <p className={settingType.hint}>
                         {view.latest
                             ? t("tv.updates.latest", { version: view.latest })
                             : t("tv.updates.noRelease")}
@@ -245,12 +245,12 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
                 ) : null}
             </div>
             {error ? (
-                <p role="alert" className="text-xs text-danger-ink">
+                <p role="alert" className={cn(settingType.small, "text-danger-ink")}>
                     {error}
                 </p>
             ) : null}
             {view.tvs.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("tv.updates.empty")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("tv.updates.empty")}</p>
             ) : (
                 <Card>
                     <CardBody className="flex flex-col divide-y divide-border p-0">
@@ -324,7 +324,7 @@ function TvUpdateRow({
                 <Tv className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <TvName row={row} onRename={onRename} />
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className={cn(settingType.hint, "truncate")}>
                         {row.versionName
                             ? t("tv.updates.runs", { version: row.versionName })
                             : t("tv.updates.versionUnknown")}
@@ -342,7 +342,7 @@ function TvUpdateRow({
                             </Badge>
                             {status.state === "failed" && status.reason ? (
                                 <span
-                                    className="min-w-0 truncate text-xs text-muted-foreground"
+                                    className={cn(settingType.hint, "min-w-0 truncate")}
                                     title={status.reason}
                                 >
                                     {status.reason}
@@ -357,7 +357,7 @@ function TvUpdateRow({
                     </Badge>
                 ) : !tvTakesUpdates(row.versionCode) ? (
                     <span
-                        className="min-w-0 max-w-[45%] shrink truncate text-end text-xs text-muted-foreground"
+                        className={cn(settingType.hint, "min-w-0 max-w-[45%] shrink truncate text-end")}
                         title={t("tv.updates.updateOnTv")}
                     >
                         {t("tv.updates.updateOnTv")}

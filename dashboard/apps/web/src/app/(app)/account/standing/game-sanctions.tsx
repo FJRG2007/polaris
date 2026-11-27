@@ -10,7 +10,7 @@
  * decision about their Polaris account.
  */
 
-import { Badge, Skeleton } from "@polaris/ui";
+import { Badge, cn, settingType, Skeleton } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { PolarisAppIcon } from "@/components/polaris-app-icon";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -44,7 +44,7 @@ export function GameSanctionsHeading() {
                 <PolarisAppIcon appId="games" />
                 {t("standing.games.title")}
             </h2>
-            <p className="text-xs text-muted-foreground">{t("standing.games.description")}</p>
+            <p className={settingType.hint}>{t("standing.games.description")}</p>
         </div>
     );
 }
@@ -71,16 +71,16 @@ export function GameSanctionsList({
 
     return (
         <div className="flex flex-col gap-2">
-            {incomplete && <p className="text-sm text-warning">{t("standing.games.incomplete")}</p>}
+            {incomplete && <p className={cn(settingType.body, "text-warning")}>{t("standing.games.incomplete")}</p>}
             {sanctions.length === 0 && !incomplete && (
-                <p className="text-sm text-muted-foreground">{t("standing.games.none")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("standing.games.none")}</p>
             )}
             {sanctions.length > 0 && (
                 <ul className="flex flex-col gap-2">
                     {sanctions.map((sanction) => (
                         <li
                             key={sanction.id}
-                            className="flex flex-col gap-1 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
+                            className={cn(settingType.body, "flex flex-col gap-1 rounded-md border border-border bg-muted/30 px-3 py-2")}
                         >
                             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                                 <span className="min-w-0 truncate" title={sanction.server}>
@@ -102,7 +102,7 @@ export function GameSanctionsList({
                                     </Badge>
                                 </span>
                             </div>
-                            <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                            <p className={cn(settingType.hint, "flex flex-wrap gap-x-3")}>
                                 <span>
                                     {t("standing.games.as", {
                                         player: sanction.player,
@@ -120,7 +120,7 @@ export function GameSanctionsList({
                                 )}
                             </p>
                             {sanction.reason && (
-                                <p className="break-words text-xs text-muted-foreground">
+                                <p className={cn(settingType.hint, "break-words")}>
                                     {t("standing.games.reason", { reason: sanction.reason })}
                                 </p>
                             )}

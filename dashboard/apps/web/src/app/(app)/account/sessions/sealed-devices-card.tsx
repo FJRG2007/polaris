@@ -92,7 +92,7 @@ export function SealedDevicesCard({ userId, devices }: { userId: string; devices
             <CardBody className="flex flex-col gap-3">
                 <div className="min-w-0">
                     <h2 className="text-sm font-medium">{t("sessions.sealed.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("sessions.sealed.description")}</p>
+                    <p className={settingType.hint}>{t("sessions.sealed.description")}</p>
                 </div>
 
                 {error ? (
@@ -102,7 +102,7 @@ export function SealedDevicesCard({ userId, devices }: { userId: string; devices
                 ) : null}
 
                 {shown.length === 0 ? (
-                    <p className="py-4 text-center text-sm text-muted-foreground">{t("sessions.sealed.empty")}</p>
+                    <p className={cn(settingType.body, "py-4 text-center text-muted-foreground")}>{t("sessions.sealed.empty")}</p>
                 ) : (
                     <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                         {shown.map((row) => {
@@ -111,7 +111,7 @@ export function SealedDevicesCard({ userId, devices }: { userId: string; devices
                             return (
                                 <li
                                     key={row.device}
-                                    className={cn("flex items-center gap-3 px-3 py-2 text-sm", busy === row.device && "opacity-60")}
+                                    className={cn(settingType.body, "flex items-center gap-3 px-3 py-2", busy === row.device && "opacity-60")}
                                 >
                                     <KeyRound className="size-4 shrink-0 text-muted-foreground" />
                                     <div className="min-w-0 flex-1">
@@ -121,7 +121,7 @@ export function SealedDevicesCard({ userId, devices }: { userId: string; devices
                                             </span>
                                             {mine ? <Badge variant="primary">{t("sessions.sealed.thisBrowser")}</Badge> : null}
                                         </p>
-                                        <p className="truncate text-xs text-muted-foreground">
+                                        <p className={cn(settingType.hint, "truncate")}>
                                             {t("sessions.sealed.added")} <RelativeTime iso={row.createdAt} />
                                             {" - "}
                                             {t("sessions.sealed.lastUsed")} <RelativeTime iso={row.lastSeenAt} />
