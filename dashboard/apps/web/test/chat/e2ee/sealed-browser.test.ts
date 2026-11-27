@@ -47,6 +47,15 @@ vi.mock("@/lib/chat/access", () => ({
     conversationAudience: async (actor: { id: string }, channelId: string) =>
         state.members.has(`${actor.id}:${channelId}`)
             ? [...state.members].filter((m) => m.endsWith(`:${channelId}`)).map((m) => m.slice(0, m.indexOf(":")))
+            : null,
+    conversationAudiencePage: async (actor: { id: string }, channelId: string, after: string | null | undefined, take: number) =>
+        state.members.has(`${actor.id}:${channelId}`)
+            ? [...state.members]
+                  .filter((m) => m.endsWith(`:${channelId}`))
+                  .map((m) => m.slice(0, m.indexOf(":")))
+                  .filter((id) => !after || id > after)
+                  .sort()
+                  .slice(0, take)
             : null
 }));
 vi.mock("@polaris/db", async () => ({ prisma: (await import("./support/mls-tables")).memoryPrisma(state) }));
