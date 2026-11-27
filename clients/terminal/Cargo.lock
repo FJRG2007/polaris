@@ -10708,6 +10708,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "polaris_instance"
+version = "0.0.0"
+dependencies = [
+ "base64 0.22.1",
+ "ring",
+ "rustls",
+ "serde_json",
+ "url",
+]
+
+[[package]]
 name = "polaris_relay"
 version = "0.0.0"
 dependencies = [
