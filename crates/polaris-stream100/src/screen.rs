@@ -17,8 +17,8 @@
 //! The command bytes and the tile layout are in [`crate::display`].
 
 use crate::display::{
-    self, IndexedFrame, Sequence, ACK, CHUNK_COUNT, CUSTOM_BACKGROUND, END, HEIGHT,
-    HOST_KEEPALIVE, PALETTE_COLORS, SCREEN_OFF, SCREEN_ON, WIDTH,
+    self, IndexedFrame, Sequence, ACK, CHUNK_COUNT, CUSTOM_BACKGROUND, END, HEIGHT, HOST_KEEPALIVE,
+    PALETTE_COLORS, SCREEN_OFF, SCREEN_ON, WIDTH,
 };
 use crate::plugin::Locale;
 use crate::session::KEEPALIVE_EVERY;
@@ -727,7 +727,10 @@ impl Painter {
 
     /// Whether the panel does not show the newest page yet.
     pub fn is_drawing(&self) -> bool {
-        !self.queue.is_empty() || self.setup_due || self.brightness_due || self.next_tile().is_some()
+        !self.queue.is_empty()
+            || self.setup_due
+            || self.brightness_due
+            || self.next_tile().is_some()
     }
 }
 

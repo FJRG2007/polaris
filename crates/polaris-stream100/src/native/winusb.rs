@@ -354,8 +354,7 @@ impl Link for WinUsbLink {
         }
         let mut read = 0u32;
         // SAFETY: the read has completed (its event is set).
-        let done =
-            unsafe { GetOverlappedResult(self.file, &*side.overlapped, &mut read, false) };
+        let done = unsafe { GetOverlappedResult(self.file, &*side.overlapped, &mut read, false) };
         side.pending = false;
         done.map_err(|error| TransportError::Io(error.message()))?;
         let read = (read as usize).min(REPORT_LEN);

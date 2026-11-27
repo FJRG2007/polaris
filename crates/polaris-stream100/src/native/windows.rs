@@ -245,7 +245,9 @@ impl AudioSessions for CoreAudio {
 
     fn set_muted(&mut self, id: &str, muted: bool) -> Result<(), AudioError> {
         // SAFETY: a COM call on a live session volume handle.
-        self.on_session(id, |simple| unsafe { simple.SetMute(muted, std::ptr::null()) })
+        self.on_session(id, |simple| unsafe {
+            simple.SetMute(muted, std::ptr::null())
+        })
     }
 
     fn output_volume(&mut self) -> Result<(u8, bool), AudioError> {
