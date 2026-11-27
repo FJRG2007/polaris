@@ -117,6 +117,7 @@ import {
     stepContext,
     polarLimitReached,
     recordPolarUsage,
+    answerTiming,
     recordPolarToolUse,
     routeRecord
 } from "@/lib/polar/usage";
@@ -669,6 +670,9 @@ export async function POST(request: Request): Promise<Response> {
     if (messages.at(-1)?.role === "user") await save(messages);
 
     const startedAt = Date.now();
+    // When the model wrote its first token, text or thinking: time to first
+    // token, the latency the provider consoles report beside the total.
+    let firstTokenAt: number | undefined;
     let spent: ReturnType<typeof answerUsage> | undefined;
     // The newest step's own counts: what the conversation measures now, for
     // the context bar. `totalUsage` sums every step and overstates it.
@@ -717,6 +721,10 @@ export async function POST(request: Request): Promise<Response> {
         // window, which an account with little credit cannot cover (`credit.ts`).
         maxOutputTokens: polarOutputTokens(resolved.option),
         stopWhen: isStepCount(STEP_MAX),
+        onChunk: ({ chunk }) => {
+            if (firstTokenAt === undefined && (chunk.type === "text-delta" || chunk.type === "reasoning-delta"))
+                firstTokenAt = Date.now();
+        },
         // Automatic sends a quick question at the lowest effort.
         reasoning,
         abortSignal: run.signal
@@ -881,6 +889,7 @@ export async function POST(request: Request): Promise<Response> {
             );
         },
         onFinish: async ({ messages: finished, responseMessage }) => {
+            const endedAt = Date.now();
             await save(finished);
             // A model that wrote its tool calls out as text cannot drive this
             // turn's tools: Automatic keeps it off such turns for a while.
@@ -906,7 +915,8 @@ export async function POST(request: Request): Promise<Response> {
                         model: answered.option.model,
                         payer: answered.credential.source === "instance" ? "instance" : "own",
                         usage: spent,
-                        ...routeRecord(resolved)
+                        ...routeRecord(resolved),
+                        timing: answerTiming(startedAt, firstTokenAt, endedAt)
                     });
                 } catch (error) {
                     console.error("polar: could not record the turn's usage", error);

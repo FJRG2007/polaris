@@ -2729,6 +2729,16 @@
         "deletedChat": "Chat eliminado",
         "empty": "Sin respuestas en este periodo.",
         "failed": "No se pudo cargar el uso. Revisa tu conexión y vuelve a intentarlo.",
-        "retry": "Reintentar"
+        "retry": "Reintentar",
+        "latency": "Latencia por modelo",
+        "latencyEmpty": "Aún no hay respuestas cronometradas.",
+        "timed": "Medidas",
+        "firstTokenP50": "Primer token p50",
+        "firstTokenP95": "Primer token p95",
+        "answerP50": "Respuesta p50",
+        "answerP95": "Respuesta p95",
+        "ms": "{ms} ms",
+        "seconds": "{seconds} s",
+        "untimed": "{count, plural, one {# respuesta sin medir} other {# respuestas sin medir}}: anteriores o no de chat."
     }
 }

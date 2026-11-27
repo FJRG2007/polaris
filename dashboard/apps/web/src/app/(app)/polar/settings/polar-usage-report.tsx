@@ -18,6 +18,7 @@ import { modelLabel } from "@/components/polar/routing-editor";
 import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
 import { Badge, Button, SegmentedControl, Skeleton, cn } from "@polaris/ui";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import type { ModelSelectorProvider } from "@/components/polar/elements/model-selector";
 import {
     POLAR_USAGE_RANGES,
@@ -187,6 +188,7 @@ function Report({
             ) : null}
             <TokensChart report={report} />
             <ModelsTable report={report} providers={providers} />
+            <LatencyTable report={report} providers={providers} />
             <ChatsTable report={report} />
         </div>
     );
@@ -353,6 +355,83 @@ function ModelsTable({
                     </tbody>
                 </table>
             </div>
+        </div>
+    );
+}
+
+/** A response time as read: milliseconds under a second, seconds past it. */
+function duration(ms: number | null, locale: string, t: NamespaceTranslator<"polar">): string {
+    if (ms === null) return "-";
+    if (ms < 1000) return t("usageReport.ms", { ms: ms.toLocaleString(locale) });
+    return t("usageReport.seconds", {
+        seconds: (ms / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })
+    });
+}
+
+/**
+ * How fast each model answered: time to the first token and to the end, p50
+ * and p95, over the answers that were timed. Answers from before timing are
+ * left out and said to be, never read as instant.
+ */
+function LatencyTable({
+    report,
+    providers
+}: {
+    report: PolarUsageReport;
+    providers: ModelSelectorProvider[] | null;
+}) {
+    const t = useTranslations("polar");
+    const locale = useLocale();
+    // A report kept from before answers were timed has no list.
+    const rows = report.latency ?? [];
+    const timed = rows.reduce((sum, row) => sum + row.timed, 0);
+    const untimed = Math.max(0, report.totals.answers - timed);
+    return (
+        <div className="flex min-w-0 flex-col gap-2">
+            <h3 className="text-xs font-medium text-foreground">{t("usageReport.latency")}</h3>
+            {rows.length === 0 ? (
+                <p className="text-xs text-muted-foreground">{t("usageReport.latencyEmpty")}</p>
+            ) : (
+                <div className="overflow-x-auto rounded-md border border-border">
+                    <table className="w-full min-w-[36rem] text-sm">
+                        <thead className="bg-surface/60 text-start">
+                            <tr>
+                                <th className="w-full max-w-0 px-3 py-2 font-medium">{t("usageReport.model")}</th>
+                                <th className={TH}>{t("usageReport.timed")}</th>
+                                <th className={TH}>{t("usageReport.firstTokenP50")}</th>
+                                <th className={TH}>{t("usageReport.firstTokenP95")}</th>
+                                <th className={TH}>{t("usageReport.answerP50")}</th>
+                                <th className={TH}>{t("usageReport.answerP95")}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((row) => {
+                                const name = modelLabel({ provider: row.provider, model: row.model }, providers).label;
+                                return (
+                                    <tr key={`${row.provider}/${row.model}`} className="border-t border-border">
+                                        <td className="w-full max-w-0 px-3 py-2">
+                                            <span className="flex min-w-0 items-center gap-2">
+                                                <IntegrationLogo slug={row.provider} className="size-4 shrink-0" />
+                                                <span className="min-w-0 truncate" title={`${row.provider}/${row.model}`}>
+                                                    {name}
+                                                </span>
+                                            </span>
+                                        </td>
+                                        <td className={cn(TD, "text-muted-foreground")}>{row.timed.toLocaleString(locale)}</td>
+                                        <td className={TD}>{duration(row.firstTokenP50, locale, t)}</td>
+                                        <td className={cn(TD, "text-muted-foreground")}>{duration(row.firstTokenP95, locale, t)}</td>
+                                        <td className={TD}>{duration(row.answerP50, locale, t)}</td>
+                                        <td className={cn(TD, "text-muted-foreground")}>{duration(row.answerP95, locale, t)}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+            {untimed > 0 ? (
+                <p className="text-xs text-muted-foreground">{t("usageReport.untimed", { count: untimed })}</p>
+            ) : null}
         </div>
     );
 }

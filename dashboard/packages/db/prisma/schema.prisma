@@ -18525,6 +18525,11 @@ model PolarUsage {
     // Of the input, what the provider read from its prompt cache; 0 when it
     // reported none (and for rows before this was recorded).
     cachedTokens Int      @default(0)
+    // From the request to the first token the model wrote (text or thinking),
+    // and to the end of the answer, in ms. Null when not timed: rows before
+    // this was recorded, and calls that are not a streamed chat answer.
+    firstTokenMs Int?
+    answerMs     Int?
     // Null when the catalogue has no price for the model: tokens only.
     costUsd      Float?
     // A transcription's length in seconds, as the provider reported it or as

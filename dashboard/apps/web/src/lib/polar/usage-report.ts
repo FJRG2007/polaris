@@ -54,6 +54,18 @@ export interface PolarUsageChat {
     costUsd: number;
 }
 
+/** How fast one model answered: p50 and p95 to the first token and to the end, in ms. */
+export interface PolarModelLatency {
+    provider: string;
+    model: string;
+    /** The answers that were timed; the rest predate timing or were not streamed. */
+    timed: number;
+    firstTokenP50: number | null;
+    firstTokenP95: number | null;
+    answerP50: number | null;
+    answerP95: number | null;
+}
+
 export interface PolarUsageReport {
     range: PolarUsageRange;
     from: number;
@@ -62,7 +74,24 @@ export interface PolarUsageReport {
     days: PolarUsageDay[];
     models: PolarUsageModel[];
     chats: PolarUsageChat[];
+    /** Per model, busiest first; only answers that were timed. */
+    latency: PolarModelLatency[];
 }
+
+/** The most models the response-time table lists. */
+export const REPORT_LATENCY_MODELS = 50;
+
+interface LatencyRow {
+    provider: string;
+    model: string;
+    timed: bigint | number;
+    ttft50: number | null;
+    ttft95: number | null;
+    total50: number | null;
+    total95: number | null;
+}
+
+const ms = (value: number | null) => (value === null ? null : Math.round(Number(value)));
 
 interface DayRow {
     day: Date;
@@ -104,7 +133,7 @@ export async function polarUsageReport(
 ): Promise<PolarUsageReport> {
     const { from, to } = windowDays(range, now);
     const where = { userId, createdAt: { gte: new Date(from) } };
-    const [dayRows, models, unpriced, chats] = await Promise.all([
+    const [dayRows, models, unpriced, chats, latencyRows] = await Promise.all([
         prisma.$queryRaw<DayRow[]>(Prisma.sql`
             SELECT date_trunc('day', u."createdAt") AS day,
                    count(*) AS answers,
@@ -133,7 +162,25 @@ export async function polarUsageReport(
             _sum: { inputTokens: true, outputTokens: true, costUsd: true },
             orderBy: { _sum: { inputTokens: "desc" } },
             take: REPORT_CHATS
-        })
+        }),
+        // Percentiles over the answers themselves, in the database; null
+        // first-token readings (an answer that wrote nothing) are skipped by
+        // percentile_cont on their own.
+        prisma.$queryRaw<LatencyRow[]>(Prisma.sql`
+            SELECT u."provider" AS provider,
+                   u."model" AS model,
+                   count(*) AS timed,
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY u."firstTokenMs") AS ttft50,
+                   percentile_cont(0.95) WITHIN GROUP (ORDER BY u."firstTokenMs") AS ttft95,
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY u."answerMs") AS total50,
+                   percentile_cont(0.95) WITHIN GROUP (ORDER BY u."answerMs") AS total95
+            FROM "PolarUsage" u
+            WHERE u."userId" = ${userId}::uuid AND u."createdAt" >= ${new Date(from)}
+              AND u."answerMs" IS NOT NULL
+            GROUP BY 1, 2
+            ORDER BY 3 DESC, 1, 2
+            LIMIT ${REPORT_LATENCY_MODELS}
+        `)
     ]);
 
     const ids = chats.flatMap((row) => (row.threadId ? [row.threadId] : []));
@@ -186,6 +233,15 @@ export async function polarUsageReport(
         totals,
         days: foldDays(dayRows, from, to),
         models: modelRows,
+        latency: latencyRows.map((row) => ({
+            provider: row.provider,
+            model: row.model,
+            timed: Number(row.timed),
+            firstTokenP50: ms(row.ttft50),
+            firstTokenP95: ms(row.ttft95),
+            answerP50: ms(row.total50),
+            answerP95: ms(row.total95)
+        })),
         chats: chats.map((row) => ({
             threadId: row.threadId!,
             title: titles.get(row.threadId!) ?? null,

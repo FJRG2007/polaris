@@ -17,8 +17,12 @@ const state = vi.hoisted(() => ({
 vi.mock("@polaris/db", () => ({
     Prisma: { sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }) },
     prisma: {
-        $queryRaw: async (query: unknown) => {
+        $queryRaw: async (query: { strings: TemplateStringsArray }) => {
             state.raw.push(query);
+            if (query.strings.join("").includes("percentile_cont"))
+                return [
+                    { provider: "openai", model: "gpt-x", timed: 2n, ttft50: 420.4, ttft95: 1900, total50: 3250.6, total95: null }
+                ];
             return [
                 { day: new Date("2026-10-14T00:00:00Z"), answers: 2n, input: 300n, output: 100n, cost: 0.5 },
                 { day: new Date("2026-10-15T00:00:00Z"), answers: 1n, input: 50n, output: 10n, cost: null }
@@ -73,8 +77,23 @@ describe("Polar's usage report", () => {
 
     it("sums on the person's own rows and names only their own chats", async () => {
         const result = await report.polarUsageReport("user-1", "7d", NOW);
-        expect(state.raw).toHaveLength(1);
+        expect(state.raw).toHaveLength(2);
         expect((state.raw[0] as { values: unknown[] }).values).toEqual(["user-1", new Date("2026-10-09T00:00:00Z")]);
+        // The response times: the same person and window, timed answers only, bounded.
+        const latency = state.raw[1] as { strings: TemplateStringsArray; values: unknown[] };
+        expect(latency.values).toEqual(["user-1", new Date("2026-10-09T00:00:00Z"), report.REPORT_LATENCY_MODELS]);
+        expect(latency.strings.join("?")).toContain('"answerMs" IS NOT NULL');
+        expect(result.latency).toEqual([
+            {
+                provider: "openai",
+                model: "gpt-x",
+                timed: 2,
+                firstTokenP50: 420,
+                firstTokenP95: 1900,
+                answerP50: 3251,
+                answerP95: null
+            }
+        ]);
         for (const query of state.groups) {
             expect(query.where.userId).toBe("user-1");
             expect(query.where.createdAt.gte.toISOString()).toBe("2026-10-09T00:00:00.000Z");
@@ -111,6 +130,16 @@ describe("Polar's usage report", () => {
         expect(markup).toContain('href="/polar?thread=t1"');
         expect(markup).toContain("Deleted chat");
         expect(markup).toContain("1 answer has no published price");
+        expect(markup).toContain("Response time by model");
+        expect(markup).toContain("420 ms");
+        expect(markup).toContain("3.3 s");
+        expect(markup).toContain("1 answer was not timed");
+    });
+
+    it("times an answer from the request, the first token absent when none came", async () => {
+        const { answerTiming } = await import("@/lib/polar/usage");
+        expect(answerTiming(1000, 1250, 4000)).toEqual({ firstTokenMs: 250, answerMs: 3000 });
+        expect(answerTiming(1000, undefined, 900)).toEqual({ firstTokenMs: null, answerMs: 0 });
     });
 
     it("says so when there is nothing to draw, and offers a retry on failure", () => {

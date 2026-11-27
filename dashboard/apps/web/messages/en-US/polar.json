@@ -2729,6 +2729,16 @@
         "deletedChat": "Deleted chat",
         "empty": "No answers in this period.",
         "failed": "Usage could not be loaded. Check your connection and try again.",
-        "retry": "Try again"
+        "retry": "Try again",
+        "latency": "Response time by model",
+        "latencyEmpty": "No timed answers in this period yet.",
+        "timed": "Timed",
+        "firstTokenP50": "First token p50",
+        "firstTokenP95": "First token p95",
+        "answerP50": "Full answer p50",
+        "answerP95": "Full answer p95",
+        "ms": "{ms} ms",
+        "seconds": "{seconds} s",
+        "untimed": "{count, plural, one {# answer was} other {# answers were}} not timed: earlier, or not a chat reply."
     }
 }

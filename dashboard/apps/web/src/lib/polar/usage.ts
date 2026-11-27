@@ -112,6 +112,8 @@ export async function recordPolarUsage(input: {
     surface?: PolarUsageSurface;
     /** Set when a fallback answered: what was asked first, and why it moved on. */
     fellBack?: { from: string; kind: string } | null;
+    /** How long a streamed answer took, in ms; absent when it was not timed. */
+    timing?: AnswerTiming | null;
 }): Promise<void> {
     await prisma.polarUsage.create({
         data: {
@@ -129,9 +131,29 @@ export async function recordPolarUsage(input: {
             keyId: input.keyId ?? null,
             surface: input.surface ?? "chat",
             fellBackFrom: input.fellBack?.from ?? null,
-            fellBackKind: input.fellBack?.kind ?? null
+            fellBackKind: input.fellBack?.kind ?? null,
+            firstTokenMs: input.timing?.firstTokenMs ?? null,
+            answerMs: input.timing?.answerMs ?? null
         }
     });
+}
+
+/** How long one answer took: to its first token (null when it wrote none) and to its end. */
+export interface AnswerTiming {
+    firstTokenMs: number | null;
+    answerMs: number;
+}
+
+/** The longest time a column holds, about 24 days: past it a reading is not a response time. */
+const TIMING_MAX = 2_147_483_647;
+
+/**
+ * An answer's timing from the moment it was asked, the moment its first token
+ * arrived and the moment it ended, all `Date.now()` readings. Pure.
+ */
+export function answerTiming(startedAt: number, firstTokenAt: number | undefined, endedAt: number): AnswerTiming {
+    const span = (at: number) => Math.min(TIMING_MAX, Math.max(0, Math.round(at - startedAt)));
+    return { firstTokenMs: firstTokenAt === undefined ? null : span(firstTokenAt), answerMs: span(endedAt) };
 }
 
 /** Where a recorded call came from. */
