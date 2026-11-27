@@ -21,7 +21,7 @@ import { Messages } from "@/components/i18n/messages";
 import { rulesAreEmpty } from "@/lib/network-rules";
 import { listConnectedApps } from "@/lib/mcp/oauth/grants";
 import type { DatabaseOption } from "./database-reach-picker";
-import { Card, CardBody, CardHeader, Skeleton } from "@polaris/ui";
+import { Card, CardBody, CardHeader, cn, settingType, Skeleton } from "@polaris/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -121,7 +121,7 @@ export default async function AssistantsPage() {
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("page.title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("page.intro")}</p>
             </div>
             <Messages namespaces={["mcp"]}>
                 <Suspense fallback={<ConnectedAppsSkeleton label={t("connectedApps.loading")} />}>

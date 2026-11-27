@@ -6,6 +6,7 @@
  * somebody signed in says yes.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { CliApproveView } from "./cli-approve-view";
 import { getTranslations } from "@/lib/i18n/request";
@@ -21,7 +22,7 @@ export default async function CliPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("cli.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("cli.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("cli.page.intro")}</p>
             </div>
             <CliApproveView account={t("cli.signedInAs", { name: user.name || user.email })} />
         </div>

@@ -61,7 +61,8 @@ import {
     Switch,
     cn,
     Checkbox,
-    useRowSelection
+    useRowSelection,
+    settingType
 } from "@polaris/ui";
 
 /** The one line that says a key is narrower than it looks, or nothing when it is
@@ -213,12 +214,12 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
 
     return (
         <div className="flex flex-col gap-4">
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {error ? <p className={settingType.error}>{error}</p> : null}
 
             <div className="flex flex-wrap items-end justify-between gap-2">
                 <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
                     <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("apiKeys.list.search")}
                         </span>
                         <Input
@@ -229,7 +230,7 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                         />
                     </label>
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("apiKeys.list.environment")}
                         </span>
                         <Select
@@ -250,7 +251,7 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                         not need a picker whose every option is "all". */}
                     {apps.length > 0 && (
                         <label className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("apiKeys.list.app")}
                             </span>
                             <Select
@@ -269,7 +270,7 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                         </label>
                     )}
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("apiKeys.list.expiryLabel")}
                         </span>
                         <Select
@@ -283,7 +284,7 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                         />
                     </label>
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("apiKeys.list.sortBy")}
                         </span>
                         <Select
@@ -321,7 +322,7 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                 </div>
             </div>
 
-            <p className="text-xs text-muted-foreground">
+            <p className={settingType.hint}>
                 {keys.length === 0
                     ? t("apiKeys.list.none")
                     : narrowed
@@ -330,7 +331,7 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
             </p>
 
             {keys.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("apiKeys.list.emptyHint")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("apiKeys.list.emptyHint")}</p>
             ) : (
                 // Scrolls sideways rather than shrinking: nine columns on a phone
                 // would be nine unreadable ones. The same table every list in
@@ -347,8 +348,8 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                 ) : null}
                 {/* Ctrl+A and Escape are heard here, as Drive's file list hears them. */}
                 <div className="overflow-x-auto rounded-lg border border-border" onKeyDown={selection.onKeyDown}>
-                    <table className="w-full min-w-[62rem] text-sm">
-                        <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                    <table className={cn(settingType.body, "w-full min-w-[62rem]")}>
+                        <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                             <tr>
                                 <th scope="col" className="w-8 px-2 py-2">
                                     <Checkbox
@@ -410,7 +411,7 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                                 <tr>
                                     <td
                                         colSpan={11}
-                                        className="px-3 py-10 text-center text-sm text-muted-foreground"
+                                        className={cn(settingType.body, "px-3 py-10 text-center text-muted-foreground")}
                                     >
                                         <span className="flex flex-col items-center gap-2">
                                             {t("apiKeys.list.noMatch")}
@@ -495,18 +496,18 @@ function KeyRow({
                     )}
                 </span>
                 {entry.description ? (
-                    <p className="truncate text-xs" title={entry.description}>
+                    <p className={cn(settingType.small, "truncate")} title={entry.description}>
                         {entry.description}
                     </p>
                 ) : null}
-                <p className="truncate text-xs text-muted-foreground">
+                <p className={cn(settingType.hint, "truncate")}>
                     {limits
                         ? t("apiKeys.list.scopesLimited", { count: entry.scopes.length, limits })
                         : t("apiKeys.list.scopes", { count: entry.scopes.length })}
                 </p>
                 {entry.lastUsedUserAgent ? (
                     <p
-                        className="truncate text-xs text-muted-foreground"
+                        className={cn(settingType.hint, "truncate")}
                         title={entry.lastUsedUserAgent}
                     >
                         {entry.lastUsedIp
@@ -569,7 +570,7 @@ function KeyRow({
                     entry.usedToday
                 )}
             </td>
-            <td className="whitespace-nowrap px-3 py-2 align-top text-xs text-muted-foreground">
+            <td className={cn(settingType.hint, "whitespace-nowrap px-3 py-2 align-top")}>
                 {t("apiKeys.list.comingSoon")}
             </td>
             <td className="px-3 py-2 align-top">

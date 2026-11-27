@@ -20,7 +20,16 @@ import { Avatar } from "@/components/avatar";
 import { useSessionViewer } from "@/components/session-scope";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { HeadphoneOff, Headphones, Mic, MicOff, PhoneOff } from "lucide-react";
-import { Button, Card, CardBody, ControlSlider, Switch, cn, useToast } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    ControlSlider,
+    Switch,
+    cn,
+    settingType,
+    useToast
+} from "@polaris/ui";
 
 /**
  * The sample call drawn in the preview: fixture people, one talking, one muted,
@@ -77,8 +86,8 @@ export function VoiceWidgetPreview({ snapshot }: { snapshot: core.AppSettingsSna
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="text-sm">{t("overlay.preview")}</span>
-                    <span className="text-xs text-muted-foreground">{t("overlay.previewHint")}</span>
+                    <span className={settingType.body}>{t("overlay.preview")}</span>
+                    <span className={settingType.hint}>{t("overlay.previewHint")}</span>
                 </div>
                 <div
                     role="img"
@@ -111,7 +120,7 @@ export function VoiceWidgetPreview({ snapshot }: { snapshot: core.AppSettingsSna
                                         )}
                                     />
                                     {named && (
-                                        <span className="flex min-w-0 items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-xs">
+                                        <span className={cn(settingType.small, "flex min-w-0 items-center gap-1 rounded-full bg-background/80 px-2 py-0.5")}>
                                             <span className="truncate" title={name}>{name}</span>
                                             {person.muted && <MicOff className="size-3 shrink-0 text-danger" aria-hidden />}
                                             {person.deafened && (
@@ -123,12 +132,12 @@ export function VoiceWidgetPreview({ snapshot }: { snapshot: core.AppSettingsSna
                             );
                         })}
                         {more > 0 && (
-                            <span className="px-1 text-xs text-muted-foreground">
+                            <span className={cn(settingType.hint, "px-1")}>
                                 {t("overlay.more", { count: more })}
                             </span>
                         )}
                         {listed.length === 0 && (
-                            <span className="px-1 text-xs text-muted-foreground">{t("overlay.nobody")}</span>
+                            <span className={cn(settingType.hint, "px-1")}>{t("overlay.nobody")}</span>
                         )}
                         {actions && (
                             <div className="mt-1 flex items-center gap-1" aria-hidden>
@@ -166,10 +175,10 @@ export function MaxUsersRow({
         <div className="flex flex-col gap-2">
             <div className="flex min-w-0 items-baseline justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="text-sm">{label}</span>
-                    <span className="text-xs text-muted-foreground">{t("items.voiceWidgetMaxUsers.hint")}</span>
+                    <span className={settingType.body}>{label}</span>
+                    <span className={settingType.hint}>{t("items.voiceWidgetMaxUsers.hint")}</span>
                 </div>
-                <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{text(value)}</span>
+                <span className={cn(settingType.body, "shrink-0 tabular-nums text-muted-foreground")}>{text(value)}</span>
             </div>
             <ControlSlider
                 value={value}
@@ -180,7 +189,7 @@ export function MaxUsersRow({
                 valueText={text}
                 onCommit={onChange}
             />
-            <div className="relative h-4 text-xs text-muted-foreground" aria-hidden>
+            <div className={cn(settingType.hint, "relative h-4")} aria-hidden>
                 {entry.marks.map((mark) => {
                     const at = ((mark - entry.min) / (entry.max - entry.min)) * 100;
                     return (
@@ -233,20 +242,20 @@ export function OverlayGames({
         <Card>
             <CardBody className="flex flex-col gap-4">
                 <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="text-sm">{t("overlay.games")}</span>
-                    <span className="text-xs text-muted-foreground">{t("overlay.gamesHint")}</span>
+                    <span className={settingType.body}>{t("overlay.games")}</span>
+                    <span className={settingType.hint}>{t("overlay.gamesHint")}</span>
                 </div>
                 {snapshot.overlayGames.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">{t("overlay.gamesEmpty")}</p>
+                    <p className={settingType.hint}>{t("overlay.gamesEmpty")}</p>
                 ) : (
                     snapshot.overlayGames.map((game) => (
                         <div key={game.key} className="flex items-center justify-between gap-3">
                             <div className="flex min-w-0 flex-1 items-center gap-2">
-                                <span className="truncate text-sm" title={game.name || game.key}>
+                                <span className={cn(settingType.body, "truncate")} title={game.name || game.key}>
                                     {game.name || game.key}
                                 </span>
                                 {game.running && (
-                                    <span className="shrink-0 rounded bg-success-soft px-1.5 py-0.5 text-xs text-success">
+                                    <span className={cn(settingType.small, "shrink-0 rounded bg-success-soft px-1.5 py-0.5 text-success")}>
                                         {t("overlay.running")}
                                     </span>
                                 )}
@@ -276,8 +285,8 @@ export function ResetOverlay({
         <Card>
             <CardBody className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="text-sm">{t("overlay.reset")}</span>
-                    <span className="text-xs text-muted-foreground">{t("overlay.resetHint")}</span>
+                    <span className={settingType.body}>{t("overlay.reset")}</span>
+                    <span className={settingType.hint}>{t("overlay.resetHint")}</span>
                 </div>
                 <Button
                     size="sm"

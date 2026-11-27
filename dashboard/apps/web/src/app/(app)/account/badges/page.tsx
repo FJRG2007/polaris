@@ -3,6 +3,7 @@
  * whom. Only the header is drawn here; the badges load after the first paint.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { BadgesSettings } from "./badges-settings";
 import { MyNameTag } from "./my-name-tag";
@@ -16,7 +17,7 @@ export default async function BadgesPage() {
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("settings.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.intro")}</p>
             </div>
             <MyNameTag />
             <BadgesSettings userId={user.id} />

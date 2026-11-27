@@ -17,6 +17,7 @@ import { LAN_HOSTS_MAX, lanHostSchema, normalizeLanHost } from "@/lib/computers/
 import {
     Badge,
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -26,7 +27,8 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-    Input
+    Input,
+    settingType
 } from "@polaris/ui";
 import {
     listComputersAction,
@@ -93,12 +95,12 @@ export function ComputersView({ initial }: { initial: ComputerView[] }) {
                 </Button>
             </div>
             {error ? (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             ) : null}
             {items.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+                <p className={cn(settingType.body, "rounded-md border border-dashed border-border px-3 py-6 text-center text-muted-foreground")}>
                     {t("computers.list.empty")}
                 </p>
             ) : (
@@ -115,7 +117,7 @@ export function ComputersView({ initial }: { initial: ComputerView[] }) {
                                         {computer.online ? t("computers.list.online") : t("computers.list.offline")}
                                     </Badge>
                                 </div>
-                                <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                <div className={cn(settingType.hint, "flex min-w-0 flex-wrap gap-x-3 gap-y-0.5")}>
                                     {computer.platform ? (
                                         <span className="truncate">
                                             {PLATFORM_NAMES[computer.platform] ?? computer.platform}
@@ -230,7 +232,7 @@ function PairDialog({ onClose }: { onClose: () => void }) {
                 </DialogHeader>
                 <ol className="flex flex-col gap-2">
                     {steps.map((step, index) => (
-                        <li key={index} className="flex min-w-0 items-start gap-3 text-sm">
+                        <li key={index} className={cn(settingType.body, "flex min-w-0 items-start gap-3")}>
                             <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
                                 {index + 1}
                             </span>
@@ -238,7 +240,7 @@ function PairDialog({ onClose }: { onClose: () => void }) {
                         </li>
                     ))}
                 </ol>
-                <p className="text-xs text-muted-foreground">{t("computers.pair.after")}</p>
+                <p className={settingType.hint}>{t("computers.pair.after")}</p>
                 <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={onClose}>
                         {t("computers.pair.close")}
@@ -293,7 +295,7 @@ function LocalModelsDialog({ computer, onClose, onSaved }: { computer: ComputerV
                 </DialogHeader>
                 <div className="flex min-w-0 flex-col gap-4">
                     {local.servers.length > 0 ? (
-                        <ul className="flex min-w-0 flex-col gap-1 text-sm">
+                        <ul className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
                             {local.servers.map((one) => (
                                 <li key={`${one.server}-${one.host}`} className="flex min-w-0 items-center justify-between gap-2">
                                     <span className="min-w-0 truncate">
@@ -305,7 +307,7 @@ function LocalModelsDialog({ computer, onClose, onSaved }: { computer: ComputerV
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-muted-foreground text-sm">{t("computers.local.none")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("computers.local.none")}</p>
                     )}
                     <form
                         className="flex min-w-0 flex-col gap-2"
@@ -314,7 +316,7 @@ function LocalModelsDialog({ computer, onClose, onSaved }: { computer: ComputerV
                             add();
                         }}
                     >
-                        <label className="flex min-w-0 flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex min-w-0 flex-col gap-1")}>
                             <span>{t("computers.local.lanLabel")}</span>
                             <div className="flex min-w-0 gap-2">
                                 <Input
@@ -332,8 +334,8 @@ function LocalModelsDialog({ computer, onClose, onSaved }: { computer: ComputerV
                                 </Button>
                             </div>
                         </label>
-                        {draftError ? <p className="text-sm text-destructive">{draftError}</p> : null}
-                        <p className="text-muted-foreground text-xs">{t("computers.local.lanHint")}</p>
+                        {draftError ? <p className={settingType.error}>{draftError}</p> : null}
+                        <p className={settingType.hint}>{t("computers.local.lanHint")}</p>
                     </form>
                     {hosts.length > 0 ? (
                         <div className="flex min-w-0 flex-wrap gap-1">
@@ -352,7 +354,7 @@ function LocalModelsDialog({ computer, onClose, onSaved }: { computer: ComputerV
                         </div>
                     ) : null}
                     {error ? (
-                        <p role="alert" className="text-sm text-destructive">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}
@@ -411,7 +413,7 @@ function RenameDialog({
                         void save();
                     }}
                 >
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         <span>{t("computers.rename.label")} *</span>
                         <Input
                             value={name}
@@ -424,7 +426,7 @@ function RenameDialog({
                         />
                     </label>
                     {error ? (
-                        <p role="alert" className="text-sm text-destructive">
+                        <p role="alert" className={settingType.error}>
                             {error}
                         </p>
                     ) : null}
@@ -491,17 +493,17 @@ function ThisComputer({ onPaired }: { onPaired: () => void }) {
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Laptop className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                 <span className="min-w-0 truncate font-medium">{t("computers.here.title")}</span>
-                <span className="min-w-0 truncate text-sm text-muted-foreground">{status}</span>
+                <span className={cn(settingType.body, "min-w-0 truncate text-muted-foreground")}>{status}</span>
             </div>
             {preparing && preparing.step !== "ready" ? (
-                <p className="text-sm text-muted-foreground" aria-live="polite">
+                <p className={cn(settingType.body, "text-muted-foreground")} aria-live="polite">
                     {preparing.step === "failed"
                         ? tp(`toolchain.failures.${preparing.code ?? "install"}`)
                         : tp("toolchain.preparing", { tools: percent === null ? tool : tp("toolchain.preparingStep", { tool, percent }) })}
                 </p>
             ) : null}
             {error ? (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className={settingType.error}>
                     {error}
                 </p>
             ) : null}

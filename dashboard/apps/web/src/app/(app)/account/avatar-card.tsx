@@ -70,7 +70,8 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
-    cn
+    cn,
+    settingType
 } from "@polaris/ui";
 
 /**
@@ -460,10 +461,10 @@ export function PictureEditor({
                             >
                                 <action.Icon className="size-4 shrink-0" />
                                 <span className="flex min-w-0 flex-col">
-                                    <span className="text-sm font-medium">{action.label}</span>
+                                    <span className={cn(settingType.body, "font-medium")}>{action.label}</span>
                                     <span
                                         className={cn(
-                                            "text-xs",
+                                            settingType.small,
                                             action.danger
                                                 ? "text-danger/80"
                                                 : "text-muted-foreground"
@@ -510,7 +511,7 @@ export function ProfilePicturesCard({
             <CardBody className="flex flex-col gap-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("pictures.cardTitle")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("pictures.personHint")}</p>
+                    <p className={settingType.hint}>{t("pictures.personHint")}</p>
                 </div>
 
                 <div className="overflow-hidden rounded-lg border border-border">
@@ -549,13 +550,13 @@ export function ProfilePicturesCard({
                                 radius="full"
                             />
                         </div>
-                        <p className="truncate text-sm font-medium" title={name}>
+                        <p className={cn(settingType.body, "truncate font-medium")} title={name}>
                             {name}
                         </p>
                     </div>
                 </div>
 
-                {error && <p className="text-sm text-danger">{error}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
             </CardBody>
         </Card>
     );
@@ -597,7 +598,7 @@ export function OrgPicturesCard({
             <CardBody className="flex flex-col gap-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("pictures.cardTitle")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("pictures.orgHint")}</p>
+                    <p className={settingType.hint}>{t("pictures.orgHint")}</p>
                 </div>
 
                 <div className="overflow-hidden rounded-lg border border-border">
@@ -634,13 +635,13 @@ export function OrgPicturesCard({
                                 radius="md"
                             />
                         </div>
-                        <p className="truncate text-sm font-medium" title={name}>
+                        <p className={cn(settingType.body, "truncate font-medium")} title={name}>
                             {name}
                         </p>
                     </div>
                 </div>
 
-                {error && <p className="text-sm text-danger">{error}</p>}
+                {error && <p className={settingType.error}>{error}</p>}
             </CardBody>
         </Card>
     );

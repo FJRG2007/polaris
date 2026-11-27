@@ -50,13 +50,15 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    settingType
 } from "@polaris/ui";
 
 export interface LinkedAccount {
@@ -259,7 +261,7 @@ export function ConnectionsView({
                             >
                                 {t(`connections.hub.category.${id ?? "all"}` as const)}
                                 <span
-                                    className="text-xs text-muted-foreground tabular-nums"
+                                    className={cn(settingType.hint, "tabular-nums")}
                                     title={t("connections.hub.connectedCount")}
                                 >
                                     {
@@ -276,7 +278,7 @@ export function ConnectionsView({
                 </div>
             ) : null}
             {providers.length > 0 && sections.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {t("connections.hub.noMatch", { query: query.trim() })}
                 </p>
             ) : null}
@@ -288,7 +290,7 @@ export function ConnectionsView({
                 >
                     <h2
                         id={`connections-${section.id}`}
-                        className="text-sm font-medium text-muted-foreground"
+                        className={cn(settingType.body, "font-medium text-muted-foreground")}
                     >
                         {t(`connections.hub.category.${section.id}` as const)}
                     </h2>
@@ -386,7 +388,7 @@ function ProviderCard({
                                 </Badge>
                             ) : null}
                         </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{provider.summary}</p>
+                        <p className={cn(settingType.hint, "mt-0.5")}>{provider.summary}</p>
                     </div>
                 </div>
 
@@ -410,7 +412,7 @@ function ProviderCard({
                                         className="size-5 shrink-0"
                                     />
                                 )}
-                                <span className="min-w-0 flex-1 truncate text-sm">
+                                <span className={cn(settingType.body, "min-w-0 flex-1 truncate")}>
                                     {account.label}
                                 </span>
                                 {account.needsReauthorization ? (
@@ -462,7 +464,7 @@ function ProviderCard({
                                         </Badge>
                                     )
                                 ) : null}
-                                <span className="hidden text-xs text-muted-foreground sm:inline">
+                                <span className={cn(settingType.hint, "hidden sm:inline")}>
                                     <RelativeTime iso={account.linkedAt} />
                                 </span>
                                 {account.method === "oauth" && provider.canAuthorize ? (
@@ -543,12 +545,12 @@ function ProviderCard({
                         ))}
                     </ul>
                 ) : (
-                    <p className="text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t("connections.none", { provider: provider.name })}
                     </p>
                 )}
 
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {provider.description}
                     {provider.canSignIn ? (
                         <>
@@ -607,7 +609,7 @@ function ProviderCard({
                             </Button>
                         ) : null}
                         {!canAdd && (provider.canAuthorize || provider.acceptsToken) ? (
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {needsApproval
                                     ? // The literal advice - disconnect one first - is true of
                                       // connecting a different account and useless here, where
@@ -622,14 +624,14 @@ function ProviderCard({
                 ) : null}
 
                 {!provider.canAuthorize && !provider.acceptsToken && !canType ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>
                         {t("connections.availableOnce", { requires: provider.requires })}
                     </p>
                 ) : null}
 
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 {notice ? (
-                    <p className={`text-sm ${notice.bad ? "text-danger" : "text-success"}`}>
+                    <p className={cn(settingType.body, notice.bad ? "text-danger" : "text-success")}>
                         {notice.text}
                     </p>
                 ) : null}
@@ -794,7 +796,7 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">
+                        <span className={cn(settingType.body, "font-medium")}>
                             {t("connections.aws.accessKeyId")}
                         </span>
                         <Input
@@ -806,7 +808,7 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">
+                        <span className={cn(settingType.body, "font-medium")}>
                             {t("connections.aws.secretAccessKey")}
                         </span>
                         <Input
@@ -817,18 +819,18 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">{t("connections.aws.region")}</span>
+                        <span className={cn(settingType.body, "font-medium")}>{t("connections.aws.region")}</span>
                         <Input
                             autoComplete="off"
                             value={region}
                             placeholder="eu-west-1"
                             onChange={(event) => setRegion(event.target.value)}
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className={settingType.hint}>
                             {t("connections.aws.regionHint")}
                         </span>
                     </label>
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={pending}>
@@ -932,7 +934,7 @@ function TypedNameDialog({
                         submit();
                     }}
                 >
-                    <label className="text-sm font-medium" htmlFor={`${kind}-name`}>
+                    <label className={cn(settingType.body, "font-medium")} htmlFor={`${kind}-name`}>
                         {t(`connections.${kind}.username`)}
                     </label>
                     <Input
@@ -949,11 +951,11 @@ function TypedNameDialog({
                     />
                     <p
                         id={`${kind}-name-hint`}
-                        className={`text-xs ${problem ? "text-danger" : "text-muted-foreground"}`}
+                        className={cn(settingType.small, problem ? "text-danger" : "text-muted-foreground")}
                     >
                         {problem ?? t(`connections.${kind}.hint`)}
                     </p>
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                 </form>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={pending}>
@@ -1022,7 +1024,7 @@ function TokenDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium" htmlFor="connection-token">
+                    <label className={cn(settingType.body, "font-medium")} htmlFor="connection-token">
                         {label}
                     </label>
                     <Input
@@ -1033,19 +1035,19 @@ function TokenDialog({
                         placeholder="ghp_..."
                         onChange={(event) => setToken(event.target.value)}
                     />
-                    {help ? <p className="text-xs text-muted-foreground">{help}</p> : null}
+                    {help ? <p className={settingType.hint}>{help}</p> : null}
                     {tokenUrl ? (
                         <a
                             href={tokenUrl}
                             target="_blank"
                             rel="noreferrer noopener"
-                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                            className={cn(settingType.small, "inline-flex items-center gap-1 text-muted-foreground hover:text-foreground")}
                         >
                             {t("connections.token.createOne")}
                             <ExternalLink className="size-3" />
                         </a>
                     ) : null}
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={pending}>

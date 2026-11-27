@@ -30,7 +30,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { OrgAvatar } from "@/components/avatar";
 import { MAX_COMPANY_LENGTH, MOST_COMPANIES } from "@polaris/core";
 import { BadgeCheck, ExternalLink, Plus, X } from "lucide-react";
-import { Button, Card, CardBody, Checkbox, Input } from "@polaris/ui";
+import { Button, Card, CardBody, Checkbox, cn, Input, settingType } from "@polaris/ui";
 import type { ProfileCompany } from "@/lib/profile-service";
 
 export function CompaniesCard({
@@ -98,23 +98,23 @@ export function CompaniesCard({
                         {username ? (
                             <Link
                                 href={`/u/${username}`}
-                                className="text-primary flex items-center gap-1 text-xs hover:underline"
+                                className={cn(settingType.small, "text-primary flex items-center gap-1 hover:underline")}
                             >
                                 {t("companies.seePage")}
                                 <ExternalLink className="size-3 shrink-0" />
                             </Link>
                         ) : null}
                     </div>
-                    <p className="text-muted-foreground text-xs">{t("companies.description")}</p>
+                    <p className={settingType.hint}>{t("companies.description")}</p>
                 </div>
 
                 {organizations.length > 0 ? (
                     <fieldset className="flex flex-col gap-2">
-                        <legend className="text-muted-foreground mb-1 text-xs">
+                        <legend className={cn(settingType.hint, "mb-1")}>
                             {t("companies.organizations")}
                         </legend>
                         {organizations.map((org) => (
-                            <label key={org.id} className="flex items-center gap-2 text-sm">
+                            <label key={org.id} className={cn(settingType.body, "flex items-center gap-2")}>
                                 <Checkbox checked={picked.has(org.id)} onChange={() => toggle(org.id)} />
                                 {/* Its own mark, the way an organization is drawn
                                     everywhere else here and on the page this
@@ -129,7 +129,7 @@ export function CompaniesCard({
                     </fieldset>
                 ) : null}
 
-                <div className="flex flex-col gap-2 text-sm">
+                <div className={cn(settingType.body, "flex flex-col gap-2")}>
                     <span>{t("companies.elsewhere")}</span>
                     {typed.map((entry, index) => (
                         // Keyed by position, deliberately: these are the same few
@@ -179,14 +179,14 @@ export function CompaniesCard({
                             {t("companies.addAnother")}
                         </Button>
                     ) : null}
-                    <span className="text-muted-foreground text-xs">
+                    <span className={settingType.hint}>
                         {t("companies.typedHint")}
                     </span>
                 </div>
 
                 <div className="flex items-center justify-between gap-2">
-                    {error ? <p className="text-danger text-sm">{error}</p> : null}
-                    {done && !error ? <p className="text-success text-sm">{t("appearance.saved")}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
+                    {done && !error ? <p className={cn(settingType.body, "text-success")}>{t("appearance.saved")}</p> : null}
                     <Button
                         type="button"
                         className="ms-auto"

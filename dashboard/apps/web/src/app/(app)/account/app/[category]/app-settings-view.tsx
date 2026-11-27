@@ -30,7 +30,19 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PolarisDesktop } from "@/lib/desktop-bridge";
 import { MaxUsersRow, OverlayGames, ResetOverlay, VoiceWidgetPreview } from "./voice-widget-preview";
 import { useAppSettingsValues } from "@/components/this-app/app-settings-values";
-import { Button, buttonVariants, Card, CardBody, ConfirmDeleteDialog, Select, settingType, Skeleton, Switch, useToast } from "@polaris/ui";
+import {
+    Button,
+    buttonVariants,
+    Card,
+    CardBody,
+    cn,
+    ConfirmDeleteDialog,
+    Select,
+    settingType,
+    Skeleton,
+    Switch,
+    useToast
+} from "@polaris/ui";
 
 export { forgetAppSettingsSnapshot } from "@/components/this-app/app-settings-values";
 
@@ -70,7 +82,7 @@ export function AppSettingsIntro({ category }: { category: core.AppSettingCatego
     const bridge = useDesktopBridge();
     const phone = phoneApp && !bridge?.appSettings;
     return (
-        <p className="text-sm text-muted-foreground">
+        <p className={cn(settingType.body, "text-muted-foreground")}>
             {phone && core.phoneHasCategory(category)
                 ? t(`phone.intros.${category}`)
                 : t(`categories.${category}.intro`)}
@@ -95,7 +107,7 @@ export function AppSettingsView({ category }: { category: core.AppSettingCategor
                 <CardBody className="flex flex-col items-start gap-3">
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">{t("notInApp.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("notInApp.body")}</p>
+                        <p className={settingType.hint}>{t("notInApp.body")}</p>
                     </div>
                     <Link href="/account/downloads" className={buttonVariants({ size: "sm", variant: "secondary" })}>
                         {t("notInApp.download")}
@@ -124,7 +136,7 @@ function InApp({
         return (
             <Card>
                 <CardBody className="flex flex-col items-start gap-3">
-                    <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("unavailable")}</p>
                     <Button size="sm" variant="secondary" onClick={() => void refresh()}>
                         {t("retry")}
                     </Button>
@@ -165,7 +177,7 @@ function InApp({
             {category === "advanced" && snapshot.restartPending && (
                 <Card>
                     <CardBody className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="min-w-0 text-sm text-muted-foreground">{t("restart.pending")}</p>
+                        <p className={cn(settingType.body, "min-w-0 text-muted-foreground")}>{t("restart.pending")}</p>
                         <Button size="sm" onClick={() => void settings.relaunch()}>
                             {t("restart.now")}
                         </Button>
@@ -477,23 +489,23 @@ function Hosts({
                 {servers === null ? (
                     <Skeleton aria-busy="true" className="h-5 w-48" />
                 ) : servers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("hosts.none")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("hosts.none")}</p>
                 ) : (
                     <ul className="flex flex-col gap-3">
                         {servers.map((host) => (
                             <li key={host.origin} className="flex min-w-0 items-center justify-between gap-3">
                                 <div className="flex min-w-0 flex-col">
-                                    <span className="truncate text-sm" title={host.name ?? host.origin}>
+                                    <span className={cn(settingType.body, "truncate")} title={host.name ?? host.origin}>
                                         {host.name ?? host.origin}
                                     </span>
                                     {host.name && (
-                                        <span className="truncate text-xs text-muted-foreground" title={host.origin}>
+                                        <span className={cn(settingType.hint, "truncate")} title={host.origin}>
                                             {host.origin}
                                         </span>
                                     )}
                                 </div>
                                 {host.origin === server && (
-                                    <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                                    <span className={cn(settingType.hint, "flex shrink-0 items-center gap-1")}>
                                         <Check className="size-3.5 shrink-0" aria-hidden />
                                         {t("hosts.current")}
                                     </span>
@@ -544,7 +556,7 @@ function InPhone({ settings, category }: { settings: PhoneAppSettings; category:
                 <CardBody className="flex flex-col items-start gap-3">
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">{t("phone.notHere.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("phone.notHere.body")}</p>
+                        <p className={settingType.hint}>{t("phone.notHere.body")}</p>
                     </div>
                     <Link href="/account/app/general" className={buttonVariants({ size: "sm", variant: "secondary" })}>
                         {t("phone.notHere.back")}
@@ -557,7 +569,7 @@ function InPhone({ settings, category }: { settings: PhoneAppSettings; category:
         return (
             <Card>
                 <CardBody className="flex flex-col items-start gap-3">
-                    <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("unavailable")}</p>
                     <Button size="sm" variant="secondary" onClick={() => setSnapshot(settings.read())}>
                         {t("retry")}
                     </Button>
@@ -589,7 +601,7 @@ function InPhone({ settings, category }: { settings: PhoneAppSettings; category:
                         </Button>
                     </Row>
                 ))}
-                {snapshot.actions.length === 0 && <p className="text-sm text-muted-foreground">{t("phone.none")}</p>}
+                {snapshot.actions.length === 0 && <p className={cn(settingType.body, "text-muted-foreground")}>{t("phone.none")}</p>}
             </CardBody>
         </Card>
     );

@@ -19,7 +19,15 @@ import type { KeyUsage, UsageKeyLabel } from "@/app/(app)/account/api-keys/usage
 import { usageAddressesAction } from "@/app/(app)/account/api-keys/usage-actions";
 import type { CallerShare } from "@/lib/api-usage/callers";
 import { ArrowLeft, BookOpen, Download, Eye, EyeOff, Pencil, RotateCw } from "lucide-react";
-import { Badge, Button, CopyButton, SegmentedControl, Skeleton, cn } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    CopyButton,
+    SegmentedControl,
+    Skeleton,
+    cn,
+    settingType
+} from "@polaris/ui";
 import type { Percentile } from "@/lib/api-usage/report";
 import { USAGE_RANGES, type UsageRange } from "@/lib/api-usage/ranges";
 import * as polls from "../../../account-polls";
@@ -90,7 +98,7 @@ export function KeyUsageView({ apiKey }: { apiKey: UsageKey }) {
                 <div className="min-w-0">
                     <Link data-swipe-back
                         href="/account/api-keys"
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground no-underline hover:text-foreground"
+                        className={cn(settingType.small, "inline-flex items-center gap-1 text-muted-foreground no-underline hover:text-foreground")}
                     >
                         <ArrowLeft className="size-3.5 shrink-0" />
                         {t("apiKeys.usage.back")}
@@ -101,7 +109,7 @@ export function KeyUsageView({ apiKey }: { apiKey: UsageKey }) {
                     >
                         {t("apiKeys.usage.title", { name: apiKey.name })}
                     </h1>
-                    <p className="truncate text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "truncate text-muted-foreground")}>
                         <span className="font-mono text-xs">{apiKey.prefix}</span>
                         {" - "}
                         {t("apiKeys.usage.lastUsed")}:{" "}
@@ -149,7 +157,7 @@ export function KeyUsageView({ apiKey }: { apiKey: UsageKey }) {
                         label: t(`apiKeys.usage.ranges.${value}` as const)
                     }))}
                 />
-                <p className="text-xs text-muted-foreground">{t("apiKeys.usage.kept")}</p>
+                <p className={settingType.hint}>{t("apiKeys.usage.kept")}</p>
             </div>
 
             <UsageData
@@ -188,7 +196,7 @@ export function UsageData({
                 role="alert"
                 className="flex flex-col items-center gap-3 rounded-lg border border-border px-4 py-10 text-center"
             >
-                <p className="text-sm text-danger">{t("apiKeys.usage.failed")}</p>
+                <p className={settingType.error}>{t("apiKeys.usage.failed")}</p>
                 <Button size="sm" variant="outline" onClick={onRetry}>
                     <RotateCw className="size-4 shrink-0" />
                     {t("apiKeys.usage.retry")}
@@ -200,8 +208,8 @@ export function UsageData({
     if (usage.total === 0) {
         return (
             <div className="flex flex-col items-center gap-1 rounded-lg border border-border px-4 py-10 text-center">
-                <p className="text-sm font-medium">{t("apiKeys.usage.empty")}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className={cn(settingType.body, "font-medium")}>{t("apiKeys.usage.empty")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {emptyHint ?? t("apiKeys.usage.emptyHint")}
                 </p>
             </div>
@@ -369,7 +377,7 @@ function UsageReport({
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
                 {tiles.map((tile) => (
                     <div key={tile.label} className="min-w-0 rounded-lg border border-border p-3">
-                        <dt className="truncate text-xs text-muted-foreground" title={tile.label}>
+                        <dt className={cn(settingType.hint, "truncate")} title={tile.label}>
                             {tile.label}
                         </dt>
                         <dd
@@ -399,8 +407,8 @@ function UsageReport({
                         </Button>
                     </div>
                     <div className="overflow-x-auto rounded-lg border border-border">
-                        <table className="w-full min-w-[40rem] text-sm">
-                            <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                        <table className={cn(settingType.body, "w-full min-w-[40rem]")}>
+                            <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                                 <tr>
                                     <th
                                         scope="col"
@@ -481,7 +489,7 @@ function UsageReport({
                                 })}
                                 {rest > 0 ? (
                                     <tr className="border-t border-border text-muted-foreground">
-                                        <td className="px-3 py-2 text-xs">
+                                        <td className={cn(settingType.small, "px-3 py-2")}>
                                             {t("apiKeys.usage.other")}
                                         </td>
                                         <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums">
@@ -498,8 +506,8 @@ function UsageReport({
                 <section className="flex min-w-0 flex-col gap-2">
                     <h2 className="text-sm font-semibold">{t("apiKeys.usage.byStatus")}</h2>
                     <div className="overflow-x-auto rounded-lg border border-border">
-                        <table className="w-full text-sm">
-                            <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                        <table className={cn(settingType.body, "w-full")}>
+                            <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                                 <tr>
                                     <th scope="col" className="px-3 py-2 font-medium">
                                         {t("apiKeys.usage.status")}
@@ -674,8 +682,8 @@ function CallerTable({
                 {action}
             </div>
             <div className="overflow-x-auto rounded-lg border border-border">
-                <table className="w-full text-sm">
-                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                <table className={cn(settingType.body, "w-full")}>
+                    <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                         <tr>
                             <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
                                 {head}
@@ -742,7 +750,7 @@ function CallerTable({
                     </tbody>
                 </table>
             </div>
-            {note ? <p className={cn("text-xs text-muted-foreground", noteTone)}>{note}</p> : null}
+            {note ? <p className={cn(settingType.hint, noteTone)}>{note}</p> : null}
         </section>
     );
 }
@@ -775,7 +783,7 @@ function CallsChart({ usage }: { usage: KeyUsage }) {
         <section className="flex min-w-0 flex-col gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold">{t("apiKeys.usage.overTime")}</h2>
-                <span className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className={cn(settingType.hint, "flex items-center gap-3")}>
                     <span className="inline-flex items-center gap-1">
                         <span className="size-2 rounded-sm bg-primary" aria-hidden="true" />
                         {t("apiKeys.usage.calls")}
@@ -833,7 +841,7 @@ function CallsChart({ usage }: { usage: KeyUsage }) {
                     })}
                 </svg>
                 {first && last ? (
-                    <div className="mt-1 flex justify-between gap-2 text-xs text-muted-foreground">
+                    <div className={cn(settingType.hint, "mt-1 flex justify-between gap-2")}>
                         <span className="truncate">{when(first.t)}</span>
                         <span className="truncate">{when(last.t)}</span>
                     </div>
@@ -855,8 +863,8 @@ function KeysTable({ usage, labels }: { usage: KeyUsage; labels: UsageKeyLabel[]
         <section className="flex min-w-0 flex-col gap-2">
             <h2 className="text-sm font-semibold">{t("apiKeys.usage.byKey")}</h2>
             <div className="overflow-x-auto rounded-lg border border-border">
-                <table className="w-full min-w-[40rem] text-sm">
-                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                <table className={cn(settingType.body, "w-full min-w-[40rem]")}>
+                    <thead className={cn(settingType.small, "bg-surface/60 text-start text-muted-foreground")}>
                         <tr>
                             <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
                                 {t("apiKeys.usage.key")}
@@ -939,7 +947,7 @@ function KeysTable({ usage, labels }: { usage: KeyUsage; labels: UsageKeyLabel[]
                 </table>
             </div>
             {quiet > 0 ? (
-                <p className="text-xs text-muted-foreground">
+                <p className={settingType.hint}>
                     {t("apiKeys.usage.quietKeys", { count: quiet })}
                 </p>
             ) : null}

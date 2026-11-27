@@ -36,7 +36,8 @@ import {
     Input,
     SegmentedControl,
     cn,
-    hasAppLogo
+    hasAppLogo,
+    settingType
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { expandPermissions, impliedBy, type Permission } from "@polaris/core";
@@ -107,7 +108,7 @@ export function ScopePicker({
     }
 
     if (available.length === 0) {
-        return <p className="text-sm text-muted-foreground">{t("apiKeys.scopes.noneHeld")}</p>;
+        return <p className={cn(settingType.body, "text-muted-foreground")}>{t("apiKeys.scopes.noneHeld")}</p>;
     }
 
     return (
@@ -124,7 +125,7 @@ export function ScopePicker({
                         className="ps-8"
                     />
                 </span>
-                <span className="text-xs text-muted-foreground">
+                <span className={settingType.hint}>
                     {t("apiKeys.scopes.selected", {
                         count: effective.size,
                         total: available.length
@@ -160,7 +161,7 @@ export function ScopePicker({
                                     scope: SCOPE_LABELS[scope]
                                 })}
                                 title={t("apiKeys.scopes.remove", { scope: SCOPE_LABELS[scope] })}
-                                className="inline-flex items-center gap-1 rounded border border-transparent bg-primary/15 px-1.5 py-px text-[0.6875rem] font-medium leading-[18px] text-primary transition-colors hover:bg-primary/25"
+                                className={cn(settingType.small, "inline-flex items-center gap-1 rounded border border-transparent bg-primary/15 px-1.5 py-px font-medium leading-[18px] text-primary transition-colors hover:bg-primary/25")}
                             >
                                 {SCOPE_LABELS[scope]}
                                 <X className="size-3 shrink-0" />
@@ -219,7 +220,7 @@ export function ScopePicker({
                                             return next;
                                         })
                                     }
-                                    className="flex min-w-0 flex-1 items-center gap-2 py-2 pe-3 text-start text-sm transition-colors hover:bg-muted/40"
+                                    className={cn(settingType.body, "flex min-w-0 flex-1 items-center gap-2 py-2 pe-3 text-start transition-colors hover:bg-muted/40")}
                                 >
                                     <ChevronRight
                                         className={cn(
@@ -238,7 +239,7 @@ export function ScopePicker({
                                     </span>
                                     <span
                                         className={cn(
-                                            "shrink-0 text-xs",
+                                            settingType.small, "shrink-0",
                                             chosen > 0 ? "text-primary" : "text-muted-foreground"
                                         )}
                                     >
@@ -288,7 +289,7 @@ export function ScopePicker({
                                             <label
                                                 key={scope}
                                                 className={cn(
-                                                    "flex items-start gap-2 text-sm",
+                                                    settingType.body, "flex items-start gap-2",
                                                     source ? "cursor-default" : "cursor-pointer"
                                                 )}
                                             >
@@ -307,14 +308,14 @@ export function ScopePicker({
                                                             {scope}
                                                         </code>
                                                         {source ? (
-                                                            <span className="text-xs text-muted-foreground">
+                                                            <span className={settingType.hint}>
                                                                 {t("apiKeys.scopes.includedWith", {
                                                                     scope: SCOPE_LABELS[source]
                                                                 })}
                                                             </span>
                                                         ) : null}
                                                     </span>
-                                                    <span className="block text-xs text-muted-foreground">
+                                                    <span className={cn(settingType.hint, "block")}>
                                                         {SCOPE_HINTS[scope]}
                                                     </span>
                                                 </span>
@@ -330,7 +331,7 @@ export function ScopePicker({
                     group.scopes.every((scope) => !matches(scope, needle))
                 ) && (
                     <div className="flex items-center justify-between gap-2 px-3 py-3">
-                        <p className="text-sm text-muted-foreground">
+                        <p className={cn(settingType.body, "text-muted-foreground")}>
                             {t("apiKeys.scopes.noMatch")}
                         </p>
                         <Button size="sm" variant="ghost" onClick={() => setSearch("")}>

@@ -9,6 +9,7 @@
  * has no section of either.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { Suspense, type ReactNode } from "react";
 import { CardSkeleton } from "@/app/(app)/admin/region-skeletons";
 import { Messages } from "@/components/i18n/messages";
@@ -73,7 +74,7 @@ export async function hubCoreSections(user: SessionUser): Promise<HubCoreSection
                     <h2 id={`connection-${section.id}-title`} className="text-sm font-medium">
                         {section.title}
                     </h2>
-                    <p className="text-sm text-muted-foreground">{section.intro}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{section.intro}</p>
                 </div>
                 {section.body}
             </section>

@@ -12,7 +12,7 @@
 
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Checkbox, Input, cn } from "@polaris/ui";
+import { Checkbox, Input, cn, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DatabaseReach } from "@/lib/mcp/oauth/database-reach";
 
@@ -55,17 +55,17 @@ export function DatabaseReachPicker({
 
     return (
         <fieldset className="flex min-w-0 flex-col gap-2 border-t border-border pt-3">
-            <legend className="pt-3 text-sm font-medium">
+            <legend className={cn(settingType.body, "pt-3 font-medium")}>
                 {t("connectedApps.databases.title")}
             </legend>
-            <p className="text-xs text-muted-foreground">{t("connectedApps.databases.hint")}</p>
+            <p className={settingType.hint}>{t("connectedApps.databases.hint")}</p>
             {(["all", "chosen"] as const).map((mode) => {
                 const active = mode === "all" ? reach === null : reach !== null;
                 return (
                     <label
                         key={mode}
                         className={cn(
-                            "flex min-w-0 items-start gap-2 rounded-md border border-border p-2.5 text-sm",
+                            settingType.body, "flex min-w-0 items-start gap-2 rounded-md border border-border p-2.5",
                             active && "border-primary/60 bg-primary/5"
                         )}
                     >
@@ -83,7 +83,7 @@ export function DatabaseReachPicker({
             {reach !== null ? (
                 <div className="flex min-w-0 flex-col gap-2 ps-6">
                     {databases.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("connectedApps.databases.noneToChoose")}
                         </p>
                     ) : null}
@@ -107,7 +107,7 @@ export function DatabaseReachPicker({
                     <ul className="flex max-h-56 flex-col gap-1.5 overflow-y-auto overscroll-contain">
                         {shown.map((database) => (
                             <li key={database.id}>
-                                <label className="flex min-w-0 items-start gap-2 text-sm">
+                                <label className={cn(settingType.body, "flex min-w-0 items-start gap-2")}>
                                     <Checkbox
                                         checked={chosen.includes(database.id)}
                                         onChange={(event) =>
@@ -123,7 +123,7 @@ export function DatabaseReachPicker({
                                         <span className="truncate" title={database.name}>
                                             {database.name}
                                         </span>
-                                        <span className="truncate text-xs text-muted-foreground">
+                                        <span className={cn(settingType.hint, "truncate")}>
                                             {database.project
                                                 ? `${database.engine} - ${database.project}`
                                                 : database.engine}
@@ -134,7 +134,7 @@ export function DatabaseReachPicker({
                         ))}
                     </ul>
                     {databases.length > 0 && chosen.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className={settingType.hint}>
                             {t("connectedApps.databases.noneChosen")}
                         </p>
                     ) : null}

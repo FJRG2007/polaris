@@ -25,6 +25,7 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -105,7 +106,7 @@ export function AccessView({
     return (
         <div className="flex flex-col gap-4">
             {currentIp || enforcedSummary ? (
-                <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <div className={cn(settingType.hint, "flex flex-col gap-1")}>
                     {currentIp ? (
                         <p>
                             {t.rich("access.connectingFrom", {
@@ -141,7 +142,7 @@ export function AccessView({
                     <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
                             <h2 className="text-sm font-medium">{t("access.groups.title")}</h2>
-                            <p className="text-xs text-muted-foreground">{t("access.groups.description")}</p>
+                            <p className={settingType.hint}>{t("access.groups.description")}</p>
                         </div>
                         <Button size="sm" className="shrink-0" onClick={() => setGroupDialog({ mode: "create" })}>
                             <Plus className="size-4" />
@@ -150,7 +151,7 @@ export function AccessView({
                     </div>
 
                     {groups.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t("access.groups.empty")}</p>
+                        <p className={cn(settingType.body, "text-muted-foreground")}>{t("access.groups.empty")}</p>
                     ) : (
                         groups.map((group) => (
                             <div
@@ -160,7 +161,7 @@ export function AccessView({
                                 <div className="flex min-w-0 items-center gap-3">
                                     <Globe className="size-4 shrink-0 text-muted-foreground" />
                                     <div className="min-w-0">
-                                        <p className="flex min-w-0 items-center gap-2 text-sm">
+                                        <p className={cn(settingType.body, "flex min-w-0 items-center gap-2")}>
                                             <span className="truncate" title={group.name}>
                                                 {group.name}
                                             </span>
@@ -171,7 +172,7 @@ export function AccessView({
                                                 <Badge>{t("access.groups.keys", { count: group.apiKeyCount })}</Badge>
                                             ) : null}
                                         </p>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className={settingType.hint}>
                                             {group.description || summarize(group, t)}
                                         </p>
                                     </div>
@@ -286,7 +287,7 @@ function GroupDialog({
                     <DialogDescription>{t("access.groups.dialogDescription")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("apiKeys.list.columns.name")}
                         <Input
                             value={name}
@@ -295,7 +296,7 @@ function GroupDialog({
                             autoComplete="off"
                         />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-col gap-1")}>
                         {t("apiKeys.form.description")}
                         <Input
                             value={description}
@@ -305,7 +306,7 @@ function GroupDialog({
                         />
                     </label>
                     <AccessRulesEditor value={value} groups={[]} onChange={setValue} showGroups={false} />
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    {error ? <p className={settingType.error}>{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             {tc("actions.cancel")}

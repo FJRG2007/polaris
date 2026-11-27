@@ -28,7 +28,18 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowLeft, Copy, KeyRound } from "lucide-react";
 import type { AccessGroupView, ApiKeyView } from "@polaris/auth";
 import { createApiKeyAction, updateApiKeyAction } from "./actions";
-import { Button, Card, CardBody, Input, Select, Textarea, isDirty, DateInput, settingType } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    Input,
+    Select,
+    Textarea,
+    isDirty,
+    DateInput,
+    settingType,
+    cn
+} from "@polaris/ui";
 import { ClientRulesEditor, EMPTY_CLIENT_RULES } from "@/components/client-rules-editor";
 import {
     AccessRulesEditor,
@@ -80,7 +91,7 @@ function Section({ title, hint, children }: { title: string; hint: string; child
             <CardBody className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-sm font-medium">{title}</h2>
-                    <p className="text-xs text-muted-foreground">{hint}</p>
+                    <p className={settingType.hint}>{hint}</p>
                 </div>
                 {children}
             </CardBody>
@@ -223,7 +234,7 @@ export function KeyForm({
             <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
                 <div>
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">{name}</h1>
-                    <p className="text-sm text-muted-foreground">{t("apiKeys.form.copyNow")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("apiKeys.form.copyNow")}</p>
                 </div>
                 <Card>
                     <CardBody className="flex flex-col gap-3">
@@ -263,7 +274,7 @@ export function KeyForm({
             <div className="flex flex-col gap-1">
                 <Link data-swipe-back
                     href="/account/api-keys"
-                    className="flex w-fit items-center gap-1 text-xs text-muted-foreground no-underline transition-colors hover:text-foreground"
+                    className={cn(settingType.small, "flex w-fit items-center gap-1 text-muted-foreground no-underline transition-colors hover:text-foreground")}
                 >
                     <ArrowLeft className="size-3.5" />
                     {t("apiKeys.page.title")}
@@ -271,14 +282,14 @@ export function KeyForm({
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {editing ? editing.name : t("apiKeys.form.newTitle")}
                 </h1>
-                <p className="text-sm text-muted-foreground">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {editing ? t("apiKeys.form.editIntro") : t("apiKeys.form.newIntro")}
                 </p>
             </div>
 
             <Section title={t("apiKeys.form.what.title")} hint={t("apiKeys.form.what.hint")}>
                 <div className="flex flex-col gap-4 sm:flex-row">
-                    <label className="flex flex-1 flex-col gap-1 text-sm">
+                    <label className={cn(settingType.body, "flex flex-1 flex-col gap-1")}>
                         {t("apiKeys.list.columns.name")}
                         <Input
                             value={name}
@@ -287,7 +298,7 @@ export function KeyForm({
                             onChange={(event) => setName(event.target.value)}
                         />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm sm:w-48">
+                    <label className={cn(settingType.body, "flex flex-col gap-1 sm:w-48")}>
                         {t("apiKeys.list.environment")}
                         <Select
                             value={environment}
@@ -299,7 +310,7 @@ export function KeyForm({
                         />
                     </label>
                 </div>
-                <label className="flex flex-col gap-1 text-sm">
+                <label className={cn(settingType.body, "flex flex-col gap-1")}>
                     {t("apiKeys.form.description")}
                     <Textarea
                         value={description}
@@ -309,7 +320,7 @@ export function KeyForm({
                         onChange={(event) => setDescription(event.target.value)}
                     />
                 </label>
-                <p className="text-xs text-muted-foreground">{t("apiKeys.form.environmentHint")}</p>
+                <p className={settingType.hint}>{t("apiKeys.form.environmentHint")}</p>
             </Section>
 
             <Section title={t("apiKeys.list.expiryLabel")} hint={t("apiKeys.form.expiryHint")}>
@@ -330,8 +341,8 @@ export function KeyForm({
                         ]}
                     />
                     {custom ? (
-                        <label className="flex flex-col gap-1 text-sm">
-                            <span className="text-xs text-muted-foreground">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
+                            <span className={settingType.hint}>
                                 {t("apiKeys.form.endOfDay")}
                             </span>
                             <DateInput

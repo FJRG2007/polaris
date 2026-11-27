@@ -5,6 +5,7 @@
  * written once.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { accountRuleGroupIds } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
@@ -31,7 +32,7 @@ export default async function AccessPage() {
         <div className="mx-auto flex max-w-4xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("access.page.title")}</h1>
-                <p className="text-sm text-muted-foreground">{t("access.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("access.page.intro")}</p>
             </div>
             {/* The rule list, its pages and the condition builder are the firewall's,
                 and speak its words for what they share with it. */}

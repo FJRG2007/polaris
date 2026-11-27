@@ -39,7 +39,8 @@ import {
     DialogHeader,
     DialogTitle,
     cn,
-    Checkbox
+    Checkbox,
+    settingType
 } from "@polaris/ui";
 
 function samePolicy(a: IpPolicy, b: IpPolicy): boolean {
@@ -105,7 +106,7 @@ export function IpRuleDialog({
                             <label
                                 key={option}
                                 className={cn(
-                                    "flex min-w-0 items-start gap-2 rounded-md border border-border p-2.5 text-sm",
+                                    settingType.body, "flex min-w-0 items-start gap-2 rounded-md border border-border p-2.5",
                                     mode === option && "border-primary/60 bg-primary/5",
                                     unavailable && "cursor-not-allowed opacity-60"
                                 )}
@@ -120,7 +121,7 @@ export function IpRuleDialog({
                                 />
                                 <span className="flex min-w-0 flex-col">
                                     <span>{t(`connectedApps.ip.modes.${option}.label`)}</span>
-                                    <span className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                                    <span className={cn(settingType.hint, "[overflow-wrap:anywhere]")}>
                                         {option === "origin"
                                             ? approvedIp
                                                 ? t("connectedApps.ip.modes.origin.hint", {
@@ -154,7 +155,7 @@ export function IpRuleDialog({
                             onChange={(next) => setDeny(next.slice(0, IP_LIST_MAX))}
                         />
                         {!valid ? (
-                            <p className="text-xs text-muted-foreground">
+                            <p className={settingType.hint}>
                                 {t("connectedApps.ip.listEmpty")}
                             </p>
                         ) : null}
@@ -166,15 +167,15 @@ export function IpRuleDialog({
                         disabled={!canExcept}
                         aria-describedby="exception-hint"
                     >
-                        <legend className="pt-3 text-sm font-medium">
+                        <legend className={cn(settingType.body, "pt-3 font-medium")}>
                             {t("connectedApps.exception.title")}
                         </legend>
-                        <p id="exception-hint" className="text-xs text-muted-foreground">
+                        <p id="exception-hint" className={settingType.hint}>
                             {canExcept
                                 ? t("connectedApps.exception.hint")
                                 : t("connectedApps.exception.adminOnly")}
                         </p>
-                        <label className="flex min-w-0 items-start gap-2 text-sm">
+                        <label className={cn(settingType.body, "flex min-w-0 items-start gap-2")}>
                             <Checkbox
                                 className="mt-1"
                                 checked={exception.presets.includes("openai")}
@@ -187,7 +188,7 @@ export function IpRuleDialog({
                             />
                             <span className="flex min-w-0 flex-col">
                                 <span>{t("connectedApps.exception.openai.label")}</span>
-                                <span className="text-xs text-muted-foreground">
+                                <span className={settingType.hint}>
                                     {t("connectedApps.exception.openai.hint")}
                                 </span>
                             </span>

@@ -23,8 +23,10 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    cn,
     Input,
-    SegmentedControl
+    SegmentedControl,
+    settingType
 } from "@polaris/ui";
 import {
     CLIENT_GUIDES,
@@ -98,7 +100,7 @@ function OfficialLink({ href }: { href: string }) {
             href={href}
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+            className={cn(settingType.small, "inline-flex w-fit items-center gap-1 text-muted-foreground underline-offset-2 hover:underline")}
         >
             {t("official")}
             <ExternalLink className="size-3" aria-hidden />
@@ -116,7 +118,7 @@ function Field({ field, urls }: { field: CopyField; urls: ServerUrls }) {
             value={field.value(urls)}
             language={language}
             label={t(`copy.${field.kind}`)}
-            className="text-xs"
+            className={settingType.small}
         />
     ) : (
         <Copyable value={field.value(urls)} label={t(`copy.${field.kind}`)} />
@@ -124,7 +126,7 @@ function Field({ field, urls }: { field: CopyField; urls: ServerUrls }) {
     if (!LABELLED_KINDS.has(field.kind)) return copyable;
     return (
         <div className="flex min-w-0 flex-col gap-1">
-            <span className="text-xs text-muted-foreground">
+            <span className={settingType.hint}>
                 {t(`fields.${field.kind}` as never)}
             </span>
             {copyable}
@@ -173,7 +175,7 @@ function ClientSteps({ guide, urls }: { guide: ClientGuide; urls: ServerUrls }) 
                 ))}
             </Steps>
             {guide.notes?.map((note) => (
-                <p key={note} className="text-xs text-muted-foreground">
+                <p key={note} className={settingType.hint}>
                     {say(note)}
                 </p>
             ))}
@@ -204,19 +206,19 @@ function OtherSteps({ urls }: { urls: ServerUrls }) {
                             label: t(`other.types.${candidate.id}.label`)
                         }))}
                     />
-                    <p className="text-xs text-muted-foreground">{t(`other.types.${type}.hint`)}</p>
+                    <p className={settingType.hint}>{t(`other.types.${type}.hint`)}</p>
                 </Step>
                 <Step number={3} text={t("other.step3")}>
                     <CodeView
                         value={chosen.value(urls)}
                         language="json"
                         label={t("copy.config")}
-                        className="text-xs"
+                        className={settingType.small}
                     />
                 </Step>
                 <Step number={4} text={t("other.step4")} />
             </Steps>
-            <p className="text-xs text-muted-foreground">
+            <p className={settingType.hint}>
                 {t.rich("other.key", {
                     header: (
                         <code key="header" className="text-xs">
@@ -291,9 +293,9 @@ export function ConnectGuides({ urls }: { urls: ServerUrls }) {
         <Card>
             <CardHeader>
                 <CardTitle>{t("title")}</CardTitle>
-                <p className="text-sm text-muted-foreground">{t("intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("intro")}</p>
             </CardHeader>
-            <CardBody className="flex flex-col gap-4 text-sm">
+            <CardBody className={cn(settingType.body, "flex flex-col gap-4")}>
                 {name ? (
                     <section
                         className="flex flex-col gap-4"

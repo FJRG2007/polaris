@@ -293,9 +293,9 @@ export function ConnectedApps({
                     {t("connectedApps.title")}
                     {apps.length > 0 ? <Badge variant="neutral">{apps.length}</Badge> : null}
                 </CardTitle>
-                <p className="text-sm text-muted-foreground">{t("connectedApps.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("connectedApps.intro")}</p>
             </CardHeader>
-            <CardBody className="flex flex-col gap-3 text-sm">
+            <CardBody className={cn(settingType.body, "flex flex-col gap-3")}>
                 {restricted ? (
                     <RestrictionNotice
                         canExcept={canExcept}
@@ -391,7 +391,7 @@ function RestrictionNotice({
     return (
         <div
             role="note"
-            className="flex min-w-0 items-start gap-2 rounded-md bg-warning-soft p-3 text-xs"
+            className={cn(settingType.small, "flex min-w-0 items-start gap-2 rounded-md bg-warning-soft p-3")}
         >
             <Globe className="mt-0.5 size-3.5 shrink-0 text-warning-ink" aria-hidden />
             <div className="flex min-w-0 flex-col gap-1.5">
@@ -485,7 +485,7 @@ function AppRow({
                 <p className="truncate font-medium" title={name}>
                     {name}
                 </p>
-                <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
+                <p className={cn(settingType.hint, "flex min-w-0 items-start gap-1.5")}>
                     <span
                         className={cn(
                             "mt-1 size-2 shrink-0 rounded-full",
@@ -508,7 +508,7 @@ function AppRow({
                             : t("connectedApps.neverUsed")}
                     </span>
                 </p>
-                <p className="min-w-0 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                <p className={cn(settingType.hint, "min-w-0 [overflow-wrap:anywhere]")}>
                     {app.redirectHost ? (
                         <span title={app.redirectHost}>
                             {t("connectedApps.returnsTo", { host: app.redirectHost })}
@@ -520,7 +520,7 @@ function AppRow({
                     })}
                 </p>
                 {app.ipPolicy.mode !== "none" ? (
-                    <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
+                    <p className={cn(settingType.hint, "flex min-w-0 items-start gap-1.5")}>
                         <Network className="mt-0.5 size-3 shrink-0" aria-hidden />
                         <span className="min-w-0 [overflow-wrap:anywhere]">
                             {ruleSummary(t, app)}
@@ -528,7 +528,7 @@ function AppRow({
                     </p>
                 ) : null}
                 {!exceptionIsEmpty(app.networkException) ? (
-                    <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
+                    <p className={cn(settingType.hint, "flex min-w-0 items-start gap-1.5")}>
                         <Globe className="mt-0.5 size-3 shrink-0" aria-hidden />
                         <span className="min-w-0 [overflow-wrap:anywhere]">
                             {t("connectedApps.exception.summary", {
@@ -538,7 +538,7 @@ function AppRow({
                     </p>
                 ) : null}
                 {holdsDatabases(app.scopes) ? (
-                    <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
+                    <p className={cn(settingType.hint, "flex min-w-0 items-start gap-1.5")}>
                         <Database className="mt-0.5 size-3 shrink-0" aria-hidden />
                         <span className="min-w-0 [overflow-wrap:anywhere]">
                             {app.databaseIds === null
@@ -550,7 +550,7 @@ function AppRow({
                     </p>
                 ) : null}
                 {app.lastRefusedAt ? (
-                    <p className="flex min-w-0 items-start gap-1.5 text-xs text-warning-ink">
+                    <p className={cn(settingType.small, "flex min-w-0 items-start gap-1.5 text-warning-ink")}>
                         <ShieldAlert className="mt-0.5 size-3 shrink-0" aria-hidden />
                         <span className="min-w-0 [overflow-wrap:anywhere]">
                             {t.rich("connectedApps.ip.refused", {
@@ -562,7 +562,7 @@ function AppRow({
                 ) : null}
                 <button
                     type="button"
-                    className="mt-1 inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    className={cn(settingType.small, "mt-1 inline-flex w-fit items-center gap-1 text-muted-foreground hover:text-foreground")}
                     aria-expanded={open}
                     aria-controls={listId}
                     title={t("connectedApps.showScopes")}
@@ -645,7 +645,7 @@ function ScopeGroups({
         <dl id={id} className="mt-1 flex flex-col gap-1.5">
             {rows.map((row) => (
                 <div key={row.title} className="flex min-w-0 flex-col gap-1 sm:flex-row sm:gap-2">
-                    <dt className="w-28 shrink-0 text-xs text-muted-foreground">{row.title}</dt>
+                    <dt className={cn(settingType.hint, "w-28 shrink-0")}>{row.title}</dt>
                     <dd className="flex min-w-0 flex-1 flex-col gap-1.5">
                         <span className="flex min-w-0 flex-wrap gap-1">
                             {row.scopes.map((scope) =>

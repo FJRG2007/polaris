@@ -5,6 +5,7 @@
  * never be created with more reach than its owner.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import { listApiKeys } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
@@ -43,7 +44,7 @@ export default async function ApiKeysPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("apiKeys.page.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("apiKeys.page.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("apiKeys.page.intro")}</p>
             </div>
             <ApiKeysView keys={keys} />
         </div>

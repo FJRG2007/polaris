@@ -13,7 +13,7 @@
  * button is how two rows of the same screen end up a pixel apart.
  */
 
-import { cn } from "@polaris/ui";
+import { cn, settingType } from "@polaris/ui";
 import type { CSSProperties, ReactNode } from "react";
 
 /** One option. The picture on it is the answer; the word beside it is only there
@@ -41,7 +41,7 @@ export function Choice({
             onClick={onClick}
             aria-pressed={chosen}
             className={cn(
-                "flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors",
+                settingType.small, "flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors",
                 chosen
                     ? "border-primary bg-primary/10 text-foreground"
                     : "border-border text-muted-foreground hover:bg-card-hover hover:text-foreground"
@@ -90,7 +90,7 @@ export function Tile({
             )}
         >
             {children}
-            <span className="w-full truncate px-1 text-center text-[0.6875rem] leading-tight">
+            <span className={cn(settingType.small, "w-full truncate px-1 text-center leading-tight")}>
                 {label}
             </span>
             {/* Only on the ones it is true of, so the row of words under the

@@ -7,7 +7,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import * as core from "@polaris/core";
-import { Button, Card, CardBody, CardHeader, CardTitle, Select, Skeleton } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    cn,
+    Select,
+    settingType,
+    Skeleton
+} from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { NameTagLabel } from "@/components/name-tags/name-tag-chip";
 import { nameTagErrorKey } from "@/components/name-tags/name-tag-editor";
@@ -66,10 +76,10 @@ export function MyNameTag() {
                 <CardTitle>{t("nameTags.mine.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-muted-foreground text-xs">{t("nameTags.mine.intro")}</p>
+                <p className={settingType.hint}>{t("nameTags.mine.intro")}</p>
                 {data === null && <Skeleton className="h-16 w-full" />}
                 {data === "failed" && (
-                    <div className="flex items-center justify-between gap-2 text-sm">
+                    <div className={cn(settingType.body, "flex items-center justify-between gap-2")}>
                         <span>{t("nameTags.mine.loadFailed")}</span>
                         <Button size="sm" variant="ghost" onClick={load}>
                             {t("nameTags.mine.retry")}
@@ -95,7 +105,7 @@ export function MyNameTag() {
                             className="w-full sm:max-w-sm"
                         />
                         {data.options.length === 0 && (
-                            <p className="text-muted-foreground text-xs">
+                            <p className={settingType.hint}>
                                 {t("nameTags.mine.empty")}
                             </p>
                         )}
@@ -104,7 +114,7 @@ export function MyNameTag() {
                 {error && (
                     <p
                         role="alert"
-                        className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                        className={cn(settingType.body, "bg-danger-soft text-danger-ink rounded-md px-3 py-2")}
                     >
                         {t(`nameTags.errors.${error as "invalid"}`)}
                     </p>

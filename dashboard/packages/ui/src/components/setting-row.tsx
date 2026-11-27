@@ -21,7 +21,13 @@ export const settingType = {
     /** What it changes, under the name; also a card's own explanation. */
     hint: "text-[0.6875rem] leading-snug text-foreground-subtle",
     /** Why the last change did not take. */
-    error: "text-[0.6875rem] leading-snug text-danger"
+    error: "text-[0.6875rem] leading-snug text-danger",
+    /** Any other line on the screen - a field's label, a list row, a notice, an
+     *  empty state - at the row's 13px. Size only: the site sets the colour. */
+    body: "text-[0.8125rem]",
+    /** A secondary line that is not a hint - a status, a count, a badge, a
+     *  timestamp - at the scale's 11px. Size only: the site sets the colour. */
+    small: "text-[0.6875rem] leading-snug"
 } as const;
 
 export function SettingRow({

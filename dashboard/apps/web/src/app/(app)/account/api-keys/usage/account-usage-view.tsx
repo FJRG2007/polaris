@@ -11,7 +11,7 @@ import Link from "next/link";
 import * as polls from "@/app/(app)/account/account-polls";
 import { ArrowLeft, BookOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Button, SegmentedControl } from "@polaris/ui";
+import { Button, cn, SegmentedControl, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { USAGE_RANGES, type UsageRange } from "@/lib/api-usage/ranges";
 import { UsageData, type Load } from "@/app/(app)/account/api-keys/[keyId]/usage/key-usage-view";
@@ -68,7 +68,7 @@ export function AccountUsageView() {
                     <Link
                         data-swipe-back
                         href="/account/api-keys"
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground no-underline hover:text-foreground"
+                        className={cn(settingType.small, "inline-flex items-center gap-1 text-muted-foreground no-underline hover:text-foreground")}
                     >
                         <ArrowLeft className="size-3.5 shrink-0" />
                         {t("apiKeys.usage.back")}
@@ -76,7 +76,7 @@ export function AccountUsageView() {
                     <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight">
                         {t("apiKeys.usage.allTitle")}
                     </h1>
-                    <p className="text-sm text-muted-foreground">{t("apiKeys.usage.allIntro")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("apiKeys.usage.allIntro")}</p>
                 </div>
                 <Button size="sm" variant="outline" asChild>
                     <Link href="/account/api-keys/reference" className="no-underline">
@@ -96,7 +96,7 @@ export function AccountUsageView() {
                         label: t(`apiKeys.usage.ranges.${value}` as const)
                     }))}
                 />
-                <p className="text-xs text-muted-foreground">{t("apiKeys.usage.kept")}</p>
+                <p className={settingType.hint}>{t("apiKeys.usage.kept")}</p>
             </div>
 
             <UsageData

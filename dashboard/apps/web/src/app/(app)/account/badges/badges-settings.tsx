@@ -31,7 +31,8 @@ import {
     Skeleton,
     useListOrder,
     moved,
-    useToast
+    useToast,
+    settingType
 } from "@polaris/ui";
 
 /** The Select value for "follow the account's badges setting". */
@@ -202,13 +203,13 @@ export function BadgesSettings({ userId }: { userId: string }) {
                                         className="size-9 shrink-0"
                                     />
                                     <span
-                                        className="min-w-0 flex-1 truncate text-[0.8125rem]"
+                                        className={cn(settingType.body, "min-w-0 flex-1 truncate")}
                                         title={name}
                                     >
                                         {name}
                                     </span>
                                     <Select
-                                        className="h-8 w-full shrink-0 text-xs sm:w-52"
+                                        className={cn(settingType.body, "h-8 w-full shrink-0 sm:w-52")}
                                         aria-label={t("settings.audience", { name })}
                                         value={row.audience ?? FOLLOW}
                                         disabled={row.hidden}
@@ -276,7 +277,7 @@ export function BadgesSettings({ userId }: { userId: string }) {
                     </ul>
                 )}
             </Card>
-            <p className="text-xs text-muted-foreground">
+            <p className={settingType.hint}>
                 {t.rich("settings.privacyLink", {
                     link: (chunks) => (
                         <Link href="/account/privacy" className="underline underline-offset-2">

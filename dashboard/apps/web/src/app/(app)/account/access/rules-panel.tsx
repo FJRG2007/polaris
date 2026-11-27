@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, CountryFlag, Input, Select, isDirty, settingType } from "@polaris/ui";
+import { Button, CountryFlag, Input, Select, cn, isDirty, settingType } from "@polaris/ui";
 import { FlaskConical, Globe, ShieldAlert, Smartphone, TriangleAlert } from "lucide-react";
 import {
     ACCOUNT_RULE_BROWSERS,
@@ -220,7 +220,7 @@ function useVocabulary(lists: readonly SavedList[], reputation: boolean): Condit
                                     }))
                                 )}
                                 {reputation ? null : (
-                                    <p className="flex items-start gap-1.5 text-xs text-warning">
+                                    <p className={cn(settingType.small, "flex items-start gap-1.5 text-warning")}>
                                         <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
                                         {t("access.rules.reputationOff")}
                                     </p>
@@ -250,7 +250,7 @@ function useVocabulary(lists: readonly SavedList[], reputation: boolean): Condit
                     case "access_group":
                         editor =
                             lists.length === 0 && test.values.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">{t("access.rules.noLists")}</p>
+                                <p className={settingType.hint}>{t("access.rules.noLists")}</p>
                             ) : (
                                 choices(
                                     lists.map((list) => ({
@@ -264,7 +264,7 @@ function useVocabulary(lists: readonly SavedList[], reputation: boolean): Condit
                 }
                 return (
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">{t("access.rules.values")}</span>
+                        <span className={cn(settingType.hint, "font-medium")}>{t("access.rules.values")}</span>
                         {editor}
                     </div>
                 );
@@ -285,7 +285,7 @@ function PreviewResult({ preview }: { preview: RulePreview }) {
     const tone =
         preview.action === "block" ? "text-danger" : preview.action === "challenge" ? "text-warning" : "text-success";
     return (
-        <div role="status" className="flex flex-col gap-1 rounded-md bg-muted px-3 py-2 text-xs">
+        <div role="status" className={cn(settingType.small, "flex flex-col gap-1 rounded-md bg-muted px-3 py-2")}>
             <p className={`font-medium ${tone}`}>{sentence}</p>
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
                 <span className="font-mono">{preview.ip ?? unknown}</span>
@@ -341,7 +341,7 @@ function TestSession({ rules, disabled }: { rules: readonly AccountRule[]; disab
 function Refusal({ error, lockout }: { error: string; lockout: RulePreview | null }) {
     return (
         <div role="alert" className="flex flex-col gap-2">
-            <p className="flex items-start gap-1.5 text-sm text-danger">
+            <p className={cn(settingType.error, "flex items-start gap-1.5")}>
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 {error}
             </p>
@@ -435,7 +435,7 @@ function RuleEditor({
                     }))}
                     onValueChange={(value) => setRule({ ...rule, action: value as AccountRule["action"] })}
                 />
-                <p className="text-xs text-muted-foreground">{t(`access.rules.effects.${rule.action}`)}</p>
+                <p className={settingType.hint}>{t(`access.rules.effects.${rule.action}`)}</p>
             </Section>
 
             <Section title={t("access.rules.preview.title")} hint={t("access.rules.preview.hint")}>
@@ -444,7 +444,7 @@ function RuleEditor({
 
             {refusal ? <Refusal error={refusal.error} lockout={refusal.lockout} /> : null}
             {blocked ? (
-                <p className="flex items-start gap-1.5 text-xs text-danger">
+                <p className={cn(settingType.error, "flex items-start gap-1.5")}>
                     <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
                     {blocked}
                 </p>
@@ -489,7 +489,7 @@ function Examples({ onPick }: { onPick: (rule: AccountRule) => void }) {
     return (
         <div className="flex flex-col items-center gap-3">
             <p>{t("access.rules.empty")}</p>
-            <p className="text-xs">{t("access.rules.examples.title")}</p>
+            <p className={settingType.small}>{t("access.rules.examples.title")}</p>
             <div className="flex flex-wrap justify-center gap-2">
                 <Button
                     type="button"

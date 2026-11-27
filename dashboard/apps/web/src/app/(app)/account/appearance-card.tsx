@@ -38,7 +38,16 @@ import { BAND_CROP, FACE_CROP } from "@/components/image-cropper";
 import { NameEffectPicker, NameFontPicker } from "./name-style-picker";
 import { useProfileStyleRefresh } from "@/components/profile-style-store";
 import { Camera, Image as ImageIcon, RotateCcw, Sparkles } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, CardTitle, ColorPicker, cn } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    ColorPicker,
+    cn,
+    settingType
+} from "@polaris/ui";
 import {
     frameCss,
     nameLookCss,
@@ -131,7 +140,7 @@ export function AppearanceCard({
         <Card>
             <CardHeader>
                 <CardTitle>{t("appearance.title")}</CardTitle>
-                <p className="text-xs text-muted-foreground">{t("pictures.personHint")}</p>
+                <p className={settingType.hint}>{t("pictures.personHint")}</p>
             </CardHeader>
             <CardBody className="flex flex-col gap-5">
                 {/* Drawn by the same components your profile is drawn by, so what
@@ -220,7 +229,7 @@ export function AppearanceCard({
                                 decoration={style.decoration}
                                 status={false}
                             />
-                            <span className="truncate text-sm">
+                            <span className={cn(settingType.body, "truncate")}>
                                 <span
                                     className={nameStyleClass(painted)}
                                     style={painted ? nameLookCss(painted) : undefined}
@@ -296,7 +305,7 @@ export function AppearanceCard({
                                     }
                                 />
                             </div>
-                            <label className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <label className={cn(settingType.hint, "flex items-center gap-3")}>
                                 {t("appearance.banner.angle")}
                                 <input
                                     type="range"
@@ -462,9 +471,9 @@ export function AppearanceCard({
 
                 <div className="flex items-center justify-between gap-2">
                     {error || pictureError ? (
-                        <p className="text-danger text-sm">{error || pictureError}</p>
+                        <p className={settingType.error}>{error || pictureError}</p>
                     ) : null}
-                    {done && !error ? <p className="text-success text-sm">{t("appearance.saved")}</p> : null}
+                    {done && !error ? <p className={cn(settingType.body, "text-success")}>{t("appearance.saved")}</p> : null}
                     <div className="ms-auto flex items-center gap-2">
                         <Button
                             type="button"
@@ -523,11 +532,11 @@ export function AppearanceCard({
 function Field({ label, hint }: { label: string; hint: string }) {
     return (
         <div className="flex flex-col gap-0.5">
-            <span className="flex items-center gap-1.5 text-sm font-medium">
+            <span className={cn(settingType.body, "flex items-center gap-1.5 font-medium")}>
                 <Sparkles className="size-3.5 shrink-0 text-muted-foreground" />
                 {label}
             </span>
-            <span className="text-xs text-muted-foreground">{hint}</span>
+            <span className={settingType.hint}>{hint}</span>
         </div>
     );
 }
