@@ -123,6 +123,7 @@ export async function recordPolarUsage(input: {
             payer: input.payer,
             inputTokens: input.usage.inputTokens,
             outputTokens: input.usage.outputTokens,
+            cachedTokens: input.usage.cachedTokens ?? 0,
             costUsd: input.usage.costUsd,
             audioSeconds: Math.max(0, Math.round(input.audioSeconds ?? 0)),
             keyId: input.keyId ?? null,

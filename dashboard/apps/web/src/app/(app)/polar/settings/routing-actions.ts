@@ -9,12 +9,18 @@
  * viewing as another account reads, and never writes.
  */
 
+import { z } from "zod";
 import { requireUser } from "@/lib/session";
 import { scopesAvailableTo } from "@polaris/auth";
 import { polarAccessFor } from "@/lib/polar/access";
 import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { codeUsageFor, type CodeUsage } from "@/lib/agents/limit-history";
+import {
+    POLAR_USAGE_RANGES,
+    polarUsageReport,
+    type PolarUsageReport
+} from "@/lib/polar/usage-report";
 import { setOwnRouting } from "@/lib/polar/router/store";
 import { checkRouting, pinnedKeyIds } from "@/lib/polar/routing-keys";
 import {
@@ -40,6 +46,17 @@ export async function loadRoutingUsageAction(): Promise<{ usage?: RoutingUsage; 
     const found = await caller();
     if (!found) return { error: (await getTranslations("polar"))("routing.errors.noAccess") };
     return { usage: await routingUsageFor(found.user.id) };
+}
+
+/** This person's spend over a period: per day, per model, per chat. */
+export async function loadUsageReportAction(
+    range: unknown
+): Promise<{ report?: PolarUsageReport; error?: string }> {
+    const found = await caller();
+    if (!found) return { error: (await getTranslations("polar"))("routing.errors.noAccess") };
+    const parsed = z.enum(POLAR_USAGE_RANGES).safeParse(range);
+    if (!parsed.success) return { error: (await getTranslations("polar"))("usageReport.failed") };
+    return { report: await polarUsageReport(found.user.id, parsed.data) };
 }
 
 /** An agent's name as the catalogue gives it, else its id. */

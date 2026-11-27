@@ -20,12 +20,14 @@ import { useSettingsModels } from "@/components/polar/settings-models";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import type { ModelSelectorProvider } from "@/components/polar/elements/model-selector";
 import Link from "next/link";
+import { UsageReportCard } from "./polar-usage-report";
 import { loadCodeUsageAction, loadRoutingUsageAction, type LabelledCodeUsage } from "./routing-actions";
 
 export function PolarUsageSettings() {
     const { answer } = useSettingsModels();
     return (
         <div className="flex min-w-0 flex-col gap-8">
+            <UsageReportCard providers={answer?.providers ?? null} />
             <UsageCard providers={answer?.providers ?? null} />
             <CodeUsageCard />
         </div>

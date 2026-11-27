@@ -2701,5 +2701,34 @@
         "title": "Rewind to this message?",
         "description": "Messages after it leave the chat and its text goes back into the box. Nothing is deleted: once you send, the old replies stay as the earlier version.",
         "confirm": "Rewind"
+    },
+    "usageReport": {
+        "title": "Usage over time",
+        "intro": "Tokens and estimated cost per day, by model and by chat.",
+        "range": "Period",
+        "ranges": {
+            "7d": "7 days",
+            "30d": "30 days",
+            "90d": "90 days"
+        },
+        "answers": "Answers",
+        "input": "Input",
+        "output": "Output",
+        "cached": "Cached",
+        "tokens": "Tokens",
+        "cost": "Est. cost",
+        "unpriced": "{count, plural, one {# answer has} other {# answers have}} no published price and is left out of the cost.",
+        "perDay": "Tokens per day (UTC)",
+        "chartLabel": "Tokens per day: {input} input, {output} output",
+        "dayTip": "{day}: {answers} answers, {input} input, {output} output, {cost}",
+        "byModel": "By model",
+        "model": "Model",
+        "byChat": "Busiest chats",
+        "chat": "Chat",
+        "openChat": "Open {title}",
+        "deletedChat": "Deleted chat",
+        "empty": "No answers in this period.",
+        "failed": "Usage could not be loaded. Check your connection and try again.",
+        "retry": "Try again"
     }
 }

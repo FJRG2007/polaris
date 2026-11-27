@@ -18500,6 +18500,9 @@ model PolarUsage {
     payer        String
     inputTokens  Int      @default(0)
     outputTokens Int      @default(0)
+    // Of the input, what the provider read from its prompt cache; 0 when it
+    // reported none (and for rows before this was recorded).
+    cachedTokens Int      @default(0)
     // Null when the catalogue has no price for the model: tokens only.
     costUsd      Float?
     // A transcription's length in seconds, as the provider reported it or as
