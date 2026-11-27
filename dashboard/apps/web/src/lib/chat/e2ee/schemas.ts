@@ -171,6 +171,8 @@ const ciphersuite = z.union([z.literal(0x004f), z.literal(0x0001)]);
 export const deviceId = z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/);
 const epoch = z.string().regex(/^\d{1,19}$/);
 const channelId = z.string().uuid();
+/** A search segment's stretch number or generation. */
+const segmentSeq = z.number().int().min(0).max(0x7fffffff);
 /** `${userId}/${device}`, as the delivery service addresses a device. */
 const deviceAddressText = z.string().max(110).regex(/^[0-9a-f-]{36}\/[A-Za-z0-9_-]{8,64}$/);
 
@@ -313,7 +315,33 @@ export const mlsBody = z.discriminatedUnion("op", [
         ciphertext: base64Url(17, 256 * 1024),
         signature: base64Url(64, 64)
     }),
-    z.object({ op: z.literal("read-sealed"), channelId, messageIds: z.array(z.string().uuid()).min(1).max(100) })
+    z.object({ op: z.literal("read-sealed"), channelId, messageIds: z.array(z.string().uuid()).min(1).max(100) }),
+    // Shared search segments (docs/chat-e2ee-mls.md, "Shared search segments").
+    z.object({ op: z.literal("claim-index-build"), channelId, device: deviceId, epoch, seq: segmentSeq }),
+    z.object({ op: z.literal("index-stretch"), channelId, epoch, afterId: z.string().uuid().nullable().default(null) }),
+    z.object({
+        op: z.literal("put-index-segment"),
+        channelId,
+        device: deviceId,
+        epoch,
+        seq: segmentSeq,
+        generation: segmentSeq,
+        base: z.boolean(),
+        messages: z.number().int().min(1).max(5_000),
+        lastId: z.string().uuid().nullable().default(null),
+        nonce: base64Url(12, 12),
+        // A padded body (4 KiB to 512 KiB) and its 16-byte tag.
+        ciphertext: base64Url(4 * 1024 + 16, 512 * 1024 + 16),
+        signature: base64Url(64, 64)
+    }),
+    // Every conversation's segments the account may read, or one conversation's (one epoch's).
+    z.object({
+        op: z.literal("index-segments"),
+        channelId: channelId.optional(),
+        epoch: epoch.optional(),
+        before: z.string().datetime().optional()
+    }),
+    z.object({ op: z.literal("index-segment"), channelId, epoch, seq: segmentSeq, generation: segmentSeq })
 ]);
 export type MlsBody = z.infer<typeof mlsBody>;
 

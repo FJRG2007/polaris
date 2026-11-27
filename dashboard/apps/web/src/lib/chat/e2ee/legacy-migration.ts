@@ -351,6 +351,10 @@ export async function migrateConversation(channelId: string): Promise<MigrationO
         if (reason) console.error("polaris: a migrated conversation kept plain rows after its cut:", channelId);
         const sealed = await prisma.chatMessage.count({ where: { channelId, e2eeDevice: MIGRATION_DEVICE } });
         await prisma.chatMigration.update({ where: { channelId }, data: { reason, sealed } });
+        // Its words are searchable from every member's browser, not only one that opened them (a failure costs only that).
+        await import("./search-segments-service")
+            .then((segments) => segments.indexMigrated(channelId, LEGACY_EPOCH, historyKey, signer))
+            .catch((caught: unknown) => console.error("polaris: a migrated conversation's search segments could not be written:", caught));
         return "cut";
     } finally {
         historyKey.fill(0);

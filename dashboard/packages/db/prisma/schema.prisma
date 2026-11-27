@@ -10952,6 +10952,8 @@ model ChatChannel {
     invites  ChatSpaceInvite[]
     webhooks ChatWebhook[]
     serviceMembers ChatServiceMember[]
+    searchSegments ChatSearchSegment[]
+    searchLeases   ChatSearchLease[]
     ageConfirmations ChatAgeConfirmation[]
     ruleProposals ChatRuleProposal[]
     forumTags     ChatForumTag[]
@@ -19778,6 +19780,47 @@ model ChatRecoveryKeyShare {
 // The conversation's history key for one epoch, sealed to one account's key
 // (or "org" for the organisation recovery key): what lets that account's next
 // device read the past (proposal 4.2 item 4). Opaque to the server.
+// Shared search segments (docs/chat-e2ee-mls.md, "Shared search segments"):
+// the search terms of a stretch of one conversation's sealed messages, sealed
+// on a member's device under a key derived from that epoch's history key. The
+// server never reads one; it hands them to accounts holding that epoch's key.
+// `generation` 0.. per (channel, epoch, seq): a base, or a correction after an
+// edit; a newer base removes every generation below it.
+model ChatSearchSegment {
+    channelId  String      @db.Uuid
+    epoch      BigInt
+    seq        Int
+    generation Int
+    // A full index of the stretch (false: a correction of a few edited messages).
+    base       Boolean
+    // How many messages it names (what the server already counts), for compaction.
+    messages   Int
+    // The last message id the stretch covers (a base), so the next stretch starts after it.
+    lastId     String?     @db.Uuid
+    nonce      Bytes
+    ciphertext Bytes
+    // The builder's device address (`${userId}/${device}`) and its signature over the ciphertext.
+    builder    String
+    signature  Bytes
+    createdAt  DateTime    @default(now())
+    channel    ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+    @@id([channelId, epoch, seq, generation])
+    @@index([channelId, createdAt])
+}
+
+// Who builds a segment: one device at a time, for ten minutes (compare-and-set).
+model ChatSearchLease {
+    channelId String      @db.Uuid
+    epoch     BigInt
+    seq       Int
+    holder    String
+    until     DateTime
+    channel   ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+    @@id([channelId, epoch, seq])
+}
+
 model ChatHistoryKey {
     channelId String   @db.Uuid
     epoch     BigInt

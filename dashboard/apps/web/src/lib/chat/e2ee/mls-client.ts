@@ -175,6 +175,10 @@ export interface MlsDeviceNotes {
 }
 
 /** A refusal from the delivery service: `reason` is its `error` field. */
+/** The route ops of shared search segments. */
+export type SearchSegmentBody = Extract<MlsBody, { op: "claim-index-build" | "index-stretch" | "put-index-segment" | "index-segments" | "index-segment" }>;
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
 export class MlsRequestError extends Error {
     constructor(
         readonly status: number,
@@ -1081,6 +1085,29 @@ export class MlsDevice {
             return joined.groupId;
         }
         throw new MlsRequestError(409, "staleEpoch");
+    }
+
+    /**
+     * A shared search segment op (docs/chat-e2ee-mls.md, "Shared search
+     * segments"), with this device named where the op takes one.
+     */
+    searchSegments(body: DistributiveOmit<SearchSegmentBody, "device">): Promise<Record<string, unknown>> {
+        const named = body.op === "claim-index-build" || body.op === "put-index-segment" ? { ...body, device: this.options.device } : body;
+        return this.send(named as MlsBody);
+    }
+
+    /** The epoch this device's copy of the conversation's group is at; null without a group. */
+    currentEpoch(channelId: string): bigint | null {
+        try {
+            return this.member.epoch(this.requireGroup(channelId));
+        } catch {
+            return null;
+        }
+    }
+
+    /** This device's signature over a search segment's payload (`segmentSignaturePayload`). */
+    signSearchSegment(payload: Uint8Array): Uint8Array {
+        return this.member.signContent(payload);
     }
 
     /**

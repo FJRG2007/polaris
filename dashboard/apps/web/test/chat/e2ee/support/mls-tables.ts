@@ -22,8 +22,9 @@ export function memoryPrisma(state: MemoryTablesState) {
             if (key === "AND") return (want as Row[]).every((w) => matches(row, w));
             if (key === "userId_device" || key === "channelId_service" || key === "channelId_epoch_sender_part") return matches(row, want as Row);
             if (want && typeof want === "object" && !(want instanceof Uint8Array)) {
-                const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint; lte?: bigint; not?: unknown };
+                const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint; lte?: bigint; not?: unknown; isEmpty?: boolean };
                 if (cond.in) return cond.in.some((value) => same(row[key], value));
+                if (cond.isEmpty !== undefined) return ((row[key] as unknown[] | undefined) ?? []).length === 0 === cond.isEmpty;
                 if ("not" in cond) return !same(row[key] ?? null, cond.not);
                 const value = row[key] as bigint;
                 if (cond.gt !== undefined || cond.gte !== undefined || cond.lt !== undefined || cond.lte !== undefined)
@@ -55,6 +56,7 @@ export function memoryPrisma(state: MemoryTablesState) {
             ...(name === "mlsGroupEvent" ? { seq: ++state.seq, recipient: null } : {}),
             ...(name === "mlsKeyPackage" ? { id: crypto.randomUUID(), createdAt: new Date(Date.now() + rows().length) } : {}),
             ...(name === "chatMessage" ? { id: crypto.randomUUID(), createdAt: new Date() } : {}),
+            ...(name === "chatSearchSegment" ? { createdAt: new Date(Date.now() + rows().length) } : {}),
             ...data
         });
         return {
@@ -126,6 +128,10 @@ export function memoryPrisma(state: MemoryTablesState) {
         // Read by `inactiveCutoffs` (an organization's tighter device limit).
         organizationMember: table("organizationMember", ["orgId", "userId"]),
         organization: table("organization", ["id"]),
+        // Shared search segments and who builds them (`search-segments-service.ts`).
+        chatSearchSegment: table("chatSearchSegment", ["channelId", "epoch", "seq", "generation"]),
+        chatSearchLease: table("chatSearchLease", ["channelId", "epoch", "seq"]),
+        chatMigrationRollback: table("chatMigrationRollback", ["kind", "id"]),
         // All or nothing, one at a time (Postgres's row lock on the group does
         // the same for two commits): run on the live tables, put the copy back
         // on a throw.

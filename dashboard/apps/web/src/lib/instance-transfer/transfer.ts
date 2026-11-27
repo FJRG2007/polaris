@@ -52,6 +52,9 @@ export const LEFT_BEHIND: ReadonlySet<string> = new Set([
     "MetricRollup",
     "RuntimeLogLine",
     "GameSample",
+    // Who builds a search segment for the next ten minutes: a builder on the
+    // old instance holds nothing here. The sealed segments themselves travel.
+    "ChatSearchLease",
     // The chain is sealed again under the new key from its first entry, so the
     // checkpoints of the old one would only contradict it.
     "AuditCheckpoint"

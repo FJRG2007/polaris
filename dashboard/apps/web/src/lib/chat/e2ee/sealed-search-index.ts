@@ -175,6 +175,11 @@ export class SealedSearchIndex {
         return out;
     }
 
+    /** Read every kept entry in, so `entry` answers for all of them (what a segment builder needs). */
+    async loaded(): Promise<void> {
+        await this.load();
+    }
+
     /** What the index keeps for `id`: its words and the version they are, once a search has read it in. */
     entry(id: string): IndexedSealed | undefined {
         const kept = this.entries.get(id);

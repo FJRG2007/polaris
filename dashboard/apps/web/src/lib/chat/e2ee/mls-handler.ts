@@ -24,6 +24,7 @@ import { chatE2eeEnabled, sealedChatServed } from "./flag";
 import { NextResponse } from "next/server";
 import * as delivery from "./mls-delivery";
 import * as sealed from "./sealed-messages";
+import * as segments from "./search-segments-service";
 import { conversationSealed } from "./sealed-conversation";
 import { backgroundUser } from "@/lib/session";
 import { sealedAppOutdated } from "./client-version";
@@ -102,7 +103,8 @@ export async function answerMls(userId: string, body: MlsBody): Promise<Response
     try {
         return await run(userId, body);
     } catch (caught) {
-        if (caught instanceof delivery.MlsDeliveryRefusal || caught instanceof sealed.SealedRefusal) return json({ error: caught.reason }, 409);
+        if (caught instanceof delivery.MlsDeliveryRefusal || caught instanceof sealed.SealedRefusal || caught instanceof segments.SearchSegmentRefusal)
+            return json({ error: caught.reason }, 409);
         // A chat rule (an edit past its window, somebody else's message) is an answer the reader is shown, in their language.
         if (caught instanceof Error && (caught.name === "ChatAccessError" || caught.name === "ChatRuleError"))
             return json({ error: "refused", text: await readerText(caught as ChatAccessError) }, 409);
@@ -129,6 +131,23 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
     if (body.op === "retire-device") {
         await delivery.retireDevice(userId, body.device);
         return json({ ok: true });
+    }
+    if (body.op === "index-segments") {
+        const reaches = (channelId: string) => channelAccess({ id: userId }, channelId).then(Boolean);
+        if (body.channelId && !(await reaches(body.channelId))) return json(REFUSED, 403);
+        const listed = await segments.listIndexSegments(
+            userId,
+            {
+                ...(body.channelId ? { channelId: body.channelId } : {}),
+                ...(body.channelId && body.epoch !== undefined ? { epoch: BigInt(body.epoch) } : {}),
+                ...(body.before ? { before: new Date(body.before) } : {})
+            },
+            reaches
+        );
+        return json({
+            segments: listed.segments.map((s) => ({ ...s, epoch: s.epoch.toString(), createdAt: s.createdAt.toISOString() })),
+            next: listed.next?.toISOString() ?? null
+        });
     }
     // Every other op is about one conversation the account has to reach.
     if (!(await channelAccess({ id: userId }, body.channelId))) return json(REFUSED, 403);
@@ -341,6 +360,35 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                 signature: bytes(body.signature)
             });
             return json({ editedAt: editedAt.toISOString() });
+        }
+        case "claim-index-build": {
+            if (!(await ownDevice(userId, body.device))) return json(REFUSED, 403);
+            const lease = await segments.claimIndexBuild(userId, body.device, body.channelId, BigInt(body.epoch), body.seq);
+            return json({ granted: lease.granted, until: lease.until.toISOString() });
+        }
+        case "index-stretch":
+            return json(await segments.indexStretch(userId, body.channelId, BigInt(body.epoch), body.afterId));
+        case "put-index-segment": {
+            if (!(await ownDevice(userId, body.device))) return json(REFUSED, 403);
+            await segments.putIndexSegment(userId, {
+                channelId: body.channelId,
+                device: body.device,
+                epoch: BigInt(body.epoch),
+                seq: body.seq,
+                generation: body.generation,
+                base: body.base,
+                messages: body.messages,
+                lastId: body.lastId,
+                nonce: bytes(body.nonce),
+                ciphertext: bytes(body.ciphertext),
+                signature: bytes(body.signature)
+            });
+            return json({ ok: true });
+        }
+        case "index-segment": {
+            const found = await segments.readIndexSegment(userId, body.channelId, BigInt(body.epoch), body.seq, body.generation);
+            if (!found) return json({ error: "gone" }, 404);
+            return json({ ...found, nonce: text(found.nonce), ciphertext: text(found.ciphertext), signature: text(found.signature) });
         }
         case "read-sealed": {
             const rows = await sealed.readSealed(userId, body.channelId, body.messageIds);

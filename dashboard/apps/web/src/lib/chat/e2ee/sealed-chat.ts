@@ -20,7 +20,10 @@
  * blinks empty between the draft and its stored copy. They are keyed by the id
  * and the time of the row's last edit, so an edited row is opened again.
  * Each one that opens is also kept in this device's search index
- * (`sealed-search-index.ts`), sealed at rest, so its words can be searched.
+ * (`sealed-search-index.ts`), sealed at rest, so its words can be searched,
+ * and goes into the conversation's shared search segments once its stretch
+ * is whole here (`search-segments-client.ts`), so a member's new browser
+ * finds it too.
  */
 
 import { z } from "zod";
@@ -28,6 +31,8 @@ import * as core from "@polaris/core";
 import { mediaShapeSchema } from "@/lib/chat/media-shape";
 import type { MlsDevice, SealedStored } from "./mls-client";
 import type { IndexedSealed, SealedSearchIndex } from "./sealed-search-index";
+import type { SegmentReader } from "./search-segments-client";
+import { bodyMatches } from "./sealed-search-index";
 
 const SEALED_CONTENT_VERSION = 1;
 /** How many opened bodies this page keeps (oldest dropped first). */
@@ -132,6 +137,15 @@ let held = false;
 const sealedAlready = new Map<string, boolean>();
 let opening: Promise<MlsDevice> | null = null;
 let indexing: Promise<SealedSearchIndex> | null = null;
+let sharing: Promise<SegmentReader> | null = null;
+/** When each conversation's epoch was last put through a segment build on this page. */
+const builtAt = new Map<string, number>();
+/** A conversation's epoch is built again at most this often per page. */
+const BUILD_EVERY_MS = 10 * 60 * 1000;
+/** How long after opening messages a build starts, so it never competes with the screen. */
+const BUILD_DELAY_MS = 5_000;
+/** How long a search waits for shared segments still arriving; the rest are there for the next one. */
+const SEGMENT_WAIT_MS = 2_000;
 /** Message id (and last edit) -> its opened content, or null when it did not open here. */
 const opened = new Map<string, SealedContent | null>();
 
@@ -157,6 +171,9 @@ export function configureSealedChat(viewerId: string | null, options?: { readonl
     opening = null;
     void indexing?.then((index) => index.close()).catch(() => undefined);
     indexing = null;
+    void sharing?.then((reader) => reader.clear()).catch(() => undefined);
+    sharing = null;
+    builtAt.clear();
     opened.clear();
 }
 
@@ -208,21 +225,70 @@ function searchIndex(): Promise<SealedSearchIndex> {
 
 /** Keep an opened message searchable on this device; a failure costs only the search. */
 function index(channelId: string, id: string, editedAt: string | undefined, content: SealedContent | null): void {
-    // A forum post is found by its title as well as its words.
-    const words = content?.title ? `${content.title}\n\n${content.body}` : content?.body;
+    const words = searchableWords(content);
     if (!words) return;
     searchIndex()
         .then((kept) => kept.record({ id, channelId, ...(editedAt ? { editedAt } : {}), body: words }))
         .catch((caught: unknown) => console.warn("polaris: an opened message could not be kept searchable here:", caught));
 }
 
+/** The words a message is found by: a forum post's title as well as its text. */
+function searchableWords(content: SealedContent | null | undefined): string | undefined {
+    return content?.title ? `${content.title}\n\n${content.body}` : content?.body;
+}
+
+/** The shared search segments this account may read, opening in a Worker (`search-segments-client.ts`). */
+function sharedSegments(): Promise<SegmentReader> {
+    if (!viewer) return Promise.reject(new Error("sealed chat is off"));
+    sharing ??= Promise.all([device(), import("./search-segments-client")])
+        .then(([mls, shared]) => {
+            let host = shared.pageSearchHost();
+            try {
+                if (typeof Worker !== "undefined") host = shared.workerSearchHost();
+            } catch (caught) {
+                console.warn("polaris: sealed search runs on the page, its Worker did not start:", caught);
+            }
+            return new shared.SegmentReader(mls, host);
+        })
+        .catch((caught: unknown) => {
+            sharing = null;
+            throw caught;
+        });
+    return sharing;
+}
+
 /**
- * The sealed messages this device opened whose words hold `term`, newest
- * first, in `channelId` when one is named. Empty while sealed chat is off.
+ * Messages the shared segments name for `term` that this device has not
+ * kept: opened here first, and kept only when their words, as they are now,
+ * hold it - a segment can hide a match but never show one.
+ */
+async function segmentEntries(term: string, channelId: string | null, limit: number, known: ReadonlySet<string>): Promise<IndexedSealed[]> {
+    const reader = await sharedSegments();
+    const refresh = reader.refresh().catch((caught: unknown) => console.warn("polaris: shared search segments could not be read:", caught));
+    await Promise.race([refresh, new Promise((resolve) => setTimeout(resolve, SEGMENT_WAIT_MS))]);
+    const candidates = (await reader.search(term, channelId, limit)).filter((hit) => !known.has(hit.id));
+    const byChannel = new Map<string, SealedRef[]>();
+    for (const hit of candidates) byChannel.set(hit.channelId, [...(byChannel.get(hit.channelId) ?? []), hit.editedAt ? { id: hit.id, editedAt: hit.editedAt } : hit.id]);
+    const out: IndexedSealed[] = [];
+    for (const [channel, refs] of byChannel) {
+        const contents = await openSealed(channel, refs).catch(() => new Map<string, SealedContent | null>());
+        for (const ref of refs) {
+            const words = searchableWords(contents.get(refId(ref)));
+            if (!words || !bodyMatches(words, term)) continue;
+            const editedAt = typeof ref === "string" ? undefined : ref.editedAt;
+            out.push({ id: refId(ref), channelId: channel, ...(editedAt ? { editedAt } : {}), body: words });
+        }
+    }
+    return out;
+}
+
+/**
+ * The sealed messages whose words hold `term`, newest first, in `channelId`
+ * when one is named: what this device opened, and what the conversation's
+ * shared segments name and opens here. Empty while sealed chat is off.
  */
 export async function searchSealedText(term: string, channelId: string | null, limit: number): Promise<string[]> {
-    if (!sealedChatActive() || !term.trim()) return [];
-    return (await searchIndex()).search(term, channelId, limit);
+    return (await searchSealedEntries(term, channelId, limit)).map((entry) => entry.id);
 }
 
 /** As `searchSealedText`, with the words each was found in and the version they are. */
@@ -230,7 +296,30 @@ export async function searchSealedEntries(term: string, channelId: string | null
     if (!sealedChatActive() || !term.trim()) return [];
     const index = await searchIndex();
     const ids = await index.search(term, channelId, limit);
-    return ids.flatMap((id) => index.entry(id) ?? []);
+    const own = ids.flatMap((id) => index.entry(id) ?? []);
+    const shared = await segmentEntries(term, channelId, limit, new Set(ids)).catch((caught: unknown) => {
+        console.warn("polaris: shared search segments could not be searched:", caught);
+        return [] as IndexedSealed[];
+    });
+    if (!shared.length) return own;
+    return [...own, ...shared].sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)).slice(0, limit);
+}
+
+/** Put this conversation's epochs through a segment build soon, each at most every `BUILD_EVERY_MS`. */
+function buildSoon(channelId: string, epochs: Iterable<bigint>): void {
+    const now = Date.now();
+    const due = [...new Set(epochs)].filter((epoch) => now - (builtAt.get(`${channelId}/${epoch}`) ?? -Infinity) >= BUILD_EVERY_MS);
+    if (!due.length) return;
+    for (const epoch of due) builtAt.set(`${channelId}/${epoch}`, now);
+    const forViewer = viewer;
+    setTimeout(() => {
+        if (viewer !== forViewer || !viewer) return;
+        void Promise.all([device(), searchIndex(), import("./search-segments-client")])
+            .then(async ([mls, index, shared]) => {
+                for (const epoch of due) await shared.buildSegments(mls, index, channelId, epoch);
+            })
+            .catch((caught: unknown) => console.warn("polaris: a shared search segment could not be built:", caught));
+    }, BUILD_DELAY_MS);
 }
 
 /** Drop messages the server says are gone from this device's search index. */
@@ -414,6 +503,7 @@ export async function openSealed(channelId: string, refs: readonly SealedRef[]):
         const page = ids.slice(start, start + READ_PAGE);
         const rows = await mls.readSealed(channelId, page);
         const byId = new Map(rows.map((row) => [row.id, row.opened ? decodeSealedContent(row.opened) : null]));
+        buildSoon(channelId, rows.filter((row) => row.opened).map((row) => row.epoch));
         for (const id of page) {
             const content = byId.get(id) ?? null;
             const ref = missing.get(id)!;
@@ -476,12 +566,23 @@ export async function editSealedMessage(input: SealedEditInput): Promise<string>
         const editedAt = await mls.editSealed(input.channelId, input.messageId, encodeSealedContent(content));
         keep(versionKey(input.messageId, editedAt), content);
         index(input.channelId, input.messageId, editedAt, content);
+        correctSegments(mls, input.channelId, input.messageId, editedAt, content);
         return editedAt;
     } catch (caught) {
         if (before === undefined) opened.delete(shown);
         else keep(shown, before);
         throw caught;
     }
+}
+
+/** Put an edited message's new words in its conversation's shared segments; a failure costs only the search. */
+function correctSegments(mls: MlsDevice, channelId: string, messageId: string, editedAt: string, content: SealedContent): void {
+    const epoch = mls.currentEpoch(channelId);
+    const words = searchableWords(content);
+    if (epoch === null || !words) return;
+    void import("./search-segments-client")
+        .then((shared) => shared.writeCorrection(mls, channelId, epoch, { id: messageId, editedAt, body: words }))
+        .catch((caught: unknown) => console.warn("polaris: an edit could not be put in the shared search segments:", caught));
 }
 
 /** Open the earlier versions of a sealed message its edit history holds; null for one that does not open here. */
