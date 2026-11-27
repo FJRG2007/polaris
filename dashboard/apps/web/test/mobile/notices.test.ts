@@ -25,6 +25,7 @@ vi.mock("@/lib/chat/stream-scope", () => ({
         resolvedAt: () => Date.now(),
         invalidate: () => {},
         refresh: async () => {},
+        onResolved: () => {},
         release: () => {}
     })
 }));

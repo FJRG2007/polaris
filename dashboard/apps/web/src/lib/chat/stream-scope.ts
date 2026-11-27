@@ -32,6 +32,9 @@ interface Scope {
     resolving: { promise: Promise<void>; generation: number } | null;
     /** How many open streams are holding this. The entry goes with the last. */
     holders: number;
+    /** Told after every resolution, so each stream can index itself under the
+     *  answer (`live.ts`), whichever of the account's tabs asked. */
+    resolved: Set<() => void>;
 }
 
 const scopes = new Map<string, Scope>();
@@ -48,6 +51,9 @@ export interface StreamScope {
     /** Resolve again, joining one already running. A failure keeps the previous
      *  answer: the next event past the TTL tries again. */
     refresh(): Promise<void>;
+    /** Be told after every resolution, by whichever stream asked for it,
+     *  until this stream is released. */
+    onResolved(listener: () => void): void;
     /** This stream is closing. */
     release(): void;
 }
@@ -62,13 +68,15 @@ export function holdStreamScope(actor: ChatActor): StreamScope {
             generation: 0,
             cause: null,
             resolving: null,
-            holders: 0
+            holders: 0,
+            resolved: new Set()
         };
         scopes.set(actor.id, scope);
     }
     scope.holders += 1;
     const held = scope;
     let released = false;
+    let mine: (() => void) | null = null;
 
     return {
         reachable: () => held.reachable,
@@ -93,6 +101,13 @@ export function holdStreamScope(actor: ChatActor): StreamScope {
                 .then((reachable) => {
                     held.reachable = reachable;
                     held.resolvedAt = Date.now();
+                    for (const listener of held.resolved) {
+                        try {
+                            listener();
+                        } catch (caught) {
+                            console.error(caught);
+                        }
+                    }
                 })
                 .catch(() => {
                     // A transient database error leaves the previous answer in
@@ -104,9 +119,16 @@ export function holdStreamScope(actor: ChatActor): StreamScope {
             held.resolving = { promise, generation: held.generation };
             return promise;
         },
+        onResolved: (listener) => {
+            if (released) return;
+            if (mine) held.resolved.delete(mine);
+            mine = listener;
+            held.resolved.add(listener);
+        },
         release: () => {
             if (released) return;
             released = true;
+            if (mine) held.resolved.delete(mine);
             held.holders -= 1;
             if (held.holders <= 0 && scopes.get(actor.id) === held) scopes.delete(actor.id);
         }

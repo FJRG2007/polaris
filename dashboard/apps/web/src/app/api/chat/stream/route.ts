@@ -15,7 +15,8 @@
  * Node runtime for Prisma, and never cached.
  */
 
-import { subscribeChatChanges } from "@/lib/chat/live";
+import { subscribeChatChanges, type ChatSubscription } from "@/lib/chat/live";
+import { queueDelivered } from "@/lib/chat/delivered-batch";
 import { frameReaches } from "@/lib/chat/ephemeral";
 import { typingAllowed } from "@/lib/privacy-service";
 import { chatPrivacyOf } from "@/lib/chat/vanish";
@@ -37,10 +38,17 @@ export const dynamic = "force-dynamic";
  *  chat that feels laggy is one people stop using. */
 const COALESCE_MS = 120;
 
-/** How long the reachable set is trusted. Short, because it is the thing
- *  standing between a private channel and somebody who was just removed from
- *  it, and because being added to one should start delivering almost at once. */
-const SCOPE_TTL_MS = 10_000;
+/**
+ * How often the reachable set is resolved again with nothing asking for it.
+ *
+ * Joining and leaving a room publish a `channels` change, which resolves it at
+ * once. This is for what moves reach without a chat frame - an organization
+ * joined, a room granted to a team - which used to be noticed by being offered
+ * every other room's messages and re-asking when one was unfamiliar: a scan of
+ * every connection per message. Shared by every tab of the account, so it is
+ * one resolution per online person per interval, whatever is being said.
+ */
+export const SCOPE_REFRESH_MS = 30_000;
 
 /** Idle keep-alive. Proxies drop a stream that says nothing for long enough, and
  *  a comment frame is not delivered to the client as a message. */
@@ -92,8 +100,9 @@ export async function GET(request: Request): Promise<Response> {
     };
     const encoder = new TextEncoder();
 
-    let unsubscribe: (() => void) | null = null;
+    let unsubscribe: ChatSubscription | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
+    let rescope: ReturnType<typeof setInterval> | null = null;
     let pending: ReturnType<typeof setTimeout> | null = null;
     let closed = false;
     let sequence = 0;
@@ -120,8 +129,10 @@ export async function GET(request: Request): Promise<Response> {
         closed = true;
         scope.release();
         if (heartbeat) clearInterval(heartbeat);
+        if (rescope) clearInterval(rescope);
         if (pending) clearTimeout(pending);
         heartbeat = null;
+        rescope = null;
         pending = null;
         unsubscribe?.();
         unsubscribe = null;
@@ -159,11 +170,18 @@ export async function GET(request: Request): Promise<Response> {
                 pending = setTimeout(() => {
                     pending = null;
                     sequence += 1;
+                    // This device holds what arrived the moment it is on its
+                    // wire, which is the second tick: said from here, gathered
+                    // with every other reader's into one write a moment later
+                    // (`delivered-batch.ts`), rather than by a request back
+                    // from every device for every message.
+                    if (arrived.size > 0) queueDelivered(actor.id, [...arrived]);
                     send({
                         kind: "posted",
                         seq: sequence,
                         channels: [...moved],
                         arrived: [...arrived],
+                        ...(arrived.size > 0 ? { delivered: true } : {}),
                         // Absent when nothing changed in place, which is the
                         // frame every build before this one sent.
                         ...(changed.size > 0
@@ -182,6 +200,14 @@ export async function GET(request: Request): Promise<Response> {
 
             await scope.refresh();
             if (closed) return;
+
+            // Indexed under the rooms this reader reaches and moved with every
+            // new answer, so a message elsewhere is never offered to it.
+            scope.onResolved(() => unsubscribe?.retarget(scope.reachable()));
+            rescope = setInterval(() => {
+                if (Date.now() - scope.resolvedAt() >= SCOPE_REFRESH_MS) void scope.refresh();
+            }, SCOPE_REFRESH_MS);
+            rescope.unref?.();
 
             unsubscribe = subscribeChatChanges((change) => {
                 if (closed) return;
@@ -406,24 +432,9 @@ export async function GET(request: Request): Promise<Response> {
                     return;
                 }
 
-                // An unfamiliar channel is usually somebody else's. Re-ask once
-                // the TTL is up, in case it is one they were just added to.
-                //
-                // Not narrowed any further than that on purpose. Whether this
-                // reader can reach a room also moves without a chat frame at
-                // all - an organization they joined, a room granted to a team
-                // they are on - and this is the only thing that notices. What
-                // keeps it cheap is that the answer is shared: every tab this
-                // person has open asks once between them, not once each.
-                if (Date.now() - scope.resolvedAt() < SCOPE_TTL_MS) return;
-                const kind = change.kind;
-                const messageIds = change.messageIds;
-                void scope.refresh().then(() => {
-                    if (!closed && kind === "posted" && scope.reachable().has(channelId)) {
-                        wake(channelId, messageIds);
-                    }
-                });
-            });
+                // Not a room this reader reaches as of the last answer: indexed
+                // under them only because the frame named their account too.
+            }, { userId: actor.id, channels: scope.reachable() });
 
             request.signal.addEventListener("abort", () => {
                 stop();

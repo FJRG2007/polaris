@@ -30,7 +30,7 @@ import {
     type ReactNode
 } from "react";
 import * as readMarks from "@/lib/chat/read-marks";
-import { subscribeSharedStream } from "@/lib/shared-stream";
+import { openPeerChannel, subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
 import { announceCallSeats, announcePresence } from "@/components/presence-store";
 import { announceAppearance } from "@/components/profile-style-store";
@@ -101,6 +101,20 @@ const COUNTED = new Set(["posted", "read", "channels", "badge"]);
  *  several move at once. */
 const SETTLE_MS = 400;
 
+/** How long a tab that does not hold the wire waits for the one that does to
+ *  hand it the new count, before asking itself. Only a holder still on a build
+ *  from before the hand-over ever leaves it waiting this long. */
+const PEER_WAIT_MS = 3_000;
+
+/** The tab-to-tab channel the count is handed over on. */
+const PEER_CHANNEL = "chat-unread";
+
+/** Whether the server already said the delivery for this frame itself, so the
+ *  device has nothing to acknowledge. Absent from a server before it. Pure. */
+export function deliveredByServer(frame: unknown): boolean {
+    return Boolean(frame && typeof frame === "object" && (frame as { delivered?: unknown }).delivered === true);
+}
+
 export function ChatUnreadProvider({
     initial,
     enabled,
@@ -136,12 +150,18 @@ export function ChatUnreadProvider({
         });
     }, []);
 
+    // The count is asked for once per device: by the tab holding the wire,
+    // which hands the answer to the others. Every tab asking for it on every
+    // message was one request per open tab per message.
+    const peers = useRef<{ post: (message: ChatUnread) => void } | null>(null);
     const recount = useCallback(() => {
         void fetch(UNREAD_PATH, { cache: "no-store" })
             .then((response) => (response.ok ? response.json() : null))
             .then((body) => {
                 const parsed = unreadSchema.safeParse(body);
-                if (parsed.success) setUnread(parsed.data);
+                if (!parsed.success) return;
+                setUnread(parsed.data);
+                peers.current?.post(parsed.data);
             })
             .catch(() => {
                 // Left as it was. A count that could not be fetched is not a
@@ -152,6 +172,15 @@ export function ChatUnreadProvider({
 
     useEffect(() => {
         if (!enabled) return;
+        const peer = openPeerChannel<ChatUnread>(PEER_CHANNEL, scope, (message) => {
+            const parsed = unreadSchema.safeParse(message);
+            if (!parsed.success) return;
+            // Handed over by the tab that asked: nothing left to ask here.
+            if (timer.current) clearTimeout(timer.current);
+            timer.current = null;
+            setUnread(parsed.data);
+        });
+        peers.current = peer;
         const stop = subscribeSharedStream(STREAM_PATH, scope, ({ data, owner }) => {
             let kind: unknown;
             let frame: { kind?: unknown; actorId?: unknown };
@@ -189,18 +218,26 @@ export function ChatUnreadProvider({
             // it. Said by the tab holding the wire alone - the device's, not each
             // tab's - and only for conversations where it landed; the server
             // ignores the sender's own messages and anything already marked.
-            if (owner) for (const id of arrivedIn(frame)) landed.current.add(id);
+            // A server that said the delivery itself (`delivered`) leaves the
+            // device nothing to say.
+            if (owner && !deliveredByServer(frame)) for (const id of arrivedIn(frame)) landed.current.add(id);
             if (timer.current) clearTimeout(timer.current);
-            timer.current = setTimeout(() => {
-                recount();
-                acknowledge();
-            }, SETTLE_MS);
+            timer.current = setTimeout(
+                () => {
+                    timer.current = null;
+                    recount();
+                    acknowledge();
+                },
+                owner ? SETTLE_MS : PEER_WAIT_MS
+            );
         });
         return () => {
             if (timer.current) clearTimeout(timer.current);
             timer.current = null;
             acknowledge();
             stop();
+            peer.close();
+            peers.current = null;
         };
     }, [enabled, scope, recount, acknowledge]);
 
