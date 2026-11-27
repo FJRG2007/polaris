@@ -203,8 +203,14 @@ off offline.
 ## Publishing a plugin
 
 `clients/device-plugins/<id>/manifest.json`, optional `listing.json` (`icon`,
-`screenshots`, `changelog`), and the files under `any/` and `<platform>/` (a
-platform's own files laid over `any/`). A native module is not committed: the
+`screenshots`, and what changed: `releases`, `[{ "version", "notes" }]` newest
+first, or the older one-string `changelog`), and the files under `any/` and
+`<platform>/` (a platform's own files laid over `any/`). `releases` is published
+as it is and also as the old string (newest versions while they fit its 4,000
+characters) for desktop apps that read only that; a `changelog` string past
+4,000 characters stops the publish. The plugin's page lists What's new one
+version per entry, splitting the old string on its `0.1.18:` markers when an
+entry has no `releases` (`pluginReleases` in `@polaris/core/device-plugins`). A native module is not committed: the
 workflow builds it per platform into `<platform>/` before packaging (the
 `native` job). A push to main touching `clients/device-plugins/**` publishes the catalog.
 

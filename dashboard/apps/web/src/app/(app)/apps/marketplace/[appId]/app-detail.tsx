@@ -16,7 +16,7 @@ import { appScreenshots } from "@/lib/apps/app-screenshots";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { categoryLabel } from "@/lib/apps/app-words";
 import type { InstalledAppReaderView } from "@/lib/apps/install-service";
-import { ArrowLeft, ExternalLink, Trash2 } from "lucide-react";
+import { ExternalLink, Trash2 } from "lucide-react";
 import { UninstallDialog } from "@/app/(app)/apps/marketplace/uninstall-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { appNeeds } from "@/lib/apps/app-needs";
@@ -35,6 +35,7 @@ import {
     storeScope
 } from "@/lib/apps/marketplace-store";
 import { GameLogo } from "@/components/game-logo";
+import { DetailBack, DetailFacts, DetailHeader, DetailSection, Fact } from "@/components/store-detail";
 import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 import { BuiltInAlternativeNote } from "../built-in-alternative";
 import { ReplacesRow } from "../replaces-row";
@@ -109,22 +110,11 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
         : null;
     return (
         <div className="flex min-w-0 flex-col gap-6">
-            <Link data-swipe-back
-                href={storeHome(storeScope(app))}
-                className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
-            >
-                <ArrowLeft className="size-4" />
-                {t("detail.back")}
-            </Link>
+            <DetailBack href={storeHome(storeScope(app))}>{t("detail.back")}</DetailBack>
 
-            <header className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
-                <AppMark app={app} size={72} />
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <h1 className="break-words text-2xl font-semibold">{app.name}</h1>
-                    <p className="text-muted-foreground break-words text-sm">{by(t, from)}</p>
-                    <p className="break-words text-sm">{app.summary}</p>
-                </div>
-            </header>
+            <DetailHeader mark={<AppMark app={app} size={72} />} name={app.name} byline={by(t, from)}>
+                <p className="break-words text-sm">{app.summary}</p>
+            </DetailHeader>
 
             {children}
 
@@ -142,28 +132,25 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
 
             {app.id === GAME_SERVERS_APP_ID ? <SupportedGames /> : null}
 
-            <section className="flex min-w-0 flex-col gap-2">
-                <h2 className="text-sm font-medium">{t("detail.about")}</h2>
+            <DetailSection title={t("detail.about")}>
                 <p className="text-muted-foreground whitespace-pre-line break-words text-sm">
                     {app.description}
                 </p>
-            </section>
+            </DetailSection>
 
             <ReplacesRow appId={app.id} />
 
             {app.capabilities.length > 0 && (
-                <section className="flex min-w-0 flex-col gap-2">
-                    <h2 className="text-sm font-medium">{t("detail.features")}</h2>
+                <DetailSection title={t("detail.features")}>
                     <div className="flex flex-wrap gap-1">
                         {app.capabilities.map((capability) => (
                             <Badge key={capability}>{t(CAPABILITY_KEYS[capability])}</Badge>
                         ))}
                     </div>
-                </section>
+                </DetailSection>
             )}
 
-            <section className="flex min-w-0 flex-col gap-2">
-                <h2 className="text-sm font-medium">{t("detail.needs")}</h2>
+            <DetailSection title={t("detail.needs")}>
                 <ul className="text-muted-foreground flex list-disc flex-col gap-1 ps-5 text-sm">
                     {appNeeds(t, app).map((line) => (
                         <li key={line} className="break-words">
@@ -171,11 +158,10 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
                         </li>
                     ))}
                 </ul>
-            </section>
+            </DetailSection>
 
-            <section className="flex min-w-0 flex-col gap-2">
-                <h2 className="text-sm font-medium">{t("detail.information")}</h2>
-                <dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
+            <DetailSection title={t("detail.information")}>
+                <DetailFacts>
                     <Fact label={t("detail.developer")}>{from.developer}</Fact>
                     <Fact label={t("detail.category")}>
                         {categoryLabel(words, app.category, navLabel)}
@@ -200,18 +186,9 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
                             </a>
                         </Fact>
                     )}
-                </dl>
-            </section>
+                </DetailFacts>
+            </DetailSection>
         </div>
-    );
-}
-
-export function Fact({ label, children }: { label: string; children: ReactNode }) {
-    return (
-        <>
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="min-w-0 break-words">{children}</dd>
-        </>
     );
 }
 

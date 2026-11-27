@@ -5,7 +5,8 @@
  *   node clients/device-plugins/scripts/publish.mjs <source dir> <out dir>
  *
  * Every folder in <source dir> is one plugin: `manifest.json`, `listing.json`
- * (icon, picture, screenshots, changelog: file names inside the folder) and the files:
+ * (icon, picture, screenshots: file names inside the folder; what changed, as
+ * `releases` [{ version, notes }] newest first or the older `changelog` string) and the files:
  * those the same everywhere under `any/`, each platform's own under
  * `<platform>/` (a native module CI built for it), laid over `any/`. Writes into <out dir> one zip per plugin and platform, the
  * pictures, `catalog.json` and `catalog.json.sig`, all to be uploaded to the
@@ -47,6 +48,32 @@ function filesUnder(dir, prefix = "") {
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
+/** The legacy string's ceiling in the catalog schema (`pluginEntrySchema.changelog`): longer and no client reads the catalog. */
+const CHANGELOG_MAX = 4000;
+
+/**
+ * What changed, from `listing.releases` ([{ version, notes }], newest first) or
+ * the old `listing.changelog` string. Releases are written as they are and also
+ * as the old string, newest first while it fits, for the desktop apps that read
+ * only that one. A string past the ceiling stops the publish instead of
+ * shipping a catalog that no client would read.
+ */
+function whatChanged(id, listing) {
+    if (Array.isArray(listing.releases) && listing.releases.length > 0) {
+        const releases = listing.releases.map(({ version, notes }) => ({ version, notes }));
+        let changelog = "";
+        for (const { version, notes } of releases) {
+            const next = changelog ? `${changelog} ${version}: ${notes}` : `${version}: ${notes}`;
+            if (next.length > CHANGELOG_MAX) break;
+            changelog = next;
+        }
+        return { changelog, releases };
+    }
+    const changelog = listing.changelog ?? "";
+    if (changelog.length > CHANGELOG_MAX) throw new Error(`${id}: listing.json changelog is ${changelog.length} characters, over ${CHANGELOG_MAX}; list it as "releases": [{ "version", "notes" }] instead`);
+    return { changelog };
+}
+
 const plugins = [];
 for (const id of existsSync(source) ? readdirSync(source).sort() : []) {
     const dir = join(source, id);
@@ -79,7 +106,7 @@ for (const id of existsSync(source) ? readdirSync(source).sort() : []) {
         ...(listing.icon ? { icon: picture(listing.icon) } : {}),
         ...(listing.picture ? { picture: picture(listing.picture) } : {}),
         screenshots: (listing.screenshots ?? []).map(picture),
-        changelog: listing.changelog ?? "",
+        ...whatChanged(id, listing),
         published: listing.published ?? new Date().toISOString()
     });
 }
