@@ -17,6 +17,7 @@
  */
 
 import { measureVoice, type VoiceLevel } from "@/app/(app)/chat/voice-level";
+import type { LiveEvent } from "@/lib/polar/live-voice";
 import {
     VOICE_TAIL_LINE_MAX,
     VOICE_TAIL_MOST,
@@ -34,8 +35,10 @@ export interface RealtimeSnapshot {
     readonly muted: boolean;
     /** A tool call is running. */
     readonly busy: boolean;
-    /** What the model said last. */
+    /** What the model said last, growing while it speaks. */
     readonly caption: string | null;
+    /** What the person said last, as transcribed (a live chat call only). */
+    readonly heard: string | null;
     readonly error: RealtimeError | null;
 }
 
@@ -110,11 +113,33 @@ export function functionCalls(event: unknown): RealtimeCall[] {
 
 const FAILED_OUTPUT = JSON.stringify({ error: "Tool request failed. Do not claim it succeeded." });
 
+/** How a call other than a Code session's opens and runs its tools. */
+export interface RealtimeChannel {
+    /** The route that mints the secret, and what it is sent. */
+    readonly mint: { readonly url: string; readonly body: unknown };
+    /** Runs one tool call; the output goes back to the model. */
+    readonly runTool: (call: RealtimeCall, signal: AbortSignal) => Promise<string>;
+    /** What was heard and said, for the thread. */
+    readonly onLive?: (event: LiveEvent) => void;
+}
+
 export function openRealtimeLink(
-    start: { binding: RealtimeBinding; lang: string | null },
+    start: { binding: RealtimeBinding; lang: string | null; channel?: RealtimeChannel },
     env: RealtimeEnv = browserEnv()
 ): RealtimeLink {
-    let state: RealtimeSnapshot = { phase: "connecting", muted: false, busy: false, caption: null, error: null };
+    let state: RealtimeSnapshot = {
+        phase: "connecting",
+        muted: false,
+        busy: false,
+        caption: null,
+        heard: null,
+        error: null
+    };
+    const channelOf = start.channel ?? null;
+    /** What the reply under way has said so far. */
+    let saying = "";
+    /** The next reply reads tool output: it answers a delegated request. */
+    let afterTool = false;
     let binding = start.binding;
     const listeners = new Set<() => void>();
     const tail: string[] = [];
@@ -160,6 +185,13 @@ export function openRealtimeLink(
     };
 
     const runTool = async (call: RealtimeCall): Promise<string> => {
+        if (channelOf) {
+            try {
+                return await channelOf.runTool(call, pending.signal);
+            } catch {
+                return FAILED_OUTPUT;
+            }
+        }
         try {
             const response = await env.fetch("/api/polar/voice/realtime/tool", {
                 method: "POST",
@@ -197,6 +229,7 @@ export function openRealtimeLink(
                 if (closed) return;
                 send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: call.callId, output } });
             }
+            afterTool = true;
             send({ type: "response.create" });
             set({ busy: false });
         });
@@ -211,23 +244,40 @@ export function openRealtimeLink(
             return;
         }
         if (!event) return;
-        if (event.type === "response.output_audio_transcript.done") {
+        if (event.type === "response.output_audio_transcript.delta") {
+            if (typeof event.delta === "string" && event.delta) {
+                saying += event.delta;
+                set({ caption: saying.trim() });
+            }
+        } else if (event.type === "response.output_audio_transcript.done") {
             const said = typeof event.transcript === "string" ? event.transcript.trim() : "";
             if (said) {
                 remember(`assistant: ${said}`);
+                saying = said;
                 set({ caption: said });
+            }
+        } else if (event.type === "conversation.item.input_audio_transcription.completed") {
+            const heardText = typeof event.transcript === "string" ? event.transcript.trim() : "";
+            if (heardText) {
+                remember(`user: ${heardText}`);
+                set({ heard: heardText });
+                channelOf?.onLive?.({ type: "heard", text: heardText });
             }
         } else if (event.type === "response.done") {
             const calls = functionCalls(event);
+            const via = calls.length > 0 ? "call" : afterTool ? "reading" : "direct";
+            if (calls.length === 0) afterTool = false;
+            channelOf?.onLive?.({ type: "said", text: saying.trim(), via });
+            saying = "";
             if (calls.length > 0) respond(calls);
         }
     };
 
     const connect = async () => {
-        const opened = await env.fetch("/api/polar/voice/realtime", {
+        const opened = await env.fetch(channelOf?.mint.url ?? "/api/polar/voice/realtime", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId: binding.sessionId, lang: start.lang }),
+            body: JSON.stringify(channelOf ? channelOf.mint.body : { sessionId: binding.sessionId, lang: start.lang }),
             signal: pending.signal
         });
         if (!opened.ok) {

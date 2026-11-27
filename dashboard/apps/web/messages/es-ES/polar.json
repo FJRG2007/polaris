@@ -517,6 +517,26 @@
             "allow": "Permite el micro para ver nombres",
             "denied": "{clientKind, select, desktop {Bloqueado. Permítelo en los ajustes del sistema.} phone {Bloqueado. Permítelo en los ajustes del móvil.} other {Bloqueado. Permítelo en el navegador.}}",
             "model": "Modelo"
+        },
+        "live": {
+            "description": "Voz en directo: Polar responde mientras hablas. Háblale encima para pararla.",
+            "connecting": "Conectando",
+            "working": "Preguntando",
+            "listening": "Escuchando",
+            "you": "Tú",
+            "polar": "Polar",
+            "askMic": "Polar necesita tu micrófono para hablar contigo.",
+            "allowMic": "Permitir micrófono",
+            "retry": "Reintentar",
+            "useTranscribed": "Usar voz por transcripción",
+            "failed": "La voz en directo no se ha conectado. Reinténtalo o usa la voz por transcripción.",
+            "noKey": "La voz en directo necesita una clave propia que hable en directo, como OpenAI.",
+            "notSaved": "Una parte de esta llamada no se ha podido guardar en el chat."
+        },
+        "transcribed": {
+            "label": "Voz por transcripción: más lenta. Conecta un proveedor con voz en directo para una conversación real.",
+            "connect": "Conectar un proveedor",
+            "useLive": "Cambiar a voz en directo"
         }
     },
     "memory": {

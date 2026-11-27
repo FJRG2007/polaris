@@ -269,7 +269,7 @@ export function PolarComposer({
                         ) : (
                             <VoiceModeButton
                                 primary
-                                available={kit.voice.dictation}
+                                available={kit.voice.dictation || !!kit.voice.realtime}
                                 disabled={voiceMode.disabled}
                                 onNotice={onNotice}
                                 onOpen={voiceMode.onOpen}

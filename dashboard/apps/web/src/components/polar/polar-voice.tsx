@@ -39,6 +39,7 @@ import { affectedBy, Confirmation } from "@/components/polar/elements/confirmati
 import { measureVoice, speaking, type VoiceLevel } from "@/app/(app)/chat/voice-level";
 import type { TranscriptionOption } from "@/lib/polar/transcription";
 import { useKeyboardDictates } from "@/components/use-phone";
+import Link from "next/link";
 import { worthChoosing } from "@/app/(app)/chat/device-choice";
 import { setMicDevice, useMicrophones } from "@/app/(app)/chat/mic-device";
 import {
@@ -436,8 +437,9 @@ const MIN_OPEN_AT_WHILE_SPEAKING = 30;
 const NO_SOUND_AFTER_MS = 4000;
 /** How long a sound has to last to be speech rather than a cough or a click. */
 const MIN_SPEECH_MS = 250;
-/** How long a pause has to last before what you said is sent. */
-const END_AFTER_MS = 1500;
+/** How long a pause has to last before what you said is sent: about what a
+ *  live model's own turn detection waits, so the reply starts sooner. */
+const END_AFTER_MS = 1000;
 /** How often the microphone is read. */
 const TICK_MS = 50;
 
@@ -499,6 +501,10 @@ export interface VoiceCallProps {
     /** Told whether the call is quiet - listening, not muted, not over - so a
      *  caller holding things to say hands them over one at a time. */
     onQuiet?: (quiet: boolean) => void;
+    /** A Polar chat's call: says plainly that it runs by transcription, with
+     *  the way to live voice - switching back when it is on offer, else
+     *  where a provider that has it is connected. */
+    mode?: { live: boolean; onLive: () => void };
 }
 
 /** One sentence ready to be said: audio from a key here, or text for the
@@ -1033,6 +1039,7 @@ export function VoiceCall(props: VoiceCallProps) {
                     </p>
                 )}
             </div>
+            {props.mode ? <TranscribedNotice live={props.mode.live} onLive={props.mode.onLive} /> : null}
             {waiting.map(({ part, name }) => (
                 <Confirmation
                     key={part.approval!.id}
@@ -1100,5 +1107,27 @@ export function VoiceCall(props: VoiceCallProps) {
                 </Button>
             </div>
         </section>
+    );
+}
+
+/** Voice mode by transcription, said plainly: slower than live voice, and how
+ *  to get live voice - back to it when it is on offer, else a provider. */
+export function TranscribedNotice({ live, onLive }: { live: boolean; onLive: () => void }) {
+    const t = useTranslations("polar");
+    if (live) {
+        return (
+            <Button type="button" variant="secondary" size="sm" className="min-w-0 max-w-full" onClick={onLive}>
+                <AudioLines />
+                <span className="truncate">{t("voice.transcribed.useLive")}</span>
+            </Button>
+        );
+    }
+    return (
+        <div data-transcribed-notice="" className="flex w-full min-w-0 flex-col items-center gap-1 text-center">
+            <p className="max-w-full break-words text-xs text-muted-foreground">{t("voice.transcribed.label")}</p>
+            <Link href="/polar/settings/providers" className="max-w-full truncate text-xs text-primary hover:underline">
+                {t("voice.transcribed.connect")}
+            </Link>
+        </div>
     );
 }

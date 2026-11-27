@@ -517,6 +517,26 @@
             "allow": "Allow the microphone to see names",
             "denied": "{clientKind, select, desktop {Blocked. Allow it in the system settings.} phone {Blocked. Allow it in the phone's settings.} other {Blocked. Allow it in the browser.}}",
             "model": "Model"
+        },
+        "live": {
+            "description": "Live voice: Polar answers as you talk. Talk over it to stop it.",
+            "connecting": "Connecting",
+            "working": "Asking Polar",
+            "listening": "Listening",
+            "you": "You",
+            "polar": "Polar",
+            "askMic": "Polar needs your microphone to talk with you.",
+            "allowMic": "Allow microphone",
+            "retry": "Try again",
+            "useTranscribed": "Use voice by transcription",
+            "failed": "Live voice didn't connect. Try again, or use voice by transcription.",
+            "noKey": "Live voice needs a key of your own that can talk live, such as OpenAI.",
+            "notSaved": "Part of this call couldn't be saved to the chat."
+        },
+        "transcribed": {
+            "label": "Voice by transcription: slower. Connect a provider with live voice for a real conversation.",
+            "connect": "Connect a provider",
+            "useLive": "Switch to live voice"
         }
     },
     "memory": {

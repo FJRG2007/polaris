@@ -16,6 +16,7 @@
  * Server-only.
  */
 
+import { liveVoiceProvider } from "@/lib/polar/live-voice";
 import type { Payer } from "@/lib/polar/shared";
 import { prisma } from "@polaris/db";
 import { createFal } from "@ai-sdk/fal";
@@ -202,7 +203,7 @@ export async function polarVoiceAvailability(
             transcriber: pickTranscription(transcribers, chosen)?.id ?? null,
             // A realtime call spends the person's own key only: the deployment's
             // is never handed to a browser, even as a short-lived secret.
-            realtime: sources.get("openai") === "own"
+            realtime: liveVoiceProvider(sources) !== null
         };
     } catch {
         return { dictation: false, speech: false, transcribers: [], transcriber: null, realtime: false };
