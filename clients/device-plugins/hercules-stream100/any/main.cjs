@@ -50,10 +50,10 @@ function describe(error, ownership) {
     }
     // Stream Control is closed and the Hercules driver is bound, yet the native
     // module could not read through the Hercules SDK either (missing, refused,
-    // or the device did not answer it). The plugin's view offers Polaris' own
-    // WinUSB driver, which needs no Hercules software.
+    // or the device did not answer it). The app sets Polaris' own WinUSB driver
+    // up by itself as the plugin's requirement; the view says where that stands.
     if (held.state === "herculesSdk") {
-        return { state: "busy", code: "herculesDriver", detail: "Polaris could not read the Stream 100 through the Hercules software. Plug it in again, or reinstall Hercules Stream Control." };
+        return { state: "busy", code: "herculesDriver", detail: "The Stream 100 still has the Hercules driver. It works here once Polaris' driver is on it." };
     }
     if (held.state === "unknown") return { state: "busy", detail: `Another driver holds the Stream 100 (${String(held.service).slice(0, 60)}).` };
     return { state: "error", code: "noControls", detail: "The Stream 100 is plugged in, but its controls were not found." };

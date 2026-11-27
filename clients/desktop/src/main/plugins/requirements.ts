@@ -4,8 +4,11 @@
  * consent: it is set up right after the install, and set up again by itself
  * when something else undoes it (the device plugged in later with another
  * driver on it). One that was never consented to (an install from before the
- * plugin needed it, or a declined or failed setup) is offered on the plugin's
- * page as a host action, in the plugin's own words, until it is set up.
+ * plugin needed it) is set up by itself on the next start or update too: the
+ * system's own prompt (Windows' UAC, Linux's password, macOS' permission) is
+ * the consent. Only a setup that did not go through (declined or failed) is
+ * offered on the plugin's page as a host action, in the plugin's own words,
+ * and an automatic one does not ask again until the next start.
  *
  * Nothing here knows any one plugin: `runnerFor` answers what can set a
  * requirement up on this machine, and null leaves it unknown and unoffered.
@@ -117,9 +120,10 @@ export function createRequirements(deps: RequirementsDeps) {
         },
 
         /**
-         * Set up whatever is consented to and missing, one at a time. A setup
-         * the person declined is not asked again by itself; the page's action
-         * asks again.
+         * Set up whatever is missing, one at a time, consented to or not (an
+         * install from before the requirement asks now, with the system's own
+         * prompt). A setup that did not go through is not asked again by itself
+         * in this run; the page's action asks again.
          */
         async ensure(id: string, manifest: Pick<PluginManifest, "requires">, reason: EnsureReason): Promise<void> {
             let moved = false;
@@ -128,8 +132,9 @@ export function createRequirements(deps: RequirementsDeps) {
                 const seen = await lookAt(id, requirement);
                 if (before?.state !== seen?.state) moved = true;
                 if (!seen || seen.state !== "missing" || failures.has(slot(id, requirement.key))) continue;
-                if (!(await consented(id, requirement.key, seen))) continue;
-                await setUp(id, requirement, reason);
+                // A first setup is not a restore: only one consented to, or set up before, says it was put back.
+                const first = !(await consented(id, requirement.key, seen));
+                if ((await setUp(id, requirement, first ? "install" : reason)) && first) await consent(id, [requirement.key]);
             }
             if (moved) deps.changed();
         },
@@ -145,7 +150,8 @@ export function createRequirements(deps: RequirementsDeps) {
 
         /**
          * What the page offers: each requirement that is not set up and will not
-         * be set up by itself (never consented to, or its last setup failed).
+         * be set up by itself (its last setup was declined or failed). One that
+         * is missing and not yet tried is being set up, so nothing is offered.
          * Read from the last look, so a snapshot never waits on the machine.
          */
         async actions(id: string, manifest: Pick<PluginManifest, "requires">): Promise<PluginHostAction[]> {
@@ -153,8 +159,7 @@ export function createRequirements(deps: RequirementsDeps) {
             for (const requirement of pluginRequirements(manifest, deps.platform)) {
                 const at = slot(id, requirement.key);
                 const seen = looks.get(at) ?? null;
-                if (!seen || seen.state === "met" || busy.has(at)) continue;
-                if (!failures.has(at) && (await consented(id, requirement.key, seen))) continue;
+                if (!seen || seen.state === "met" || busy.has(at) || !failures.has(at)) continue;
                 offered.push({ id: requirement.key, label: requirement.label, ...(requirement.missing ? { detail: requirement.missing } : {}) });
             }
             return offered;

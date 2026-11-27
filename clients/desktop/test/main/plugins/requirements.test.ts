@@ -59,16 +59,43 @@ describe("plugin requirements", () => {
         expect(await requirements.actions("pad", MANIFEST)).toEqual([]);
     });
 
-    it("never set up by themselves without a consent: the page offers them instead (an install from before)", async () => {
-        const { requirements, runner } = setup();
+    it("are set up by themselves for an install from before them, on start, and kept as consented", async () => {
+        const { requirements, runner, restored, stored } = setup();
+        expect(await requirements.actions("pad", MANIFEST)).toEqual([]);
         await requirements.ensure("pad", MANIFEST, "start");
-        expect(runner.setUp).not.toHaveBeenCalled();
+        expect(runner.setUp).toHaveBeenCalledTimes(1);
+        expect(stored()).toEqual({ pad: ["driver"] });
+        // A first setup is not a restore: no "put back" notice.
+        expect(restored).not.toHaveBeenCalled();
+        expect(await requirements.actions("pad", MANIFEST)).toEqual([]);
+    });
+
+    it("offer nothing while a missing one is being set up; only a declined one is offered, with its reason", async () => {
+        let finish: (outcome: RequirementOutcome) => void = () => undefined;
+        const { requirements, runner } = setup();
+        runner.setUp.mockImplementationOnce(() => new Promise<RequirementOutcome>((resolve) => (finish = resolve)));
+        const running = requirements.ensure("pad", MANIFEST, "start");
+        await vi.waitFor(() => expect(runner.setUp).toHaveBeenCalledTimes(1));
+        expect(await requirements.actions("pad", MANIFEST)).toEqual([]);
+        finish({ ok: false, reason: "declined" });
+        await running;
+        expect(requirements.failure("pad", "driver")).toBe("declined");
         expect(await requirements.actions("pad", MANIFEST)).toEqual([
             { id: "driver", label: MANIFEST.requires["win32-x64"]![0]!.label, detail: MANIFEST.requires["win32-x64"]![0]!.missing }
         ]);
         expect(await requirements.run("pad", MANIFEST, "driver")).toBe(true);
-        expect(runner.setUp).toHaveBeenCalledTimes(1);
         expect(await requirements.actions("pad", MANIFEST)).toEqual([]);
+    });
+
+    it("ask again on the next start after a declined prompt, and after a plugin update", async () => {
+        const first = setup({ outcome: { ok: false, reason: "declined" } });
+        await first.requirements.ensure("pad", MANIFEST, "start");
+        await first.requirements.ensure("pad", MANIFEST, "install");
+        expect(first.runner.setUp).toHaveBeenCalledTimes(1);
+        const next = setup({ kept: first.stored() });
+        await next.requirements.ensure("pad", MANIFEST, "start");
+        expect(next.runner.setUp).toHaveBeenCalledTimes(1);
+        expect(await next.requirements.actions("pad", MANIFEST)).toEqual([]);
     });
 
     it("are put back by themselves when something else undid them, and say so", async () => {
@@ -114,7 +141,8 @@ describe("plugin requirements", () => {
     it("read a damaged consent file as none, and forget an uninstalled plugin", async () => {
         const damaged = setup({ kept: "garbage" });
         await damaged.requirements.ensure("pad", MANIFEST, "start");
-        expect(damaged.runner.setUp).not.toHaveBeenCalled();
+        expect(damaged.runner.setUp).toHaveBeenCalledTimes(1);
+        expect(damaged.stored()).toEqual({ pad: ["driver"] });
         const kept = setup({ kept: { pad: ["driver"], other: ["x"] } });
         await kept.requirements.forget("pad");
         expect(kept.stored()).toEqual({ other: ["x"] });

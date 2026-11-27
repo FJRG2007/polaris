@@ -238,6 +238,8 @@ export function startDevicePlugins(showPolaris: (path?: string) => void): Plugin
             notice.show();
         },
         notify: (id, news) => {
+            // An update can bring a requirement the install never had: it is set up now, not on the next start.
+            if (news.kind === "updated") void ensureRequirements("install", id);
             const words = newsWords(news);
             showNotice({
                 title: words.title,
