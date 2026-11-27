@@ -1418,7 +1418,6 @@
         "snowballing": "Amasando nieve"
     },
     "web": {
-        "browserClose": "Cerrando pestaña",
         "toggle": "Buscar en la web",
         "searched": "Buscó en la web",
         "reading": "Leyendo {site}",
@@ -1427,19 +1426,62 @@
         "browserMissing": "Polar necesita la extensión de Polaris conectada aquí.",
         "browserConnect": "Obtener extensión",
         "browserSteps": {
-            "open": "Abriendo {site} en tu navegador",
-            "read": "Leyendo {site} en tu navegador",
-            "find": "Revisando {site}",
-            "click": "Pulsar {element} en {site}",
-            "type": "Escribir en {element} en {site}",
-            "key": "Pulsar teclas en {site}",
-            "scroll": "Desplazando {site}",
-            "hover": "Señalar {element} en {site}",
-            "select": "Elegir en {element} en {site}",
-            "back": "Volviendo atrás en {site}",
-            "forward": "Avanzando en {site}",
-            "reload": "Recargando {site}",
-            "wait": "Esperando a la página"
+            "open": {
+                "running": "Abriendo {target}",
+                "done": "Abrió {target}"
+            },
+            "read": {
+                "running": "Leyendo {target}",
+                "done": "Leyó {target}"
+            },
+            "find": {
+                "running": "Revisando {target}",
+                "done": "Revisó {target}"
+            },
+            "click": {
+                "running": "Pulsando {target}",
+                "done": "Pulsó {target}"
+            },
+            "type": {
+                "running": "Escribiendo en {target}",
+                "done": "Escribió en {target}"
+            },
+            "key": {
+                "running": "Pulsando teclas",
+                "done": "Pulsó teclas"
+            },
+            "scroll": {
+                "running": "Desplazando {target}",
+                "done": "Desplazó {target}"
+            },
+            "hover": {
+                "running": "Señalando {target}",
+                "done": "Señaló {target}"
+            },
+            "select": {
+                "running": "Eligiendo en {target}",
+                "done": "Eligió en {target}"
+            },
+            "back": {
+                "running": "Retrocediendo",
+                "done": "Retrocedió"
+            },
+            "forward": {
+                "running": "Avanzando",
+                "done": "Avanzó"
+            },
+            "reload": {
+                "running": "Recargando {target}",
+                "done": "Recargó {target}"
+            },
+            "wait": {
+                "running": "Esperando a la página",
+                "done": "Esperó a la página"
+            },
+            "close": {
+                "running": "Cerrando pestaña",
+                "done": "Cerró pestaña"
+            }
         },
         "searchingFor": "Buscando en la web: {query}",
         "searchedFor": "Buscó en la web: {query}",
@@ -2158,7 +2200,8 @@
             "webSearch": "{count, plural, one {Buscó en la web una vez} other {Buscó en la web # veces}}",
             "webFetch": "{count, plural, one {Leyó # página} other {Leyó # páginas}}",
             "edit": "{count, plural, one {Editó # archivo} other {Editó # archivos}}",
-            "write": "{count, plural, one {Creó # archivo} other {Creó # archivos}}"
+            "write": "{count, plural, one {Creó # archivo} other {Creó # archivos}}",
+            "same": "{label}, {count, plural, one {una vez} other {# veces}}"
         },
         "result": {
             "lines": "{count, plural, one {# línea} other {# líneas}}",

@@ -323,42 +323,63 @@ export const GROUPED_VERBS: ReadonlySet<CodeStepVerb> = new Set([
     "write"
 ]);
 
+/** A run of items as a list draws it: one item, or a fold of several that
+ *  share a key. */
+export type Run<T> =
+    | { readonly kind: "one"; readonly entry: T }
+    | { readonly kind: "group"; readonly key: string; readonly entries: readonly T[] };
+
+/**
+ * Consecutive items with the same key folded into one run; an item whose key
+ * is null always stands alone and ends the fold before it. The one grouping
+ * rule every step list uses - Polar Code's thread and Polar's chat. Pure.
+ */
+export function groupRuns<T>(items: readonly T[], keyOf: (item: T) => string | null): Run<T>[] {
+    const runs: Run<T>[] = [];
+    let key: string | null = null;
+    let open: T[] = [];
+    const close = () => {
+        if (open.length === 1) runs.push({ kind: "one", entry: open[0]! });
+        else if (open.length > 1 && key !== null) runs.push({ kind: "group", key, entries: open });
+        open = [];
+        key = null;
+    };
+    for (const item of items) {
+        const next = keyOf(item);
+        if (next === null) {
+            close();
+            runs.push({ kind: "one", entry: item });
+            continue;
+        }
+        if (next !== key) close();
+        key = next;
+        open.push(item);
+    }
+    close();
+    return runs;
+}
+
 /** A run of entries as the thread draws it: one entry, or a fold of several
  *  steps of the same verb. */
 export type StepRun<T> =
-    | { readonly kind: "one"; readonly entry: T; }
-    | { readonly kind: "group"; readonly verb: CodeStepVerb; readonly entries: readonly T[]; };
+    | { readonly kind: "one"; readonly entry: T }
+    | { readonly kind: "group"; readonly verb: CodeStepVerb; readonly entries: readonly T[] };
 
 /**
  * Consecutive finished steps of the same verb, folded: two reads in a row are
  * "Read 2 files". A running or failed step stays a row of its own, so the live
  * line and a failure are never hidden in a fold; housekeeping steps go. Pure.
  */
-export function groupSteps<T extends { readonly step?: CodeToolStep; }>(entries: readonly T[]): StepRun<T>[] {
-    const runs: StepRun<T>[] = [];
-    let verb: CodeStepVerb | null = null;
-    let open: T[] = [];
-    const close = () => {
-        if (open.length === 1) runs.push({ kind: "one", entry: open[0]! });
-        else if (open.length > 1 && verb) runs.push({ kind: "group", verb, entries: open });
-        open = [];
-        verb = null;
-    };
-    for (const entry of entries) {
+export function groupSteps<T extends { readonly step?: CodeToolStep }>(entries: readonly T[]): StepRun<T>[] {
+    const shown = entries.filter((entry) => !entry.step || !isHiddenStep(entry.step));
+    return groupRuns(shown, (entry) => {
         const step = entry.step;
-        if (step && isHiddenStep(step)) continue;
-        const next = step ? verbOfStep(step) : null;
-        if (step && next && GROUPED_VERBS.has(next) && step.state === "done") {
-            if (next !== verb) close();
-            verb = next;
-            open.push(entry);
-            continue;
-        }
-        close();
-        runs.push({ kind: "one", entry });
-    }
-    close();
-    return runs;
+        if (!step || step.state !== "done") return null;
+        const verb = verbOfStep(step);
+        return GROUPED_VERBS.has(verb) ? verb : null;
+    }).map((run) =>
+        run.kind === "one" ? run : { kind: "group", verb: run.key as CodeStepVerb, entries: run.entries }
+    );
 }
 /** The last part of a path, for a step line a person reads. */
 export function baseName(path: string): string {

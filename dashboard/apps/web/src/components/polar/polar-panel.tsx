@@ -15,6 +15,7 @@
 
 import * as serverCommand from "@/lib/polar/server-command";
 import * as codeSteps from "@/lib/polar/code-steps";
+import { chatStepGroup } from "@/lib/polar/chat-step-group";
 import Link from "next/link";
 import { PolarAllowedContext } from "./polar-allowed";
 import { PolarFailureNotice } from "./polar-failure";
@@ -3596,9 +3597,9 @@ function MessageView({
         }
         const browser = browserStepOf(name, input);
         if (browser) {
-            const values = { site: browser.site, element: browser.element || "?" };
-            if (browser.kind === "close") return t("web.browserClose");
-            return t(`web.browserSteps.${browser.kind}`, values);
+            // The element it acted on, else the site it was on (`step-words.ts`).
+            const target = browser.element || browser.site || "?";
+            return t(`web.browserSteps.${browser.kind}.${done ? "done" : "running"}`, { target });
         }
         const step = webStepOf(name, input);
         if (!step) return toolName(name);
@@ -3753,18 +3754,44 @@ function MessageView({
                                     : null
                             }
                         >
-                            {work.map((entry) =>
-                                entry.type === "reasoning" ? (
-                                    <Reasoning
-                                        key={message.parts.indexOf(entry)}
-                                        isStreaming={false}
-                                    >
-                                        {entry.text}
-                                    </Reasoning>
-                                ) : (
-                                    renderTool(entry, message.parts.indexOf(entry))
-                                )
-                            )}
+                            {codeSteps
+                                .groupRuns(work, (entry) => {
+                                    const found = toolOf(entry);
+                                    return found && found.tool.state === "output-available"
+                                        ? chatStepGroup(found.name, found.tool.input)
+                                        : null;
+                                })
+                                .map((run) => {
+                                    if (run.kind === "group") {
+                                        const first = toolOf(run.entries[0]!)!;
+                                        return (
+                                            <Tool
+                                                key={message.parts.indexOf(run.entries[0]!)}
+                                                title={
+                                                    codeSteps.GROUPED_VERBS.has(run.key as codeSteps.CodeStepVerb)
+                                                        ? t(`code.group.${run.key as "read"}`, { count: run.entries.length })
+                                                        : t("code.group.same", {
+                                                              label: stepTitle(first.name, first.tool.input, first.tool.state),
+                                                              count: run.entries.length
+                                                          })
+                                                }
+                                                state="output-available"
+                                            >
+                                                <div className="flex min-w-0 flex-col gap-1">
+                                                    {run.entries.map((entry) => renderTool(entry, message.parts.indexOf(entry)))}
+                                                </div>
+                                            </Tool>
+                                        );
+                                    }
+                                    const entry = run.entry;
+                                    return entry.type === "reasoning" ? (
+                                        <Reasoning key={message.parts.indexOf(entry)} isStreaming={false}>
+                                            {entry.text}
+                                        </Reasoning>
+                                    ) : (
+                                        renderTool(entry, message.parts.indexOf(entry))
+                                    );
+                                })}
                         </Work>
                     );
                 }

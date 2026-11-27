@@ -1418,7 +1418,6 @@
         "snowballing": "Snowballing"
     },
     "web": {
-        "browserClose": "Closing a tab",
         "toggle": "Search the web",
         "searched": "Searched the web",
         "reading": "Reading {site}",
@@ -1427,19 +1426,62 @@
         "browserMissing": "Polar needs the Polaris extension connected in this browser.",
         "browserConnect": "Get the extension",
         "browserSteps": {
-            "open": "Opening {site} in your browser",
-            "read": "Reading {site} in your browser",
-            "find": "Looking over {site}",
-            "click": "Click {element} on {site}",
-            "type": "Type into {element} on {site}",
-            "key": "Press keys on {site}",
-            "scroll": "Scrolling {site}",
-            "hover": "Point at {element} on {site}",
-            "select": "Pick in {element} on {site}",
-            "back": "Going back on {site}",
-            "forward": "Going forward on {site}",
-            "reload": "Reloading {site}",
-            "wait": "Waiting for the page"
+            "open": {
+                "running": "Opening {target}",
+                "done": "Opened {target}"
+            },
+            "read": {
+                "running": "Reading {target}",
+                "done": "Read {target}"
+            },
+            "find": {
+                "running": "Looking over {target}",
+                "done": "Looked over {target}"
+            },
+            "click": {
+                "running": "Clicking {target}",
+                "done": "Clicked {target}"
+            },
+            "type": {
+                "running": "Typing into {target}",
+                "done": "Typed into {target}"
+            },
+            "key": {
+                "running": "Pressing keys",
+                "done": "Pressed keys"
+            },
+            "scroll": {
+                "running": "Scrolling {target}",
+                "done": "Scrolled {target}"
+            },
+            "hover": {
+                "running": "Pointing at {target}",
+                "done": "Pointed at {target}"
+            },
+            "select": {
+                "running": "Picking in {target}",
+                "done": "Picked in {target}"
+            },
+            "back": {
+                "running": "Going back",
+                "done": "Went back"
+            },
+            "forward": {
+                "running": "Going forward",
+                "done": "Went forward"
+            },
+            "reload": {
+                "running": "Reloading {target}",
+                "done": "Reloaded {target}"
+            },
+            "wait": {
+                "running": "Waiting for the page",
+                "done": "Waited for the page"
+            },
+            "close": {
+                "running": "Closing a tab",
+                "done": "Closed a tab"
+            }
         },
         "searchingFor": "Searching the web for {query}",
         "searchedFor": "Searched the web for {query}",
@@ -2158,7 +2200,8 @@
             "webSearch": "{count, plural, one {Searched the web once} other {Searched the web # times}}",
             "webFetch": "{count, plural, one {Read # page} other {Read # pages}}",
             "edit": "{count, plural, one {Edited # file} other {Edited # files}}",
-            "write": "{count, plural, one {Created # file} other {Created # files}}"
+            "write": "{count, plural, one {Created # file} other {Created # files}}",
+            "same": "{label}, {count, plural, one {once} other {# times}}"
         },
         "result": {
             "lines": "{count, plural, one {# line} other {# lines}}",

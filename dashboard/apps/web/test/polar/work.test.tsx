@@ -112,13 +112,15 @@ describe("an answer's work", () => {
         const view = mount();
         fireEvent.click(await screen.findByRole("button", { name: /Worked for 38 s/ }));
         expect(workLine().getAttribute("aria-expanded")).toBe("true");
+        // Two finished calls of one tool in a row read as one folded line.
+        fireEvent.click(screen.getByText("List deployments, 2 times"));
         expect(screen.getAllByText("List deployments")).toHaveLength(2);
         view.unmount();
         mount();
         expect(workLine().getAttribute("aria-expanded")).toBe("true");
         fireEvent.click(workLine());
         expect(workLine().getAttribute("aria-expanded")).toBe("false");
-        expect(screen.queryByText("List deployments")).toBeNull();
+        expect(screen.queryByText(/List deployments/)).toBeNull();
     });
 
     it("keeps a call waiting for an approval in view", async () => {
