@@ -41,24 +41,6 @@ pub fn stored(ctx: &AppContext) -> Option<PolarisAccount> {
     })
 }
 
-/// Saves the account after a sign-in.
-pub fn store(account: &PolarisAccount, ctx: &AppContext) -> anyhow::Result<()> {
-    let storage = ctx.secure_storage();
-    storage.write_value(INSTANCE_KEY, &account.origin)?;
-    storage.write_value(TERMINAL_KEY, &account.key)?;
-    Ok(())
-}
-
-/// Forgets the account after a sign-out.
-pub fn clear(ctx: &AppContext) {
-    let storage = ctx.secure_storage();
-    for key in [TERMINAL_KEY, INSTANCE_KEY] {
-        if let Err(error) = storage.remove_value(key) {
-            log::debug!("Could not remove {key} from secure storage: {error}");
-        }
-    }
-}
-
 /// The relay address for an instance origin: `https` becomes `wss`, `http` `ws`.
 pub fn relay_url(origin: &str) -> Option<String> {
     let origin = origin.trim_end_matches('/');
