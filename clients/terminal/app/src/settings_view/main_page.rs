@@ -43,6 +43,10 @@ use crate::auth::auth_state::AuthState;
 use crate::auth::auth_view_modal::AuthViewVariant;
 use crate::auth::{AuthStateProvider, UserUid};
 use crate::autoupdate::{self, AutoupdateStage, AutoupdateState};
+#[cfg(feature = "local_fs")]
+use crate::editor::{EditorView, SingleLineEditorOptions, TextOptions};
+#[cfg(feature = "local_fs")]
+use crate::polaris_sign_in::{PolarisSignIn, SignInState};
 use crate::server::ids::ServerId;
 use crate::settings::cloud_preferences::CloudPreferencesSettings;
 use crate::workspace::WorkspaceAction;
@@ -130,6 +134,12 @@ pub enum MainPageAction {
     OpenUrl(String),
     #[cfg(not(target_family = "wasm"))]
     RefreshIapCredentials,
+    #[cfg(feature = "local_fs")]
+    PolarisSignIn,
+    #[cfg(feature = "local_fs")]
+    PolarisCancelSignIn,
+    #[cfg(feature = "local_fs")]
+    PolarisSignOut,
 }
 
 impl MainPageAction {
@@ -166,6 +176,9 @@ pub struct MainSettingsPageView {
     self_handle: WeakViewHandle<Self>,
     page: PageType<Self>,
     auth_state: Arc<AuthState>,
+    /// The Polaris address the person signs in with.
+    #[cfg(feature = "local_fs")]
+    polaris_address: ViewHandle<EditorView>,
 }
 
 impl Entity for MainSettingsPageView {
@@ -245,6 +258,16 @@ impl TypedActionView for MainSettingsPageView {
                 IapManager::handle(ctx).update(ctx, |manager, ctx| manager.start_refresh(ctx));
                 ctx.notify();
             }
+            #[cfg(feature = "local_fs")]
+            MainPageAction::PolarisSignIn => self.sign_in_to_polaris(ctx),
+            #[cfg(feature = "local_fs")]
+            MainPageAction::PolarisCancelSignIn => {
+                PolarisSignIn::handle(ctx).update(ctx, |sign_in, ctx| sign_in.cancel(ctx));
+            }
+            #[cfg(feature = "local_fs")]
+            MainPageAction::PolarisSignOut => {
+                PolarisSignIn::handle(ctx).update(ctx, |sign_in, ctx| sign_in.sign_out(ctx));
+            }
         }
     }
 }
@@ -278,10 +301,15 @@ impl MainSettingsPageView {
             ctx.notify();
         });
 
+        #[cfg(feature = "local_fs")]
+        let polaris_address = Self::polaris_address_input(ctx);
+
         let mut widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
             Box::new(AccountWidget::default()),
             Box::new(DividerWidget {}),
         ];
+        #[cfg(feature = "local_fs")]
+        widgets.push(Box::new(PolarisAccountWidget::default()));
 
         widgets.push(Box::new(SettingsSyncWidget::default()));
 
@@ -310,7 +338,50 @@ impl MainSettingsPageView {
             self_handle: ctx.handle(),
             page,
             auth_state,
+            #[cfg(feature = "local_fs")]
+            polaris_address,
         }
+    }
+
+    #[cfg(feature = "local_fs")]
+    fn polaris_address_input(ctx: &mut ViewContext<Self>) -> ViewHandle<EditorView> {
+        let input = ctx.add_typed_action_view(|ctx| {
+            let appearance = Appearance::as_ref(ctx);
+            let mut editor = EditorView::single_line(
+                SingleLineEditorOptions {
+                    text: TextOptions {
+                        font_size_override: Some(REGULAR_TEXT_FONT_SIZE),
+                        font_family_override: Some(appearance.ui_font_family()),
+                        ..Default::default()
+                    },
+                    soft_wrap: false,
+                    ..Default::default()
+                },
+                ctx,
+            );
+            editor.set_placeholder_text("polaris.example.com", ctx);
+            editor
+        });
+        if let Some(account) = PolarisSignIn::account(ctx) {
+            input.update(ctx, |editor, ctx| {
+                editor.set_buffer_text(&account.origin, ctx)
+            });
+        }
+        ctx.subscribe_to_view(&input, |me, _, event, ctx| {
+            if matches!(event, crate::editor::Event::Enter) {
+                me.sign_in_to_polaris(ctx);
+            }
+        });
+        ctx.subscribe_to_model(&PolarisSignIn::handle(ctx), |_, _, _, ctx| {
+            ctx.notify();
+        });
+        input
+    }
+
+    #[cfg(feature = "local_fs")]
+    fn sign_in_to_polaris(&mut self, ctx: &mut ViewContext<Self>) {
+        let address = self.polaris_address.as_ref(ctx).buffer_text(ctx);
+        PolarisSignIn::handle(ctx).update(ctx, |sign_in, ctx| sign_in.sign_in(&address, ctx));
     }
 
     fn handle_autoupdate_state_change(
@@ -1273,5 +1344,153 @@ impl SettingsPageMeta for MainSettingsPageView {
 impl From<ViewHandle<MainSettingsPageView>> for SettingsPageViewHandle {
     fn from(view_handle: ViewHandle<MainSettingsPageView>) -> Self {
         SettingsPageViewHandle::Main(view_handle)
+    }
+}
+
+/// The Polaris account this terminal signs in to: the address, the code to
+/// approve while a sign-in is open, and Sign out once it is signed in.
+#[cfg(feature = "local_fs")]
+#[derive(Default)]
+struct PolarisAccountWidget {
+    primary_button: MouseStateHandle,
+    secondary_button: MouseStateHandle,
+}
+
+#[cfg(feature = "local_fs")]
+impl PolarisAccountWidget {
+    fn button(
+        &self,
+        appearance: &Appearance,
+        primary: bool,
+        label: &str,
+        action: Option<MainPageAction>,
+    ) -> Box<dyn Element> {
+        let (variant, mouse_state) = if primary {
+            (ButtonVariant::Accent, self.primary_button.clone())
+        } else {
+            (ButtonVariant::Secondary, self.secondary_button.clone())
+        };
+        let button = appearance
+            .ui_builder()
+            .button(variant, mouse_state)
+            .with_text_label(label.to_owned());
+        match action {
+            Some(action) => button
+                .build()
+                .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
+                .finish(),
+            None => button.disabled().build().finish(),
+        }
+    }
+}
+
+#[cfg(feature = "local_fs")]
+impl SettingsWidget for PolarisAccountWidget {
+    type View = MainSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "polaris account sign in sign out log in address instance server"
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let row = |first: Box<dyn Element>, second: Box<dyn Element>| {
+            Flex::row()
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_child(first)
+                .with_child(Container::new(second).with_margin_left(8.).finish())
+                .finish()
+        };
+        let address_input = || {
+            ConstrainedBox::new(
+                appearance
+                    .ui_builder()
+                    .text_input(view.polaris_address.clone())
+                    .with_style(UiComponentStyles {
+                        padding: Some(Coords::uniform(6.)),
+                        ..Default::default()
+                    })
+                    .build()
+                    .finish(),
+            )
+            .with_width(240.)
+            .finish()
+        };
+
+        let state = PolarisSignIn::as_ref(app).state();
+        let (description, child) = if let Some(account) = PolarisSignIn::account(app) {
+            (
+                format!("Signed in to {}.", account.origin),
+                self.button(
+                    appearance,
+                    false,
+                    "Sign out",
+                    Some(MainPageAction::PolarisSignOut),
+                ),
+            )
+        } else {
+            match state {
+                SignInState::Checking => (
+                    "Opening a sign-in on your Polaris...".to_owned(),
+                    row(
+                        address_input(),
+                        self.button(appearance, true, "Signing in...", None),
+                    ),
+                ),
+                SignInState::Waiting {
+                    user_code,
+                    approve_url,
+                } => (
+                    format!(
+                        "Approve code {user_code} in Polaris Desktop or on the page that opened in your browser."
+                    ),
+                    row(
+                        self.button(
+                            appearance,
+                            true,
+                            "Open the approval page",
+                            Some(MainPageAction::OpenUrl(approve_url.clone())),
+                        ),
+                        self.button(
+                            appearance,
+                            false,
+                            "Cancel",
+                            Some(MainPageAction::PolarisCancelSignIn),
+                        ),
+                    ),
+                ),
+                SignInState::Idle | SignInState::Failed(_) => (
+                    match state {
+                        SignInState::Failed(reason) => reason.clone(),
+                        _ => "The address you open Polaris at in the browser.".to_owned(),
+                    },
+                    row(
+                        address_input(),
+                        self.button(
+                            appearance,
+                            true,
+                            "Sign in",
+                            Some(MainPageAction::PolarisSignIn),
+                        ),
+                    ),
+                ),
+            }
+        };
+
+        Container::new(render_body_item::<MainPageAction>(
+            "Polaris".into(),
+            None,
+            LocalOnlyIconState::Hidden,
+            ToggleState::Enabled,
+            appearance,
+            child,
+            Some(description),
+        ))
+        .with_margin_top(VERTICAL_MARGIN)
+        .finish()
     }
 }

@@ -41,6 +41,25 @@ pub fn stored(ctx: &AppContext) -> Option<PolarisAccount> {
     })
 }
 
+/// Saves the account after a sign-in. The key is a secret, so a platform that
+/// falls back to a file keeps that file readable by this user only.
+pub fn store(account: &PolarisAccount, ctx: &AppContext) -> anyhow::Result<()> {
+    let storage = ctx.secure_storage();
+    storage.write_value_with_owner_only_fallback(INSTANCE_KEY, &account.origin)?;
+    storage.write_value_with_owner_only_fallback(TERMINAL_KEY, &account.key)?;
+    Ok(())
+}
+
+/// Forgets the account after a sign-out.
+pub fn clear(ctx: &AppContext) {
+    let storage = ctx.secure_storage();
+    for key in [TERMINAL_KEY, INSTANCE_KEY] {
+        if let Err(error) = storage.remove_value(key) {
+            log::debug!("Could not remove {key} from secure storage: {error}");
+        }
+    }
+}
+
 /// The relay address for an instance origin: `https` becomes `wss`, `http` `ws`.
 pub fn relay_url(origin: &str) -> Option<String> {
     let origin = origin.trim_end_matches('/');

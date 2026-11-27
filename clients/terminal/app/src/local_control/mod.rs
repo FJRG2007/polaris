@@ -95,6 +95,7 @@ use permissions::{ensure_action_allowed, ensure_protocol_version};
 use pterm_core::channel::ChannelState;
 use ptermui::{Entity, ModelContext, ModelSpawner, SingletonEntity};
 pub use relay::PolarisRelay;
+pub(crate) use relay::user_agent;
 #[cfg(unix)]
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
