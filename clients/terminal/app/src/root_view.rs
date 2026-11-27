@@ -2819,9 +2819,9 @@ impl RootView {
                         ctx
                     );
                 }
-                let upgrade_url = AuthManager::handle(ctx)
-                    .update(ctx, |auth_manager, _| auth_manager.upgrade_url());
-                ctx.open_url(&upgrade_url);
+                // Polaris has no upgrade page: a plan reaches this app through
+                // the Polaris sign-in.
+                self.open_polaris_sign_in_from_onboarding(ctx);
             }
             AgentOnboardingEvent::UpgradePasteTokenFromClipboardRequested => {
                 // A plan bought on the instance reaches this app through the

@@ -38,9 +38,9 @@ use crate::ai::pricing_promotion::{
 use crate::ai::request_usage_model::{
     AIRequestUsageModel, AIRequestUsageModelEvent, AMBIENT_AGENT_TRIAL_CREDIT_THRESHOLD,
 };
-use crate::auth::auth_manager::AuthManager;
 use crate::search::slash_command_menu::static_commands::commands;
 use crate::settings::AISettings;
+use crate::settings_view::SettingsSection;
 use crate::terminal::input::buffer_model::{InputBufferModel, InputBufferUpdateEvent};
 use crate::terminal::input::message_bar::attached_context::{
     AttachedBlocksMessageProducer, AttachedContextArgs, AttachedTextSelectionMessageProducer,
@@ -480,9 +480,11 @@ impl TypedActionView for AgentMessageBar {
                 PricingPromotionState::handle(ctx).update(ctx, |state, ctx| {
                     state.record_clicked(PricingPromotionSurface::AgentMessageBar, ctx);
                 });
-                let upgrade_url = AuthManager::handle(ctx)
-                    .update(ctx, |auth_manager, _| auth_manager.upgrade_url());
-                ctx.open_url(&upgrade_url);
+                // A plan reaches this app through the Polaris account, so the
+                // promotion opens the sign-in instead of a web upgrade page.
+                ctx.dispatch_typed_action(&WorkspaceAction::ShowSettingsPage(
+                    SettingsSection::Account,
+                ));
             }
             AgentMessageBarAction::DismissPricingPromotion => {
                 PricingPromotionState::handle(ctx).update(ctx, |state, ctx| {
