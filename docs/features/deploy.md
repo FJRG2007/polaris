@@ -112,3 +112,27 @@ A project has two services: `egress-proxy`, an authenticated HTTP proxy, and
 
 To change the password, change it in `egress-proxy` and redeploy both
 services: `worker` picks up the new value when it deploys.
+
+## Keeping your servers safe
+
+**Servers > Security** keeps every machine Polaris manages patched and closed,
+without being asked:
+
+- **Firewall.** A server with no firewall gets one, as long as nothing it is
+  already serving would be cut off and no other firewall is in charge. If the
+  server stops answering, the change undoes itself within two minutes. Turning
+  it off yourself is respected for good.
+- **Security updates.** Automatic security updates are turned on once, unless
+  somebody already chose. When an update needs a restart, Polaris schedules it
+  for 04:30 server time. If players were on a game server in the last day, or a
+  deploy is under way, it asks you first instead.
+- **Restart now.** On the **Host** tab, **Restart now** restarts the server a
+  minute later to finish its updates; **Cancel restart** still calls it off in
+  that minute. The alert clears by itself once the server is back.
+- **SSH sign-in.** The review lists every key that can still sign in, by account
+  and fingerprint, and marks the one Polaris uses. Password sign-in is only
+  turned off when a key still gets in, and undoes itself if it does not.
+
+Each alert opens the exact setting it is about. If the machine Polaris runs on
+needs a Polaris update for one of these, the screen says so and offers the
+update.

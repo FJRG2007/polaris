@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { ErrorLine } from "./error-line";
 import * as actions from "../actions/security";
 import type { SecurityTranslator } from "../lib/i18n";
 import {
@@ -135,6 +136,37 @@ function Names({ names }: { names: readonly string[] }) {
     );
 }
 
+/** The keys that keep signing in, by account, with Polaris's own named. */
+export function KeyList({ t, keys }: { t: SecurityTranslator; keys: View["keys"] }) {
+    return (
+        <ul className="flex max-h-56 flex-col gap-2 overflow-y-auto">
+            {keys.map((key) => (
+                <li key={`${key.account} ${key.fingerprint}`} className="flex min-w-0 flex-col gap-0.5">
+                    <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate font-mono" title={key.account}>
+                            {key.account}
+                        </span>
+                        <span className="shrink-0 text-muted-foreground">{key.type}</span>
+                        {key.polaris ? (
+                            <Badge className="shrink-0" variant="neutral">
+                                {t("ssh.polarisKey")}
+                            </Badge>
+                        ) : null}
+                    </div>
+                    <span
+                        className="truncate text-xs text-muted-foreground"
+                        title={`${key.comment} ${key.fingerprint}`.trim()}
+                    >
+                        {key.polaris ? t("ssh.polarisKeyHint") : key.comment || t("ssh.noComment")}
+                        {" · "}
+                        <span className="font-mono">{key.fingerprint}</span>
+                    </span>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
 function ReviewDialog({
     t,
     targetId,
@@ -156,7 +188,7 @@ function ReviewDialog({
         void actions.sshAction({ targetId }).then((result) => {
             if (!live) return;
             if (!result.ok) {
-                setFailure(t(`errors.${result.error}` as never) || t("errors.failed"));
+                setFailure(result.error);
                 return;
             }
             setView(result.data);
@@ -186,7 +218,7 @@ function ReviewDialog({
                     <DialogDescription>{t("ssh.dialogHint")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-4 text-sm">
-                    {failure ? <p className="text-danger">{failure}</p> : null}
+                    {failure ? <ErrorLine t={t} code={failure} /> : null}
                     {!view && !failure ? <Skeleton className="h-32 w-full" /> : null}
                     {blocked ? <p className="text-warning">{t(`ssh.blocked.${blocked}`)}</p> : null}
                     {view ? (
@@ -194,6 +226,8 @@ function ReviewDialog({
                             <h3 className="font-medium">{t("ssh.keeps")}</h3>
                             {view.plan.keyed.length === 0 ? (
                                 <p className="text-muted-foreground">{t("ssh.keepsNone")}</p>
+                            ) : view.keys.length > 0 ? (
+                                <KeyList t={t} keys={view.keys} />
                             ) : (
                                 <Names names={view.plan.keyed} />
                             )}

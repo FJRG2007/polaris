@@ -28,7 +28,8 @@ describe("SSH hardening", () => {
                 { name: "root", keys: 0, password: true },
                 { name: "polaris", keys: 1, password: false },
                 { name: "bob", keys: 0, password: true }
-            ]
+            ],
+            keys: []
         });
         expect(model.parseSshLog("POLARIS_DISTRO id=debian")).toBeNull();
     });
@@ -96,5 +97,37 @@ describe("SSH hardening", () => {
         const argv = specs.hostArgv("ssh-apply", ["0f8c2a4e-1b2c"]);
         expect(argv.slice(-3)).toEqual([specs.UPDATES_SCRIPTS["ssh-apply"], "polaris", "0f8c2a4e-1b2c"]);
         expect(argv).toContain("--privileged");
+    });
+});
+
+const ED25519 = "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+
+describe("SSH keys in the status read", () => {
+    it("prints every account's key lines, capped, in the daemon's script too", () => {
+        const script = specs.UPDATES_SCRIPTS["ssh-status"];
+        expect(script).toContain('print "POLARIS_KEY=" u " "');
+        expect(script).toContain("n < 20");
+    });
+
+    it("reads keys with options and comments, and drops anything else", () => {
+        const report = model.parseSshLog(
+            [
+                "POLARIS_SSH=off",
+                `POLARIS_KEY=polaris ssh-ed25519 ${ED25519} polaris@dashboard`,
+                `POLARIS_KEY=alice from="10.0.0.1 x",no-pty ssh-ed25519 ${ED25519}`,
+                `POLARIS_KEY=bad;name ssh-ed25519 ${ED25519} x`,
+                "POLARIS_KEY=bob not-a-key at all",
+                "POLARIS_KEY=carol"
+            ].join("\n")
+        );
+        expect(report?.keys).toEqual([
+            { account: "polaris", type: "ssh-ed25519", blob: ED25519, comment: "polaris@dashboard" },
+            { account: "alice", type: "ssh-ed25519", blob: ED25519, comment: "" }
+        ]);
+    });
+
+    it("strips control characters from a comment", () => {
+        const line = model.parseKeyLine(`root ssh-ed25519 ${ED25519} me\u0007@box`);
+        expect(line?.comment).toBe("me@box");
     });
 });

@@ -112,3 +112,28 @@ y `worker`, que envía sus peticiones de salida a través de él.
 
 Para cambiar la contraseña, cámbiala en `egress-proxy` y vuelve a desplegar los
 dos servicios: `worker` recoge el valor nuevo al desplegarse.
+
+## Servidores seguros
+
+**Servidores > Seguridad** mantiene parcheada y cerrada cada máquina que
+gestiona Polaris, sin que lo pidas:
+
+- **Firewall.** Un servidor sin firewall recibe uno, siempre que no corte nada de
+  lo que ya sirve y que no mande otro firewall. Si el servidor deja de
+  responder, el cambio se deshace solo en dos minutos. Si lo apagas tú, se
+  respeta para siempre.
+- **Actualizaciones de seguridad.** Se activan una vez, salvo que alguien ya
+  eligiera. Cuando una necesita reiniciar, Polaris lo programa a las 04:30 hora
+  del servidor. Si hubo jugadores en un servidor de juegos el último día, o hay
+  un despliegue en marcha, te pregunta antes.
+- **Reiniciar ahora.** En la pestaña **Sistema**, **Reiniciar ahora** reinicia el
+  servidor un minuto después para terminar las actualizaciones; **Cancelar
+  reinicio** aún lo anula en ese minuto. El aviso se cierra solo cuando el
+  servidor vuelve.
+- **Acceso SSH.** La revisión lista cada llave que seguirá entrando, por cuenta
+  y huella, y marca la que usa Polaris. El acceso con contraseña solo se apaga
+  si una llave sigue entrando, y se deshace solo si no.
+
+Cada aviso abre el ajuste exacto del que habla. Si la máquina donde corre
+Polaris necesita una actualización de Polaris para algo de esto, la pantalla lo
+dice y ofrece la actualización.

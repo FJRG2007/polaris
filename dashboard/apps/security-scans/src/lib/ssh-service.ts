@@ -15,7 +15,8 @@
 import { prisma } from "@polaris/db";
 import { securityTFor } from "./i18n";
 import * as model from "../model/ssh";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { parseKey, publicKeyBlob } from "@polaris/ssh";
 import { host } from "@polaris/app-host";
 import { hostHref } from "../model/landing";
 import {
@@ -43,6 +44,58 @@ export interface SshView {
     readonly state: model.SshState;
     readonly plan: model.SshPlan;
     readonly choice: string | null;
+    /** The keys that keep signing in; Polaris's own is named. Empty when the
+     *  host service predates listing them. */
+    readonly keys: readonly SshKeyView[];
+}
+
+export interface SshKeyView {
+    readonly account: string;
+    readonly type: string;
+    readonly comment: string;
+    /** OpenSSH's `SHA256:` fingerprint, as `ssh-keygen -l` prints it. */
+    readonly fingerprint: string;
+    /** The key Polaris itself signs in to this server with. */
+    readonly polaris: boolean;
+}
+
+/** OpenSSH's fingerprint of a key blob: `SHA256:` and the unpadded base64 hash. */
+export function keyFingerprint(blob: string): string {
+    const digest = createHash("sha256").update(Buffer.from(blob, "base64")).digest("base64");
+    return `SHA256:${digest.replace(/=+$/, "")}`;
+}
+
+/** The public half of the key Polaris signs in with, as a blob; null locally,
+ *  with a password, or when it cannot be read. */
+async function polarisBlobOf(target: ScanTarget): Promise<string | null> {
+    if (isLocal(target)) return null;
+    try {
+        const { auth } = await host.hostService.getHostConnection(target.hostId!, target.ownerId);
+        if (auth.method !== "key" || !auth.privateKey) return null;
+        const parsed = parseKey(auth.privateKey, auth.passphrase);
+        const key = Array.isArray(parsed) ? parsed[0] : parsed;
+        if (!key || key instanceof Error) return null;
+        return key.getPublicSSH().toString("base64");
+    } catch {
+        return null;
+    }
+}
+
+/** The status read's keys as the dialog shows them: only real keys, with
+ *  Polaris's own named. Pure apart from the hash. */
+export function keyViews(
+    lines: readonly model.SshKeyLine[],
+    polarisBlob: string | null
+): SshKeyView[] {
+    return lines
+        .filter((line) => publicKeyBlob(`${line.type} ${line.blob}`) !== null)
+        .map((line) => ({
+            account: line.account,
+            type: line.type,
+            comment: line.comment,
+            fingerprint: keyFingerprint(line.blob),
+            polaris: line.blob === polarisBlob
+        }));
 }
 
 async function targetOf(targetId: string): Promise<ScanTarget> {
@@ -104,7 +157,8 @@ export async function readSsh(targetId: string): Promise<SshView> {
         sshHardened: plan.hardened,
         sshBlocked: plan.blocked
     });
-    return { state: report.state, plan, choice: setting?.sshChoice ?? null };
+    const keys = report.keys.length > 0 ? keyViews(report.keys, await polarisBlobOf(target)) : [];
+    return { state: report.state, plan, choice: setting?.sshChoice ?? null, keys };
 }
 
 /** Wait for the server to say the change held. Null when it never answered in time. */

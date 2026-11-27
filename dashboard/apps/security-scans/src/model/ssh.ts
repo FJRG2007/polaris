@@ -19,6 +19,16 @@ export interface SshAccount {
     readonly password: boolean;
 }
 
+/** A key in an account's `authorized_keys`, as the status read printed it. An
+ *  older host service's read prints none. */
+export interface SshKeyLine {
+    readonly account: string;
+    readonly type: string;
+    /** The key's base64 blob, which is what a fingerprint is taken of. */
+    readonly blob: string;
+    readonly comment: string;
+}
+
 export interface SshReport {
     readonly state: SshState;
     /** Whether sshd accepts a password today; null when it did not say. */
@@ -26,10 +36,30 @@ export interface SshReport {
     /** sshd's effective `permitrootlogin`; null when it did not say. */
     readonly rootLogin: string | null;
     readonly accounts: readonly SshAccount[];
+    readonly keys: readonly SshKeyLine[];
 }
 
 const STATES: readonly SshState[] = ["on", "armed", "off", "unavailable"];
 const MAX_ACCOUNTS = 200;
+const MAX_KEYS = 400;
+const ACCOUNT = /^[A-Za-z0-9._-]{1,64}$/;
+// Options may precede the type and hold quoted spaces, so the key is found by
+// its type rather than by position.
+const KEY_LINE = /(?:^|\s)((?:ssh-|ecdsa-|sk-)[A-Za-z0-9@._-]{1,64})\s+([A-Za-z0-9+/]{16,}={0,2})(?:\s+(.*))?$/;
+
+/** One `POLARIS_KEY=<account> <authorized_keys line>`, or null. Pure. */
+export function parseKeyLine(rest: string): SshKeyLine | null {
+    const space = rest.indexOf(" ");
+    if (space <= 0) return null;
+    const account = rest.slice(0, space);
+    if (!ACCOUNT.test(account)) return null;
+    const match = KEY_LINE.exec(rest.slice(space + 1));
+    if (!match) return null;
+    const [, type = "", blob = "", comment = ""] = match;
+    // eslint-disable-next-line no-control-regex
+    const clean = comment.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 200);
+    return { account, type, blob, comment: clean };
+}
 
 function value(line: string, key: string): string | null {
     return line.startsWith(`${key}=`) ? line.slice(key.length + 1).trim() : null;
@@ -42,6 +72,7 @@ export function parseSshLog(output: string): SshReport | null {
     let rootLogin: string | null = null;
     let kbd: boolean | null = null;
     const accounts: SshAccount[] = [];
+    const keys: SshKeyLine[] = [];
     for (const raw of output.split("\n")) {
         const line = raw.trim();
         const word = value(line, "POLARIS_SSH");
@@ -58,15 +89,18 @@ export function parseSshLog(output: string): SshReport | null {
         const account = value(line, "POLARIS_ACCOUNT");
         if (account && accounts.length < MAX_ACCOUNTS) {
             const [name = "", keys = "", password = ""] = account.split(/\s+/);
-            if (/^[A-Za-z0-9._-]{1,64}$/.test(name) && /^\d{1,6}$/.test(keys)) {
+            if (ACCOUNT.test(name) && /^\d{1,6}$/.test(keys)) {
                 accounts.push({ name, keys: Number(keys), password: password === "yes" });
             }
         }
+        const key = value(line, "POLARIS_KEY");
+        const parsed = key && keys.length < MAX_KEYS ? parseKeyLine(key) : null;
+        if (parsed) keys.push(parsed);
     }
     if (!state) return null;
     // Keyboard-interactive is a password prompt too, as far as a guesser is concerned.
     const anyPassword = passwordLogin === null && kbd === null ? null : Boolean(passwordLogin || kbd);
-    return { state, passwordLogin: anyPassword, rootLogin, accounts };
+    return { state, passwordLogin: anyPassword, rootLogin, accounts, keys };
 }
 
 export type SshBlocker = "unavailable" | "passwordLogin" | "noKeys";
