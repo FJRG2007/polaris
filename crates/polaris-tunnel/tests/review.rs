@@ -255,8 +255,9 @@ async fn media_stays_fast_under_inbound_bulk() {
     // The daemon itself drops none of the media: every drop it makes is
     // counted, and none is. What is lost is lost in the kernel, at the wire
     // socket the junk keeps full; how much depends on how much CPU the machine
-    // gives the daemon (0-2 on a quiet one, up to 10 on a loaded CI runner),
-    // so the bound only catches a broken path.
+    // gives the daemon (0-2 on a quiet one, up to 21 seen on a loaded CI
+    // runner on 2026-11-27), so the bound only catches a broken path, which
+    // loses most of the 150 to the 1 s timeout.
     for side in [pair.relay(), pair.house()] {
         let c = side.status.lock().unwrap().counters.clone();
         assert_eq!(
@@ -265,7 +266,7 @@ async fn media_stays_fast_under_inbound_bulk() {
             "the daemon dropped media"
         );
     }
-    assert!(lost <= 15, "{lost} of 150 media datagrams lost");
+    assert!(lost <= 40, "{lost} of 150 media datagrams lost");
     // Latency is bounded the same way: a quiet machine sees a p95 of a few ms, a
     // loaded CI runner has shown 121 ms, and a broken path (media queued behind
     // the bulk, or waiting out a turn) shows up as the 1 s timeout instead.
