@@ -7,6 +7,7 @@
  * than back in history, where the settings page visited before this one is.
  */
 
+import { cn, settingType } from "@polaris/ui";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -31,7 +32,7 @@ export function SettingsBack({ label }: { label: string }) {
                     // Nothing to forget.
                 }
             }}
-            className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            className={cn(settingType.small, "inline-flex w-fit items-center gap-1 text-muted-foreground hover:text-foreground")}
         >
             <ArrowLeft aria-hidden className="size-3.5 shrink-0" />
             {label}

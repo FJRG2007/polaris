@@ -19,7 +19,7 @@ import * as vaultCrypto from "@/lib/vault/crypto";
 import { readImportFile } from "@/lib/vault/portability";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { importRefusalText } from "../vault-labels";
-import { Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { Card, CardBody, CardHeader, CardTitle, cn, Input, settingType } from "@polaris/ui";
 import { decryptFolders, encryptItem, type VaultItem } from "../vault-model";
 import { saveFolderAction, saveItemAction, vaultContentsAction } from "../vault-actions";
 
@@ -92,7 +92,7 @@ export function VaultImport({ vaultKey }: { vaultKey: vaultCrypto.SymmetricKey |
                 <CardTitle>{t("port.import")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {t("port.importIntro")}
                 </p>
                 <Input
@@ -107,19 +107,19 @@ export function VaultImport({ vaultKey }: { vaultKey: vaultCrypto.SymmetricKey |
                     aria-label={t("port.file")}
                 />
                 {progress ? (
-                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "flex items-center gap-2 text-muted-foreground")}>
                         <Loader2 className="size-4 animate-spin" />
                         {t("port.progress", { done: progress.done, total: progress.total })}
                     </p>
                 ) : null}
                 {done ? (
-                    <p className="flex items-center gap-2 text-sm text-success">
+                    <p className={cn(settingType.body, "flex items-center gap-2 text-success")}>
                         <Upload className="size-4" />
                         {done}
                     </p>
                 ) : null}
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
-                <p className="text-xs text-muted-foreground">
+                {error ? <p className={settingType.error}>{error}</p> : null}
+                <p className={settingType.hint}>
                     {t.rich("port.kdbxNote", { code: (chunks) => <code>{chunks}</code> })}
                 </p>
             </CardBody>

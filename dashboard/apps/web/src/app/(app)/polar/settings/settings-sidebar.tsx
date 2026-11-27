@@ -35,7 +35,7 @@ import { SettingsBack } from "./settings-back";
 import { useWide } from "@/components/polar/use-wide";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { SIDEBAR_KEY, readStored, writeStored } from "@/lib/polar/stored";
-import { Button, Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogTitle, cn, settingType } from "@polaris/ui";
 import { settingsSection, type PolarSettingsSection } from "@/lib/polar/settings-path";
 
 const ICONS: Record<PolarSettingsSection, ComponentType<{ className?: string }>> = {
@@ -100,7 +100,7 @@ function SettingsNav({
             <div className="flex min-w-0 items-center gap-2 px-3 pb-2 pt-3">
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <SettingsBack label={t("settings.back")} />
-                    <p className="truncate text-sm font-semibold text-foreground">
+                    <p className={cn(settingType.body, "truncate font-semibold text-foreground")}>
                         {t("settings.title")}
                     </p>
                 </div>
@@ -140,7 +140,7 @@ function SettingsNav({
                             className="flex flex-col gap-0.5 pt-3 first:pt-0"
                         >
                             {heading ? (
-                                <p className="truncate px-2 pb-1 text-[0.6875rem] font-medium text-foreground-subtle">
+                                <p className={cn(settingType.hint, "truncate px-2 pb-1 font-medium")}>
                                     {heading}
                                 </p>
                             ) : null}
@@ -155,7 +155,7 @@ function SettingsNav({
                                         href={href}
                                         aria-current={current ? "page" : undefined}
                                         className={cn(
-                                            "flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-card hover:text-foreground",
+                                            settingType.body, "flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 hover:bg-card hover:text-foreground",
                                             current
                                                 ? "bg-card text-foreground"
                                                 : "text-muted-foreground"

@@ -26,7 +26,17 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { VaultPasskeyChoice } from "@/lib/vault/passkey-schema";
 import { stepUpRemainingAction } from "@/app/(app)/account/step-up-actions";
-import { Button, Card, CardBody, CardHeader, CardTitle, Skeleton, Switch } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    cn,
+    settingType,
+    Skeleton,
+    Switch
+} from "@polaris/ui";
 import {
     enrollVaultPasskeyAction,
     removeVaultPasskeyAction,
@@ -185,11 +195,11 @@ export function VaultPasskeys() {
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">{t("passkeys.body")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("passkeys.body")}</p>
                 {unavailable ? (
                     <p
                         id="vault-passkeys-unavailable"
-                        className="text-sm text-muted-foreground"
+                        className={cn(settingType.body, "text-muted-foreground")}
                         data-testid="passkey-unavailable"
                     >
                         {support === "no-prf"
@@ -198,7 +208,7 @@ export function VaultPasskeys() {
                     </p>
                 ) : null}
                 {loadFailed ? (
-                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <div className={cn(settingType.body, "flex flex-wrap items-center gap-2")}>
                         <span className="text-danger">{t("passkeys.loadFailed")}</span>
                         <Button variant="secondary" size="sm" onClick={() => void load()}>
                             {t("passkeys.retry")}
@@ -210,7 +220,7 @@ export function VaultPasskeys() {
                         <Skeleton className="h-11 w-full" />
                     </div>
                 ) : choices.length === 0 ? (
-                    <p className="text-sm text-muted-foreground" data-testid="passkey-none">
+                    <p className={cn(settingType.body, "text-muted-foreground")} data-testid="passkey-none">
                         {t("passkeys.none")}{" "}
                         <Link href={SECURITY_PATH} className="underline">
                             {t("passkeys.openSecurity")}
@@ -240,12 +250,12 @@ export function VaultPasskeys() {
                                     >
                                         <div className="min-w-0 flex-1">
                                             <p
-                                                className="truncate text-sm font-medium"
+                                                className={cn(settingType.body, "truncate font-medium")}
                                                 title={name}
                                             >
                                                 {name}
                                             </p>
-                                            <p className="truncate text-xs text-muted-foreground">
+                                            <p className={cn(settingType.hint, "truncate")}>
                                                 {!choice.vault ? (
                                                     t("passkeys.off")
                                                 ) : choice.vault.lastUsedAt ? (
@@ -303,14 +313,14 @@ export function VaultPasskeys() {
                         </ul>
                         <Link
                             href={SECURITY_PATH}
-                            className="self-start text-xs text-muted-foreground underline"
+                            className={cn(settingType.hint, "self-start underline")}
                         >
                             {t("passkeys.manage")}
                         </Link>
                     </>
                 )}
-                {done ? <p className="text-sm text-success">{done}</p> : null}
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {done ? <p className={cn(settingType.body, "text-success")}>{done}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
                 <StepUpDialog
                     open={asking !== null}
                     purpose={PURPOSE}

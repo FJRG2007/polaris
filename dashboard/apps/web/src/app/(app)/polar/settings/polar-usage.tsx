@@ -12,7 +12,7 @@
 import { useEffect, useState } from "react";
 import { IntegrationLogo } from "@/components/logos";
 import { RelativeTime } from "@/components/relative-time";
-import { Badge, Skeleton, cn } from "@polaris/ui";
+import { Badge, Skeleton, cn, settingType } from "@polaris/ui";
 import { modelLabel } from "@/components/polar/routing-editor";
 import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
 import type { RoutingUsage } from "@/lib/polar/routing-screen";
@@ -58,7 +58,7 @@ function CodeUsageCard() {
         <section className="flex min-w-0 flex-col gap-4">
             <div className="min-w-0">
                 <h2 className="text-sm font-medium text-foreground">{t("codeUsage.title")}</h2>
-                <p className="text-xs text-muted-foreground">{t("codeUsage.intro")}</p>
+                <p className={settingType.hint}>{t("codeUsage.intro")}</p>
             </div>
             {usage ? (
                 <>
@@ -82,7 +82,7 @@ function CodeUsageCard() {
                     <div className="flex min-w-0 flex-col gap-2">
                         <h3 className="text-xs font-medium text-foreground">{t("codeUsage.limits")}</h3>
                         {usage.limits.length === 0 ? (
-                            <p className="rounded-md border border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                            <p className={cn(settingType.small, "rounded-md border border-border px-3 py-4 text-center text-muted-foreground")}>
                                 {t("codeUsage.noLimits")}
                             </p>
                         ) : (
@@ -91,11 +91,11 @@ function CodeUsageCard() {
                                     <li key={row.id} className="flex min-w-0 flex-col gap-0.5 px-3 py-2">
                                         <Link
                                             href={`/polar?session=${encodeURIComponent(row.sessionId)}`}
-                                            className="min-w-0 truncate text-sm text-foreground hover:underline"
+                                            className={cn(settingType.body, "min-w-0 truncate text-foreground hover:underline")}
                                         >
                                             {t(`codeUsage.outcome.${row.outcome}`, { agent: label(row.cli) })}
                                         </Link>
-                                        <p className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                                        <p className={cn(settingType.hint, "flex flex-wrap gap-x-2")}>
                                             <RelativeTime iso={row.at} />
                                             {row.resetAt ? (
                                                 <span className="inline-flex gap-1">
@@ -111,7 +111,7 @@ function CodeUsageCard() {
                     </div>
                 </>
             ) : failed ? (
-                <p className="text-xs text-muted-foreground" role="alert">
+                <p className={settingType.hint} role="alert">
                     {t("codeUsage.error")}
                 </p>
             ) : (
@@ -167,7 +167,7 @@ function UsageCard({ providers }: { providers: ModelSelectorProvider[] | null })
         <section className="flex min-w-0 flex-col gap-4">
             <div className="min-w-0">
                 <h2 className="text-sm font-medium text-foreground">{t("routing.usage.title")}</h2>
-                <p className="text-xs text-muted-foreground">{t("routing.usage.intro")}</p>
+                <p className={settingType.hint}>{t("routing.usage.intro")}</p>
             </div>
             {usage ? (
                 <>
@@ -213,7 +213,7 @@ function UsageCard({ providers }: { providers: ModelSelectorProvider[] | null })
                             {t("routing.usage.fallbacks")}
                         </h3>
                         {usage.fallbacks.length === 0 ? (
-                            <p className="rounded-md border border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                            <p className={cn(settingType.small, "rounded-md border border-border px-3 py-4 text-center text-muted-foreground")}>
                                 {t("routing.usage.noFallbacks")}
                             </p>
                         ) : (
@@ -223,13 +223,13 @@ function UsageCard({ providers }: { providers: ModelSelectorProvider[] | null })
                                         key={`${row.at}:${index}`}
                                         className="flex min-w-0 flex-col gap-0.5 px-3 py-2"
                                     >
-                                        <p className="min-w-0 truncate text-sm text-foreground">
+                                        <p className={cn(settingType.body, "min-w-0 truncate text-foreground")}>
                                             {t("routing.usage.fellBack", {
                                                 from: modelOf(row.from),
                                                 to: modelOf(`${row.provider}/${row.model}`)
                                             })}
                                         </p>
-                                        <p className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                                        <p className={cn(settingType.hint, "flex flex-wrap gap-x-2")}>
                                             <RelativeTime iso={row.at} />
                                             <span>{reason(row.kind)}</span>
                                             <span>{surface(row.surface)}</span>
@@ -241,7 +241,7 @@ function UsageCard({ providers }: { providers: ModelSelectorProvider[] | null })
                     </div>
                 </>
             ) : failed ? (
-                <p className="text-xs text-muted-foreground" role="alert">
+                <p className={settingType.hint} role="alert">
                     {t("routing.errors.usage")}
                 </p>
             ) : (
@@ -287,7 +287,7 @@ function UsageTable({
         <div className="flex min-w-0 flex-col gap-2">
             <h3 className="text-xs font-medium text-foreground">{caption}</h3>
             <div className="overflow-x-auto rounded-md border border-border">
-                <table className="w-full text-sm">
+                <table className={cn(settingType.body, "w-full")}>
                     <thead className="bg-surface/60 text-start">
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">{first}</th>
@@ -305,7 +305,7 @@ function UsageTable({
                     <tbody>
                         {rows.length === 0 ? (
                             <tr>
-                                <td colSpan={4} className="px-3 py-4 text-center text-xs text-muted-foreground">
+                                <td colSpan={4} className={cn(settingType.hint, "px-3 py-4 text-center")}>
                                     {empty}
                                 </td>
                             </tr>
@@ -335,7 +335,7 @@ function UsageTable({
                                         {row.detail || row.hint ? (
                                             <span
                                                 className={cn(
-                                                    "block truncate text-xs text-muted-foreground",
+                                                    settingType.hint, "block truncate",
                                                     row.logo && "ps-6"
                                                 )}
                                                 title={[row.detail, row.hint].filter(Boolean).join(" - ")}

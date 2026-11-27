@@ -37,18 +37,9 @@
     "apps/deploy/settings/members-section.tsx": 2,
     "apps/deploy/settings/tokens-section.tsx": 2,
     "apps/deploy/settings/usage-section.tsx": 1,
-    "mail/settings/settings-nav.tsx": 1,
     "polar/settings/permission-rules-editor.tsx": 1,
     "polar/settings/polar-custom-tools.tsx": 1,
     "polar/settings/polar-routing.tsx": 1,
     "polar/settings/polar-skill-import.tsx": 2,
-    "polar/settings/polar-usage-report.tsx": 1,
-    "polar/settings/polar-usage.tsx": 13,
-    "polar/settings/settings-back.tsx": 1,
-    "polar/settings/settings-sidebar.tsx": 3,
-    "polar/settings/skill-detail-dialog.tsx": 5,
-    "vault/settings/vault-export.tsx": 3,
-    "vault/settings/vault-import.tsx": 5,
-    "vault/settings/vault-passkeys.tsx": 9,
-    "vault/settings/vault-settings.tsx": 17
+    "polar/settings/polar-usage-report.tsx": 1
 }

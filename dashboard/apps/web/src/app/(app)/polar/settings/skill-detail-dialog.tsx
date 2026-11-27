@@ -13,6 +13,7 @@ import { Eye, GitMerge, Pencil, RotateCcw } from "lucide-react";
 import {
     Badge,
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -208,7 +209,7 @@ export function SkillDetailDialog({
 
                 <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain [&>*]:shrink-0">
                     {failed !== null ? (
-                        <div role="alert" className="flex flex-col items-start gap-2 text-sm">
+                        <div role="alert" className={cn(settingType.body, "flex flex-col items-start gap-2")}>
                             <p className="text-danger">{failed || t("settings.skills.upstream.loadFailed")}</p>
                             <Button type="button" size="sm" variant="outline" onClick={() => setAttempt((n) => n + 1)}>
                                 {t("settings.skills.upstream.retry")}
@@ -240,7 +241,7 @@ export function SkillDetailDialog({
                                 />
                             ) : null}
                             {tierLayer?.upstreamChanged ? (
-                                <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm text-warning-ink">
+                                <div className={cn(settingType.body, "flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-warning-ink")}>
                                     <p>{t("settings.skills.upstream.movedBody")}</p>
                                     {!readOnly ? (
                                         <div className="flex flex-wrap gap-2">
@@ -291,7 +292,7 @@ export function SkillDetailDialog({
                                 />
                             ) : null}
                             {tab === "edit" && editable ? (
-                                <div className="flex flex-col gap-3 text-sm">
+                                <div className={cn(settingType.body, "flex flex-col gap-3")}>
                                     <div className="flex flex-col gap-1">
                                         <label htmlFor="skill-override-description">{t("settings.skills.editor.description")} *</label>
                                         <Input
@@ -312,7 +313,7 @@ export function SkillDetailDialog({
                                             className="max-h-[45dvh]"
                                             onChange={(instructions) => setDraft((current) => ({ ...current, instructions }))}
                                         />
-                                        <span className={conflicted ? "text-xs text-danger" : "text-xs text-muted-foreground"}>
+                                        <span className={conflicted ? settingType.error : settingType.hint}>
                                             {conflicted
                                                 ? t("settings.skills.upstream.conflicts")
                                                 : draft.instructions.length > layers.OVERRIDE_INSTRUCTIONS_MAX

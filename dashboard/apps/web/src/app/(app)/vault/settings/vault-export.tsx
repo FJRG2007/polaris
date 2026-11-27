@@ -19,7 +19,16 @@ import { useVaultSession } from "../vault-session";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { vaultContentsAction } from "../vault-actions";
 import { decryptFolders, decryptItem, type VaultItem } from "../vault-model";
-import { Button, Card, CardBody, CardHeader, CardTitle, Select } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    cn,
+    Select,
+    settingType
+} from "@polaris/ui";
 import { EXPORT_FORMATS, writeExport, type ExportFormat } from "@/lib/vault/portability";
 
 export function VaultExport({
@@ -106,7 +115,7 @@ export function VaultExport({
                 <CardTitle>{t("port.export")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">
+                <p className={cn(settingType.body, "text-muted-foreground")}>
                     {t("port.exportIntro")}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
@@ -129,8 +138,8 @@ export function VaultExport({
                         {t("port.export")}
                     </Button>
                 </div>
-                {notice ? <p className="text-sm text-muted-foreground">{notice}</p> : null}
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                {notice ? <p className={cn(settingType.body, "text-muted-foreground")}>{notice}</p> : null}
+                {error ? <p className={settingType.error}>{error}</p> : null}
             </CardBody>
         </Card>
     );

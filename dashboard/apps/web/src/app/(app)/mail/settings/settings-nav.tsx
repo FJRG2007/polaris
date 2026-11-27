@@ -4,7 +4,7 @@
  *  vertical rail beside a vertical rail is a maze. */
 
 import Link from "next/link";
-import { cn } from "@polaris/ui";
+import { cn, settingType } from "@polaris/ui";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -45,7 +45,7 @@ export function SettingsNav() {
                         aria-current={pathname === href ? "page" : undefined}
                         className={cn(
                             // One line per tab; the row wraps between tabs instead.
-                            "whitespace-nowrap rounded-md px-2.5 py-1 text-[13px]",
+                            settingType.body, "whitespace-nowrap rounded-md px-2.5 py-1",
                             pathname === href
                                 ? "bg-card font-medium text-foreground"
                                 : "text-muted-foreground hover:bg-card hover:text-foreground"

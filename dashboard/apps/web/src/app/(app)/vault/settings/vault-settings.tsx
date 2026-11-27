@@ -23,7 +23,18 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { validationMessage } from "@/components/i18n/validation-message";
 import { unlockTimeoutLabel } from "../vault-labels";
 import { Clock, Loader2, ShieldAlert, Trash2 } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select, Switch } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    cn,
+    Input,
+    Select,
+    settingType,
+    Switch
+} from "@polaris/ui";
 import {
     changeMasterPasswordAction,
     deauthorizeVaultAction,
@@ -187,7 +198,7 @@ export function VaultSettings() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("settings.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">{t("settings.intro")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.intro")}</p>
             </div>
 
             <Card>
@@ -196,7 +207,7 @@ export function VaultSettings() {
                 </CardHeader>
                 <CardBody>
                     <form onSubmit={onChangePassword} className="flex flex-col gap-3">
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("settings.currentMaster")}
                             <Input
                                 type="password"
@@ -205,7 +216,7 @@ export function VaultSettings() {
                                 onChange={(event) => setCurrent(event.target.value)}
                             />
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("settings.newMaster")}
                             {/* enigma:allow-no-breach-check enigma:allow-identity-password
                                 Both run here, in usePasswordSafety. Neither can run
@@ -218,8 +229,8 @@ export function VaultSettings() {
                                 onChange={(event) => setNext(event.target.value)}
                             />
                         </label>
-                        {unsafe ? <p className="text-sm text-danger">{unsafe}</p> : null}
-                        <label className="flex flex-col gap-1 text-sm">
+                        {unsafe ? <p className={settingType.error}>{unsafe}</p> : null}
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("settings.again")}
                             {/* enigma:allow-no-breach-check enigma:allow-identity-password
                                 A confirmation of the field above, not a second secret. */}
@@ -230,7 +241,7 @@ export function VaultSettings() {
                                 onChange={(event) => setConfirmValue(event.target.value)}
                             />
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("settings.polarisPassword")}
                             {/* enigma:allow-no-breach-check enigma:allow-identity-password
                                 The existing account password, typed to prove who this
@@ -243,11 +254,11 @@ export function VaultSettings() {
                                 value={accountPassword}
                                 onChange={(event) => setAccountPassword(event.target.value)}
                             />
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("settings.polarisPasswordHint")}
                             </span>
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className={cn(settingType.body, "flex flex-col gap-1")}>
                             {t("settings.kdf")}
                             <Select
                                 value={nextKdf}
@@ -255,12 +266,12 @@ export function VaultSettings() {
                                 options={kdfOptions}
                                 aria-label={t("settings.kdfLabel")}
                             />
-                            <span className="text-xs text-muted-foreground">
+                            <span className={settingType.hint}>
                                 {t("settings.kdfHint")}
                             </span>
                         </label>
-                        {done ? <p className="text-sm text-success">{done}</p> : null}
-                        {error ? <p className="text-sm text-danger">{error}</p> : null}
+                        {done ? <p className={cn(settingType.body, "text-success")}>{done}</p> : null}
+                        {error ? <p className={settingType.error}>{error}</p> : null}
                         <div className="flex justify-end">
                             <Button
                                 type="submit"
@@ -283,8 +294,8 @@ export function VaultSettings() {
                     <CardTitle>{t("settings.icons")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
-                    <p className="text-sm text-muted-foreground">{t("settings.iconsBody")}</p>
-                    <label className="flex items-center gap-3 text-sm">
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.iconsBody")}</p>
+                    <label className={cn(settingType.body, "flex items-center gap-3")}>
                         <Switch
                             checked={favicons}
                             onChange={(next) => {
@@ -308,7 +319,7 @@ export function VaultSettings() {
                     <CardTitle>{t("settings.apps")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-muted-foreground">{t("settings.appsBody")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.appsBody")}</p>
                     <Button
                         variant="secondary"
                         onClick={async () => {
@@ -329,7 +340,7 @@ export function VaultSettings() {
                     </CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
-                    <p className="text-sm text-muted-foreground">{t("settings.timeoutBody")}</p>
+                    <p className={cn(settingType.body, "text-muted-foreground")}>{t("settings.timeoutBody")}</p>
                     <Select
                         value={lockAfter}
                         onValueChange={async (value) => {
@@ -354,7 +365,7 @@ export function VaultSettings() {
                             label: unlockTimeoutLabel(t, minutes)
                         }))}
                     />
-                    <p className="text-xs text-muted-foreground">{t("settings.timeoutNote")}</p>
+                    <p className={settingType.hint}>{t("settings.timeoutNote")}</p>
                 </CardBody>
             </Card>
 
@@ -369,7 +380,7 @@ export function VaultSettings() {
                     </CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="max-w-md text-sm text-muted-foreground">
+                    <p className={cn(settingType.body, "max-w-md text-muted-foreground")}>
                         {t("settings.deleteHint")}
                     </p>
                     <Button variant="secondary" onClick={onDelete} disabled={pending !== null}>
