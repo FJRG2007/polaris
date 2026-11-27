@@ -64,8 +64,9 @@ describe("the / list in Code", () => {
         expect(screen.queryByRole("listbox")).toBeNull();
         type("/");
         const list = screen.getByRole("listbox", { name: "Commands" });
-        expect(options()).toHaveLength(19);
+        expect(options()).toHaveLength(20);
         expect(options()[0]).toMatch(/^\/help/);
+        expect(options().some((option) => option?.startsWith("/btw"))).toBe(true);
         expect(screen.getByText("Summarize the agent's conversation to free room")).toBeTruthy();
         expect(screen.getByTestId("composer").contains(list)).toBe(false);
         expect(box.getAttribute("aria-controls")).toBe(list.id);

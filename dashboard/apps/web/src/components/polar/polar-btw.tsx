@@ -16,7 +16,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Copy, MessageCircleQuestion, Trash2, X } from "lucide-react";
 import { MessageResponse } from "@/components/polar/elements/message";
 
-const ERRORS = new Set([
+/** The refusals the route names, each with its words at `polar.btw.errors.<code>`. */
+const ERROR_CODES = [
     "failed",
     "no_key",
     "unknown_model",
@@ -24,12 +25,18 @@ const ERRORS = new Set([
     "usage_limit",
     "rate_limited",
     "invalid"
-]);
+] as const;
+type ErrorCode = (typeof ERROR_CODES)[number];
+const ERRORS: ReadonlySet<string> = new Set(ERROR_CODES);
+
+function isErrorCode(code: string | undefined): code is ErrorCode {
+    return code !== undefined && ERRORS.has(code);
+}
 
 /** The exchange on screen. `shown` is what the panel says was asked when it
  *  is not the question itself (`/recap`'s, which is Polar's own words). */
 type Earlier = btw.BtwExchange & { shown?: string };
-type Current = { question: string; shown?: string; answer: string | null; error: string | null };
+type Current = { question: string; shown?: string; answer: string | null; error: ErrorCode | null };
 
 /** The side questions of one chat: kept on this screen only, as Claude Code
  *  keeps them in memory, and gone with the chat. */
@@ -68,7 +75,7 @@ export function useSideQuestions(threadId: string | null) {
             if (response?.ok && data?.answer) {
                 return setCurrent({ question: input.question, shown, answer: data.answer, error: null });
             }
-            const code = data?.error && ERRORS.has(data.error) ? data.error : "failed";
+            const code: ErrorCode = isErrorCode(data?.error) ? data.error : "failed";
             setCurrent({ question: input.question, shown, answer: null, error: code });
         },
         [current, earlier, threadId]
@@ -174,7 +181,7 @@ export function PolarSideQuestion({
                             <button
                                 type="button"
                                 className={cn(
-                                    "block w-full min-w-0 truncate text-left hover:text-foreground",
+                                    "block w-full min-w-0 truncate text-start hover:text-foreground",
                                     shown === index && "text-foreground"
                                 )}
                                 title={entry.shown ?? entry.question}
@@ -189,7 +196,7 @@ export function PolarSideQuestion({
             <p className="min-w-0 break-words font-medium" title={question}>
                 {question}
             </p>
-            <div className="min-h-0 min-w-0 overflow-y-auto">
+            <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain">
                 {answer ? (
                     <MessageResponse>{answer}</MessageResponse>
                 ) : current.error && !picked ? (

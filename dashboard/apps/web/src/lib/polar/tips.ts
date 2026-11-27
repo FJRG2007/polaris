@@ -8,14 +8,20 @@
  * Client-safe: no server imports.
  */
 
+import type { NamespaceKey } from "@/lib/i18n/types";
 import type { CodeCommand } from "@/lib/polar/code-commands";
 import type { ControlCommand } from "@/lib/polar/shared";
 
 export type TipSurface = "chat" | "code";
 
+type TipIdOf<K> = K extends `tips.${infer Id}` ? Id : never;
+
+/** A tip's id, drawn from the `polar.tips` words, so a tip without them does not compile. */
+export type TipId = Exclude<TipIdOf<NamespaceKey<"polar">>, "label">;
+
 export type PolarTip =
-    | { id: string; surface: "chat"; command: ControlCommand }
-    | { id: string; surface: "code"; command: CodeCommand };
+    | { id: TipId; surface: "chat"; command: ControlCommand }
+    | { id: TipId; surface: "code"; command: CodeCommand };
 
 /** One list for every surface, in no particular order: one is picked at random. */
 export const POLAR_TIPS: readonly PolarTip[] = [

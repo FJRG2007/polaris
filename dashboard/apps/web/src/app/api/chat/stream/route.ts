@@ -48,7 +48,7 @@ const COALESCE_MS = 120;
  * every connection per message. Shared by every tab of the account, so it is
  * one resolution per online person per interval, whatever is being said.
  */
-export const SCOPE_REFRESH_MS = 30_000;
+const SCOPE_REFRESH_MS = 30_000;
 
 /** Idle keep-alive. Proxies drop a stream that says nothing for long enough, and
  *  a comment frame is not delivered to the client as a message. */

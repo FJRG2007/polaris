@@ -301,11 +301,13 @@ describe("the / commands", () => {
         mount();
         await ready();
         slash("/");
-        // Polar's six, the fourteen that act on the chat, then the entry that
-        // writes a new one.
-        expect(options()).toHaveLength(21);
+        // Polar's six, the sixteen that act on the chat (with /btw and /recap),
+        // then the entry that writes a new one.
+        expect(options()).toHaveLength(23);
         expect(screen.getByText("Keep working until a condition is met")).toBeTruthy();
-        expect(options()[20]).toMatch(/^New command/);
+        expect(options().some((option) => option?.startsWith("/btw"))).toBe(true);
+        expect(options().some((option) => option?.startsWith("/recap"))).toBe(true);
+        expect(options()[22]).toMatch(/^New command/);
         expect(highlighted()).toMatch(/^\/new/);
         const box = screen.getByLabelText("Message Polar");
         expect(box.getAttribute("aria-activedescendant")).toBe(
@@ -947,6 +949,7 @@ describe("matching the / list", () => {
             "context",
             "export",
             "stop",
+            "btw",
             "tldr",
             "translate",
             "fix-tests"
@@ -958,14 +961,18 @@ describe("matching the / list", () => {
 
     it("lists Enigma's chat commands last, behind Polar's and the person's own names", () => {
         const enigma = [
-            { name: "recap", description: "Sum up.", argumentHint: null },
+            { name: "standup", description: "Sum up.", argumentHint: null },
             { name: "tldr", description: "Shadowed by the person's own.", argumentHint: null },
             { name: "stop", description: "Shadowed by Polar's.", argumentHint: null }
         ];
         const found = slashMatches("/", [row("tldr")], enigma);
         expect(found.filter((match) => match.kind === "enigma")).toEqual([{ kind: "enigma", command: enigma[0] }]);
         expect(found.at(-1)?.kind).toBe("enigma");
-        expect(slashMatches("/rec", [], enigma)).toEqual([{ kind: "enigma", command: enigma[0] }]);
+        expect(slashMatches("/standu", [], enigma)).toEqual([{ kind: "enigma", command: enigma[0] }]);
+        // Polar's own /recap now shadows an Enigma command of that name.
+        expect(slashMatches("/recap", [], [{ name: "recap", description: "Sum up.", argumentHint: null }])).toEqual(
+            slashMatches("/recap", [], [])
+        );
     });
 
     it("finds the command a message starts with, and nothing for any other", () => {

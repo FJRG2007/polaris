@@ -118,7 +118,9 @@ describe("POST /api/polar/btw", () => {
         expect(await response.json()).toEqual({ answer: "It was config/polar.ts.", model: "M 1" });
         expect(state.calls).toHaveLength(1);
         expect(state.calls[0]?.tools).toBeUndefined();
-        expect(state.calls[0]?.toolChoice).toBeUndefined();
+        // AI SDK 7 fills in `{ type: "auto" }` whenever no choice is given, tools
+        // or not; with none sent there is nothing for it to choose.
+        expect(state.calls[0]?.toolChoice).toEqual({ type: "auto" });
         const sent = JSON.stringify(state.calls[0]?.prompt);
         expect(sent).toContain("config/polar.ts");
         expect(sent).toContain("What was the config file called?");
