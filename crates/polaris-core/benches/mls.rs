@@ -26,36 +26,19 @@ fn member(n: u32) -> Member {
     .expect("member")
 }
 
-/// Members added per commit while building a group: one commit adding all
-/// 500 is past the 1 MiB the delivery service takes, as it would be live.
-const ADD_BATCH: u32 = 100;
-
 /// A group of `size` members: the creator and one receiver that joined by
-/// Welcome, the rest added in commits of at most `ADD_BATCH`, which the
-/// receiver processes like any member.
+/// Welcome, the rest added in the same commit.
 fn group(size: u32) -> (Member, Member) {
     let creator = member(0);
     creator.create_group(GROUP).expect("create");
     let receiver = member(1);
-    let first_end = size.min(ADD_BATCH + 1);
     let mut packages = vec![receiver.key_package().expect("kp")];
-    packages.extend((2..first_end).map(|n| member(n).key_package().expect("kp")));
+    packages.extend((2..size).map(|n| member(n).key_package().expect("kp")));
     let out = creator.add_members(GROUP, &packages).expect("add");
     creator.merge_pending_commit(GROUP).expect("merge");
     receiver
         .join_by_welcome(&out.welcome.expect("welcome"))
         .expect("join");
-    let mut next = first_end;
-    while next < size {
-        let end = size.min(next + ADD_BATCH);
-        let packages: Vec<_> = (next..end)
-            .map(|n| member(n).key_package().expect("kp"))
-            .collect();
-        let out = creator.add_members(GROUP, &packages).expect("add");
-        creator.merge_pending_commit(GROUP).expect("merge");
-        receiver.process(GROUP, &out.commit).expect("process");
-        next = end;
-    }
     (creator, receiver)
 }
 

@@ -227,6 +227,7 @@ import type { PolarMark } from "@/lib/polar/answer-feedback";
 import type { PolarRefine } from "@/lib/polar/prompt";
 import * as answerActions from "@/components/polar/polar-answer-actions";
 import { VoiceCall, type VoiceNotice } from "@/components/polar/polar-voice";
+import { LiveVoiceCall } from "@/components/polar/live-voice-call";
 import { SkillTrialBar, trialFromAddress, type SkillTrial } from "@/components/polar/polar-skill-trial";
 import { AgentBar, type ChatAgent } from "@/components/polar/polar-agent-bar";
 import { agentNameAction } from "@/app/(app)/polar/settings/agents-actions";
@@ -899,6 +900,8 @@ export function PolarChat({
     }, []);
     const [voiceNotice, setVoiceNotice] = useState<VoiceNotice | null>(null);
     const [inCall, setInCall] = useState(false);
+    /** This call went on by transcription though live voice was on offer. */
+    const [transcribedCall, setTranscribedCall] = useState(false);
     const [choice, setChoice] = useState<ModelChoice | null>(null);
     /** The repository a Code task answered here is about, until another
      *  conversation opens. */
@@ -2622,9 +2625,27 @@ export function PolarChat({
                     onClear={() => void clearGoal()}
                 />
             ) : null}
-            {inCall ? (
+            {inCall && voice.realtime && !transcribedCall ? (
+                <LiveVoiceCall
+                    threadId={threadId}
+                    temporary={temporary}
+                    messages={chat.messages}
+                    status={chat.status}
+                    onSend={(text) => void sendSpoken(text)}
+                    onSaved={(said) => chat.setMessages((list) => [...list, ...said])}
+                    onTranscribed={() => setTranscribedCall(true)}
+                    onEnd={() => {
+                        setInCall(false);
+                        requestAnimationFrame(() => textarea.current?.focus());
+                    }}
+                />
+            ) : inCall ? (
                 // Above the box, which stays in use under it.
                 <VoiceCall
+                    mode={{
+                        live: !!voice.realtime,
+                        onLive: () => setTranscribedCall(false)
+                    }}
                     messages={chat.messages}
                     status={chat.status}
                     speech={voice.speech}
@@ -2641,6 +2662,7 @@ export function PolarChat({
                     }}
                     onEnd={() => {
                         setInCall(false);
+                        setTranscribedCall(false);
                         // Back to the box, which stayed in place for the call.
                         requestAnimationFrame(() => textarea.current?.focus());
                     }}
@@ -2840,6 +2862,7 @@ export function PolarChat({
                     disabled: noKeys || !choice,
                     onOpen: () => {
                         answerActions.stopReading();
+                        setTranscribedCall(false);
                         setInCall(true);
                     }
                 }}

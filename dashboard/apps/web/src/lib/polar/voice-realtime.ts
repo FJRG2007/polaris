@@ -15,6 +15,7 @@
 
 import { z } from "zod";
 import { asSchema } from "ai";
+import { ASK_POLAR_TOOL } from "@/lib/polar/live-voice";
 import type { RealtimeGrant, RealtimeToolAnswer } from "@/lib/polar/voice-call";
 import {
     delegatorInstructions,
@@ -68,30 +69,17 @@ export async function realtimeTools(): Promise<RealtimeTool[]> {
 const mintAnswer = z.object({ value: z.string().min(1), expires_at: z.number() });
 
 /**
- * A client secret for one realtime call, or null when OpenAI refused or did
- * not answer. The key is only sent to OpenAI and never returned.
+ * A client secret for one realtime session, or null when OpenAI refused or
+ * did not answer. The key is only sent to OpenAI and never returned.
  */
-export async function mintRealtimeSecret(input: {
-    apiKey: string;
-    viewed: { id: string; title: string };
-    lang: string | null;
-    fetch?: typeof fetch;
-}): Promise<RealtimeGrant | null> {
-    const send = input.fetch ?? fetch;
+async function mintSecret(apiKey: string, session: Record<string, unknown>, send: typeof fetch): Promise<RealtimeGrant | null> {
     try {
         const response = await send(REALTIME_SECRETS_URL, {
             method: "POST",
-            headers: { Authorization: `Bearer ${input.apiKey}`, "Content-Type": "application/json" },
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
             body: JSON.stringify({
                 expires_after: { anchor: "created_at", seconds: SECRET_SECONDS },
-                session: {
-                    type: "realtime",
-                    model: REALTIME_MODEL,
-                    instructions: delegatorInstructions(input.viewed, [], input.lang),
-                    audio: { output: { voice: REALTIME_VOICE } },
-                    tools: await realtimeTools(),
-                    tool_choice: "auto"
-                }
+                session: { type: "realtime", model: REALTIME_MODEL, ...session }
             }),
             signal: AbortSignal.timeout(MINT_TIMEOUT_MS),
             cache: "no-store"
@@ -107,6 +95,78 @@ export async function mintRealtimeSecret(input: {
         console.warn("polar: no realtime client secret", error instanceof Error ? error.name : "error");
         return null;
     }
+}
+
+/** A client secret for a realtime call on a Code session, with the delegator's tools. */
+export async function mintRealtimeSecret(input: {
+    apiKey: string;
+    viewed: { id: string; title: string };
+    lang: string | null;
+    fetch?: typeof fetch;
+}): Promise<RealtimeGrant | null> {
+    return mintSecret(
+        input.apiKey,
+        {
+            instructions: delegatorInstructions(input.viewed, [], input.lang),
+            audio: { output: { voice: REALTIME_VOICE } },
+            tools: await realtimeTools(),
+            tool_choice: "auto"
+        },
+        input.fetch ?? fetch
+    );
+}
+
+/** Transcribes what the person says in a live chat call, for the thread. */
+export const LIVE_TRANSCRIBE_MODEL = "gpt-live-transcribe";
+
+/** What the voice model in a Polar chat is told. */
+export function liveInstructions(lang: string | null): string {
+    return [
+        "You are Polar, the assistant of a Polaris workspace, talking with the person out loud.",
+        "Answer briefly and naturally, as in a phone call: short sentences, no lists, no markdown, no links read out.",
+        `Anything that needs Polar's tools, the web, files, tasks, mail, chat, servers, the person's data, or a long written answer: call ${ASK_POLAR_TOOL} with what the person asked, in their words, and then say its answer in a few spoken sentences. Never make up what a tool would have found.`,
+        "If the answer says something is waiting for approval on screen, tell the person to approve or decline it there.",
+        lang ? `Speak in the language of the locale ${lang} unless the person speaks another one.` : "Speak in the person's language."
+    ].join("\n");
+}
+
+/** `ask_polar` as a realtime function definition. */
+export const ASK_POLAR_DEFINITION: RealtimeTool = {
+    type: "function",
+    name: ASK_POLAR_TOOL,
+    description:
+        "Send a request to Polar, which answers with every tool it has (web, files, tasks, mail, chat, servers, memory). Use it for anything beyond small talk or what you already know.",
+    parameters: {
+        type: "object",
+        properties: { request: { type: "string", description: "What the person asked, in their words." } },
+        required: ["request"],
+        additionalProperties: false
+    }
+};
+
+/** A client secret for a live call in a Polar chat: speech to speech, what the
+ *  person says transcribed for the thread, and `ask_polar` as its only tool. */
+export async function mintLiveSecret(input: {
+    apiKey: string;
+    lang: string | null;
+    fetch?: typeof fetch;
+}): Promise<RealtimeGrant | null> {
+    return mintSecret(
+        input.apiKey,
+        {
+            instructions: liveInstructions(input.lang),
+            audio: {
+                input: {
+                    transcription: { model: LIVE_TRANSCRIBE_MODEL },
+                    turn_detection: { type: "semantic_vad", interrupt_response: true, create_response: true }
+                },
+                output: { voice: REALTIME_VOICE }
+            },
+            tools: [ASK_POLAR_DEFINITION],
+            tool_choice: "auto"
+        },
+        input.fetch ?? fetch
+    );
 }
 
 function encode(value: unknown): string {
