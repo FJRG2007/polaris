@@ -4,6 +4,7 @@
 // half (test/setup/app-polls.ts), so a step the two halves disagree on is
 // caught here.
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CALL_E2EE_VERSION } from "@/lib/chat/call-e2ee";
 
 vi.unmock("@/app/(app)/chat/call-requests");
 
@@ -77,7 +78,7 @@ const CASES = [
         name: "ticket",
         ask: () => requests.callTicket(MEETING),
         action: "callTokenAction",
-        args: [MEETING]
+        args: [MEETING, CALL_E2EE_VERSION]
     },
     {
         name: "read",
