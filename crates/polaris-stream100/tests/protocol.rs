@@ -265,6 +265,54 @@ fn a_fast_spin_accelerates_within_the_cap() {
 }
 
 #[test]
+fn a_fast_turn_accelerates_and_no_report_of_it_is_cut() {
+    let tuning = Tuning::default();
+    let mut knob = Encoder::default();
+    // A detent every 10 ms: two turns a second, as fast as a hand spins it.
+    let moved: Vec<i32> = (0..10u64)
+        .map(|tick| knob.turn(encoder::DETENT_COUNTS, tick * 10, &tuning))
+        .collect();
+    // The first report has no speed yet; every one after it is at x3, and
+    // none is cut to the old 10 % cap.
+    assert_eq!(moved[0], 2);
+    assert!(moved[1..].iter().all(|step| *step == 6), "{moved:?}");
+    assert_eq!(moved.iter().sum::<i32>(), 2 + 9 * 6);
+}
+
+#[test]
+fn a_fast_turn_read_late_in_one_report_still_moves_all_the_way() {
+    let tuning = Tuning::default();
+    let mut knob = Encoder::default();
+    assert_eq!(knob.turn(encoder::DETENT_COUNTS, 0, &tuning), 2);
+    // Half a turn in 200 ms, carried by one report (a read that came late).
+    let moved = knob.turn(encoder::COUNTS_PER_TURN / 2, 200, &tuning);
+    assert!(moved > i32::from(tuning.max_step), "{moved}");
+    assert_eq!(moved, encoder::COUNTS_PER_TURN / 2 * 2 / 10);
+}
+
+#[test]
+fn a_slow_partial_step_is_kept_past_the_settle_time() {
+    let tuning = Tuning::default();
+    let mut knob = Encoder::default();
+    // Most of a step, then a pause longer than settle_ms, then the rest.
+    assert_eq!(knob.turn(8, 0, &tuning), 0);
+    let later = u64::from(tuning.settle_ms) + 750;
+    assert_eq!(knob.turn(4, later, &tuning), 1);
+}
+
+#[test]
+fn tiny_movements_are_still_ignored() {
+    let tuning = Tuning::default();
+    let mut knob = Encoder::default();
+    // A count within the dead band, then nothing for a while: dropped.
+    assert_eq!(knob.turn(i32::from(tuning.dead_band), 0, &tuning), 0);
+    let later = u64::from(tuning.settle_ms) + 1;
+    assert_eq!(knob.turn(i32::from(tuning.dead_band), later, &tuning), 0);
+    // Back and forth within the dead band never moves.
+    assert_eq!(knob.turn(-2, later + 5, &tuning), 0);
+}
+
+#[test]
 fn a_burst_after_a_stall_is_capped() {
     let tuning = Tuning::default();
     let mut knob = Encoder::default();

@@ -6,14 +6,18 @@
 //!
 //! 1. **Jitter.** A knob at rest can report a count or two back and forth. Added
 //!    up blindly, that creeps until it crosses a step. Movements smaller than
-//!    the dead band that reverse direction cancel out, and a partial step left
-//!    alone for [`Tuning::settle_ms`] is dropped instead of kept.
+//!    the dead band that reverse direction cancel out, and a remainder no
+//!    larger than the dead band left alone for [`Tuning::settle_ms`] is
+//!    dropped. A larger remainder is a real, slow turn: it is kept.
 //! 2. **Banked counts.** Counts turned while nothing was assigned to the knob
 //!    (the app was closed) used to be applied all at once when it reopened.
 //!    [`Encoder::discard`] throws them away; the caller does that whenever the
 //!    knob has no target.
 //! 3. **Runaway steps.** One report may carry a large delta after a USB stall.
-//!    A single report never moves the volume more than [`Tuning::max_step`].
+//!    A report never moves the volume more than [`Tuning::max_step`] per
+//!    [`STEP_WINDOW_MS`] since the one before it, so a fast turn read late in
+//!    one report still moves all the way, and a burst no hand could turn is
+//!    still cut.
 //!
 //! Acceleration is deliberate and bounded: a fast spin moves further per
 //! detent, a slow turn always moves exactly the configured amount.
@@ -49,11 +53,11 @@ pub struct Tuning {
     pub percent_per_detent: u8,
     /// Counts that never count as movement on their own.
     pub dead_band: u8,
-    /// A partial step untouched this long is dropped.
+    /// A remainder within the dead band untouched this long is dropped.
     pub settle_ms: u32,
     /// Largest multiplier a fast spin reaches; 1 turns acceleration off.
     pub max_acceleration: u8,
-    /// Most percent one report may move, whatever it carries.
+    /// Most percent a report may move per [`STEP_WINDOW_MS`] since the last one.
     pub max_step: u8,
 }
 
@@ -92,6 +96,12 @@ impl Tuning {
 const ACCEL_FROM: f64 = DETENT_COUNTS as f64 / 60.0;
 const ACCEL_FULL: f64 = DETENT_COUNTS as f64 / 12.0;
 
+/// The time [`Tuning::max_step`] is measured over, and how many of them one
+/// report can claim: a report that comes long after the last one (an idle
+/// knob, a stalled read) still cannot move more than this many windows' worth.
+pub const STEP_WINDOW_MS: u64 = 25;
+const MAX_WINDOWS: u64 = 8;
+
 /// One knob's state between reports.
 #[derive(Debug, Clone, Default)]
 pub struct Encoder {
@@ -110,7 +120,10 @@ impl Encoder {
     pub fn turn(&mut self, counts: i32, now_ms: u64, tuning: &Tuning) -> i32 {
         let tuning = tuning.clamped();
         let elapsed = self.last_ms.map(|last| now_ms.saturating_sub(last));
-        if elapsed.is_some_and(|ms| ms > u64::from(tuning.settle_ms)) {
+        let dead_band = i32::from(tuning.dead_band);
+        if elapsed.is_some_and(|ms| ms > u64::from(tuning.settle_ms))
+            && self.pending.abs() <= dead_band
+        {
             self.pending = 0;
         }
         self.last_ms = Some(now_ms);
@@ -119,7 +132,6 @@ impl Encoder {
         }
         // A small move against what is pending is jitter: it cancels the
         // pending remainder instead of starting a step the other way.
-        let dead_band = i32::from(tuning.dead_band);
         if self.pending.signum() == -counts.signum() && counts.abs() <= dead_band {
             self.pending = 0;
             return 0;
@@ -137,7 +149,8 @@ impl Encoder {
             return 0;
         }
         self.pending -= steps * per_percent;
-        let max = i32::from(tuning.max_step);
+        let windows = elapsed.map_or(1, |ms| ms.div_ceil(STEP_WINDOW_MS).clamp(1, MAX_WINDOWS));
+        let max = i32::from(tuning.max_step) * windows as i32;
         if steps.abs() > max {
             // A burst larger than any real turn: apply the cap, drop the rest.
             self.pending = 0;

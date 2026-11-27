@@ -24,10 +24,18 @@
 //! a [`Link`] - how it opens the device and moves bytes (WinUSB on Windows,
 //! libusb on Linux and macOS). What is sent, in which order and how often is
 //! the same everywhere.
+//!
+//! The display is fed from a thread of its own, so a display write (up to
+//! [`WRITE_WAIT`]) never holds back an input report: the input and display
+//! interfaces are independent, and a report is handed back the moment it
+//! arrives.
 
 use crate::display::{self, MAX_TRANSFER_PACKETS, PACKET_SIZE};
 use crate::report::{Report, REPORT_LEN};
 use crate::screen::{self, Painter};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::Arc;
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 /// The input interface and its interrupt IN endpoint (64-byte reports).
@@ -110,7 +118,11 @@ pub fn read_slice(remaining: Duration, since_last: Duration) -> Duration {
 /// How one system's USB stack moves the session's bytes. Everything the
 /// session decides - the start-up reads, the keep-alive cadence, how long a
 /// read may block - lives in [`Session`]; a link only carries it out.
-pub trait Link {
+///
+/// Once started, [`Link::write_transfer`] is called from the display thread
+/// while [`Link::read_report`] may be waiting on the session's own thread, so
+/// a link keeps the two directions' state apart.
+pub trait Link: Send + Sync + 'static {
     type Error;
 
     /// One vendor control read; its answer is not needed.
@@ -125,12 +137,12 @@ pub trait Link {
     /// [`PACKET_SIZE`] packets, at most [`TRANSFER_LEN`] bytes (the sync
     /// packet and the message, as [`Painter::next`] builds it), given up
     /// after `wait`. A failed write is left behind.
-    fn write_transfer(&mut self, transfer: &[u8], wait: Duration);
+    fn write_transfer(&self, transfer: &[u8], wait: Duration);
 
     /// One input report from [`INPUT_ENDPOINT`] into `buffer`, waiting at
     /// most `wait`; `Ok(None)` when none came in that time.
     fn read_report(
-        &mut self,
+        &self,
         buffer: &mut [u8; REPORT_LEN],
         wait: Duration,
     ) -> Result<Option<usize>, Self::Error>;
@@ -142,18 +154,50 @@ pub const WRITE_WAIT: Duration = Duration::from_millis(100);
 /// The largest transfer the display takes, sync packet included.
 pub const TRANSFER_LEN: usize = MAX_TRANSFER_PACKETS * PACKET_SIZE;
 
+/// What the session tells its display thread.
+enum Signal {
+    /// The controller asked for an acknowledgement.
+    Ack,
+    Stop,
+}
+
+/// The display thread: the keep-alive, acknowledgements and the newest page.
+struct Display {
+    signals: Sender<Signal>,
+    thread: Option<JoinHandle<()>>,
+}
+
 /// A session with the controller over any [`Link`].
-pub struct Session<L> {
-    link: L,
-    display: bool,
-    // Boxed: it holds two pages, and the input enum stays small.
-    painter: Box<Painter>,
+pub struct Session<L: Link> {
+    link: Arc<L>,
+    display: Option<Display>,
     report: Box<[u8; REPORT_LEN]>,
+}
+
+/// Feeds the display until told to stop: whatever [`Painter`] has due, and in
+/// between, waits for the next slot or a signal from the session.
+fn pump<L: Link>(link: &L, signals: &Receiver<Signal>) {
+    let mut painter = Box::<Painter>::default();
+    loop {
+        if let Some(page) = screen::latest() {
+            painter.show(&page);
+        }
+        if let Some(transfer) = painter.next(Instant::now()) {
+            let length = transfer.len().min(TRANSFER_LEN);
+            link.write_transfer(&transfer[..length], WRITE_WAIT);
+        }
+        match signals.recv_timeout(painter.wait(Instant::now())) {
+            Ok(Signal::Ack) => painter.acknowledge(),
+            Ok(Signal::Stop) | Err(RecvTimeoutError::Disconnected) => return,
+            Err(RecvTimeoutError::Timeout) => {}
+        }
+    }
 }
 
 impl<L: Link> Session<L> {
     /// Starts the session: the display interface first, then the documented
-    /// start-up reads. A controller that refuses either is still read.
+    /// start-up reads, then the display thread. A controller that refuses
+    /// either is still read.
     pub fn start(mut link: L) -> Self {
         let display = link.start_display();
         for read in INIT_READS {
@@ -161,62 +205,55 @@ impl<L: Link> Session<L> {
                 link.control_in(setup);
             }
         }
+        let link = Arc::new(link);
+        let display = display.then(|| {
+            let (signals, received) = mpsc::channel();
+            let shared = Arc::clone(&link);
+            let thread = std::thread::Builder::new()
+                .name("stream100-display".into())
+                .spawn(move || pump(&*shared, &received))
+                .ok();
+            Display { signals, thread }
+        });
         Self {
             link,
-            display,
-            painter: Box::default(),
+            display: display.filter(|display| display.thread.is_some()),
             report: Box::new([0u8; REPORT_LEN]),
         }
     }
 
     /// Whether the display interface is up (and so the keep-alive goes out).
     pub fn has_display(&self) -> bool {
-        self.display
+        self.display.is_some()
     }
 
     pub fn link(&self) -> &L {
         &self.link
     }
 
-    /// Sends what the display is due: the keep-alive, an acknowledgement,
-    /// a heartbeat or the next tile of the newest page ([`Painter`]).
-    fn paint(&mut self) {
-        if !self.display {
-            return;
-        }
-        if let Some(page) = screen::latest() {
-            self.painter.show(&page);
-        }
-        let Some(transfer) = self.painter.next(Instant::now()) else {
-            return;
-        };
-        let length = transfer.len().min(TRANSFER_LEN);
-        self.link.write_transfer(&transfer[..length], WRITE_WAIT);
-    }
-
     /// Waits up to `timeout` for the next report; `Ok(None)` when none came.
-    /// The display is kept fed on time while it waits, and the controller's
-    /// requests for an acknowledgement are answered.
+    /// The display thread keeps the controller fed meanwhile; a request for
+    /// an acknowledgement is passed on to it.
     pub fn next(&mut self, timeout: Duration) -> Result<Option<Report>, L::Error> {
-        let deadline = Instant::now() + timeout;
-        loop {
-            self.paint();
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            let slice = if self.display {
-                remaining.min(self.painter.wait(Instant::now()))
-            } else {
-                remaining
-            };
-            match self.link.read_report(&mut self.report, slice)? {
-                Some(read) => {
-                    let read = read.min(REPORT_LEN);
-                    if display::asks_for_ack(&self.report[..read]) {
-                        self.painter.acknowledge();
-                    }
-                    return Ok(Report::parse(&self.report[..read]));
-                }
-                None if Instant::now() >= deadline => return Ok(None),
-                None => continue,
+        let Some(read) = self.link.read_report(&mut self.report, timeout)? else {
+            return Ok(None);
+        };
+        let read = read.min(REPORT_LEN);
+        if display::asks_for_ack(&self.report[..read]) {
+            if let Some(display) = &self.display {
+                let _ = display.signals.send(Signal::Ack);
+            }
+        }
+        Ok(Report::parse(&self.report[..read]))
+    }
+}
+
+impl<L: Link> Drop for Session<L> {
+    fn drop(&mut self) {
+        if let Some(mut display) = self.display.take() {
+            let _ = display.signals.send(Signal::Stop);
+            if let Some(thread) = display.thread.take() {
+                let _ = thread.join();
             }
         }
     }

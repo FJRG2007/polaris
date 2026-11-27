@@ -34,6 +34,7 @@ use libusb1_sys::constants::{
 use libusb1_sys::*;
 use std::ffi::{c_int, c_void};
 use std::ptr::{null, null_mut};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 /// How long one start-up control read may take.
@@ -69,12 +70,16 @@ pub struct LibUsbLink {
     handle: *mut libusb_device_handle,
     input_claimed: bool,
     display_claimed: bool,
-    packet: Box<[u8; TRANSFER_LEN]>,
+    /// The display thread's buffer; the input side reads into the caller's.
+    packet: Mutex<Box<[u8; TRANSFER_LEN]>>,
 }
 
-// SAFETY: a libusb context and handle are usable from any thread; the struct
-// is only ever used by one thread at a time (`&mut self`).
+// SAFETY: a libusb context and handle are usable from any thread, and libusb
+// supports a synchronous read on one thread while another handles the events
+// of its own asynchronous write ("Multi-threaded applications and asynchronous
+// I/O" in the libusb documentation). The write's buffer is behind a lock.
 unsafe impl Send for LibUsbLink {}
+unsafe impl Sync for LibUsbLink {}
 
 /// Set by the isochronous write's callback when libusb is done with it.
 extern "system" fn write_done(transfer: *mut libusb_transfer) {
@@ -90,7 +95,7 @@ impl LibUsbLink {
             handle: null_mut(),
             input_claimed: false,
             display_claimed: false,
-            packet: Box::new([0u8; TRANSFER_LEN]),
+            packet: Mutex::new(Box::new([0u8; TRANSFER_LEN])),
         };
         // From here on `Drop` releases whatever was set up.
         // SAFETY: plain libusb calls; the device list is freed before
@@ -178,7 +183,7 @@ impl Link for LibUsbLink {
         }
     }
 
-    fn write_transfer(&mut self, transfer: &[u8], wait: Duration) {
+    fn write_transfer(&self, transfer: &[u8], wait: Duration) {
         let length = transfer.len().min(TRANSFER_LEN);
         if !self.display_claimed || length == 0 {
             return;
@@ -187,8 +192,12 @@ impl Link for LibUsbLink {
         // padded with zeros). TRANSFER_LEN is whole packets, so it still fits.
         let count = length.div_ceil(PACKET_SIZE);
         let padded = count * PACKET_SIZE;
-        self.packet[..length].copy_from_slice(&transfer[..length]);
-        self.packet[length..padded].fill(0);
+        let mut packet = self
+            .packet
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        packet[..length].copy_from_slice(&transfer[..length]);
+        packet[length..padded].fill(0);
         let mut done: c_int = 0;
         // SAFETY: `count` isochronous packets from the boxed buffer. The transfer
         // is always waited for - cancelled first when it outlives `wait` -
@@ -203,7 +212,7 @@ impl Link for LibUsbLink {
                 transfer,
                 self.handle,
                 DISPLAY_ENDPOINT,
-                self.packet.as_mut_ptr(),
+                packet.as_mut_ptr(),
                 padded as c_int,
                 count as c_int,
                 write_done,
@@ -238,7 +247,7 @@ impl Link for LibUsbLink {
     }
 
     fn read_report(
-        &mut self,
+        &self,
         buffer: &mut [u8; REPORT_LEN],
         wait: Duration,
     ) -> Result<Option<usize>, TransportError> {

@@ -9,7 +9,7 @@
 //!   ([`macos`]).
 //! - What is playing, from the system's media session ([`media`]).
 
-use crate::audio::{AudioError, AudioSessions};
+use crate::audio::{AudioError, AudioSessions, Cached};
 use crate::ownership::Observed;
 
 pub mod input;
@@ -27,14 +27,15 @@ pub mod windows;
 #[cfg(windows)]
 pub mod winusb;
 
-/// This system's per-app volume, opened on the calling thread.
+/// This system's per-app volume, opened on the calling thread, with its
+/// reads kept for [`crate::audio::AUDIO_FRESH`] ([`Cached`]).
 pub fn open() -> Result<Box<dyn AudioSessions>, AudioError> {
     #[cfg(windows)]
-    return Ok(Box::new(windows::CoreAudio::open()?));
+    return Ok(Box::new(Cached::new(windows::CoreAudio::open()?)));
     #[cfg(target_os = "linux")]
-    return Ok(Box::new(linux::Pulse::open()?));
+    return Ok(Box::new(Cached::new(linux::Pulse::open()?)));
     #[cfg(target_os = "macos")]
-    return Ok(Box::new(macos::CoreAudioOutput::open()?));
+    return Ok(Box::new(Cached::new(macos::CoreAudioOutput::open()?)));
     #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     Err(AudioError::Unsupported)
 }

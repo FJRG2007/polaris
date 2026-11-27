@@ -111,6 +111,47 @@ pub const TILE_OFFSETS: [(u8, u8); CHUNK_COUNT] = [
     (7, 3),
 ];
 
+/// `(width, height)` of the block the firmware fills from each sample of a
+/// tile, in [`TILE_OFFSETS`] order: tile 0 paints the whole 8x4 cell around
+/// each of its samples, the last sixteen only their own pixel (the official
+/// SDK's table, CataclysmX/New-Hera-lunx `hsm01-proto/src/background.rs`
+/// `TILES`). Sending a coarse tile again paints over the finer ones inside
+/// its blocks, so they have to follow it.
+pub const TILE_BLOCKS: [(u8, u8); CHUNK_COUNT] = [
+    (8, 4),
+    (4, 4),
+    (4, 2),
+    (4, 2),
+    (2, 2),
+    (2, 2),
+    (2, 2),
+    (2, 2),
+    (2, 1),
+    (2, 1),
+    (2, 1),
+    (2, 1),
+    (2, 1),
+    (2, 1),
+    (2, 1),
+    (2, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+    (1, 1),
+];
+
 /// The message checksum: a 16-bit CRC over every byte except the checksum
 /// field itself (offsets 4 and 5), shifted right with the constant `0x8005`
 /// and starting from zero. That pairing is unusual (no standard CRC uses it)
@@ -332,24 +373,37 @@ impl IndexedFrame {
     pub fn bodies(&self, setup: Option<&[u8]>) -> Vec<Vec<u8>> {
         (0..CHUNK_COUNT)
             .map(|chunk| {
-                let mut body = Vec::with_capacity(CHUNK_SIZE + 600);
-                if chunk == 0 {
-                    if let Some(setup) = setup {
-                        body.extend_from_slice(setup);
-                        body.extend_from_slice(&CMD_PALETTE);
-                        for color in self.palette {
-                            body.extend_from_slice(&color.to_le_bytes());
-                        }
-                    }
-                }
-                let mut header = CMD_PIXELS;
-                header[2] = chunk as u8;
-                body.extend_from_slice(&header);
-                body.extend_from_slice(&self.tile(chunk));
-                body.push(END);
-                body
+                let prefix = match (chunk, setup) {
+                    (0, Some(setup)) => [setup, &self.palette_command()].concat(),
+                    _ => Vec::new(),
+                };
+                self.tile_body(chunk, &prefix)
             })
             .collect()
+    }
+
+    /// The command that loads this image's palette.
+    pub fn palette_command(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(CMD_PALETTE.len() + PALETTE_COLORS * 2);
+        out.extend_from_slice(&CMD_PALETTE);
+        for color in self.palette {
+            out.extend_from_slice(&color.to_le_bytes());
+        }
+        out
+    }
+
+    /// One tile's command list, unframed, with `prefix` (commands already
+    /// built, no [`END`]) ahead of it.
+    pub fn tile_body(&self, tile: usize, prefix: &[u8]) -> Vec<u8> {
+        let tile = tile % CHUNK_COUNT;
+        let mut body = Vec::with_capacity(prefix.len() + CMD_PIXELS.len() + CHUNK_SIZE + 1);
+        body.extend_from_slice(prefix);
+        let mut header = CMD_PIXELS;
+        header[2] = tile as u8;
+        body.extend_from_slice(&header);
+        body.extend_from_slice(&self.tile(tile));
+        body.push(END);
+        body
     }
 
     /// The 32 tile messages for this image, framed in `sequence`.

@@ -84,7 +84,13 @@ impl Engine {
     /// The running programs the desktop's game detection recognises, by
     /// program key (`program_key`), for the Games category.
     pub fn set_games(&mut self, keys: impl IntoIterator<Item = String>) {
-        self.games = keys.into_iter().collect();
+        // The desktop's keys keep `.exe` and may carry a folder; the sessions
+        // are matched by the bare lowercased name.
+        self.games = keys
+            .into_iter()
+            .map(|key| crate::audio::program_key(key.trim()))
+            .filter(|key| !key.is_empty())
+            .collect();
     }
 
     /// The language the screen is drawn in. Answers whether it changed.
@@ -499,5 +505,26 @@ mod tests {
             Output::default(),
         );
         assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn the_desktop_game_keys_match_however_they_are_written() {
+        let mut engine = engine();
+        // As the desktop's game detection writes them: `.exe` kept, any case.
+        engine.set_games([r"C:\Games\EldenRing.exe".to_owned(), " ".to_owned()]);
+        let sessions = [session("g", "eldenring.exe", 80, false)];
+        let commands = engine.feed(
+            &report(0, [0, 0, DETENT_COUNTS as i16, 0]),
+            1_000,
+            &sessions,
+            Output::default(),
+        );
+        assert_eq!(
+            commands,
+            vec![Command::SetVolume {
+                id: "g".into(),
+                volume: 82
+            }]
+        );
     }
 }
