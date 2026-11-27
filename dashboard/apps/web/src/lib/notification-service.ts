@@ -54,6 +54,12 @@ export interface NotificationInput {
     dedupKey?: string | null;
     /** How repeats and bursts are folded; only read with `dedupKey`. */
     repeat?: RepeatPolicy;
+    /**
+     * With `dedupKey` and no `repeat`: at most one row per reader for that key,
+     * ever. What makes a fan-out safe to run again - a retried or doubled run
+     * writes nothing new for whoever it already told.
+     */
+    once?: boolean;
 }
 
 /**
@@ -235,6 +241,18 @@ function rowData(input: NotificationInput, now: Date) {
 export async function createNotification(input: NotificationInput): Promise<NotificationOutcome> {
     try {
         const now = new Date();
+        if (input.dedupKey && input.once && !input.repeat) {
+            try {
+                await prisma.notification.create({
+                    data: { ...rowData(input, now), dedupKey: input.dedupKey }
+                });
+                return "created";
+            } catch (caught) {
+                // Already told: the unique (userId, dedupKey) is the answer.
+                if ((caught as { code?: string }).code === "P2002") return "collapsed";
+                throw caught;
+            }
+        }
         if (!input.dedupKey || !input.repeat) {
             await prisma.notification.create({ data: rowData(input, now) });
             return "created";

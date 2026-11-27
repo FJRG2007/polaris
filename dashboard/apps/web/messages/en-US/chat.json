@@ -315,7 +315,8 @@
         },
         "pollAnonymous": "The votes on that poll are anonymous",
         "pollVotersHidden": "Who picked what shows once the poll closes",
-        "sealedGroupFull": "This private conversation is full. An end-to-end encrypted one holds {cap} people, so someone has to leave first."
+        "sealedGroupFull": "This private conversation is full. An end-to-end encrypted one holds {cap} people, so someone has to leave first.",
+        "roomMentionAdminsOnly": "Only the admins of this space can use @everyone and @here"
     },
     "media": {
         "refused": {
@@ -1270,7 +1271,10 @@
         "newcomerHistoryDefaultHint": "Applies to every channel that uses the server default.",
         "newcomerHistoryDefaultLocked": "Only server admins can change the default.",
         "webhookPicture": "Change picture",
-        "privateSealedNote": "Private channels are end-to-end encrypted. Making it public stops encrypting new messages; earlier ones stay encrypted."
+        "privateSealedNote": "Private channels are end-to-end encrypted. Making it public stops encrypting new messages; earlier ones stay encrypted.",
+        "roomMentions": "Members can use @everyone and @here",
+        "roomMentionsHint": "Off: only admins can notify the whole space at once.",
+        "roomMentionsLocked": "Only the admins of this space can change this."
     },
     "callMenus": {
         "volume": "Volume",
@@ -1891,6 +1895,7 @@
         "hideTheMembers": "Hide the members",
         "heading": "Members",
         "headingCount": "Members - {count}",
+        "headingCountCapped": "Members - {count}+",
         "onlineCount": "Online - {count}",
         "offlineCount": "Offline - {count}",
         "you": "(you)",

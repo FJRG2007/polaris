@@ -15,6 +15,7 @@ import * as core from "@polaris/core";
 import type { ChatGameLinkView } from "./game-links";
 import { publishChatChange } from "./live";
 import { groupOwnerId } from "./ownership";
+import { z } from "zod";
 import { prisma, type Prisma } from "@polaris/db";
 import { receiptsAmong } from "@/lib/privacy-service";
 import * as groupReceipts from "./group-receipts";
@@ -52,6 +53,7 @@ import {
     type ChatErrorText
 } from "./access";
 import * as history from "./history-visibility";
+import { inBatches } from "./bounded";
 import { concealedFrom, listedFor } from "./chat-lock";
 import { badgeClearedAt, laterMark } from "@/lib/badge-seen";
 import { applyDefaultTimer, chatPrivacyIn, type ChatPrivacyRules } from "./vanish";
@@ -169,6 +171,9 @@ export interface ChatChannelView {
     /** Whether this reader may use `@everyone` and `@here` here. Only decides
      *  what the composer offers; sending asks the same question again. */
     readonly mayMentionRoom: boolean;
+    /** Whether the space lets members who do not run it use @everyone and
+     *  @here. False outside a space. */
+    readonly membersMayMentionEveryone: boolean;
     /** Whether anybody may post here, or only whoever runs it (the group's
      *  owner, a space channel's administrators). */
     readonly membersMaySend: boolean;
@@ -223,6 +228,14 @@ export interface ChatMemberView {
 /** How many unread messages a badge counts up to before it says "more". Reading
  *  past this is somebody scrolling, not somebody catching up on a number. */
 const UNREAD_CAP = 99;
+
+/** The most rows one channel's unread read may return: one past the cap, so the
+ *  badge can tell 99 from "more", and never the channel's whole history. */
+export const UNREAD_LIMIT = UNREAD_CAP + 1;
+
+/** How many channels' unread reads run at once. A rail of hundreds is read a few
+ *  at a time instead of holding the pool. */
+export const UNREAD_CONCURRENCY = 8;
 
 /** Said the same way wherever it is refused, because it is one situation and the
  *  next step is the same: an administrator switches the chat on for them. */
@@ -364,6 +377,22 @@ export async function updateSpace(
 }
 
 /**
+ * Whether members who do not run the space may use @everyone and @here in it.
+ * Only a space admin decides; the send asks the same rule (`refuseRoomMention`).
+ */
+export async function setSpaceRoomMentions(
+    actor: ChatActor,
+    spaceId: string,
+    value: boolean
+): Promise<void> {
+    await requireSpace(actor, spaceId, "admin");
+    await prisma.chatSpace.update({
+        where: { id: spaceId },
+        data: { membersMayMentionEveryone: value }
+    });
+}
+
+/**
  * Whether people who join later read earlier history: a space's default, or one
  * channel's choice. Only whoever runs that scope - a space admin for the
  * default, a channel admin for a channel. A group is its owner's, through
@@ -428,27 +457,70 @@ export async function deleteSpace(actor: ChatActor, spaceId: string): Promise<vo
     await prisma.chatSpace.delete({ where: { id: spaceId } });
 }
 
+/** How many people one page of a member list holds. */
+export const MEMBER_PAGE = 200;
+
+/** Past this many, a member list says "10,000+" rather than counting a space of
+ *  a million to print one number. */
+export const MEMBER_COUNT_CAP = 10_000;
+
+/** One page of a member list, the cursor for the next, and how many there are
+ *  in all - up to `MEMBER_COUNT_CAP`, past which `total` is that cap and
+ *  `more` is true. */
+export interface ChatMemberPage {
+    readonly members: ChatMemberView[];
+    readonly next: string | null;
+    readonly total: number;
+    readonly totalCapped: boolean;
+}
+
+/** The opaque cursor a page hands back: the id of the last row it drew. */
+const memberCursor = z.string().uuid();
+
 export async function listSpaceMembers(
     actor: ChatActor,
     spaceId: string
 ): Promise<ChatMemberView[]> {
+    return (await listSpaceMembersPage(actor, spaceId)).members;
+}
+
+/**
+ * A space's people a page at a time, in the order they joined, with the owner
+ * first. Never the whole roster: a space can hold a million people.
+ */
+export async function listSpaceMembersPage(
+    actor: ChatActor,
+    spaceId: string,
+    after?: string | null
+): Promise<ChatMemberPage> {
     await requireSpace(actor, spaceId);
-    const [space, members] = await Promise.all([
-        prisma.chatSpace.findUnique({
-            where: { id: spaceId },
-            select: { ownerId: true, owner: { select: { name: true } } }
-        }),
+    const cursor = after && memberCursor.safeParse(after).success ? after : null;
+    const [space, rows, counted] = await Promise.all([
+        cursor
+            ? null
+            : prisma.chatSpace.findUnique({
+                  where: { id: spaceId },
+                  select: { ownerId: true, owner: { select: { name: true } } }
+              }),
         prisma.chatSpaceMember.findMany({
             where: { spaceId },
-            orderBy: { createdAt: "asc" },
-            select: { userId: true, role: true, user: { select: { name: true } } }
-        })
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+            select: { id: true, userId: true, role: true, user: { select: { name: true } } },
+            take: MEMBER_PAGE
+        }),
+        prisma.chatSpaceMember.count({ where: { spaceId }, take: MEMBER_COUNT_CAP })
     ]);
-    if (!space) return [];
-    return [
-        { userId: space.ownerId, name: space.owner.name, role: "owner" },
-        ...members.map((row) => ({ userId: row.userId, name: row.user.name, role: row.role }))
-    ];
+    const members = rows.map((row) => ({ userId: row.userId, name: row.user.name, role: row.role }));
+    return {
+        members: space
+            ? [{ userId: space.ownerId, name: space.owner.name, role: "owner" }, ...members]
+            : members,
+        next: rows.length === MEMBER_PAGE ? rows[rows.length - 1]!.id : null,
+        // The owner has no row of their own.
+        total: Math.min(counted + 1, MEMBER_COUNT_CAP),
+        totalCapped: counted >= MEMBER_COUNT_CAP
+    };
 }
 
 export async function addSpaceMembers(
@@ -840,7 +912,7 @@ export async function listChannels(
             topic: true,
             private: true,
             archived: true,
-            space: { select: { archived: true, newcomerHistory: true } },
+            space: { select: { archived: true, newcomerHistory: true, membersMayMentionEveryone: true } },
             lastMessageAt: true,
             newcomerHistory: true,
             ownerId: true,
@@ -1082,7 +1154,12 @@ export async function listChannels(
             mayManageSpaceDefault: Boolean(channel.spaceId && administered.has(channel.spaceId)),
             mayInvite: invitesAllowed({ ...channel, mayAdminister }, actor.id),
             membersMayMention: channel.membersMayMention,
-            mayMentionRoom: roomMentionsAllowed(channel, actor.id),
+            mayMentionRoom: roomMentionsAllowed(
+                channel,
+                actor.id,
+                Boolean(channel.spaceId && administered.has(channel.spaceId))
+            ),
+            membersMayMentionEveryone: channel.space?.membersMayMentionEveryone ?? false,
             membersMaySend: channel.membersMaySend,
             stage: channel.stage,
             membersMayKeep: channel.membersMayKeep,
@@ -2395,33 +2472,51 @@ export async function listChannelMembers(
     actor: ChatActor,
     channelId: string
 ): Promise<ChatMemberView[]> {
+    return (await listChannelMembersPage(actor, channelId)).members;
+}
+
+/** A conversation's people a page at a time - see `listSpaceMembersPage`. */
+export async function listChannelMembersPage(
+    actor: ChatActor,
+    channelId: string,
+    after?: string | null
+): Promise<ChatMemberPage> {
     const access = await requireChannel(actor, channelId);
     if (!access.spaceId || (await isPrivate(channelId))) {
-        const [members, channel] = await Promise.all([
+        const cursor = after && memberCursor.safeParse(after).success ? after : null;
+        const [rows, channel, counted] = await Promise.all([
             prisma.chatChannelMember.findMany({
                 where: { channelId },
-                orderBy: { createdAt: "asc" },
-                select: { userId: true, role: true, user: { select: { name: true } } }
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+                select: { id: true, userId: true, role: true, user: { select: { name: true } } },
+                take: MEMBER_PAGE
             }),
             prisma.chatChannel.findUnique({
                 where: { id: channelId },
                 select: { ownerId: true, createdById: true }
-            })
+            }),
+            prisma.chatChannelMember.count({ where: { channelId }, take: MEMBER_COUNT_CAP })
         ]);
         // Worked out rather than stored. A member row is a member or an admin -
         // owning the group is a fact about the group, not about the row - and
         // reading it off the channel is also what puts a crown against the owner
         // of a group made before the column was being filled in.
         const owner = channel ? groupOwnerId(channel) : null;
-        return members.map((row) => ({
-            userId: row.userId,
-            name: row.user.name,
-            role: row.userId === owner ? "owner" : row.role
-        }));
+        return {
+            members: rows.map((row) => ({
+                userId: row.userId,
+                name: row.user.name,
+                role: row.userId === owner ? "owner" : row.role
+            })),
+            next: rows.length === MEMBER_PAGE ? rows[rows.length - 1]!.id : null,
+            total: Math.min(counted, MEMBER_COUNT_CAP),
+            totalCapped: counted >= MEMBER_COUNT_CAP
+        };
     }
     // An open channel in a space is everybody in the space, and saying so is
     // more truthful than listing the handful who happen to have a row.
-    return listSpaceMembers(actor, access.spaceId);
+    return listSpaceMembersPage(actor, access.spaceId, after);
 }
 
 // ---------------------------------------------------------------------------
@@ -2672,22 +2767,15 @@ export async function unreadConversations(actor: ChatActor): Promise<ChatUnreadC
  * of them always forgets. Own messages are excluded: sending one is having read
  * it, and a badge that counted them would never reach zero.
  *
- * One grouped query for every channel, however many there are. Each channel
- * has its own threshold - the reader's mark in it, or none - and that is
- * carried as one branch of an OR per channel rather than one count per channel:
- * a rail of forty conversations used to be forty-one round trips on every page
- * (the badge in the app switcher reads this too), plus a count of every message
- * ever written in each of them that was then thrown away for every channel with
- * a mark. The channels with no mark share one branch, since for them the
- * threshold is the same - the beginning.
- *
- * Kept in the query builder rather than written as SQL on purpose: the schema is
- * kept portable to SQLite, and a Postgres-only statement here would be the one
- * query the local setup cannot run. What it costs is the cap, which is applied
- * afterwards rather than inside the count. The index that serves the branches is
- * the one on `(channelId, createdAt)`.
+ * Read per channel, a few channels at a time (`UNREAD_CONCURRENCY`), and each
+ * read stops at `UNREAD_LIMIT` rows: what a badge shows is capped at 99, so
+ * anything past the cap is work nobody sees. It used to be one grouped COUNT
+ * across every channel with no upper bound, which for a public channel the
+ * reader never opened meant counting its entire history on every message.
+ * The index that serves each read is the partial one on unread messages,
+ * `(channelId, createdAt)` where not deleted, not a reply and not a system line.
  */
-async function unreadCounts(
+export async function unreadCounts(
     actor: ChatActor,
     channels: readonly { id: string }[],
     mine: ReadonlyMap<string, { lastReadAt: Date | null }>
@@ -2708,38 +2796,41 @@ async function unreadCounts(
     ]);
     const ignored = [actor.id, ...blocked];
 
-    const unseen: string[] = [];
-    const since: Prisma.ChatMessageWhereInput[] = [];
-    for (const channel of channels) {
+    // One bounded read per channel rather than one COUNT over all of them: a
+    // public channel nobody here ever opened has no mark, so its threshold is
+    // the beginning, and counting a million-message history to then show 99+
+    // was a full scan per reader per message. Asking for one row past the cap
+    // is all the badge can say anyway - Slack and Discord both stop at a
+    // ceiling rather than count - and the partial index on unread messages
+    // (`ChatMessage_unread_channelId_createdAt_idx`) answers each one by
+    // walking at most that many entries.
+    const reads = await inBatches(channels, UNREAD_CONCURRENCY, (channel) => {
         const mark = mine.get(channel.id)?.lastReadAt;
-        if (mark) since.push({ channelId: channel.id, createdAt: { gt: mark } });
-        else unseen.push(channel.id);
-    }
-
-    const grouped = await prisma.chatMessage.groupBy({
-        by: ["channelId"],
-        where: {
-            deletedAt: null,
-            authorId: { notIn: ignored },
-            // Somebody joining is not somebody talking. A room that lit up
-            // because a person walked into it is a badge that gets ignored,
-            // which costs the messages that really are waiting.
-            kind: { not: "system" },
-            // A thread reply is unread inside the thread, not in the channel:
-            // counting both would double every conversation that has one.
-            parentId: null,
-            OR: [...(unseen.length > 0 ? [{ channelId: { in: unseen } }] : []), ...since],
-            AND: [history.readableWhere(floors, actor.id)]
-        },
-        _count: { _all: true }
+        const floor = floors.get(channel.id);
+        return prisma.chatMessage.findMany({
+            where: {
+                channelId: channel.id,
+                ...(mark ? { createdAt: { gt: mark } } : {}),
+                deletedAt: null,
+                authorId: { notIn: ignored },
+                // Somebody joining is not somebody talking. A room that lit up
+                // because a person walked into it is a badge that gets ignored,
+                // which costs the messages that really are waiting.
+                kind: { not: "system" },
+                // A thread reply is unread inside the thread, not in the
+                // channel: counting both would double every conversation that
+                // has one.
+                parentId: null,
+                AND: [history.readableWhere(floor ? new Map([[channel.id, floor]]) : new Map(), actor.id)]
+            },
+            select: { id: true },
+            take: UNREAD_LIMIT
+        });
     });
-    // Only channels with something in them come back from the group-by, so the
-    // ones with nothing are already zero.
-    const totals = new Map(grouped.map((row) => [row.channelId, row._count._all]));
 
-    for (const channel of channels) {
-        counted.set(channel.id, Math.min(totals.get(channel.id) ?? 0, UNREAD_CAP));
-    }
+    channels.forEach((channel, index) => {
+        counted.set(channel.id, Math.min(reads[index]?.length ?? 0, UNREAD_CAP));
+    });
     return counted;
 }
 

@@ -44,10 +44,13 @@ import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { channelMentions } from "@/components/rich-text/markdown";
 import { chatAlertShelf } from "./isolation";
 import { chatWordsFor } from "./text";
+import { inBatches } from "./bounded";
 import { recipientShelf } from "@/lib/workspace-scope";
 import {
     ChatAccessError,
     roomMentionsAllowed,
+    runsSpace,
+    spaceAccess,
     type ChannelAccess,
     type ChatActor,
     type ChatErrorText
@@ -55,6 +58,9 @@ import {
 
 /** What somebody is told when the owner of a group has kept these to themselves. */
 const ROOM_MENTION_REFUSED: ChatErrorText = { key: "errors.roomMentionOwnerOnly" };
+
+/** What somebody is told in a space whose admins kept these to themselves. */
+const ROOM_MENTION_SPACE_REFUSED: ChatErrorText = { key: "errors.roomMentionAdminsOnly" };
 
 /**
  * Refuse a message that names the room from somebody the room does not let.
@@ -76,15 +82,29 @@ export async function refuseRoomMention(
     access: ChannelAccess,
     body: string
 ): Promise<void> {
-    if (access.kind !== "group") return;
+    if (access.kind !== "group" && !access.spaceId) return;
     if (!body.includes("@") || channelMentions(body).size === 0) return;
-    const group = await prisma.chatChannel.findUnique({
+    const channel = await prisma.chatChannel.findUnique({
         where: { id: access.channelId },
-        select: { kind: true, ownerId: true, createdById: true, membersMayMention: true }
+        select: {
+            kind: true,
+            ownerId: true,
+            createdById: true,
+            membersMayMention: true,
+            spaceId: true,
+            space: { select: { membersMayMentionEveryone: true } }
+        }
     });
-    if (group && !roomMentionsAllowed(group, actor.id)) {
-        throw new ChatAccessError(ROOM_MENTION_REFUSED);
+    if (!channel) return;
+    if (channel.kind === "group") {
+        if (!roomMentionsAllowed(channel, actor.id)) throw new ChatAccessError(ROOM_MENTION_REFUSED);
+        return;
     }
+    if (!channel.spaceId || channel.space?.membersMayMentionEveryone) return;
+    // Asked only when the space has not handed it out: one more read, and only
+    // for a message that names the room.
+    const admin = runsSpace(await spaceAccess(actor, channel.spaceId));
+    if (!roomMentionsAllowed(channel, actor.id, admin)) throw new ChatAccessError(ROOM_MENTION_SPACE_REFUSED);
 }
 
 /**
@@ -125,21 +145,11 @@ export async function announceRoomMention(
     // written to.
     if (!channel || channel.kind === "dm") return;
 
-    const audience = await reachable(channel);
-    if (audience.size === 0) return;
-
     // `@everyone` wins where a message carries both: it is the wider of the two,
     // and telling somebody twice about one message is worse than telling the
     // people `@here` would have skipped.
     const everyone = named.has("everyone");
-    const online = everyone ? null : onlineUserIds();
     const label = everyone ? "@everyone" : "@here";
-
-    // A mention gets through the conversation's mute and Chat's as a whole,
-    // unless that mute holds mentions too.
-    const mutes = await muteStates([channelId], [...audience]);
-    const silenced = await silencedIn(channelId, [...audience]);
-    const shut = await blockersOf(authorId, [...audience]);
     const where = channel.spaceId ? `#${channel.name}` : channel.name;
     const author = await prisma.user.findUnique({
         where: { id: authorId },
@@ -147,60 +157,116 @@ export async function announceRoomMention(
     });
     const authorName = author?.name ?? null;
     const about = await chatAlertShelf(channel);
-    // Somebody who locked the conversation is told only that something arrived.
-    const locked = await lockedFor(channelId, [...audience]);
 
-    await Promise.all(
-        [...audience]
-            .filter((userId) => userId !== authorId)
+    // A page of the room at a time, never the whole roster: a space of a
+    // million people is two thousand pages, each bounded in what it reads and
+    // in how many notifications it writes at once. `@here` never pages the
+    // roster at all - it starts from who is online, the smaller set.
+    const pages = everyone ? rosterPages(channel) : onlinePages(channel, onlineUserIds());
+    for await (const page of pages) {
+        const ids = page.filter((userId) => userId !== authorId);
+        if (ids.length === 0) continue;
+        // A mention gets through the conversation's mute and Chat's as a whole,
+        // unless that mute holds mentions too.
+        const [mutes, silenced, shut, locked] = await Promise.all([
+            muteStates([channelId], ids),
+            silencedIn(channelId, ids),
+            blockersOf(authorId, ids),
+            // Somebody who locked the conversation is told only that something arrived.
+            lockedFor(channelId, ids)
+        ]);
+        const told = ids
             .filter((userId) => !core.chatMuteHolds(mutes(channelId, userId), true))
             .filter((userId) => !silenced.has(userId))
-            .filter((userId) => !shut.has(userId))
-            .filter((userId) => online === null || online.has(userId))
-            .map(async (userId) => {
-                // Written for whoever is told, in their own language.
-                const words = await chatWordsFor(userId);
-                return createNotification({
-                    userId,
-                    type: "chat.mention",
-                    title: locked.has(userId)
-                        ? words("lock.newMessage")
-                        : words("notices.roomMention", {
-                              name: authorName ?? words("notices.somebodyCapital"),
-                              mention: label,
-                              where
-                          }),
-                    body: locked.has(userId) ? null : plainExcerpt(body, 140),
-                    href: `/chat/c/${channelId}/${messageId}`,
-                    level: "info",
-                    // Addressed to the room, and drawn as that: the conversation
-                    // it went to rather than "you", so it reads as an
-                    // announcement and not as a message written to the reader.
-                    audience: "group",
-                    audienceLabel: locked.has(userId) ? null : where || null,
-                    shelf: await recipientShelf(userId, about).catch(() => null)
-                });
-            })
-    );
+            .filter((userId) => !shut.has(userId));
+        await inBatches(told, ROOM_MENTION_CONCURRENCY, async (userId) => {
+            // Written for whoever is told, in their own language.
+            const words = await chatWordsFor(userId);
+            return createNotification({
+                userId,
+                type: "chat.mention",
+                title: locked.has(userId)
+                    ? words("lock.newMessage")
+                    : words("notices.roomMention", {
+                          name: authorName ?? words("notices.somebodyCapital"),
+                          mention: label,
+                          where
+                      }),
+                body: locked.has(userId) ? null : plainExcerpt(body, 140),
+                href: `/chat/c/${channelId}/${messageId}`,
+                level: "info",
+                // Addressed to the room, and drawn as that: the conversation
+                // it went to rather than "you", so it reads as an
+                // announcement and not as a message written to the reader.
+                audience: "group",
+                audienceLabel: locked.has(userId) ? null : where || null,
+                shelf: await recipientShelf(userId, about).catch(() => null),
+                // One per reader per message, however often this runs.
+                dedupKey: `chat.room-mention:${messageId}`,
+                once: true
+            });
+        });
+    }
 }
 
-/** Everybody the message reaches: the channel's own members where it has them,
- *  and the space's roster where the channel is open to all of it. */
-async function reachable(channel: {
-    id: string;
-    spaceId: string | null;
-    private: boolean;
-}): Promise<Set<string>> {
-    if (!channel.spaceId || channel.private) {
-        const members = await prisma.chatChannelMember.findMany({
-            where: { channelId: channel.id },
-            select: { userId: true }
-        });
-        return new Set(members.map((row) => row.userId));
+/** How many people one page of a room mention covers. */
+export const ROOM_MENTION_PAGE = 500;
+
+/** How many notifications of one page are written at once. */
+export const ROOM_MENTION_CONCURRENCY = 16;
+
+type Room = { readonly id: string; readonly spaceId: string | null; readonly private: boolean; };
+
+/**
+ * Everybody the message reaches, a page at a time in id order, the last id
+ * the cursor: the channel's own members where it has them, and the space's
+ * roster where the channel is open to all of it.
+ */
+export async function* rosterPages(channel: Room): AsyncGenerator<string[]> {
+    let after: string | undefined;
+    for (;;) {
+        const cursor = after ? { userId: { gt: after } } : {};
+        const rows =
+            !channel.spaceId || channel.private
+                ? await prisma.chatChannelMember.findMany({
+                      where: { channelId: channel.id, ...cursor },
+                      orderBy: { userId: "asc" },
+                      select: { userId: true },
+                      take: ROOM_MENTION_PAGE
+                  })
+                : await prisma.chatSpaceMember.findMany({
+                      where: { spaceId: channel.spaceId, ...cursor },
+                      orderBy: { userId: "asc" },
+                      select: { userId: true },
+                      take: ROOM_MENTION_PAGE
+                  });
+        if (rows.length === 0) return;
+        yield rows.map((row) => row.userId);
+        if (rows.length < ROOM_MENTION_PAGE) return;
+        after = rows[rows.length - 1]!.userId;
     }
-    const members = await prisma.chatSpaceMember.findMany({
-        where: { spaceId: channel.spaceId },
-        select: { userId: true }
-    });
-    return new Set(members.map((row) => row.userId));
+}
+
+/** The people online right now who are in the room, a page at a time. */
+export async function* onlinePages(
+    channel: Room,
+    online: ReadonlySet<string>
+): AsyncGenerator<string[]> {
+    const ids = [...online];
+    for (let start = 0; start < ids.length; start += ROOM_MENTION_PAGE) {
+        const chunk = ids.slice(start, start + ROOM_MENTION_PAGE);
+        const rows =
+            !channel.spaceId || channel.private
+                ? await prisma.chatChannelMember.findMany({
+                      where: { channelId: channel.id, userId: { in: chunk } },
+                      select: { userId: true },
+                      take: ROOM_MENTION_PAGE
+                  })
+                : await prisma.chatSpaceMember.findMany({
+                      where: { spaceId: channel.spaceId, userId: { in: chunk } },
+                      select: { userId: true },
+                      take: ROOM_MENTION_PAGE
+                  });
+        if (rows.length > 0) yield rows.map((row) => row.userId);
+    }
 }

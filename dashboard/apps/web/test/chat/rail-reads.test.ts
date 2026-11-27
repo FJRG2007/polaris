@@ -114,7 +114,7 @@ vi.mock("@polaris/db", () => ({
                 return { id: "new" };
             }
         },
-        chatMessage: { groupBy: async () => [] }
+        chatMessage: { findMany: async () => [] }
     }
 }));
 

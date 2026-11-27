@@ -22,7 +22,7 @@ import { allowedBy } from "@/lib/privacy-service";
 import { friendIds } from "@/lib/friends-service";
 import { nicknamesFor } from "@/lib/contact-names";
 import { memberOrgIds } from "@/lib/orgs/org-service";
-import { conversationAudience } from "@/lib/chat/access";
+import { conversationAudienceWhere } from "@/lib/chat/access";
 import type { ReferenceKind } from "@/components/rich-text/references";
 import type { DiscoveryPolicy } from "@/lib/discovery-policy";
 
@@ -126,11 +126,13 @@ async function searchPeople(
     channelId?: string
 ): Promise<MentionCandidate[]> {
     const contains = term ? like(term) : undefined;
-    const inRoom = channelId ? await conversationAudience({ id: actor.id }, channelId) : null;
+    // The room as a filter the database applies, not a list of its people: a
+    // space can hold a million, and this runs on every keystroke.
+    const inRoom = channelId ? await conversationAudienceWhere({ id: actor.id }, channelId) : null;
     // Null means this account cannot reach that conversation - somebody typing
     // into a channel they were just removed from, or a bad id. Falling back to
     // the ordinary reach rather than refusing: a caret is not worth an error.
-    const scope = inRoom ?? (actor.isAdmin ? null : await reachablePeople(actor));
+    const scope = inRoom ? null : actor.isAdmin ? null : await reachablePeople(actor);
 
     // The names this reader gave other people are theirs alone, and they are the
     // name this reader actually thinks in - so typing one has to find whoever it
@@ -148,7 +150,7 @@ async function searchPeople(
 
     const users = await prisma.user.findMany({
         where: {
-            ...(scope ? { id: { in: scope } } : {}),
+            ...(inRoom ? { AND: [inRoom] } : scope ? { id: { in: scope } } : {}),
             ...(contains
                 ? {
                       OR: [

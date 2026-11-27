@@ -106,6 +106,12 @@ interface Roster {
     readonly loading: boolean;
     /** The server's answer is in, so the count is the whole list's. */
     readonly settled: boolean;
+    /** How many there are in all, which can be more than are loaded. */
+    readonly total: number;
+    /** Whether `total` is a ceiling ("10,000+") rather than an exact count. */
+    readonly totalCapped: boolean;
+    /** Ask for the next page; a no-op when there is none or one is on its way. */
+    readonly loadMore: () => void;
 }
 
 /**
@@ -144,6 +150,9 @@ export function useMembersPanel(): {
     return { open, setOpen, toggle: useCallback(() => setOpen(!open), [open, setOpen]) };
 }
 
+/** How many rows before the end of the list the next page is asked for. */
+const END_SLACK = 20;
+
 /** How long a burst of list changes settles before the roster is read again. */
 const ROSTER_SETTLE_MS = 1000;
 
@@ -161,11 +170,43 @@ function useRoster(
     seed: readonly ChatRosterMember[]
 ): Roster {
     const [members, setMembers] = useState<readonly ChatRosterMember[] | null>(null);
+    const [total, setTotal] = useState({ count: 0, capped: false });
+    // The cursor of the next page, and whether a read of it is in flight. Refs,
+    // because the list's end fires on every scroll frame and must not wait on a
+    // render to see that a page is already being read.
+    const next = useRef<string | null>(null);
+    const paging = useRef(false);
 
+    // The first page only: a reload after somebody joins starts over rather
+    // than re-reading every page somebody scrolled through.
     const load = useCallback(async () => {
         if (!showing) return;
         const result = await actions.listRosterAction(channelId);
+        next.current = result.next ?? null;
+        setTotal({ count: result.total ?? result.members?.length ?? 0, capped: Boolean(result.totalCapped) });
         setMembers(result.members ?? []);
+    }, [channelId, showing]);
+
+    const loadMore = useCallback(() => {
+        const after = next.current;
+        if (!showing || !after || paging.current) return;
+        paging.current = true;
+        void actions
+            .listRosterAction(channelId, after)
+            .then((result) => {
+                // A reload that landed meanwhile moved the cursor: this page is
+                // of a list that is no longer the one on screen.
+                if (next.current !== after) return;
+                next.current = result.next ?? null;
+                const page = result.members ?? [];
+                setMembers((held) => {
+                    const seen = new Set((held ?? []).map((member) => member.userId));
+                    return [...(held ?? []), ...page.filter((member) => !seen.has(member.userId))];
+                });
+            })
+            .finally(() => {
+                paging.current = false;
+            });
     }, [channelId, showing]);
 
     useEffect(() => {
@@ -211,7 +252,10 @@ function useRoster(
     return {
         members: owned,
         loading: members === null && seed.length === 0,
-        settled: members !== null
+        settled: members !== null,
+        total: members === null ? owned.length : Math.max(total.count, owned.length),
+        totalCapped: total.capped,
+        loadMore
     };
 }
 
@@ -222,10 +266,13 @@ function MemberRows({
     channel,
     onMention,
     onChanged,
+    onEnd,
     className
 }: {
     members: readonly ChatRosterMember[];
     loading: boolean;
+    /** Called when the last rows come into view, to load the next page. */
+    onEnd?: () => void;
     viewerId: string;
     /** The room being looked at, which is what decides who may do what to whom -
      *  see `MemberMenu`. */
@@ -273,6 +320,12 @@ function MemberRows({
         getItemKey: (index) => items[index]?.key ?? index,
         overscan: 8
     });
+    // The next page is asked for when the drawn window reaches the last rows,
+    // so a long list loads as it is scrolled and never all at once.
+    const lastDrawn = rows.getVirtualItems().at(-1)?.index ?? -1;
+    useEffect(() => {
+        if (items.length > 0 && lastDrawn >= items.length - END_SLACK) onEnd?.();
+    }, [lastDrawn, items.length, onEnd]);
 
     if (loading) {
         return (
@@ -581,10 +634,17 @@ export function ChannelMembers({
                   })),
         [channel.spaceId, channel.others]
     );
-    const { members, loading, settled } = useRoster(channel.id, channel.ownerId, open, seed);
+    const { members, loading, settled, total, totalCapped, loadMore } = useRoster(
+        channel.id,
+        channel.ownerId,
+        open,
+        seed
+    );
     const heading = !settled
         ? t("members.heading")
-        : t("members.headingCount", { count: members.length });
+        : totalCapped
+          ? t("members.headingCountCapped", { count: total })
+          : t("members.headingCount", { count: total });
     // Above the two early returns below, and deliberately: a hook that only runs
     // on some renders is a crash the first time this panel is closed or drawn on
     // a narrow window.
@@ -610,6 +670,7 @@ export function ChannelMembers({
                         channel={channel}
                         onMention={onMention}
                         onChanged={refresh}
+                        onEnd={loadMore}
                     />
                 </DialogContent>
             </Dialog>
@@ -677,6 +738,7 @@ export function ChannelMembers({
                     channel={channel}
                     onMention={onMention}
                     onChanged={refresh}
+                    onEnd={loadMore}
                 />
             </aside>
         </>
