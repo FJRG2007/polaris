@@ -25,6 +25,19 @@ describe("liveVoiceProvider", () => {
     it("never the deployment's key", () => {
         expect(liveVoiceProvider(new Map([["openai", "instance"]]))).toBeNull();
     });
+    it("picks Google on a key of the person's own, never the deployment's", () => {
+        expect(liveVoiceProvider(new Map([["google-ai", "own"]]))).toBe("google-ai");
+        expect(liveVoiceProvider(new Map([["google-ai", "instance"]]))).toBeNull();
+    });
+    it("with both held, follows the chat's model provider, else the first", () => {
+        const both = new Map([["openai", "own"], ["google-ai", "own"]]);
+        expect(liveVoiceProvider(both, "google-ai")).toBe("google-ai");
+        expect(liveVoiceProvider(both, "openai")).toBe("openai");
+        expect(liveVoiceProvider(both, "anthropic")).toBe("openai");
+        expect(liveVoiceProvider(both)).toBe("openai");
+        // A preference for a provider whose key is the deployment's is not followed.
+        expect(liveVoiceProvider(new Map([["openai", "own"], ["google-ai", "instance"]]), "google-ai")).toBe("openai");
+    });
     it("none without a live-capable provider", () => {
         expect(liveVoiceProvider(new Map([["groq", "own"], ["anthropic", "own"]]))).toBeNull();
         expect(liveVoiceProvider(new Map())).toBeNull();

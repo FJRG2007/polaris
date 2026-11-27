@@ -111,12 +111,19 @@ export function functionCalls(event: unknown): RealtimeCall[] {
     return calls;
 }
 
-const FAILED_OUTPUT = JSON.stringify({ error: "Tool request failed. Do not claim it succeeded." });
+/** The error a refused mint answers with, as the call shows it. */
+export function mintError(error: unknown): RealtimeError {
+    return error === "no_key" ? "no_key" : error === "rate_limited" ? "rate_limited" : "failed";
+}
+
+export const FAILED_OUTPUT = JSON.stringify({ error: "Tool request failed. Do not claim it succeeded." });
 
 /** How a call other than a Code session's opens and runs its tools. */
 export interface RealtimeChannel {
     /** The route that mints the secret, and what it is sent. */
     readonly mint: { readonly url: string; readonly body: unknown };
+    /** A secret minted already (`openLiveLink`): the mint route is not called again. */
+    readonly grant?: RealtimeGrant;
     /** Runs one tool call; the output goes back to the model. */
     readonly runTool: (call: RealtimeCall, signal: AbortSignal) => Promise<string>;
     /** What was heard and said, for the thread. */
@@ -273,7 +280,8 @@ export function openRealtimeLink(
         }
     };
 
-    const connect = async () => {
+    const mint = async (): Promise<RealtimeGrant | null> => {
+        if (channelOf?.grant) return channelOf.grant;
         const opened = await env.fetch(channelOf?.mint.url ?? "/api/polar/voice/realtime", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -282,10 +290,15 @@ export function openRealtimeLink(
         });
         if (!opened.ok) {
             const { error } = (await opened.json().catch(() => ({}))) as { error?: string };
-            return fail(error === "no_key" ? "no_key" : error === "rate_limited" ? "rate_limited" : "failed");
+            fail(mintError(error));
+            return null;
         }
-        const grant = (await opened.json()) as RealtimeGrant;
-        if (closed) return;
+        return (await opened.json()) as RealtimeGrant;
+    };
+
+    const connect = async () => {
+        const grant = await mint();
+        if (!grant || closed) return;
         try {
             microphone = await env.microphone();
         } catch {

@@ -530,7 +530,7 @@
             "retry": "Reintentar",
             "useTranscribed": "Usar voz por transcripción",
             "failed": "La voz en directo no se ha conectado. Reinténtalo o usa la voz por transcripción.",
-            "noKey": "La voz en directo necesita una clave propia que hable en directo, como OpenAI.",
+            "noKey": "La voz en directo necesita una clave propia que hable en directo, como OpenAI o Google.",
             "notSaved": "Una parte de esta llamada no se ha podido guardar en el chat."
         },
         "transcribed": {

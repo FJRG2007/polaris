@@ -2,7 +2,8 @@
 
 /**
  * Live voice in a Polar chat: the person talks with a speech-to-speech model
- * over a direct connection (`realtime-link.ts`), as in ChatGPT's voice mode -
+ * over a direct connection (`live-link.ts`: OpenAI over WebRTC, or Gemini
+ * Live over a WebSocket), as in ChatGPT's voice mode -
  * it answers as soon as you stop, stops the moment you talk over it, and
  * what both of you said shows as it is said.
  *
@@ -23,7 +24,8 @@ import { AudioLines, Mic, MicOff, PhoneOff } from "lucide-react";
 import { VoiceOrb, type OrbState } from "@/components/polar/voice-orb";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { openRealtimeLink, type RealtimeCall, type RealtimeLink, type RealtimeSnapshot } from "@/lib/polar/realtime-link";
+import { openLiveLink } from "@/lib/polar/live-link";
+import type { RealtimeCall, RealtimeLink, RealtimeSnapshot } from "@/lib/polar/realtime-link";
 import {
     ASK_POLAR_ANSWER_MAX,
     ASK_POLAR_TOOL,
@@ -39,6 +41,8 @@ export interface LiveVoiceCallProps {
     temporary: boolean;
     /** The project a new chat goes into. */
     projectId: string | null;
+    /** The provider of the model the chat is on: the call runs on it when it can. */
+    provider: string | null;
     messages: UIMessage[];
     status: ChatStatus;
     /** Send a request as the next message of the thread. */
@@ -196,11 +200,12 @@ export function LiveVoiceCall(props: LiveVoiceCallProps) {
         setPermission("granted");
         current.current?.close();
         ledger.current = EMPTY_LEDGER;
-        const next = openRealtimeLink({
-            binding: { sessionId: latest.current.threadId, onOpen: () => undefined },
+        const { threadId, provider } = latest.current;
+        const next = openLiveLink({
+            threadId,
             lang: locale,
             channel: {
-                mint: { url: "/api/polar/voice/live", body: { threadId: latest.current.threadId, lang: locale } },
+                mint: { url: "/api/polar/voice/live", body: { threadId, lang: locale, provider } },
                 runTool,
                 onLive
             }

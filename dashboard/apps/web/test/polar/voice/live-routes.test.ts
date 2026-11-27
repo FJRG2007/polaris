@@ -17,10 +17,13 @@ const state = {
     user: { id: OWNER, viewingAs: null as string | null },
     limited: false,
     threadOwner: OWNER as string | null,
+    threadChoice: null as unknown,
     sources: new Map<string, string>([["openai", "own"]]),
     baseUrl: null as string | null,
     minted: true,
     mints: [] as Array<Record<string, unknown>>,
+    geminiMints: [] as Array<Record<string, unknown>>,
+    credentials: [] as Array<{ provider: string; payer: string | null }>,
     ensured: [] as unknown[][],
     saved: [] as Array<{ messages: unknown[]; parents: Array<string | null> }>
 };
@@ -29,16 +32,19 @@ vi.mock("@/lib/polar/access", () => ({
     polarCaller: async () => ({ ...state.user, isAdmin: false, name: "Ada" }),
     polarAccessFor: async () => ({ use: true, spend: true, web: true, connectors: true }),
     polarKeySources: async () => state.sources,
-    polarCredentialFor: async (_user: string, provider: string, payer: string | null) =>
-        state.sources.get(provider) === "own" && payer === "own"
-            ? { provider, source: "own", secret: KEY, baseUrl: state.baseUrl, gatewayModel: null }
-            : null
+    polarCredentialFor: async (_user: string, provider: string, payer: string | null) => {
+        state.credentials.push({ provider, payer });
+        return state.sources.get(provider) === "own" && payer === "own"
+            ? { provider, source: "own", secret: `${KEY}-${provider}`, baseUrl: state.baseUrl, gatewayModel: null }
+            : null;
+    }
 }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: !state.limited }) }));
 vi.mock("@polaris/db", () => ({
     prisma: {
         polarThread: {
-            findUnique: async () => (state.threadOwner ? { userId: state.threadOwner } : null)
+            findUnique: async () =>
+                state.threadOwner ? { userId: state.threadOwner, choice: state.threadChoice } : null
         }
     }
 }));
@@ -46,6 +52,14 @@ vi.mock("@/lib/polar/voice-realtime", () => ({
     mintLiveSecret: async (input: Record<string, unknown>) => {
         state.mints.push(input);
         return state.minted ? { value: "ek_fixture", expiresAt: 1_800_000_000 } : null;
+    }
+}));
+vi.mock("@/lib/polar/gemini-live", () => ({
+    mintGeminiLiveToken: async (input: Record<string, unknown>) => {
+        state.geminiMints.push(input);
+        return state.minted
+            ? { provider: "google-ai", token: "auth_tokens/fixture", setup: { model: "models/fixture" }, expiresAt: 1_800_000_000 }
+            : null;
     }
 }));
 vi.mock("@/lib/polar/threads", () => ({
@@ -86,6 +100,9 @@ beforeEach(() => {
     state.user = { id: OWNER, viewingAs: null };
     state.limited = false;
     state.threadOwner = OWNER;
+    state.threadChoice = null;
+    state.geminiMints = [];
+    state.credentials = [];
     state.sources = new Map([["openai", "own"]]);
     state.baseUrl = null;
     state.minted = true;
@@ -100,9 +117,47 @@ describe("POST /api/polar/voice/live", () => {
         expect(response.status).toBe(200);
         expect(response.headers.get("cache-control")).toBe("no-store");
         const text = await response.text();
-        expect(JSON.parse(text)).toEqual({ value: "ek_fixture", expiresAt: 1_800_000_000 });
+        expect(JSON.parse(text)).toEqual({ provider: "openai", value: "ek_fixture", expiresAt: 1_800_000_000 });
         expect(text).not.toContain(KEY);
-        expect(state.mints).toEqual([{ apiKey: KEY, lang: "en-US" }]);
+        expect(state.mints).toEqual([{ apiKey: `${KEY}-openai`, lang: "en-US" }]);
+    });
+    it("mints a Gemini Live token on the person's own Google key, never answering the key", async () => {
+        state.sources = new Map([["google-ai", "own"]]);
+        const response = await open();
+        expect(response.status).toBe(200);
+        const text = await response.text();
+        expect(JSON.parse(text)).toMatchObject({ provider: "google-ai", token: "auth_tokens/fixture" });
+        expect(text).not.toContain(KEY);
+        expect(state.geminiMints).toEqual([{ apiKey: `${KEY}-google-ai`, lang: "en-US" }]);
+        expect(state.mints).toEqual([]);
+        // Only ever asked for the person's own key.
+        expect(state.credentials).toEqual([{ provider: "google-ai", payer: "own" }]);
+    });
+    it("never mints Gemini on the deployment's Google key", async () => {
+        state.sources = new Map([["google-ai", "instance"]]);
+        const response = await open();
+        expect(response.status).toBe(409);
+        expect(await response.json()).toEqual({ error: "no_key" });
+        expect(state.geminiMints).toEqual([]);
+        expect(state.credentials).toEqual([]);
+    });
+    it("with both keys, follows the chat's model provider, then the thread's choice", async () => {
+        state.sources = new Map([["openai", "own"], ["google-ai", "own"]]);
+        await open({ threadId: THREAD, lang: "en-US", provider: "google-ai" });
+        expect(state.geminiMints).toHaveLength(1);
+        await open({ threadId: THREAD, lang: "en-US", provider: "openai" });
+        expect(state.mints).toHaveLength(1);
+        state.threadChoice = { provider: "google-ai", model: "gemini-fixture" };
+        await open();
+        expect(state.geminiMints).toHaveLength(2);
+        // A provider that cannot talk live falls back to the first held.
+        state.threadChoice = null;
+        await open({ threadId: THREAD, lang: "en-US", provider: "anthropic" });
+        expect(state.mints).toHaveLength(2);
+    });
+    it("rejects a provider hint that is not a string", async () => {
+        expect((await open({ threadId: THREAD, lang: "en-US", provider: 7 })).status).toBe(400);
+        expect((await open({ threadId: THREAD, lang: "en-US", provider: "x".repeat(65) })).status).toBe(400);
     });
     it("mints for a new chat that has no row yet", async () => {
         state.threadOwner = null;
