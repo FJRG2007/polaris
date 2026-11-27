@@ -298,6 +298,14 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                     </label>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    {keys.length > 0 ? (
+                        <Button size="sm" variant="outline" asChild>
+                            <Link href="/account/api-keys/usage" className="no-underline">
+                                <BarChart3 className="size-4" />
+                                {t("apiKeys.list.allUsage")}
+                            </Link>
+                        </Button>
+                    ) : null}
                     <Button size="sm" variant="outline" asChild>
                         <Link href="/account/api-keys/reference" className="no-underline">
                             <BookOpen className="size-4" />

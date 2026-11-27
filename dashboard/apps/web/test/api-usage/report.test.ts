@@ -6,6 +6,10 @@ const at = (iso: string) => new Date(iso);
 vi.mock("@polaris/db", () => ({
     prisma: {
         apiKeyCallHour: {
+            aggregate: async (args: Record<string, any>) => {
+                queries.push(args);
+                return { _sum: { ms25: 5, ms50: 5, ms100: 4, msOver: 1 } };
+            },
             groupBy: async (args: Record<string, any>) => {
                 queries.push(args);
                 const by = args.by.join(",");
@@ -16,6 +20,14 @@ vi.mock("@polaris/db", () => ({
                         : [
                               { hour: at("2026-10-15T09:00:00Z"), _sum: { calls: 10 } },
                               { hour: at("2026-10-15T10:00:00Z"), _sum: { calls: 5 } }
+                          ];
+                }
+                if (by === "apiKeyId") {
+                    return failed
+                        ? [{ apiKeyId: "k2", _sum: { calls: 2 } }]
+                        : [
+                              { apiKeyId: "k2", _sum: { calls: 10, ms25: 10 } },
+                              { apiKeyId: "k1", _sum: { calls: 5, ms100: 5 } }
                           ];
                 }
                 if (by === "method,route") {
@@ -70,7 +82,7 @@ describe("a key's usage report", () => {
     it("aggregates in the database, scoped to the key and the window, and fills quiet hours with zeros", async () => {
         queries.length = 0;
         const result = await report.keyUsageReport("k1", "24h", new Date("2026-10-15T10:30:00Z"));
-        expect(queries).toHaveLength(5);
+        expect(queries).toHaveLength(6);
         for (const query of queries) {
             expect(query.where.apiKeyId).toBe("k1");
             expect(query.where.hour.gte.toISOString()).toBe("2026-10-14T11:00:00.000Z");
@@ -83,6 +95,19 @@ describe("a key's usage report", () => {
         expect(result.classes).toEqual({ success: 13, client: 1, server: 1 });
         expect(result.routes[0]).toMatchObject({ route: "/api/v1/me", calls: 15, errors: 2 });
         expect(result.p50).toEqual({ ms: 38, over: false });
+        expect(result.p99).toEqual({ ms: 5000, over: true });
+        expect(result.keys).toEqual([]);
+    });
+
+    it("sums several keys as one and names each key's share", async () => {
+        queries.length = 0;
+        const result = await report.usageReport(["k1", "k2"], "7d", { now: new Date("2026-10-15T10:30:00Z") });
+        expect(queries).toHaveLength(8);
+        for (const query of queries) expect(query.where.apiKeyId).toEqual({ in: ["k1", "k2"] });
+        expect(result.keys).toEqual([
+            { apiKeyId: "k2", calls: 10, errors: 2, p50: { ms: 13, over: false }, p95: { ms: 24, over: false } },
+            { apiKeyId: "k1", calls: 5, errors: 0, p50: { ms: 75, over: false }, p95: { ms: 98, over: false } }
+        ]);
     });
 
     it("folds the long windows into days", async () => {

@@ -14,8 +14,9 @@ import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useDisplayFormat, useDisplayPreferences } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { KeyUsage } from "@/app/(app)/account/api-keys/usage-actions";
-import { ArrowLeft, BookOpen, Pencil, RotateCw } from "lucide-react";
+import { csvCell } from "@/lib/access/grant-use-csv";
+import type { KeyUsage, UsageKeyLabel } from "@/app/(app)/account/api-keys/usage-actions";
+import { ArrowLeft, BookOpen, Download, Pencil, RotateCw } from "lucide-react";
 import { Badge, Button, SegmentedControl, Skeleton, cn } from "@polaris/ui";
 import type { Percentile } from "@/lib/api-usage/report";
 import { USAGE_RANGES, type UsageRange } from "@/lib/api-usage/ranges";
@@ -32,7 +33,10 @@ export interface UsageKey {
     lastUsedUserAgent: string | null;
 }
 
-type Load = { state: "loading" } | { state: "failed" } | { state: "ready"; usage: KeyUsage };
+export type Load<T = KeyUsage> =
+    | { state: "loading" }
+    | { state: "failed" }
+    | { state: "ready"; usage: T };
 
 const CACHE_PREFIX = "polaris.api-key-usage.";
 
@@ -152,7 +156,21 @@ export function KeyUsageView({ apiKey }: { apiKey: UsageKey }) {
 }
 
 /** The figures: skeletons while they load, a retry when they failed, the report when they came. */
-export function UsageData({ load, onRetry }: { load: Load; onRetry: () => void }) {
+export function UsageData({
+    load,
+    onRetry,
+    labels,
+    emptyHint,
+    exportName
+}: {
+    load: Load;
+    onRetry: () => void;
+    /** Every key of the account, for the overview's per-key table. */
+    labels?: UsageKeyLabel[];
+    emptyHint?: string;
+    /** The downloaded file's name, without the period or the extension. */
+    exportName?: string;
+}) {
     const t = useTranslations("account");
     if (load.state === "loading") return <UsageSkeleton />;
     if (load.state === "failed") {
@@ -174,18 +192,20 @@ export function UsageData({ load, onRetry }: { load: Load; onRetry: () => void }
         return (
             <div className="flex flex-col items-center gap-1 rounded-lg border border-border px-4 py-10 text-center">
                 <p className="text-sm font-medium">{t("apiKeys.usage.empty")}</p>
-                <p className="text-sm text-muted-foreground">{t("apiKeys.usage.emptyHint")}</p>
+                <p className="text-sm text-muted-foreground">
+                    {emptyHint ?? t("apiKeys.usage.emptyHint")}
+                </p>
             </div>
         );
     }
-    return <UsageReport usage={usage} />;
+    return <UsageReport usage={usage} labels={labels} exportName={exportName ?? "api-usage"} />;
 }
 
 function UsageSkeleton() {
     return (
         <div className="flex flex-col gap-6" aria-busy="true">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                {Array.from({ length: 6 }, (_, index) => (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+                {Array.from({ length: 8 }, (_, index) => (
                     <div
                         key={index}
                         className="flex flex-col gap-2 rounded-lg border border-border p-3"
@@ -219,7 +239,61 @@ function statusClass(status: number): "success" | "client" | "server" {
     return status >= 500 ? "server" : status >= 400 ? "client" : "success";
 }
 
-function UsageReport({ usage }: { usage: KeyUsage }) {
+export interface UsageCsvHeads {
+    route: string;
+    key: string;
+    calls: string;
+    errors: string;
+    p50: string;
+    p95: string;
+    p99: string;
+}
+
+/** The report as a spreadsheet: one row per route, then one per key when there are several. */
+export function usageCsv(
+    usage: KeyUsage,
+    labels: UsageKeyLabel[] | undefined,
+    heads: UsageCsvHeads
+): string {
+    const ms = (value: Percentile | null) => (value ? String(value.ms) : "");
+    const line = (cells: string[]) => `${cells.map(csvCell).join(",")}\n`;
+    let csv = line([heads.route, heads.calls, heads.errors, heads.p50, heads.p95, heads.p99]);
+    for (const row of usage.routes) {
+        csv += line([
+            `${row.method} ${row.route}`,
+            String(row.calls),
+            String(row.errors),
+            ms(row.p50),
+            ms(row.p95),
+            ms(row.p99)
+        ]);
+    }
+    if (labels && usage.keys.length > 0) {
+        const named = new Map(labels.map((label) => [label.id, label]));
+        csv += `\n${line([heads.key, heads.calls, heads.errors, heads.p50, heads.p95])}`;
+        for (const row of usage.keys) {
+            const label = named.get(row.apiKeyId);
+            csv += line([
+                label ? `${label.name} (${label.prefix})` : row.apiKeyId,
+                String(row.calls),
+                String(row.errors),
+                ms(row.p50),
+                ms(row.p95)
+            ]);
+        }
+    }
+    return csv;
+}
+
+function UsageReport({
+    usage,
+    labels,
+    exportName
+}: {
+    usage: KeyUsage;
+    labels?: UsageKeyLabel[];
+    exportName: string;
+}) {
     const t = useTranslations("account");
     const format = useDisplayFormat();
     const number = (value: number) => format.number(value);
@@ -235,6 +309,11 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
         { label: t("apiKeys.usage.calls"), value: number(usage.total) },
         { label: t("apiKeys.usage.success"), value: number(usage.classes.success) },
         {
+            label: t("apiKeys.usage.errorRate"),
+            value: share(usage.classes.client + usage.classes.server),
+            tone: usage.classes.server > 0 ? "text-danger" : undefined
+        },
+        {
             label: t("apiKeys.usage.clientErrors"),
             value: number(usage.classes.client),
             tone: usage.classes.client > 0 ? "text-warning" : undefined
@@ -245,12 +324,31 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
             tone: usage.classes.server > 0 ? "text-danger" : undefined
         },
         { label: t("apiKeys.usage.p50"), value: latency(usage.p50, t, number) },
-        { label: t("apiKeys.usage.p95"), value: latency(usage.p95, t, number) }
+        { label: t("apiKeys.usage.p95"), value: latency(usage.p95, t, number) },
+        { label: t("apiKeys.usage.p99"), value: latency(usage.p99, t, number) }
     ];
+
+    const download = () => {
+        const csv = usageCsv(usage, labels, {
+            route: t("apiKeys.usage.route"),
+            key: t("apiKeys.usage.key"),
+            calls: t("apiKeys.usage.calls"),
+            errors: t("apiKeys.usage.errors"),
+            p50: t("apiKeys.usage.p50"),
+            p95: t("apiKeys.usage.p95"),
+            p99: t("apiKeys.usage.p99")
+        });
+        const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${exportName}-${usage.range}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
 
     return (
         <div className="flex flex-col gap-6">
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
                 {tiles.map((tile) => (
                     <div key={tile.label} className="min-w-0 rounded-lg border border-border p-3">
                         <dt className="truncate text-xs text-muted-foreground" title={tile.label}>
@@ -271,11 +369,19 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
 
             <CallsChart usage={usage} />
 
+            {labels ? <KeysTable usage={usage} labels={labels} /> : null}
+
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
                 <section className="flex min-w-0 flex-col gap-2">
-                    <h2 className="text-sm font-semibold">{t("apiKeys.usage.byRoute")}</h2>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="text-sm font-semibold">{t("apiKeys.usage.byRoute")}</h2>
+                        <Button size="sm" variant="outline" onClick={download}>
+                            <Download className="size-4 shrink-0" />
+                            {t("apiKeys.usage.export")}
+                        </Button>
+                    </div>
                     <div className="overflow-x-auto rounded-lg border border-border">
-                        <table className="w-full min-w-[34rem] text-sm">
+                        <table className="w-full min-w-[40rem] text-sm">
                             <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                                 <tr>
                                     <th
@@ -295,6 +401,9 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                                     </th>
                                     <th scope="col" className="px-3 py-2 text-end font-medium">
                                         {t("apiKeys.usage.p95")}
+                                    </th>
+                                    <th scope="col" className="px-3 py-2 text-end font-medium">
+                                        {t("apiKeys.usage.p99")}
                                     </th>
                                 </tr>
                             </thead>
@@ -346,6 +455,9 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                                             <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums text-muted-foreground">
                                                 {latency(row.p95, t, number)}
                                             </td>
+                                            <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums text-muted-foreground">
+                                                {latency(row.p99, t, number)}
+                                            </td>
                                         </tr>
                                     );
                                 })}
@@ -357,7 +469,7 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                                         <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums">
                                             {number(rest)}
                                         </td>
-                                        <td colSpan={3} />
+                                        <td colSpan={4} />
                                     </tr>
                                 ) : null}
                             </tbody>
@@ -504,6 +616,110 @@ function CallsChart({ usage }: { usage: KeyUsage }) {
                     </div>
                 ) : null}
             </div>
+        </section>
+    );
+}
+
+/** Each key's share of the account's calls; a row opens that key's own usage. */
+function KeysTable({ usage, labels }: { usage: KeyUsage; labels: UsageKeyLabel[]; }) {
+    const t = useTranslations("account");
+    const format = useDisplayFormat();
+    const number = (value: number) => format.number(value);
+    const named = useMemo(() => new Map(labels.map((label) => [label.id, label])), [labels]);
+    const busy = new Set(usage.keys.map((row) => row.apiKeyId));
+    const quiet = labels.filter((label) => !busy.has(label.id)).length;
+    return (
+        <section className="flex min-w-0 flex-col gap-2">
+            <h2 className="text-sm font-semibold">{t("apiKeys.usage.byKey")}</h2>
+            <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="w-full min-w-[40rem] text-sm">
+                    <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                        <tr>
+                            <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
+                                {t("apiKeys.usage.key")}
+                            </th>
+                            <th scope="col" className="px-3 py-2 text-end font-medium">
+                                {t("apiKeys.usage.calls")}
+                            </th>
+                            <th scope="col" className="px-3 py-2 text-end font-medium">
+                                {t("apiKeys.usage.errors")}
+                            </th>
+                            <th scope="col" className="px-3 py-2 text-end font-medium">
+                                {t("apiKeys.usage.p50")}
+                            </th>
+                            <th scope="col" className="px-3 py-2 text-end font-medium">
+                                {t("apiKeys.usage.p95")}
+                            </th>
+                            <th scope="col" className="px-3 py-2 text-end font-medium">
+                                {t("apiKeys.usage.lastUsed")}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {usage.keys.map((row) => {
+                            const label = named.get(row.apiKeyId);
+                            const name = label?.name ?? t("apiKeys.usage.removedKey");
+                            return (
+                                <tr key={row.apiKeyId} className="border-t border-border">
+                                    <td className="max-w-0 px-3 py-2">
+                                        <span className="flex min-w-0 items-center gap-2">
+                                            {label ? (
+                                                <Link
+                                                    href={`/account/api-keys/${label.id}/usage`}
+                                                    className="min-w-0 truncate no-underline hover:underline"
+                                                    title={t("apiKeys.usage.openKey", { name })}
+                                                    aria-label={t("apiKeys.usage.openKey", { name })}
+                                                >
+                                                    {name}
+                                                </Link>
+                                            ) : (
+                                                <span className="min-w-0 truncate text-muted-foreground">
+                                                    {name}
+                                                </span>
+                                            )}
+                                            {label ? (
+                                                <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                                                    {label.prefix}
+                                                </span>
+                                            ) : null}
+                                            {label?.revoked ? (
+                                                <Badge variant="neutral" className="shrink-0">
+                                                    {t("apiKeys.list.revoked")}
+                                                </Badge>
+                                            ) : null}
+                                        </span>
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums">
+                                        {number(row.calls)}
+                                    </td>
+                                    <td
+                                        className={cn(
+                                            "whitespace-nowrap px-3 py-2 text-end tabular-nums",
+                                            row.errors > 0 ? "text-danger" : "text-muted-foreground"
+                                        )}
+                                    >
+                                        {number(row.errors)}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums text-muted-foreground">
+                                        {latency(row.p50, t, number)}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2 text-end tabular-nums text-muted-foreground">
+                                        {latency(row.p95, t, number)}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2 text-end text-muted-foreground">
+                                        {label?.lastUsedAt ? <RelativeTime iso={label.lastUsedAt} /> : "-"}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+            {quiet > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                    {t("apiKeys.usage.quietKeys", { count: quiet })}
+                </p>
+            ) : null}
         </section>
     );
 }

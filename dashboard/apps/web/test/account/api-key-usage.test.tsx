@@ -13,7 +13,9 @@ const OTHER_KEY = "22222222-2222-4222-8222-222222222222";
 
 const state = vi.hoisted(() => ({
     lookups: [] as Record<string, unknown>[],
-    reports: [] as string[]
+    reports: [] as string[],
+    listed: [] as Record<string, unknown>[],
+    summed: [] as { keyIds: string[]; options: unknown }[]
 }));
 
 vi.mock("@/lib/session", () => ({ requireUser: async () => ({ id: "user-1", isAdmin: false }) }));
@@ -24,12 +26,44 @@ vi.mock("@polaris/db", () => ({
                 state.lookups.push(args.where);
                 const owned = args.where.id === OWN_KEY && args.where.userId === "user-1";
                 return owned ? { id: OWN_KEY } : null;
+            },
+            findMany: async (args: { where: Record<string, unknown> }) => {
+                state.listed.push(args.where);
+                return [
+                    {
+                        id: OWN_KEY,
+                        name: "Deploy bot",
+                        prefix: "pk_abc",
+                        lastUsedAt: new Date("2026-10-15T09:00:00Z"),
+                        revokedAt: null
+                    }
+                ];
             }
         }
     }
 }));
+const quietReport = (range: string) => ({
+    range,
+    from: 0,
+    to: 0,
+    bucket: "hour",
+    total: 0,
+    classes: { success: 0, client: 0, server: 0 },
+    p50: null,
+    p95: null,
+    p99: null,
+    series: [],
+    routes: [],
+    statuses: [],
+    keys: []
+});
+
 vi.mock("@/lib/api-usage/report", () => ({
     USAGE_RANGES: ["24h", "7d", "30d", "90d"],
+    usageReport: async (keyIds: string[], range: string, options: unknown) => {
+        state.summed.push({ keyIds, options });
+        return quietReport(range);
+    },
     keyUsageReport: async (keyId: string, range: string) => {
         state.reports.push(keyId);
         return {
@@ -48,12 +82,40 @@ vi.mock("@/lib/api-usage/report", () => ({
     }
 }));
 
-const { keyUsageAction } = await import("@/app/(app)/account/api-keys/usage-actions");
-const { UsageData } = await import("@/app/(app)/account/api-keys/[keyId]/usage/key-usage-view");
+const { accountUsageAction, keyUsageAction } = await import(
+    "@/app/(app)/account/api-keys/usage-actions"
+);
+const { UsageData, usageCsv } = await import("@/app/(app)/account/api-keys/[keyId]/usage/key-usage-view");
 
 beforeEach(() => {
     state.lookups.length = 0;
     state.reports.length = 0;
+    state.listed.length = 0;
+    state.summed.length = 0;
+});
+
+describe("the account's usage overview", () => {
+    it("sums only the signed-in account's own keys, sessions of devices left out", async () => {
+        const result = await accountUsageAction({ range: "30d" });
+        expect(state.listed).toEqual([
+            { userId: "user-1", kind: { notIn: ["cli", "streamdeck", "tv", "terminal"] } }
+        ]);
+        expect(state.summed).toEqual([{ keyIds: [OWN_KEY], options: { shares: true } }]);
+        expect(result.usage?.labels).toEqual([
+            {
+                id: OWN_KEY,
+                name: "Deploy bot",
+                prefix: "pk_abc",
+                lastUsedAt: "2026-10-15T09:00:00.000Z",
+                revoked: false
+            }
+        ]);
+    });
+
+    it("refuses a period it does not offer before touching the database", async () => {
+        expect(await accountUsageAction({ range: "1y" })).toEqual({ error: "invalid" });
+        expect(state.listed).toEqual([]);
+    });
 });
 
 describe("a key's usage action", () => {
@@ -97,9 +159,11 @@ describe("the usage data region", () => {
         classes: { success: 0, client: 0, server: 0 },
         p50: null,
         p95: null,
+        p99: null,
         series: [],
         routes: [],
         statuses: [],
+        keys: [],
         anchors: []
     };
 
@@ -135,7 +199,8 @@ describe("the usage data region", () => {
                     calls: 3,
                     errors: 1,
                     p50: { ms: 20, over: false },
-                    p95: null
+                    p95: null,
+                    p99: null
                 }
             ],
             statuses: [
@@ -151,5 +216,57 @@ describe("the usage data region", () => {
         expect(markup).toContain('href="/account/api-keys/reference#getMe"');
         expect(markup).toContain(">404<");
         expect(markup).toContain("<svg");
+        expect(markup).toContain("Export CSV");
+        expect(markup).not.toContain("By key");
+    });
+
+    it("lists each key's share on the overview, a row opening that key", () => {
+        const usage = {
+            ...empty,
+            total: 4,
+            classes: { success: 3, client: 1, server: 0 },
+            series: [{ t: Date.UTC(2026, 9, 15, 9), calls: 4, errors: 1 }],
+            keys: [
+                { apiKeyId: OWN_KEY, calls: 3, errors: 1, p50: null, p95: null },
+                { apiKeyId: OTHER_KEY, calls: 1, errors: 0, p50: null, p95: null }
+            ]
+        };
+        const labels = [
+            { id: OWN_KEY, name: "Deploy bot", prefix: "pk_abc", lastUsedAt: null, revoked: true },
+            { id: "33333333-3333-4333-8333-333333333333", name: "Quiet", prefix: "pk_q", lastUsedAt: null, revoked: false }
+        ];
+        const markup = renderToStaticMarkup(
+            withMessages(
+                <UsageData load={{ state: "ready", usage }} onRetry={() => {}} labels={labels} />
+            )
+        );
+        expect(markup).toContain(`href="/account/api-keys/${OWN_KEY}/usage"`);
+        expect(markup).toContain("Revoked");
+        // A key since deleted still counts, under a name that says so.
+        expect(markup).toContain("Deleted key");
+        expect(markup).toContain("1 more key had no calls in this period.");
+        expect(markup).toContain("25%");
+    });
+
+    it("exports routes and keys as a spreadsheet that cannot run a formula", () => {
+        const csv = usageCsv(
+            {
+                ...empty,
+                routes: [
+                    { method: "GET", route: "/api/v1/me", calls: 3, errors: 1, p50: { ms: 20, over: false }, p95: null, p99: null }
+                ],
+                keys: [{ apiKeyId: OWN_KEY, calls: 3, errors: 1, p50: null, p95: null }]
+            },
+            [{ id: OWN_KEY, name: "=cmd", prefix: "pk_abc", lastUsedAt: null, revoked: false }],
+            { route: "Route", key: "Key", calls: "Calls", errors: "Errors", p50: "p50", p95: "p95", p99: "p99" }
+        );
+        expect(csv.split("\n")).toEqual([
+            '"Route","Calls","Errors","p50","p95","p99"',
+            '"GET /api/v1/me","3","1","20","",""',
+            "",
+            '"Key","Calls","Errors","p50","p95"',
+            `"'=cmd (pk_abc)","3","1","",""`,
+            ""
+        ]);
     });
 });

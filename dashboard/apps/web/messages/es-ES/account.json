@@ -363,7 +363,8 @@
             "bulkDeleteTitle": "{count, plural, one {¿Eliminar # clave?} other {¿Eliminar # claves?}}",
             "selectionLabel": "Selección",
             "selectAll": "Elegir todas",
-            "selectNamed": "Elegir {name}"
+            "selectNamed": "Elegir {name}",
+            "allUsage": "Uso"
         },
         "form": {
             "neverExpires": "No caduca",
@@ -734,7 +735,18 @@
                 "success": "Correcta",
                 "client": "Error cliente",
                 "server": "Error servidor"
-            }
+            },
+            "allTitle": "Uso de las claves",
+            "allIntro": "Llamadas, errores y tiempos de respuesta de todas tus claves.",
+            "allEmptyHint": "Las llamadas con cualquiera de tus claves aparecen aquí en un minuto.",
+            "errorRate": "Tasa de error",
+            "p99": "Percentil 99",
+            "export": "Exportar CSV",
+            "byKey": "Por clave",
+            "key": "Clave",
+            "openKey": "Abrir el uso de {name}",
+            "removedKey": "Clave borrada",
+            "quietKeys": "{count, plural, one {# clave más no tuvo} other {# claves más no tuvieron}} llamadas en este periodo."
         }
     },
     "connections": {

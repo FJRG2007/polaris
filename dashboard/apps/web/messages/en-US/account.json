@@ -363,7 +363,8 @@
             "bulkDeleteTitle": "{count, plural, one {Delete # key?} other {Delete # keys?}}",
             "selectionLabel": "Chosen keys",
             "selectAll": "Select all keys",
-            "selectNamed": "Select {name}"
+            "selectNamed": "Select {name}",
+            "allUsage": "Usage"
         },
         "form": {
             "neverExpires": "Never expires",
@@ -734,7 +735,18 @@
                 "success": "Success",
                 "client": "Client error",
                 "server": "Server error"
-            }
+            },
+            "allTitle": "Usage of all keys",
+            "allIntro": "Calls, errors and response times across every key you hold.",
+            "allEmptyHint": "Calls made with any of your keys show up here within a minute.",
+            "errorRate": "Error rate",
+            "p99": "99th percentile",
+            "export": "Export CSV",
+            "byKey": "By key",
+            "key": "Key",
+            "openKey": "Open the usage of {name}",
+            "removedKey": "Deleted key",
+            "quietKeys": "{count, plural, one {# more key had} other {# more keys had}} no calls in this period."
         }
     },
     "connections": {

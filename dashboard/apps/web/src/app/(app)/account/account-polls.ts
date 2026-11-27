@@ -20,6 +20,13 @@ export const keyUsage = (input: { keyId: string; range: string }, signal?: Abort
         signal
     );
 
+export const accountUsage = (input: { range: string }, signal?: AbortSignal) =>
+    readPoll<Answer<typeof usageActionsModule.accountUsageAction>>(
+        "/api/account/api-keys/usage/all",
+        input,
+        signal
+    );
+
 export const friendsPage = (
     after: Parameters<typeof privacyActionsModule.loadFriendsAction>[0],
     signal?: AbortSignal

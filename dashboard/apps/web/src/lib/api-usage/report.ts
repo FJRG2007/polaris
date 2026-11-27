@@ -1,8 +1,10 @@
 /**
- * One key's usage over a window, summed in the database from the hourly rows.
+ * Keys' usage over a window, summed in the database from the hourly rows: one
+ * key's for the screen behind it, every key of an account's for the overview.
  *
- * Every read is a GROUP BY on the key's own rows inside the window, through the
- * primary key (key first, hour second): calls over time, by route, by status.
+ * Every read is a GROUP BY on the keys' own rows inside the window, through the
+ * primary key (key first, hour second): calls over time, by route, by status,
+ * by key.
  * The only work left here is folding hours into days for the long windows and
  * reading percentiles off the summed latency histogram.
  */
@@ -41,6 +43,16 @@ export interface RouteUsage {
     errors: number;
     p50: Percentile | null;
     p95: Percentile | null;
+    p99: Percentile | null;
+}
+
+/** One key's share of a report across several. */
+export interface KeyShare {
+    apiKeyId: string;
+    calls: number;
+    errors: number;
+    p50: Percentile | null;
+    p95: Percentile | null;
 }
 
 export interface KeyUsageReport {
@@ -52,10 +64,16 @@ export interface KeyUsageReport {
     classes: { success: number; client: number; server: number };
     p50: Percentile | null;
     p95: Percentile | null;
+    p99: Percentile | null;
     series: UsagePoint[];
     routes: RouteUsage[];
     statuses: { status: number; calls: number }[];
+    /** Every key with calls in the window, busiest first; empty for one key's report. */
+    keys: KeyShare[];
 }
+
+/** The most routes and keys a report lists; the rest are summed as "other". */
+export const REPORT_ROWS = 50;
 
 type Histogram = Record<LatencyColumn, number>;
 
@@ -122,42 +140,79 @@ export function foldSeries(
     return points;
 }
 
-export async function keyUsageReport(
+export function keyUsageReport(
     keyId: string,
     range: UsageRange,
     now = new Date()
 ): Promise<KeyUsageReport> {
+    return usageReport([keyId], range, { now });
+}
+
+/**
+ * Several keys' usage summed as one, with each key's share unless `shares` is
+ * off (one key's own screen). The keys are the caller's to choose - an
+ * account's own - and the list is bounded by what one account holds.
+ */
+export async function usageReport(
+    keyIds: readonly string[],
+    range: UsageRange,
+    options: { now?: Date; shares?: boolean } = {}
+): Promise<KeyUsageReport> {
+    const now = options.now ?? new Date();
     const hours = RANGE_HOURS[range];
     const bucket = hours > 24 * 7 ? "day" : "hour";
     const step = bucket === "day" ? DAY_MS : HOUR_MS;
     const lastHour = hourOf(now).getTime();
     const to = bucket === "day" ? Math.floor(lastHour / DAY_MS) * DAY_MS : lastHour;
     const from = to - (bucket === "day" ? hours / 24 - 1 : hours - 1) * step;
-    const where = { apiKeyId: keyId, hour: { gte: new Date(from) } };
+    const where = {
+        apiKeyId: keyIds.length === 1 ? keyIds[0]! : { in: [...keyIds] },
+        hour: { gte: new Date(from) }
+    };
     const failed = { ...where, status: { gte: 400 } };
+    const several = options.shares ?? keyIds.length > 1;
 
-    const [byHour, errorsByHour, byRoute, errorsByRoute, byStatus] = await Promise.all([
-        prisma.apiKeyCallHour.groupBy({ by: ["hour"], where, _sum: { calls: true } }),
-        prisma.apiKeyCallHour.groupBy({ by: ["hour"], where: failed, _sum: { calls: true } }),
-        prisma.apiKeyCallHour.groupBy({
-            by: ["method", "route"],
-            where,
-            _sum: { calls: true, ...SUM_LATENCY },
-            orderBy: { _sum: { calls: "desc" } },
-            take: 50
-        }),
-        prisma.apiKeyCallHour.groupBy({
-            by: ["method", "route"],
-            where: failed,
-            _sum: { calls: true }
-        }),
-        prisma.apiKeyCallHour.groupBy({
-            by: ["status"],
-            where,
-            _sum: { calls: true },
-            orderBy: { status: "asc" }
-        })
-    ]);
+    const [byHour, errorsByHour, byRoute, errorsByRoute, byStatus, all, byKey, errorsByKey] =
+        await Promise.all([
+            prisma.apiKeyCallHour.groupBy({ by: ["hour"], where, _sum: { calls: true } }),
+            prisma.apiKeyCallHour.groupBy({ by: ["hour"], where: failed, _sum: { calls: true } }),
+            prisma.apiKeyCallHour.groupBy({
+                by: ["method", "route"],
+                where,
+                _sum: { calls: true, ...SUM_LATENCY },
+                orderBy: { _sum: { calls: "desc" } },
+                take: REPORT_ROWS
+            }),
+            prisma.apiKeyCallHour.groupBy({
+                by: ["method", "route"],
+                where: failed,
+                _sum: { calls: true }
+            }),
+            prisma.apiKeyCallHour.groupBy({
+                by: ["status"],
+                where,
+                _sum: { calls: true },
+                orderBy: { status: "asc" }
+            }),
+            // The whole window's latency, routes past the listed ones included.
+            prisma.apiKeyCallHour.aggregate({ where, _sum: SUM_LATENCY }),
+            several
+                ? prisma.apiKeyCallHour.groupBy({
+                      by: ["apiKeyId"],
+                      where,
+                      _sum: { calls: true, ...SUM_LATENCY },
+                      orderBy: { _sum: { calls: "desc" } },
+                      take: REPORT_ROWS
+                  })
+                : Promise.resolve([]),
+            several
+                ? prisma.apiKeyCallHour.groupBy({
+                      by: ["apiKeyId"],
+                      where: failed,
+                      _sum: { calls: true }
+                  })
+                : Promise.resolve([])
+        ]);
 
     const errorsAt = new Map(errorsByHour.map((row) => [row.hour.getTime(), row._sum.calls ?? 0]));
     const series = foldSeries(
@@ -174,20 +229,21 @@ export async function keyUsageReport(
     const routeErrors = new Map(
         errorsByRoute.map((row) => [`${row.method} ${row.route}`, row._sum.calls ?? 0])
     );
-    const overall = histogramOf({});
+    const overall = histogramOf(all._sum);
     const routes = byRoute.map((row): RouteUsage => {
         const histogram = histogramOf(row._sum);
-        for (const column of LATENCY_COLUMNS) overall[column] += histogram[column];
         return {
             method: row.method,
             route: row.route,
             calls: row._sum.calls ?? 0,
             errors: routeErrors.get(`${row.method} ${row.route}`) ?? 0,
             p50: percentile(histogram, 0.5),
-            p95: percentile(histogram, 0.95)
+            p95: percentile(histogram, 0.95),
+            p99: percentile(histogram, 0.99)
         };
     });
 
+    const keyErrors = new Map(errorsByKey.map((row) => [row.apiKeyId, row._sum.calls ?? 0]));
     const statuses = byStatus.map((row) => ({ status: row.status, calls: row._sum.calls ?? 0 }));
     const classes = { success: 0, client: 0, server: 0 };
     for (const row of statuses) {
@@ -205,8 +261,19 @@ export async function keyUsageReport(
         classes,
         p50: percentile(overall, 0.5),
         p95: percentile(overall, 0.95),
+        p99: percentile(overall, 0.99),
         series,
         routes,
-        statuses
+        statuses,
+        keys: byKey.map((row): KeyShare => {
+            const histogram = histogramOf(row._sum);
+            return {
+                apiKeyId: row.apiKeyId,
+                calls: row._sum.calls ?? 0,
+                errors: keyErrors.get(row.apiKeyId) ?? 0,
+                p50: percentile(histogram, 0.5),
+                p95: percentile(histogram, 0.95)
+            };
+        })
     };
 }
