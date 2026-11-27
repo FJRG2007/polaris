@@ -196,7 +196,11 @@ export async function restartAction(input: unknown) {
     const parsed = schemas.restartInput.safeParse(input);
     if (!parsed.success) return { ok: false, error: "invalid" } as const;
     return run(async () =>
-        (await service()).scheduleRestart(parsed.data.targetId, parsed.data.schedule)
+        (await service()).scheduleRestart(
+            parsed.data.targetId,
+            parsed.data.schedule,
+            parsed.data.now === true
+        )
     );
 }
 

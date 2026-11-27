@@ -894,6 +894,7 @@ function HostPanel({
     const [updates, setUpdates] = useState(server?.updates ?? "unknown");
     const [every, setEvery] = useState(server?.everyHours ?? 0);
     const [pending, setPending] = useState(false);
+    const [confirmNow, setConfirmNow] = useState(false);
     const [waiting, setWaiting] = useState(() => waitingOf(server));
     const [offByHandAt, setOffByHandAt] = useState(server?.offByHandAt ?? null);
     const firewallSummary = useMemo(
@@ -919,10 +920,10 @@ function HostPanel({
         setWaiting(waitingOf(server));
         setOffByHandAt(server?.offByHandAt ?? null);
     }, [server]);
-    const restart = async (schedule: boolean) => {
+    const restart = async (schedule: boolean, now = false) => {
         setPending(true);
         await submit(async () => {
-            const result = await actions.restartAction({ targetId, schedule });
+            const result = await actions.restartAction({ targetId, schedule, now });
             if (result.ok) setWaiting((last) => waitingFrom(result.data, last));
             return result;
         });
@@ -1034,22 +1035,57 @@ function HostPanel({
                                   })}`
                                 : ""}
                         </span>
-                        {waiting.reboot === "required" ? (
-                            <Button size="sm" disabled={pending} onClick={() => void restart(true)}>
-                                {t("host.restart")}
-                            </Button>
-                        ) : waiting.reboot === "scheduled" ? (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={pending}
-                                onClick={() => void restart(false)}
-                            >
-                                {t("host.restartCancel")}
-                            </Button>
+                        {waiting.reboot === "required" || waiting.reboot === "scheduled" ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                                {waiting.reboot === "required" ? (
+                                    <Button size="sm" disabled={pending} onClick={() => void restart(true)}>
+                                        {t("host.restart")}
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        disabled={pending}
+                                        onClick={() => void restart(false)}
+                                    >
+                                        {t("host.restartCancel")}
+                                    </Button>
+                                )}
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={pending}
+                                    onClick={() => setConfirmNow(true)}
+                                >
+                                    {t("host.restartNow")}
+                                </Button>
+                            </div>
                         ) : null}
                     </div>
                 ) : null}
+                <Dialog open={confirmNow} onOpenChange={(next) => !next && !pending && setConfirmNow(false)}>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>{t("host.restartNowTitle")}</DialogTitle>
+                            <DialogDescription>{t("host.restartNowBody")}</DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="ghost" disabled={pending} onClick={() => setConfirmNow(false)}>
+                                {t("host.restartNowKeep")}
+                            </Button>
+                            <Button
+                                variant="danger"
+                                disabled={pending}
+                                onClick={() => {
+                                    setConfirmNow(false);
+                                    void restart(true, true);
+                                }}
+                            >
+                                {t("host.restartNowConfirm")}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
                 <div {...focused("firewall")} className={focused.ring("firewall")}>
                     <FirewallPanel
                         t={t}

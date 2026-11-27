@@ -381,6 +381,7 @@ export type HostAction =
     | "updates-on"
     | "updates-off"
     | "reboot-schedule"
+    | "reboot-now"
     | "reboot-cancel"
     | "packages-fix"
     | "package-versions"
@@ -414,6 +415,9 @@ export const UPDATES_SCRIPTS: Readonly<Record<Exclude<HostAction, "audit">, stri
     // Only when the host says a restart is pending; systemd announces it to every
     // session on the machine and can still be cancelled until it happens.
     "reboot-schedule": `${DISTRO}; if [ -f /var/run/reboot-required ] || { command -v needs-restarting >/dev/null 2>&1 && ! needs-restarting -r >/dev/null 2>&1; }; then shutdown -r 04:30 'Polaris: restarting at 04:30 to finish security updates' >/dev/null 2>&1 && echo POLARIS_REBOOT=scheduled; else echo POLARIS_REBOOT=none; fi; [ -f /run/systemd/shutdown/scheduled ] && echo "POLARIS_REBOOT_AT=$(sed -n 's/^USEC=//p' /run/systemd/shutdown/scheduled)"; true`,
+    // The same restart a minute from now, when someone asks for it: still a
+    // scheduled shutdown, so "Cancel restart" calls it off inside that minute.
+    "reboot-now": `${DISTRO}; if [ -f /var/run/reboot-required ] || { command -v needs-restarting >/dev/null 2>&1 && ! needs-restarting -r >/dev/null 2>&1; }; then shutdown -r +1 'Polaris: restarting in a minute to finish security updates' >/dev/null 2>&1 && echo POLARIS_REBOOT=scheduled; else echo POLARIS_REBOOT=none; fi; [ -f /run/systemd/shutdown/scheduled ] && echo "POLARIS_REBOOT_AT=$(sed -n 's/^USEC=//p' /run/systemd/shutdown/scheduled)"; true`,
     "reboot-cancel": `${DISTRO}; shutdown -c 'Polaris: the restart was cancelled' >/dev/null 2>&1; echo POLARIS_REBOOT=cancelled`,
 
     // The pending security updates, now: the same tool the automatic updates

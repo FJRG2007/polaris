@@ -1440,11 +1440,13 @@ function waitingData(report: parse.UpdatesReport) {
     };
 }
 
-/** Schedule the restart that finishes the updates (04:30, the host's own time, and
- *  only when the host says one is pending), or call a scheduled one off. */
-export async function scheduleRestart(targetId: string, schedule: boolean) {
+/** Schedule the restart that finishes the updates (04:30, the host's own time, or
+ *  a minute from now when `now`; only when the host says one is pending), or call
+ *  a scheduled one off. */
+export async function scheduleRestart(targetId: string, schedule: boolean, now = false) {
     const target = await targetRow(targetId);
-    const { output } = await runHostAction(target, schedule ? "reboot-schedule" : "reboot-cancel");
+    const action = !schedule ? "reboot-cancel" : now ? "reboot-now" : "reboot-schedule";
+    const { output } = await runHostAction(target, action);
     if (!/POLARIS_REBOOT=/.test(output)) throw new ScanFailure("updatesFailed");
     return automaticUpdates(targetId);
 }

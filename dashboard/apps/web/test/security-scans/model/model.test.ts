@@ -160,6 +160,11 @@ describe("automatic updates output", () => {
         const schedule = specs.UPDATES_SCRIPTS["reboot-schedule"];
         expect(schedule).toContain("if [ -f /var/run/reboot-required ]");
         expect(schedule).toContain("shutdown -r 04:30 'Polaris:");
+        const now = specs.UPDATES_SCRIPTS["reboot-now"];
+        expect(now).toContain("if [ -f /var/run/reboot-required ]");
+        expect(now).toContain("shutdown -r +1 'Polaris:");
+        expect(now).toContain("POLARIS_REBOOT_AT=");
+        expect(specs.hostArgv("reboot-now")).toContain("--privileged");
         expect(specs.hostArgv("reboot-cancel").at(-1)).toContain("shutdown -c");
         expect(specs.hostArgv("reboot-schedule")).toContain("--privileged");
         const on = specs.UPDATES_SCRIPTS["updates-on"];

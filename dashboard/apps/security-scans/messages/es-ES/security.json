@@ -75,6 +75,11 @@
         "restartAt": "Se reinicia el {when}.",
         "restart": "Reiniciar 04:30",
         "restartCancel": "Cancelar reinicio",
+        "restartNow": "Reiniciar ahora",
+        "restartNowTitle": "¿Reiniciar este servidor ahora?",
+        "restartNowBody": "Se reinicia en un minuto para terminar las actualizaciones. Lo que se ejecuta en él se detiene hasta que vuelve, normalmente unos minutos. Cancelar reinicio lo anula dentro de ese minuto.",
+        "restartNowKeep": "Ahora no",
+        "restartNowConfirm": "Reiniciar",
         "offByHand": "Desactivadas a mano el {when}. Polaris no las reactiva."
     },
     "images": {

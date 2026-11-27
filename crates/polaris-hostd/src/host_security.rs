@@ -42,6 +42,10 @@ pub const UPDATES_OFF_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POL
 
 pub const REBOOT_SCHEDULE_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if [ -f /var/run/reboot-required ] || { command -v needs-restarting >/dev/null 2>&1 && ! needs-restarting -r >/dev/null 2>&1; }; then shutdown -r 04:30 'Polaris: restarting at 04:30 to finish security updates' >/dev/null 2>&1 && echo POLARIS_REBOOT=scheduled; else echo POLARIS_REBOOT=none; fi; [ -f /run/systemd/shutdown/scheduled ] && echo "POLARIS_REBOOT_AT=$(sed -n 's/^USEC=//p' /run/systemd/shutdown/scheduled)"; true"#;
 
+/// The restart that finishes the updates, a minute from now instead of 04:30: a
+/// scheduled shutdown like the nightly one, so `shutdown -c` still calls it off.
+pub const REBOOT_NOW_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if [ -f /var/run/reboot-required ] || { command -v needs-restarting >/dev/null 2>&1 && ! needs-restarting -r >/dev/null 2>&1; }; then shutdown -r +1 'Polaris: restarting in a minute to finish security updates' >/dev/null 2>&1 && echo POLARIS_REBOOT=scheduled; else echo POLARIS_REBOOT=none; fi; [ -f /run/systemd/shutdown/scheduled ] && echo "POLARIS_REBOOT_AT=$(sed -n 's/^USEC=//p' /run/systemd/shutdown/scheduled)"; true"#;
+
 pub const REBOOT_CANCEL_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; shutdown -c 'Polaris: the restart was cancelled' >/dev/null 2>&1; echo POLARIS_REBOOT=cancelled"#;
 
 pub const PACKAGES_FIX_SCRIPT: &str = r#". /etc/os-release 2>/dev/null; echo "POLARIS_DISTRO id=$ID"; if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; nice -n 10 apt-get update -qq >/dev/null 2>&1; if ! command -v unattended-upgrade >/dev/null 2>&1; then echo POLARIS_FIX=unavailable; elif nice -n 10 unattended-upgrade >/dev/null 2>&1; then echo POLARIS_FIX=done; else echo POLARIS_FIX=failed; fi; [ -f /var/run/reboot-required ] && echo POLARIS_REBOOT=required; elif command -v dnf >/dev/null 2>&1; then if nice -n 10 dnf upgrade --security -y -q >/dev/null 2>&1; then echo POLARIS_FIX=done; else echo POLARIS_FIX=failed; fi; command -v needs-restarting >/dev/null 2>&1 && { needs-restarting -r >/dev/null 2>&1 || echo POLARIS_REBOOT=required; }; else echo POLARIS_FIX=unsupported; fi; true"#;
@@ -95,6 +99,7 @@ pub enum HostAction {
     UpdatesOn,
     UpdatesOff,
     RebootSchedule,
+    RebootNow,
     RebootCancel,
     PackagesFix,
     PackageVersions,
@@ -267,6 +272,7 @@ pub fn argv(action: HostAction, arguments: &[String]) -> Vec<String> {
                 HostAction::UpdatesStatus => UPDATES_STATUS_SCRIPT,
                 HostAction::UpdatesOn => UPDATES_ON_SCRIPT,
                 HostAction::RebootSchedule => REBOOT_SCHEDULE_SCRIPT,
+                HostAction::RebootNow => REBOOT_NOW_SCRIPT,
                 HostAction::RebootCancel => REBOOT_CANCEL_SCRIPT,
                 HostAction::PackagesFix => PACKAGES_FIX_SCRIPT,
                 HostAction::PackageVersions => PACKAGE_VERSIONS_SCRIPT,
@@ -775,6 +781,7 @@ mod tests {
             (HostAction::UpdatesOn, UPDATES_ON_SCRIPT),
             (HostAction::UpdatesOff, UPDATES_OFF_SCRIPT),
             (HostAction::RebootSchedule, REBOOT_SCHEDULE_SCRIPT),
+            (HostAction::RebootNow, REBOOT_NOW_SCRIPT),
             (HostAction::RebootCancel, REBOOT_CANCEL_SCRIPT),
             (HostAction::PackagesFix, PACKAGES_FIX_SCRIPT),
             (HostAction::PackageVersions, PACKAGE_VERSIONS_SCRIPT),
@@ -798,6 +805,7 @@ mod tests {
             UPDATES_ON_SCRIPT,
             UPDATES_OFF_SCRIPT,
             REBOOT_SCHEDULE_SCRIPT,
+            REBOOT_NOW_SCRIPT,
             REBOOT_CANCEL_SCRIPT,
             PACKAGES_FIX_SCRIPT,
             PACKAGES_SCRIPT,

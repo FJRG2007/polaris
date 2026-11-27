@@ -75,6 +75,11 @@
         "restartAt": "Restarts at {when}.",
         "restart": "Restart at 04:30",
         "restartCancel": "Cancel restart",
+        "restartNow": "Restart now",
+        "restartNowTitle": "Restart this server now?",
+        "restartNowBody": "It restarts in a minute to finish the updates. What runs on it stops until it is back, usually a few minutes. Cancel restart calls it off inside that minute.",
+        "restartNowKeep": "Not now",
+        "restartNowConfirm": "Restart",
         "offByHand": "Turned off by hand on {when}. Polaris leaves them off."
     },
     "images": {

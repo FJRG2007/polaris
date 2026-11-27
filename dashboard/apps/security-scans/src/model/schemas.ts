@@ -93,7 +93,12 @@ export const findingInput = z.object({ findingId: id });
 export const quarantineInput = z.object({ quarantineId: id, op: z.enum(["restore", "delete"]) });
 
 export const updatesInput = z.object({ targetId: id, enabled: z.boolean() });
-export const restartInput = z.object({ targetId: id, schedule: z.boolean() });
+export const restartInput = z.object({
+    targetId: id,
+    schedule: z.boolean(),
+    /** A minute from now instead of 04:30; only with `schedule`. */
+    now: z.boolean().optional()
+});
 
 /** A package name as dpkg and rpm write them; the host daemon checks the same. */
 export const packageName = z

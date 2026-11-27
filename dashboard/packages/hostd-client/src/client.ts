@@ -259,6 +259,7 @@ export class HostdClient {
             | "updates-on"
             | "updates-off"
             | "reboot-schedule"
+            | "reboot-now"
             | "reboot-cancel"
             | "packages-fix"
             | "package-versions"
