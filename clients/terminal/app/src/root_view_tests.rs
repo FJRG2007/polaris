@@ -647,7 +647,7 @@ fn log_in_from_the_welcome_slide_finishes_onboarding_before_the_terminal() {
 #[test]
 fn onboarding_choices_made_before_the_polaris_sign_in_are_applied() {
     App::test((), |mut app| async move {
-        crate::workspace::view::tests::initialize_app(&mut app);
+        let root_view = root_view_for_join_test(&mut app);
         set_local_onboarding_completed(&mut app, false);
         app.update(|ctx| {
             TabSettings::handle(ctx).update(ctx, |settings, ctx| {
@@ -667,7 +667,7 @@ fn onboarding_choices_made_before_the_polaris_sign_in_are_applied() {
             show_agent_notifications: false,
         };
 
-        app.update(|ctx| {
+        root_view.update(&mut app, |_, ctx| {
             RootView::finish_onboarding_before_polaris_sign_in(Some(&choices), ctx);
         });
 
