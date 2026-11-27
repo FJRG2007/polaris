@@ -29,9 +29,12 @@ const GENERATION = "polaris-mls/generation/";
  * The calls that take no lock: two answer at once from the shared notes, and
  * reading sealed messages touches no group state (only the delivery route and
  * the history keys kept in their own store), so a page's first messages never
- * wait behind another tab's send.
+ * wait behind another tab's send. The search segments' three are synchronous
+ * (`search-segments-client.ts` uses what they return, never a promise of it)
+ * and only read this tab's copy: its epoch, a member's key, or a signature by
+ * the device's key, which never changes.
  */
-const AT_ONCE = new Set<PropertyKey>(["hasGroup", "groupOf", "readSealed", "openVersions"]);
+const AT_ONCE = new Set<PropertyKey>(["hasGroup", "groupOf", "readSealed", "openVersions", "currentEpoch", "memberSignatureKey", "signSearchSegment"]);
 
 /** What this needs of the browser: `navigator.locks` and `localStorage`, or stand-ins. */
 export interface TabsEnvironment {

@@ -49,8 +49,14 @@ interface Fake {
     privateKey: KeyObject;
 }
 
+/**
+ * Which leaves this device's copy of the group holds: every registered device
+ * (`"all"`), these addresses only, or no copy at all (`"none"`).
+ */
+type GroupCopy = "all" | "none" | ReadonlySet<string>;
+
 /** A browser device of `userId`: registered with its Ed25519 key, holding the history keys its account holds. */
-function fakeDevice(userId: string, name: string, current: bigint | null = 9n): Fake {
+function fakeDevice(userId: string, name: string, current: bigint | null = 9n, group: GroupCopy = "all"): Fake {
     const { publicKey, privateKey } = generateKeyPairSync("ed25519");
     (state.tables.mlsDevice ??= []).push({ userId, device: name, signatureKey: Buffer.from(publicKey.export({ format: "der", type: "spki" }).subarray(-32)), retiredAt: null, lastSeenAt: new Date() });
     return {
@@ -59,6 +65,12 @@ function fakeDevice(userId: string, name: string, current: bigint | null = 9n): 
             historyKey: async (channelId, epoch) =>
                 (state.tables.chatHistoryKey ?? []).some((r) => r.channelId === channelId && r.epoch === epoch && r.recipient === userId) ? hk(channelId, epoch) : null,
             currentEpoch: () => current,
+            memberSignatureKey: (_channelId, address) => {
+                if (group === "none") return undefined;
+                if (group !== "all" && !group.has(address)) return null;
+                const leaf = (state.tables.mlsDevice ?? []).find((r) => `${r.userId}/${r.device}` === address);
+                return leaf ? new Uint8Array(leaf.signatureKey as Buffer) : null;
+            },
             signSearchSegment: (payload) => new Uint8Array(sign(null, Buffer.concat([CONTENT_SIGNATURE_LABEL, payload]), privateKey)),
             searchSegments: async (body) => {
                 const named = body.op === "claim-index-build" || body.op === "put-index-segment" ? { ...body, device: name } : body;
@@ -177,6 +189,88 @@ describe("building and reading", () => {
     });
 });
 
+describe("signatures on the reader", () => {
+    const text = (b: Uint8Array) => Buffer.from(b).toString("base64url");
+
+    /** A segment put straight into the table, as a server that does not check would keep it. */
+    async function forged(builder: string, privateKey: KeyObject, epoch = 5n, body = "forged budget") {
+        const binding = { channelId: CHANNEL, epoch, seq: 0, generation: 0 };
+        const { nonce, ciphertext } = await segment.sealSegment(await segment.indexKey(hk(CHANNEL, epoch), CHANNEL, epoch), binding, segment.buildIndex([{ id: msgId(1), body }]));
+        const signature = sign(null, Buffer.concat([CONTENT_SIGNATURE_LABEL, await segment.segmentSignaturePayload(binding, nonce, ciphertext)]), privateKey);
+        (state.tables.chatSearchSegment ??= []).push({
+            ...binding,
+            base: true,
+            messages: 1,
+            lastId: msgId(1),
+            nonce: Buffer.from(nonce),
+            ciphertext: Buffer.from(ciphertext),
+            builder,
+            signature,
+            createdAt: new Date()
+        });
+        return { nonce, ciphertext, signature };
+    }
+
+    it("leaves out a segment signed by a key that is not its builder's leaf, and the builder rebuilds it", async () => {
+        message(1, 5n);
+        const alice = fakeDevice(ALICE, "alice-device-1");
+        const stranger = generateKeyPairSync("ed25519").privateKey;
+        await forged(`${ALICE}/alice-device-1`, stranger);
+        const bob = fakeDevice(BOB, "bob-new-browser");
+        const reader = new client.SegmentReader(bob.device, client.pageSearchHost());
+        await reader.refresh();
+        expect(await reader.search("budget", null, 10)).toEqual([]);
+
+        // Alice's builder takes the forged base for a missing one and writes the next generation over it.
+        expect(await client.buildSegments(alice.device, source(new Map([[msgId(1), { body: "the real budget" }]])), CHANNEL, 5n)).toBe(1);
+        expect(state.tables.chatSearchSegment!.map((r) => r.generation)).toEqual([1]);
+        await reader.refresh();
+        expect((await reader.search("real", null, 10)).map((h) => h.id)).toEqual([msgId(1)]);
+    });
+
+    it("leaves out a segment whose builder holds no leaf in this device's group, whatever key the server names", async () => {
+        message(1, 5n);
+        const eve = fakeDevice(EVE, "eve-device-01");
+        await forged(`${EVE}/eve-device-01`, eve.privateKey);
+        const outside = fakeDevice(BOB, "bob-device-01", 9n, new Set([`${ALICE}/alice-device-1`]));
+        const reader = new client.SegmentReader(outside.device, client.pageSearchHost());
+        await reader.refresh();
+        expect(await reader.search("budget", null, 10)).toEqual([]);
+        // The same segment where its builder is a member is taken.
+        const inside = new client.SegmentReader(fakeDevice(BOB, "bob-device-02").device, client.pageSearchHost());
+        await inside.refresh();
+        expect((await inside.search("budget", null, 10)).map((h) => h.id)).toEqual([msgId(1)]);
+    });
+
+    it("checks against the device's registered key only where this device holds no copy of the group", async () => {
+        message(1, 5n);
+        const alice = fakeDevice(ALICE, "alice-device-1");
+        const { nonce, ciphertext, signature } = await forged(`${ALICE}/alice-device-1`, alice.privateKey);
+        const groupless = fakeDevice(BOB, "bob-device-01", null, "none").device;
+        const binding = { channelId: CHANNEL, epoch: 5n, seq: 0, generation: 0 };
+        const registered = text(new Uint8Array((state.tables.mlsDevice ?? []).find((r) => r.device === "alice-device-1")!.signatureKey as Buffer));
+        const answer = { builder: `${ALICE}/alice-device-1`, signature: text(signature), signatureKey: registered };
+        expect(await client.signedSegment(groupless, binding, nonce, ciphertext, answer)).toBe(true);
+        const other = text(new Uint8Array(generateKeyPairSync("ed25519").publicKey.export({ format: "der", type: "spki" }).subarray(-32)));
+        expect(await client.signedSegment(groupless, binding, nonce, ciphertext, { ...answer, signatureKey: other })).toBe(false);
+        expect(await client.signedSegment(groupless, binding, nonce, ciphertext, { ...answer, signature: undefined })).toBe(false);
+        // With a copy of the group, the key the server names is never what is checked.
+        const member = fakeDevice(BOB, "bob-device-02", 9n, new Set()).device;
+        expect(await client.signedSegment(member, binding, nonce, ciphertext, answer)).toBe(false);
+    });
+
+    it("takes a migrated segment only in the legacy epoch", async () => {
+        message(1, 5n);
+        holdKey(BOB, 5n);
+        const run = generateKeyPairSync("ed25519");
+        (state.tables.chatMigration ??= []).push({ channelId: CHANNEL, state: "cut", signKey: Buffer.from(run.publicKey.export({ format: "der", type: "spki" }).subarray(-32)) });
+        await forged("migration", run.privateKey);
+        const reader = new client.SegmentReader(fakeDevice(BOB, "bob-device-01").device, client.pageSearchHost());
+        await reader.refresh();
+        expect(await reader.search("budget", null, 10)).toEqual([]);
+    });
+});
+
 describe("refusals", () => {
     async function sealed(fake: Fake, generation = 0) {
         const binding = { channelId: CHANNEL, epoch: 5n, seq: 0, generation };
@@ -250,6 +344,8 @@ describe("migrated history", () => {
             { kind: "message", id: msgId(2), messageId: msgId(2), channelId: CHANNEL, body: "something else" }
         );
         const pair = (await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"])) as CryptoKeyPair;
+        // The run's public key, as the migration keeps it (`ChatMigration.signKey`) and a reader checks it.
+        (state.tables.chatMigration ??= []).push({ channelId: CHANNEL, state: "cut", signKey: Buffer.from(await crypto.subtle.exportKey("raw", pair.publicKey)) });
         expect(await service.indexMigrated(CHANNEL, LEGACY, hk(CHANNEL, LEGACY), { privateKey: pair.privateKey })).toBe(1);
         expect(state.tables.chatSearchSegment![0]).toMatchObject({ builder: "migration", base: true, messages: 2 });
         const reader = new client.SegmentReader(fakeDevice(BOB, "bob-device-01").device, client.pageSearchHost());

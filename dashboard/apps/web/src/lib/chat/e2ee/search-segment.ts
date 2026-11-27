@@ -37,6 +37,8 @@ export const SEGMENT_MIN_BYTES = 4 * 1024;
 export const SEGMENT_MAX_BYTES = 512 * 1024;
 /** Corrections past this share of the base's messages make the next builder write a new base. */
 export const CORRECTION_SHARE = 0.25;
+/** The builder a migrated segment names (`indexMigrated`): the migration run, signed by its own key. */
+export const MIGRATION_BUILDER = "migration";
 
 const KEY_INFO = "polaris chat index v1";
 const SEAL_LABEL = "polaris/chat-e2ee/index-segment/v1";

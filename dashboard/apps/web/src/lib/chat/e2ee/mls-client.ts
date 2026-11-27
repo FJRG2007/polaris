@@ -139,7 +139,7 @@ export interface MlsMemberLike {
     /** Blank nodes on this member's path; above zero, its `selfUpdate` fills them. */
     blankPath(groupId: Uint8Array): number;
     forgetGroup(groupId: Uint8Array): void;
-    members(groupId: Uint8Array): { leaf: number; identity: Uint8Array }[];
+    members(groupId: Uint8Array): { leaf: number; identity: Uint8Array; signatureKey: Uint8Array }[];
     ownLeaf(groupId: Uint8Array): number;
     signContent(payload: Uint8Array): Uint8Array;
     mergePendingCommit(groupId: Uint8Array): void;
@@ -226,6 +226,8 @@ export interface MlsSealedMessage {
     epoch: bigint;
     /** Which version of the message this is: 0 as sent, one more per edit. */
     revision: number;
+    /** When the version handed out was stored by an edit; absent for one never edited. */
+    editedAt?: string;
     /**
      * The content; null when its signature or sealing does not check out, no
      * key here opens it, or it is older than a version this device has seen.
@@ -252,6 +254,8 @@ interface SealedWire extends SealedStored {
     authorId: string | null;
     /** The account of the signing device when `authorId` is null (a member the server runs); absent from older servers. */
     signer?: string | null;
+    /** When the version handed out was stored by an edit; absent for one never edited. */
+    editedAt?: string;
 }
 
 /** How many times an edit is sealed again when another device's edit landed first. */
@@ -836,7 +840,15 @@ export class MlsDevice {
             const current = revision >= this.revisionFloor(channelId, row.id);
             const opened = current ? await this.openStored(channelId, row) : null;
             if (opened) this.raiseRevisionFloor(channelId, row.id, revision);
-            out.push({ id: row.id, authorId: row.authorId, sender: signer ? `${signer}/${row.device}` : null, epoch: BigInt(row.epoch), revision, opened });
+            out.push({
+                id: row.id,
+                authorId: row.authorId,
+                sender: signer ? `${signer}/${row.device}` : null,
+                epoch: BigInt(row.epoch),
+                revision,
+                ...(typeof row.editedAt === "string" ? { editedAt: row.editedAt } : {}),
+                opened
+            });
         }
         return out;
     }
@@ -1102,6 +1114,22 @@ export class MlsDevice {
             return this.member.epoch(this.requireGroup(channelId));
         } catch {
             return null;
+        }
+    }
+
+    /**
+     * The signature key the member at `address` (`${userId}/${device}`) holds
+     * in this device's copy of the conversation's group: what MLS
+     * authenticated, never what the server says. Null when that address holds
+     * no leaf there; undefined when this device holds no copy of the group.
+     */
+    memberSignatureKey(channelId: string, address: string): Uint8Array | null | undefined {
+        const groupId = this.groupOf(channelId);
+        if (!groupId) return undefined;
+        try {
+            return this.member.members(groupId).find((m) => decoder.decode(m.identity) === address)?.signatureKey ?? null;
+        } catch {
+            return undefined;
         }
     }
 

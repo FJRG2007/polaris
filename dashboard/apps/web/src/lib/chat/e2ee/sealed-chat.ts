@@ -271,12 +271,13 @@ async function segmentEntries(term: string, channelId: string | null, limit: num
     for (const hit of candidates) byChannel.set(hit.channelId, [...(byChannel.get(hit.channelId) ?? []), hit.editedAt ? { id: hit.id, editedAt: hit.editedAt } : hit.id]);
     const out: IndexedSealed[] = [];
     for (const [channel, refs] of byChannel) {
-        const contents = await openSealed(channel, refs).catch(() => new Map<string, SealedContent | null>());
+        const contents = await openVersioned(channel, refs).catch(() => new Map<string, OpenedVersion>());
         for (const ref of refs) {
-            const words = searchableWords(contents.get(refId(ref)));
+            const found = contents.get(refId(ref));
+            const words = searchableWords(found?.content);
             if (!words || !bodyMatches(words, term)) continue;
-            const editedAt = typeof ref === "string" ? undefined : ref.editedAt;
-            out.push({ id: refId(ref), channelId: channel, ...(editedAt ? { editedAt } : {}), body: words });
+            // The version that opened, which an edit since the segment was built moved past the ref's.
+            out.push({ id: refId(ref), channelId: channel, ...(found?.editedAt ? { editedAt: found.editedAt } : {}), body: words });
         }
     }
     return out;
@@ -488,11 +489,28 @@ export function sealedSendFailure(caught: unknown): "refused" | "unreachable" {
  * are not asked for again.
  */
 export async function openSealed(channelId: string, refs: readonly SealedRef[]): Promise<ReadonlyMap<string, SealedContent | null>> {
-    const out = new Map<string, SealedContent | null>();
+    return new Map([...(await openVersioned(channelId, refs))].map(([id, found]) => [id, found.content]));
+}
+
+/** What a sealed message opened to, and the version that is: when it was last edited (absent if never). */
+interface OpenedVersion {
+    readonly content: SealedContent | null;
+    readonly editedAt?: string;
+}
+
+/**
+ * As `openSealed`, with the version each one opened at. The server hands out
+ * a message as it stands, which may be later than the version a ref names (a
+ * search segment built before an edit): what it opened to is kept, and
+ * indexed, under the version the server handed out, never under the ref's.
+ */
+async function openVersioned(channelId: string, refs: readonly SealedRef[]): Promise<ReadonlyMap<string, OpenedVersion>> {
+    const out = new Map<string, OpenedVersion>();
     const missing = new Map<string, SealedRef>();
     for (const ref of refs) {
         const known = opened.get(refKey(ref));
-        if (known !== undefined) out.set(refId(ref), known);
+        const editedAt = typeof ref === "string" ? undefined : ref.editedAt;
+        if (known !== undefined) out.set(refId(ref), { content: known, ...(editedAt ? { editedAt } : {}) });
         else missing.set(refId(ref), ref);
     }
     if (!missing.size) return out;
@@ -502,14 +520,17 @@ export async function openSealed(channelId: string, refs: readonly SealedRef[]):
     for (let start = 0; start < ids.length; start += READ_PAGE) {
         const page = ids.slice(start, start + READ_PAGE);
         const rows = await mls.readSealed(channelId, page);
-        const byId = new Map(rows.map((row) => [row.id, row.opened ? decodeSealedContent(row.opened) : null]));
+        const byId = new Map(rows.map((row) => [row.id, row]));
         buildSoon(channelId, rows.filter((row) => row.opened).map((row) => row.epoch));
         for (const id of page) {
-            const content = byId.get(id) ?? null;
+            const row = byId.get(id);
+            const content = row?.opened ? decodeSealedContent(row.opened) : null;
             const ref = missing.get(id)!;
-            keep(refKey(ref), content);
-            index(channelId, id, typeof ref === "string" ? undefined : ref.editedAt, content);
-            out.set(id, content);
+            // A row handed out is the version it is; one not handed out is kept as missing under the ref.
+            const editedAt = row ? row.editedAt : typeof ref === "string" ? undefined : ref.editedAt;
+            keep(row ? versionKey(id, editedAt) : refKey(ref), content);
+            index(channelId, id, editedAt, content);
+            out.set(id, { content, ...(editedAt ? { editedAt } : {}) });
         }
     }
     return out;

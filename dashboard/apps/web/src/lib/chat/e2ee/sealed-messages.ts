@@ -360,6 +360,8 @@ export interface SealedRow {
     senderLeaf: number;
     /** Which version the content is: 0 as sent, one more per edit. */
     revision: number;
+    /** When the version handed out was stored by an edit; null for one never edited. */
+    editedAt: Date | null;
     ciphertext: Uint8Array;
     signature: Uint8Array;
     signatureKey: Uint8Array;
@@ -389,7 +391,8 @@ export async function readSealed(userId: string, channelId: string, ids: readonl
             e2eeDevice: true,
             e2eeSignature: true,
             e2eeSignatureKey: true,
-            e2eeRevision: true
+            e2eeRevision: true,
+            editedAt: true
         },
         take: MAX_SEALED_READ
     });
@@ -409,6 +412,7 @@ export async function readSealed(userId: string, channelId: string, ids: readonl
                 epoch: e2eeEpoch,
                 senderLeaf: e2eeSenderLeaf,
                 revision: row.e2eeRevision ?? 0,
+                editedAt: row.editedAt ?? null,
                 ciphertext: new Uint8Array(e2eeCiphertext),
                 signature: new Uint8Array(e2eeSignature),
                 signatureKey: new Uint8Array(e2eeSignatureKey)

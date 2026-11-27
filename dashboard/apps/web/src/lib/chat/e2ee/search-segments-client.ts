@@ -15,10 +15,15 @@
  * Searching: the segments this account may read are listed newest first and
  * opened in a Worker (in memory only); a hit is only a candidate, opened and
  * checked against its words before it is shown (`sealed-chat.ts`).
+ *
+ * Neither uses a segment whose signature does not check (`signedSegment`):
+ * against the key the builder's leaf holds in this device's copy of the group,
+ * so the server cannot pass off one under another member's name.
  */
 
 import * as segment from "./search-segment";
 import { fromText, toText } from "./base64url";
+import { LEGACY_EPOCH } from "./mls-history-keys";
 import type { SearchSegmentBody } from "./mls-client";
 import type { IndexedSealed } from "./sealed-search-index";
 
@@ -28,6 +33,8 @@ export interface SegmentDevice {
     searchSegments(body: SegmentOp): Promise<Record<string, unknown>>;
     signSearchSegment(payload: Uint8Array): Uint8Array;
     currentEpoch(channelId: string): bigint | null;
+    /** The key `address`'s leaf holds in this device's copy of the group; null for no leaf, undefined for no copy. */
+    memberSignatureKey(channelId: string, address: string): Uint8Array | null | undefined;
 }
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -92,10 +99,49 @@ function byStretch(listed: readonly ListedSegment[]): Map<number, { base: Listed
     return out;
 }
 
-async function openListed(device: SegmentDevice, key: Uint8Array, listed: ListedSegment): Promise<segment.SegmentIndex | null> {
+/** One segment as the server hands it out, its signature checked; null when it is not there or does not check. */
+async function fetchSigned(device: SegmentDevice, listed: ListedSegment): Promise<{ binding: segment.SegmentBinding; nonce: Uint8Array; ciphertext: Uint8Array } | null> {
     const answer = await device.searchSegments({ op: "index-segment", channelId: listed.channelId, epoch: listed.epoch, seq: listed.seq, generation: listed.generation });
     if (typeof answer.nonce !== "string" || typeof answer.ciphertext !== "string") return null;
-    return segment.openSegment(key, { channelId: listed.channelId, epoch: BigInt(listed.epoch), seq: listed.seq, generation: listed.generation }, fromText(answer.nonce), fromText(answer.ciphertext));
+    const binding = { channelId: listed.channelId, epoch: BigInt(listed.epoch), seq: listed.seq, generation: listed.generation };
+    const nonce = fromText(answer.nonce);
+    const ciphertext = fromText(answer.ciphertext);
+    return (await signedSegment(device, binding, nonce, ciphertext, answer)) ? { binding, nonce, ciphertext } : null;
+}
+
+/**
+ * Whether a segment's signature is its builder's. A member device's is checked
+ * against the key that member's leaf holds in this device's copy of the
+ * group, which MLS authenticated: a builder with no leaf there is refused,
+ * whatever key the server names. Only where this device holds no copy is the
+ * key the server registered for the device taken, as for a sealed message
+ * (`MlsDevice.readSealed`); the seal under the epoch's index key still means
+ * only a holder of its history key made it. A migrated segment is taken only
+ * in the legacy epoch, under the run's key: that epoch's history key was made
+ * by the migrator, which signed its messages the same way.
+ */
+export async function signedSegment(
+    device: SegmentDevice,
+    binding: segment.SegmentBinding,
+    nonce: Uint8Array,
+    ciphertext: Uint8Array,
+    answer: Record<string, unknown>
+): Promise<boolean> {
+    const { builder, signature, signatureKey } = answer;
+    if (typeof builder !== "string" || typeof signature !== "string") return false;
+    const named = typeof signatureKey === "string" ? fromText(signatureKey) : null;
+    let key: Uint8Array | null;
+    if (builder === segment.MIGRATION_BUILDER) key = binding.epoch === LEGACY_EPOCH ? named : null;
+    else {
+        const member = device.memberSignatureKey(binding.channelId, builder);
+        key = member === undefined ? named : member;
+    }
+    return key !== null && segment.verifySegmentSignature(key, binding, nonce, ciphertext, fromText(signature));
+}
+
+async function openListed(device: SegmentDevice, key: Uint8Array, listed: ListedSegment): Promise<segment.SegmentIndex | null> {
+    const fetched = await fetchSigned(device, listed);
+    return fetched ? segment.openSegment(key, fetched.binding, fetched.nonce, fetched.ciphertext) : null;
 }
 
 /** Seal, sign and store one segment. */
@@ -347,17 +393,16 @@ export class SegmentReader {
                 const s = listed[cursor++]!;
                 const key = await this.indexKey(s.channelId, s.epoch);
                 if (!key) continue;
-                const answer = await this.device
-                    .searchSegments({ op: "index-segment", channelId: s.channelId, epoch: s.epoch, seq: s.seq, generation: s.generation })
-                    .catch(() => null);
-                if (!answer || typeof answer.nonce !== "string" || typeof answer.ciphertext !== "string") continue;
+                // One the server forged or swapped is left out, as if it were not there.
+                const fetched = await fetchSigned(this.device, s).catch(() => null);
+                if (!fetched) continue;
                 const opened = await this.host.add({
                     op: "add",
                     key: segmentKey(s),
                     binding: { channelId: s.channelId, epoch: s.epoch, seq: s.seq, generation: s.generation },
                     indexKey: key,
-                    nonce: fromText(answer.nonce),
-                    ciphertext: fromText(answer.ciphertext)
+                    nonce: fetched.nonce,
+                    ciphertext: fetched.ciphertext
                 });
                 if (opened) this.held.add(segmentKey(s));
             }

@@ -221,7 +221,34 @@ export async function readIndexSegment(userId: string, channelId: string, epoch:
     });
     if (!row) return null;
     const { builder, base, messages, lastId } = row;
-    return { builder, base, messages, lastId, nonce: new Uint8Array(row.nonce), ciphertext: new Uint8Array(row.ciphertext), signature: new Uint8Array(row.signature) };
+    const signatureKey = await builderKey(channelId, builder);
+    return {
+        builder,
+        base,
+        messages,
+        lastId,
+        nonce: new Uint8Array(row.nonce),
+        ciphertext: new Uint8Array(row.ciphertext),
+        signature: new Uint8Array(row.signature),
+        ...(signatureKey ? { signatureKey } : {})
+    };
+}
+
+/**
+ * The key the server holds for a segment's builder: the device's registered
+ * one, or the migration run's. A reader checks a device's signature against
+ * the key its own copy of the group holds for that member, and takes this one
+ * only where it holds no copy (`search-segments-client.ts`).
+ */
+async function builderKey(channelId: string, builder: string): Promise<Uint8Array | null> {
+    if (builder === segment.MIGRATION_BUILDER) {
+        const run = await prisma.chatMigration.findUnique({ where: { channelId }, select: { signKey: true } });
+        return run?.signKey ? new Uint8Array(run.signKey) : null;
+    }
+    const slash = builder.indexOf("/");
+    if (slash < 0) return null;
+    const device = await prisma.mlsDevice.findFirst({ where: { userId: builder.slice(0, slash), device: builder.slice(slash + 1) }, select: { signatureKey: true } });
+    return device ? new Uint8Array(device.signatureKey) : null;
 }
 
 /** What the migrator signs segments with: its run's own Ed25519 key (`ChatMigration.signKey`). */
@@ -297,4 +324,4 @@ export async function indexMigrated(channelId: string, epoch: bigint, historyKey
 }
 
 /** The builder a migrated segment names. */
-export const MIGRATION_BUILDER = "migration";
+export const MIGRATION_BUILDER = segment.MIGRATION_BUILDER;

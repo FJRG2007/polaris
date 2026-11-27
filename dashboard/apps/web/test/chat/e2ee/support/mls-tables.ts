@@ -22,8 +22,9 @@ export function memoryPrisma(state: MemoryTablesState) {
             if (key === "AND") return (want as Row[]).every((w) => matches(row, w));
             if (key === "userId_device" || key === "channelId_service" || key === "channelId_epoch_sender_part") return matches(row, want as Row);
             if (want && typeof want === "object" && !(want instanceof Uint8Array)) {
-                const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint; lte?: bigint; not?: unknown; isEmpty?: boolean };
+                const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint; lte?: bigint; not?: unknown; isEmpty?: boolean; equals?: unknown };
                 if (cond.in) return cond.in.some((value) => same(row[key], value));
+                if ("equals" in cond) return same(row[key] ?? null, cond.equals ?? null);
                 if (cond.isEmpty !== undefined) return ((row[key] as unknown[] | undefined) ?? []).length === 0 === cond.isEmpty;
                 if ("not" in cond) return !same(row[key] ?? null, cond.not);
                 const value = row[key] as bigint;
@@ -47,6 +48,7 @@ export function memoryPrisma(state: MemoryTablesState) {
         const sign = direction === "desc" ? -1 : 1;
         return [...found].sort((a, b) => ((a[column] as bigint) < (b[column] as bigint) ? -sign : (a[column] as bigint) > (b[column] as bigint) ? sign : 0));
     };
+    const copy = (row: Row | undefined): Row | null => (row ? { ...row } : null);
     const table = (name: string, keys: string[]) => {
         const rows = () => (state.tables[name] ??= []);
         const unique = (data: Row) => {
@@ -60,10 +62,13 @@ export function memoryPrisma(state: MemoryTablesState) {
             ...data
         });
         return {
-            findUnique: async ({ where }: { where: Row }) => rows().find((r) => matches(r, where)) ?? null,
-            findFirst: async ({ where }: { where: Row }) => rows().find((r) => matches(r, where)) ?? null,
+            // Reads hand out copies, as Prisma does: a later write never reaches a row already read.
+            findUnique: async ({ where }: { where: Row }) => copy(rows().find((r) => matches(r, where))),
+            findFirst: async ({ where }: { where: Row }) => copy(rows().find((r) => matches(r, where))),
             findMany: async ({ where, take, orderBy }: { where: Row; take?: number; orderBy?: unknown }) =>
-                ordered(rows().filter((r) => matches(r, where)), orderBy).slice(0, take ?? Infinity),
+                ordered(rows().filter((r) => matches(r, where)), orderBy)
+                    .slice(0, take ?? Infinity)
+                    .map((r) => ({ ...r })),
             count: async ({ where }: { where: Row }) => rows().filter((r) => matches(r, where)).length,
             create: async ({ data }: { data: Row }) => {
                 unique(data);
@@ -91,8 +96,10 @@ export function memoryPrisma(state: MemoryTablesState) {
             },
             upsert: async ({ where, create, update }: { where: Row; create: Row; update: Row }) => {
                 const row = rows().find((r) => matches(r, where));
-                if (row) Object.assign(row, update);
-                else rows().push(fill(create));
+                if (row) return Object.assign(row, update);
+                const created = fill(create);
+                rows().push(created);
+                return created;
             },
             updateMany: async ({ where, data }: { where: Row; data: Row }) => {
                 const hit = rows().filter((r) => matches(r, where));
@@ -132,6 +139,8 @@ export function memoryPrisma(state: MemoryTablesState) {
         chatSearchSegment: table("chatSearchSegment", ["channelId", "epoch", "seq", "generation"]),
         chatSearchLease: table("chatSearchLease", ["channelId", "epoch", "seq"]),
         chatMigrationRollback: table("chatMigrationRollback", ["kind", "id"]),
+        // Who a migration asks on behalf of (`legacy-migration.ts audienceOf`).
+        chatChannelMember: table("chatChannelMember", ["channelId", "userId"]),
         // All or nothing, one at a time (Postgres's row lock on the group does
         // the same for two commits): run on the live tables, put the copy back
         // on a throw.

@@ -388,7 +388,13 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
         case "index-segment": {
             const found = await segments.readIndexSegment(userId, body.channelId, BigInt(body.epoch), body.seq, body.generation);
             if (!found) return json({ error: "gone" }, 404);
-            return json({ ...found, nonce: text(found.nonce), ciphertext: text(found.ciphertext), signature: text(found.signature) });
+            return json({
+                ...found,
+                nonce: text(found.nonce),
+                ciphertext: text(found.ciphertext),
+                signature: text(found.signature),
+                ...(found.signatureKey ? { signatureKey: text(found.signatureKey) } : {})
+            });
         }
         case "read-sealed": {
             const rows = await sealed.readSealed(userId, body.channelId, body.messageIds);
@@ -402,6 +408,7 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                     epoch: r.epoch.toString(),
                     senderLeaf: r.senderLeaf,
                     revision: r.revision,
+                    ...(r.editedAt ? { editedAt: r.editedAt.toISOString() } : {}),
                     ciphertext: text(r.ciphertext),
                     signature: text(r.signature),
                     signatureKey: text(r.signatureKey)

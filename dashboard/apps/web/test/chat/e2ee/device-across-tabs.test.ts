@@ -98,6 +98,15 @@ describe("one device across tabs", () => {
         expect(prepared).toEqual(["one"]);
     });
 
+    it("answers the search segments' synchronous calls with their values, not promises", async () => {
+        const open = async () =>
+            ({ currentEpoch: () => 7n, memberSignatureKey: () => new Uint8Array([1]), signSearchSegment: () => new Uint8Array([2]) }) as unknown as MlsDevice;
+        const one = await deviceAcrossTabs("d", memoryStore(), open, { locks: fakeLocks(), notes: memoryNotes() });
+        expect(one.currentEpoch("c")).toBe(7n);
+        expect(one.memberSignatureKey("c", "a/b")).toEqual(new Uint8Array([1]));
+        expect(one.signSearchSegment(new Uint8Array())).toEqual(new Uint8Array([2]));
+    });
+
     it("reads sealed messages without waiting behind another tab's operation", async () => {
         const locks = fakeLocks(), notes = memoryNotes();
         let release: () => void = () => undefined;
