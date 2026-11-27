@@ -13,11 +13,11 @@
 //! `nusb` 0.2 has no isochronous transfers, which is why this route talks to
 //! WinUSB directly through the `windows` crate the plugin already pins.
 
-use crate::display::PACKET_SIZE;
+use crate::display::{self, MAX_TRANSFER_PACKETS, PACKET_SIZE};
 use crate::report::{Report, REPORT_LEN};
+use crate::screen::{self, Painter};
 use crate::session::{
-    keepalive_due, read_slice, KeepAlive, DEVICE_INTERFACE_GUID_U128, DISPLAY_ALT_SETTING,
-    DISPLAY_ENDPOINT, INIT_READS, INPUT_ENDPOINT,
+    DEVICE_INTERFACE_GUID_U128, DISPLAY_ALT_SETTING, DISPLAY_ENDPOINT, INIT_READS, INPUT_ENDPOINT,
 };
 use crate::transport::TransportError;
 use std::ffi::c_void;
@@ -45,7 +45,10 @@ use windows::Win32::Storage::FileSystem::{
 use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::Win32::System::IO::{CancelIoEx, GetOverlappedResult, OVERLAPPED};
 
-/// How long one keep-alive write may take before it is given up.
+/// The registered buffer: the largest transfer the display takes.
+const TRANSFER_LEN: usize = MAX_TRANSFER_PACKETS * PACKET_SIZE;
+
+/// How long one display write may take before it is given up.
 const WRITE_WAIT_MS: u32 = 100;
 
 /// The NUL-terminated paths of every present device interface of `guid`.
@@ -115,8 +118,8 @@ pub struct WinUsbInput {
     display: WINUSB_INTERFACE_HANDLE,
     /// The registered isochronous buffer, or null.
     isoch: *mut c_void,
-    keepalive: KeepAlive,
-    last_keepalive: Option<Instant>,
+    // Boxed: it holds two pages, and the input enum stays small.
+    painter: Box<Painter>,
     read_event: HANDLE,
     write_event: HANDLE,
     // Boxed: the system writes into these while a transfer is pending, so
@@ -124,7 +127,7 @@ pub struct WinUsbInput {
     read_overlapped: Box<OVERLAPPED>,
     write_overlapped: Box<OVERLAPPED>,
     report: Box<[u8; REPORT_LEN]>,
-    packet: Box<[u8; PACKET_SIZE]>,
+    packet: Box<[u8; TRANSFER_LEN]>,
     pending: bool,
 }
 
@@ -168,14 +171,13 @@ impl WinUsbInput {
             input: WINUSB_INTERFACE_HANDLE::default(),
             display: WINUSB_INTERFACE_HANDLE::default(),
             isoch: std::ptr::null_mut(),
-            keepalive: KeepAlive::default(),
-            last_keepalive: None,
+            painter: Box::default(),
             read_event: HANDLE::default(),
             write_event: HANDLE::default(),
             read_overlapped: Box::default(),
             write_overlapped: Box::default(),
             report: Box::new([0u8; REPORT_LEN]),
-            packet: Box::new([0u8; PACKET_SIZE]),
+            packet: Box::new([0u8; TRANSFER_LEN]),
             pending: false,
         };
         // From here on `Drop` releases whatever was set up.
@@ -248,14 +250,21 @@ impl WinUsbInput {
         }
     }
 
-    /// Sends a keep-alive when one is due. A failed write is left for the next
-    /// one: input keeps being read either way.
-    fn keep_alive(&mut self) {
-        if self.isoch.is_null() || !keepalive_due(self.last_keepalive.map(|at| at.elapsed())) {
+    /// Sends what the display is due: the keep-alive, an acknowledgement,
+    /// or the next tile of the newest page ([`Painter`]). A failed write is
+    /// left behind: input keeps being read either way.
+    fn paint(&mut self) {
+        if self.isoch.is_null() {
             return;
         }
-        self.last_keepalive = Some(Instant::now());
-        *self.packet = self.keepalive.next_packet();
+        if let Some(page) = screen::latest() {
+            self.painter.show(&page);
+        }
+        let Some(transfer) = self.painter.next(Instant::now()) else {
+            return;
+        };
+        let length = transfer.len().min(TRANSFER_LEN);
+        self.packet[..length].copy_from_slice(&transfer[..length]);
         *self.write_overlapped = OVERLAPPED {
             hEvent: self.write_event,
             ..Default::default()
@@ -267,7 +276,7 @@ impl WinUsbInput {
             let started = WinUsb_WriteIsochPipeAsap(
                 self.isoch,
                 0,
-                PACKET_SIZE as u32,
+                length as u32,
                 false,
                 Some(&*self.write_overlapped),
             );
@@ -288,7 +297,7 @@ impl WinUsbInput {
     pub fn next(&mut self, timeout: Duration) -> Result<Option<Report>, TransportError> {
         let deadline = Instant::now() + timeout;
         loop {
-            self.keep_alive();
+            self.paint();
             if !self.pending {
                 *self.read_overlapped = OVERLAPPED {
                     hEvent: self.read_event,
@@ -316,8 +325,7 @@ impl WinUsbInput {
             let slice = if self.isoch.is_null() {
                 remaining
             } else {
-                let since = self.last_keepalive.map_or(Duration::MAX, |at| at.elapsed());
-                read_slice(remaining, since)
+                remaining.min(self.painter.wait(Instant::now()))
             };
             let wait = u32::try_from(slice.as_millis()).unwrap_or(u32::MAX - 1);
             // SAFETY: waits on the event this struct owns.
@@ -342,6 +350,9 @@ impl WinUsbInput {
             self.pending = false;
             done.map_err(|error| TransportError::Io(error.message()))?;
             let read = (read as usize).min(REPORT_LEN);
+            if display::asks_for_ack(&self.report[..read]) {
+                self.painter.acknowledge();
+            }
             return Ok(Report::parse(&self.report[..read]));
         }
     }

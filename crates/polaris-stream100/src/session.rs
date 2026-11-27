@@ -11,14 +11,15 @@
 //!    endpoint `0x01` (952-byte packets);
 //! 3. two vendor reads: request `0x52` (value 0, 2 bytes) and `0x02`
 //!    (2 bytes, the firmware version);
-//! 4. an `SM` keep-alive on endpoint `0x01` at least twice a second.
+//! 4. a keep-alive on endpoint `0x01` at least twice a second, in a
+//!    transfer that starts with the `HERCULES` sync packet
+//!    ([`crate::screen::Painter`] sends it, with the screen's frames).
 //!
 //! The controller also answers requests that reboot it into its firmware
 //! updater (`0xF2`) or write its flash. Those are never sent: the only
 //! control requests this crate can build are the reads in [`INIT_READS`],
 //! and [`VendorRead::setup`] refuses anything else.
 
-use crate::display::{heartbeat, packets, Sequence, PACKET_SIZE};
 use std::time::Duration;
 
 /// The input interface and its interrupt IN endpoint (64-byte reports).
@@ -84,21 +85,6 @@ impl VendorRead {
             return None;
         }
         Some((VENDOR_IN, self.request, self.value, 0, self.length))
-    }
-}
-
-/// Builds the keep-alive packets for one session, numbered in its sequence.
-#[derive(Debug, Default)]
-pub struct KeepAlive {
-    sequence: Sequence,
-}
-
-impl KeepAlive {
-    /// The next keep-alive, as the one isochronous packet that carries it.
-    pub fn next_packet(&mut self) -> [u8; PACKET_SIZE] {
-        let message = heartbeat(&mut self.sequence);
-        // A 9-byte message always fits one packet.
-        packets(&message)[0]
     }
 }
 

@@ -12,10 +12,17 @@
 //! | 6      | 2    | sequence number, little-endian, one per message |
 //! | 8      | ..   | one or more commands |
 //!
-//! A message longer than one packet continues in the next ones, zero-padded.
+//! A message longer than one packet continues in the next ones, zero-padded,
+//! and every isochronous transfer starts with one sync packet (`"HERCULES"`,
+//! then zeros) ahead of the message ([`transfer`]). A message sent without
+//! it is never read.
 //!
 //! The image is 8-bit indexed: a 256-entry RGB565 palette and one byte per
-//! pixel, sent as 32 chunks of 4080 bytes (480 x 272 = 32 x 4080).
+//! pixel, sent as 32 tiles of 4080 samples. A tile is not a band of rows:
+//! tile `t` holds the pixels at `(8 * column + dx, 4 * row + dy)` for its
+//! [`TILE_OFFSETS`] entry, 60 columns by 68 rows, so the panel refines the
+//! picture tile after tile (CataclysmX/New-Hera-lunx, `docs/protocol/commands.md`,
+//! read from the controller's firmware and the official SDK).
 
 /// Display size in pixels.
 pub const WIDTH: usize = 480;
@@ -29,10 +36,80 @@ pub const CHUNK_COUNT: usize = WIDTH * HEIGHT / CHUNK_SIZE;
 /// Palette entries, two bytes each.
 pub const PALETTE_COLORS: usize = 256;
 
+/// The most packets one transfer carries, sync packet included (the most
+/// the official SDK sends; the firmware's ring holds 34).
+pub const MAX_TRANSFER_PACKETS: usize = 10;
+/// The longest message one transfer carries.
+pub const MAX_MESSAGE_LEN: usize = (MAX_TRANSFER_PACKETS - 1) * PACKET_SIZE;
+
 const HEADER_LEN: usize = 8;
 const CMD_BRIGHTNESS: u8 = 0x31;
 const CMD_PALETTE: [u8; 7] = [0x33, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00];
 const CMD_PIXELS: [u8; 9] = [0x37, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x0f];
+
+/// Ends a list of commands.
+pub const END: u8 = 0x00;
+/// Acknowledges the device-information message the controller repeats
+/// while a host is present ([`asks_for_ack`]). The firmware drops a host
+/// that never acknowledges it after a few seconds: the Hercules logo, then
+/// a dark screen.
+pub const ACK: u8 = 0x14;
+/// Screen on, at the stored brightness.
+pub const SCREEN_ON: [u8; 5] = [0x12, 0, 0, 0, 0];
+/// Screen off (standby).
+pub const SCREEN_OFF: [u8; 5] = [0x13, 0, 0, 0, 0];
+/// Screen configuration showing the host's own background: screen type 0,
+/// background type `0xff`, then colours and an action-zone style that a
+/// custom background does not use.
+pub const CUSTOM_BACKGROUND: [u8; 16] = [0x38, 0x00, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+/// The keep-alive the official SDK sends every 500 ms: `0x10 0x01`, the
+/// host's OS version as four `u16` (10.0.26100.712), the SDK version (1.51,
+/// BCD minor first), twelve zeros, then `0x11 0x00` ("host present"). The
+/// firmware keeps a session while it keeps coming.
+pub const HOST_KEEPALIVE: [u8; 26] = [
+    0x10, 0x01, 0x0a, 0x00, 0x00, 0x00, 0xf4, 0x65, 0xc8, 0x02, 0x51, 0x01, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0x11, 0x00,
+];
+/// The sync packet every transfer starts with, zero-padded to a packet.
+pub const SYNC: [u8; 8] = *b"HERCULES";
+
+/// `(dx, dy)` of each tile: tile `t` carries the pixels at
+/// `(8 * column + dx, 4 * row + dy)`. Ordered coarse to fine: the firmware
+/// fills a block around each sample of the early tiles, so they must go first.
+pub const TILE_OFFSETS: [(u8, u8); CHUNK_COUNT] = [
+    (0, 0),
+    (4, 0),
+    (0, 2),
+    (4, 2),
+    (2, 0),
+    (6, 0),
+    (2, 2),
+    (6, 2),
+    (0, 1),
+    (2, 1),
+    (4, 1),
+    (6, 1),
+    (0, 3),
+    (2, 3),
+    (4, 3),
+    (6, 3),
+    (1, 0),
+    (3, 0),
+    (5, 0),
+    (7, 0),
+    (1, 2),
+    (3, 2),
+    (5, 2),
+    (7, 2),
+    (1, 1),
+    (3, 1),
+    (5, 1),
+    (7, 1),
+    (1, 3),
+    (3, 3),
+    (5, 3),
+    (7, 3),
+];
 
 /// The message checksum: a 16-bit CRC over every byte except the checksum
 /// field itself (offsets 4 and 5), shifted right with the constant `0x8005`
@@ -96,9 +173,50 @@ pub fn heartbeat(sequence: &mut Sequence) -> Vec<u8> {
     message(&[0], sequence)
 }
 
-/// Backlight brightness, 0-100.
+/// The backlight command, 0-100.
+pub fn brightness_command(percent: u8) -> [u8; 4] {
+    [CMD_BRIGHTNESS, 0x01, 0x00, percent.min(100)]
+}
+
+/// Backlight brightness, 0-100, as a message of its own.
 pub fn brightness(percent: u8, sequence: &mut Sequence) -> Vec<u8> {
-    message(&[CMD_BRIGHTNESS, 0x01, 0x00, percent.min(100)], sequence)
+    let command = brightness_command(percent);
+    message(&[&command[..], &[END]].concat(), sequence)
+}
+
+/// One isochronous transfer: the sync packet, then the message in
+/// zero-padded packets. `None` for a message longer than a transfer holds.
+pub fn transfer(message: &[u8]) -> Option<Vec<u8>> {
+    if message.len() > MAX_MESSAGE_LEN {
+        return None;
+    }
+    let mut out = vec![0u8; PACKET_SIZE * (1 + message.len().div_ceil(PACKET_SIZE))];
+    out[..SYNC.len()].copy_from_slice(&SYNC);
+    out[PACKET_SIZE..PACKET_SIZE + message.len()].copy_from_slice(message);
+    Some(out)
+}
+
+/// Whether an input report carries the controller's device-information
+/// message, which the host answers with [`ACK`]. After the controls block
+/// (its length in byte 0) a report may carry a lowercase `sm` message:
+/// `"sm"`, its length (header included), and its type at offset 6
+/// (1 = device information, 2 = status); its bytes sum to 0 mod 256.
+pub fn asks_for_ack(report: &[u8]) -> bool {
+    let Some(&start) = report.first() else {
+        return false;
+    };
+    let rest = report.get(usize::from(start)..).unwrap_or_default();
+    if rest.len() < 7 || &rest[..2] != b"sm" {
+        return false;
+    }
+    let length = usize::from(rest[2]);
+    if length < 7 || length > rest.len() {
+        return false;
+    }
+    let sum = rest[..length]
+        .iter()
+        .fold(0u8, |sum, byte| sum.wrapping_add(*byte));
+    sum == 0 && rest[6] == 1
 }
 
 /// Checks a received or recorded message: magic, length and checksum.
@@ -191,14 +309,27 @@ impl IndexedFrame {
         Self { palette, pixels }
     }
 
-    /// The 32 framebuffer messages for this image.
+    /// The samples of tile `tile` (0-31), 4080 bytes.
+    pub fn tile(&self, tile: usize) -> Vec<u8> {
+        let (dx, dy) = TILE_OFFSETS[tile % CHUNK_COUNT];
+        let mut out = Vec::with_capacity(CHUNK_SIZE);
+        for row in 0..HEIGHT / 4 {
+            let y = row * 4 + usize::from(dy);
+            for column in 0..WIDTH / 8 {
+                out.push(self.pixels[y * WIDTH + column * 8 + usize::from(dx)]);
+            }
+        }
+        out
+    }
+
+    /// The command list of each of the 32 tile messages, unframed: the
+    /// sender numbers and frames each one as it goes out ([`message`]), so
+    /// keep-alives can go out between them in the same sequence.
     ///
-    /// `setup`, when given, is the display-configuration command the first
-    /// message carries ahead of the palette. It comes from the controller's
-    /// initialization (see the protocol document): it is sent with the first
-    /// image after connecting, not with every redraw, because re-sending it
-    /// visibly disturbs the panel.
-    pub fn messages(&self, setup: Option<&[u8]>, sequence: &mut Sequence) -> Vec<Vec<u8>> {
+    /// `setup`, when given, travels in the first one ahead of the palette,
+    /// as the official software sends screen configuration, palette and tile
+    /// 0 together; without it the palette already on the panel is kept.
+    pub fn bodies(&self, setup: Option<&[u8]>) -> Vec<Vec<u8>> {
         (0..CHUNK_COUNT)
             .map(|chunk| {
                 let mut body = Vec::with_capacity(CHUNK_SIZE + 600);
@@ -214,10 +345,18 @@ impl IndexedFrame {
                 let mut header = CMD_PIXELS;
                 header[2] = chunk as u8;
                 body.extend_from_slice(&header);
-                body.extend_from_slice(&self.pixels[chunk * CHUNK_SIZE..(chunk + 1) * CHUNK_SIZE]);
-                body.push(0);
-                message(&body, sequence)
+                body.extend_from_slice(&self.tile(chunk));
+                body.push(END);
+                body
             })
+            .collect()
+    }
+
+    /// The 32 tile messages for this image, framed in `sequence`.
+    pub fn messages(&self, setup: Option<&[u8]>, sequence: &mut Sequence) -> Vec<Vec<u8>> {
+        self.bodies(setup)
+            .iter()
+            .map(|body| message(body, sequence))
             .collect()
     }
 }

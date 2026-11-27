@@ -7,9 +7,10 @@
 //! (the plugin process) applies the commands and the engine stays pure and
 //! tested without a device.
 
-use crate::audio::{resolve, Session, Target};
+use crate::audio::{resolve, Category, Session, Target};
 use crate::encoder::{apply, Encoder};
 use crate::report::{Decoder, Event, KnobMap, Report};
+use crate::screen::{Knob, Screen};
 use crate::settings::Settings;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -174,6 +175,57 @@ impl Engine {
         }
     }
 
+    /// What the screen shows after `commands` (this report's answer) apply:
+    /// each knob's name, the loudest volume among what it follows, and
+    /// whether all of that is muted.
+    pub fn screen(&self, sessions: &[Session], output: Output, commands: &[Command]) -> Screen {
+        let mut output = output;
+        let mut sessions = sessions.to_vec();
+        for command in commands {
+            match command {
+                Command::SetVolume { id, volume } => {
+                    for session in sessions.iter_mut().filter(|s| &s.id == id) {
+                        session.volume = *volume;
+                    }
+                }
+                Command::SetMuted { id, muted } => {
+                    for session in sessions.iter_mut().filter(|s| &s.id == id) {
+                        session.muted = *muted;
+                    }
+                }
+                Command::SetOutputVolume { volume } => output.volume = *volume,
+                Command::SetOutputMuted { muted } => output.muted = *muted,
+                Command::Action { .. } => {}
+            }
+        }
+        let knobs = std::array::from_fn(|knob| {
+            let label = knob_label(&self.settings.knobs[knob]);
+            match self.targets(knob, &sessions) {
+                None => Knob {
+                    label,
+                    volume: Some(output.volume),
+                    muted: output.muted,
+                },
+                Some(ids) => {
+                    let followed: Vec<&Session> = sessions
+                        .iter()
+                        .filter(|s| ids.contains(&s.id.as_str()))
+                        .collect();
+                    Knob {
+                        label,
+                        volume: followed.iter().map(|s| s.volume).max(),
+                        muted: !followed.is_empty() && followed.iter().all(|s| s.muted),
+                    }
+                }
+            }
+        });
+        Screen {
+            mode: self.settings.display,
+            brightness: self.settings.brightness,
+            knobs,
+        }
+    }
+
     /// A knob press mutes what it follows, or unmutes it when all of it is muted.
     fn press(
         &self,
@@ -200,6 +252,30 @@ impl Engine {
                 }
             }
         }
+    }
+}
+
+/// A knob's name on the screen: its category, the program it follows
+/// without the extension, or `Output`.
+fn knob_label(target: &Target) -> String {
+    match target {
+        Target::Category { category } => match category {
+            Category::Music => "Music",
+            Category::Calls => "Calls",
+            Category::Games => "Games",
+            Category::Browser => "Browser",
+            Category::System => "System",
+            Category::Other => "Other",
+        }
+        .to_owned(),
+        Target::Program { program } => program
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or(program)
+            .trim_end_matches(".exe")
+            .to_owned(),
+        Target::Output => "Output".to_owned(),
+        Target::None => String::new(),
     }
 }
 

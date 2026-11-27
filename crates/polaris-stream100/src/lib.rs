@@ -18,6 +18,8 @@
 //! - [`plugin`]: the same settings as the plugin page's flat fields.
 //! - [`sdk`]: the Hercules SDK's input state, as the same reports.
 //! - [`engine`]: reports in, volume changes and Polaris actions out.
+//! - [`screen`]: what the screen shows (each knob's volume), drawn into
+//!   frames, and the order a session sends them and its keep-alive in.
 //! - [`session`]: the start-up reads and keep-alive of a plain-USB session,
 //!   and the device interface of Polaris' own WinUSB driver package.
 //!
@@ -33,6 +35,7 @@ pub mod manifest;
 pub mod ownership;
 pub mod plugin;
 pub mod report;
+pub mod screen;
 pub mod sdk;
 pub mod session;
 pub mod settings;

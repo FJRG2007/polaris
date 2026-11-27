@@ -48,7 +48,10 @@ calibration (`0x08, 0x01, 0x04, 0x02`) did not hold. It stays a setting
 
 ### Display messages (interface 1)
 
-Every command is inside an `SM` message:
+Every transfer on isochronous OUT `0x01` is one sync packet - `"HERCULES"`
+and 944 zeros - followed by one `SM` message in zero-padded 952-byte packets,
+at most ten packets in all. A message sent without the sync packet is never
+read (this is why the first keep-alive Polaris sent kept nothing alive).
 
 | Offset | Size | Meaning |
 | --- | --- | --- |
@@ -56,53 +59,72 @@ Every command is inside an `SM` message:
 | 2 | 2 | message length, header included, LE |
 | 4 | 2 | checksum, LE |
 | 6 | 2 | sequence number, LE, one per message for the whole session |
-| 8 | .. | commands |
+| 8 | .. | commands, ended by `0x00` (the keep-alive has no end byte) |
 
 Checksum: 16 bits, starting at zero, over every byte except offsets 4 and 5;
 per byte `crc ^= byte`, then eight times `crc = crc & 1 ? (crc >> 1) ^ 0x8005 : crc >> 1`.
-All 192 intact messages in a recording of the official software's
-initialization validate with it (the 32 framebuffer templates in that recording
-have their pixels blanked, so their stored checksums no longer match, as
-expected).
-
-A message longer than 952 bytes continues in the following packets,
-zero-padded.
+It matches every message recorded from the official software (192 in one
+recording of its start-up, and the keep-alive, configuration and
+acknowledgement published by New-Hera-lunx); the firmware drops a message
+whose checksum is wrong before reading it.
 
 | Command | Bytes | Meaning |
 | --- | --- | --- |
-| `0x00` | 1 | keep-alive (a 9-byte message), sent about every 18 ms while idle |
+| `0x00` | 1 | end of the list (alone: an idle heartbeat) |
+| `0x10` | 24 | host description: `10 01`, OS version 4 x u16, SDK version, 12 zeros |
+| `0x11` | `11 00` | host present; with `0x10` it is the official keep-alive, every 500 ms |
+| `0x12` | `12 00 00 00 00` | screen on |
+| `0x13` | `13 00 00 00 00` | screen off |
+| `0x14` | 1 | acknowledges the controller's device-information message |
 | `0x31` | `31 01 00 <0-100>` | backlight brightness |
-| `0x32` | 26 | native mixer panel state (four 6-byte channel records) |
-| `0x33` | `33 00 00 00 00 01 00` + 512 | palette: 256 RGB565 LE entries |
-| `0x34` | 13 | native meter surface |
-| `0x37` | `37 01 <chunk> 00 00 00 00 f0 0f` + 4080 + `00` | framebuffer chunk |
-| `0x38` | 16 | display configuration (layout); sent once, before the palette |
-| `0x14` | .. | batch wrapper used during initialization |
+| `0x33` | `33 00 00 <first> <count u16> 00` + RGB565 LE | palette |
+| `0x37` | `37 01 <tile u32> 00 f0 0f` + 4080 | background tile |
+| `0x38` | 16 | screen configuration; background type `0xff` = the host's own image |
+| `0x35` / `0x36` | .. | the firmware's own 32x32 icons and 110x16 labels (not used) |
+| `0x30`, `0x32`, `0x34`, `0x40`, `0x41` | .. | LEDs, panel and meter settings (not used) |
 
-The image is 8-bit indexed: 480 x 272 = 32 chunks of 4080 pixels, row-major.
-The first image after connecting carries configuration + palette + chunk 0 in
-one 4633-byte message; every later chunk is a 4098-byte message. Re-sending
-configuration and palette on every redraw visibly disturbs the panel.
+The image is 8-bit indexed, 480 x 272, in 32 tiles of 4080 samples. Tile
+`t` holds the pixels at `(8 * column + dx, 4 * row + dy)` (60 columns, 68
+rows) for its `(dx, dy)` in `display::TILE_OFFSETS`, coarse to fine; the
+firmware fills a block around each sample of the early tiles, so the picture
+sharpens tile by tile and the tiles must go in order. The first tile after
+the screen is set up carries screen on, brightness, configuration `0xff` and
+the palette ahead of it (a 4642-byte message); every other tile is a
+4098-byte message. The official software sends one tile every other 20 ms
+slot; Polaris sends one every 40 ms, so a whole page takes about 1.3 s.
 
-On the wire an image goes in cycles of eight packets per chunk: the five
-packets of the chunk message, a packet starting with `HERCULES`, a keep-alive,
-and another `HERCULES` packet.
+The session: the keep-alive (`0x10` + `11 00`) every 250 ms, and a heartbeat
+(`0x00` alone) in any 20 ms slot with nothing else to send - the panel goes
+dark when that cadence stops. While a host is
+present the controller repeats a device-information message in its input
+reports (after the controls block, a lowercase `sm` message of type 1 whose
+bytes sum to zero); the host answers each with `14 00`. A host that does not
+is dropped after a few seconds: the Hercules logo, then a dark screen.
 
-LED state for the four lit buttons is not a separate USB command: it is part
-of the native panel objects drawn over the display (a state 0-2 per button; OpenStream100
-uses 0 for off and 1 for lit).
+Polaris draws its own page (`screen::render`): one column under each knob
+with what it follows, its volume as a number and a bar (red when muted, a
+dash when nothing it follows is playing), on a fixed seven-colour palette so a
+redraw never resends it. A page is redrawn only when it changes; a page that
+changes mid-draw waits for that draw to end; a brightness change alone is one
+`0x31` command; "Off" sends `0x13`. "Call" and "Now playing" show the mixer
+page until the plugin has a call roster and a now-playing source.
+
+`screen::Painter` decides all of it and hands over ready transfers, so every
+transport (WinUSB today, libusb on Linux and macOS) sends the same bytes.
+
+Sources: CataclysmX/New-Hera-lunx `docs/protocol/framing.md`, `commands.md`,
+`usb.md`, `live-tests.md` (read from the firmware's dispatcher and the
+official SDK, checked on a device); cont1nuity/hercules-stream-linux
+`docs/PROTOCOL.md`, `src/sm.py` (the sync packet and the brightness message,
+byte-matched against captures). Facts only; no code was copied.
 
 ### What is not known yet
 
-- **Initialization.** The controller only accepts images after an
-  initialization of 192 packets. OpenStream100 replays a recording of the
-  official software doing it and patches a few fields. That recording is
-  Hercules' traffic, not something Polaris can redistribute, and the meaning
-  of most of it is not documented. Until the sequence is understood command by
-  command, Polaris draws on the display only through the Hercules SDK.
-- **The `HERCULES` framing packets** between chunks are taken verbatim from the
-  same recording; their fields are not decoded.
-- **The `0x38` configuration**: only its first bytes are known.
+- **The firmware's own panel layers** (icons, labels, meters) are composited
+  over the background. Polaris never sends them, so nothing should be drawn
+  over its page; this has not been seen on a device yet.
+- **The `0x38` colours and action-zone style** for a custom background.
+  Polaris sends zeros, as New-Hera-lunx does for its background preview.
 
 ### Other sources checked (2026-11-26)
 
@@ -121,9 +143,9 @@ Read as references only; no code was copied.
     payload packets;
   - the panel is woken with 32 recorded frames, and **heartbeats (op `0x00`)
     go every ~20 ms**: when they stop the panel blanks, and heartbeats alone do
-    not repaint it (there is no framebuffer). Polaris' WinUSB keep-alive is one
-    heartbeat every 250 ms with no sync packet, enough only if input does not
-    depend on it - to be confirmed on a real unit;
+    not repaint it (there is no framebuffer). Polaris follows that cadence
+    (`screen::Painter`), and its first keep-alive, sent with no sync packet,
+    was the reason nothing was ever drawn;
   - op `0x30` sets a channel LED, payload `[channel][state]`, 0 off, 1 on,
     2 blink;
   - an isochronous write to a surprise-removed device aborts the process on
@@ -262,7 +284,7 @@ first run.
 | Input on Windows (feature `native`) | the HID API: the largest input collection of `06f8:e053`, opened read-only and shared, one overlapped read at a time with a timeout. Windows puts the report id first (`0` when the device numbers none) and `report::from_hid_read` brings it back to the USB transfer's bytes. Exercised against another HID device (opens, times out, cancels cleanly); never against the Stream 100, which the Hercules driver holds |
 | Input on Linux | the USB transport (`nusb`); needs the `uaccess` rule for the device, and without it the plugin says the system does not let Polaris open it |
 | Input on macOS | not written (HID manager), so no package is built for macOS |
-| Display transport | not written: `nusb` 0.2 has no isochronous transfers, and initialization is not understood (above). The Hercules SDK does not draw a full image either: its graphic exports (`HSM_PrepareGraphicElement`, `HSM_SetGraphicElement`, `HSM_SetScreenConfiguration`) place its own panel elements, 32x32 icons and 110x16 labels, with undocumented arguments. The plugin's Screen group says Polaris does not draw on the screen yet |
+| Display transport | written (`screen::Painter`, `display`): sync packet, keep-alive, 20 ms heartbeat, acknowledgement, screen setup and the 32 interlaced tiles, tested against recorded messages (`tests/screen.rs`). Sent over WinUSB on Windows; the libusb route on Linux and macOS sends the same transfers. Not yet seen on a device |
 | Per-app audio backends | Windows Core Audio and PulseAudio/PipeWire done; macOS answers unsupported |
 | Desktop binding (`crates/polaris-stream100-node`) | `Controller` (reports in, volume out, actions back) and `Reader` (reads on a worker thread, `await reader.next(500)`) |
 | Device plugin (`clients/device-plugins/hercules-stream100`) | manifest generated from the crate (`cargo run -p polaris-stream100 --example manifest`, a test keeps them equal), entry `any/main.cjs`, native module built per platform by `.github/workflows/device-plugins.yml` (Windows x64, Linux x64). Settings live only on the plugin's page, never in the app's own settings |
@@ -357,7 +379,7 @@ does what the person picked, and `official.ts` answers the page through
 | Buttons: OBS / Streamlabs scenes, Voicemeeter, soundboard, hotkeys | missing |
 | Button toggled / untoggled labels | in the settings model (`PageButton.toggled_label`); not imported (its key not seen yet) |
 | Knob and button colors, LED brightness | missing |
-| Display: mixer, meters, icons, background image | display: only through the Hercules SDK, not built |
+| Display: mixer, meters, icons, background image | the mixer page (each knob's name, volume, mute) drawn by Polaris as the background, with its own driver; the firmware's meters and icons are not used |
 | Broadcast / creator mode | missing |
 | Firmware update | not Polaris's |
 

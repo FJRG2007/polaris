@@ -1,9 +1,8 @@
 //! The plain-USB session: what is sent at start, and the keep-alive.
 
-use polaris_stream100::display::{is_valid, PACKET_SIZE};
 use polaris_stream100::session::{
-    keepalive_due, read_slice, KeepAlive, VendorRead, DEVICE_INTERFACE_GUID,
-    DEVICE_INTERFACE_GUID_U128, FORBIDDEN_REQUESTS, INIT_READS, KEEPALIVE_EVERY,
+    keepalive_due, read_slice, VendorRead, DEVICE_INTERFACE_GUID, DEVICE_INTERFACE_GUID_U128,
+    FORBIDDEN_REQUESTS, INIT_READS, KEEPALIVE_EVERY,
 };
 use std::time::Duration;
 
@@ -36,22 +35,6 @@ fn the_firmware_updater_request_can_never_be_built() {
     };
     assert_eq!(other.setup(), None);
     assert!(INIT_READS.iter().all(|read| read.request != 0xf2));
-}
-
-#[test]
-fn a_keep_alive_is_one_valid_packet_numbered_in_order() {
-    let mut keepalive = KeepAlive::default();
-    let first = keepalive.next_packet();
-    let second = keepalive.next_packet();
-    assert_eq!(first.len(), PACKET_SIZE);
-    assert!(is_valid(&first[..9]));
-    assert_eq!(&first[..2], b"SM");
-    assert_eq!(u16::from_le_bytes([first[2], first[3]]), 9);
-    assert_eq!(first[8], 0x00);
-    assert!(first[9..].iter().all(|byte| *byte == 0));
-    assert_eq!(u16::from_le_bytes([first[6], first[7]]), 0);
-    assert_eq!(u16::from_le_bytes([second[6], second[7]]), 1);
-    assert!(is_valid(&second[..9]));
 }
 
 #[test]

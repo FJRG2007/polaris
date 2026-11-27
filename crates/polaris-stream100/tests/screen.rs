@@ -1,0 +1,426 @@
+//! The screen: the display's initialization and keep-alive bytes against
+//! frames recorded from the official software, the tile layout, the order a
+//! session sends things in, and the page drawn from the knobs.
+
+use polaris_stream100::audio::Session;
+use polaris_stream100::display::{
+    self, IndexedFrame, Sequence, ACK, CHUNK_COUNT, CUSTOM_BACKGROUND, END, HEIGHT, HOST_KEEPALIVE,
+    MAX_TRANSFER_PACKETS, PACKET_SIZE, SCREEN_OFF, SCREEN_ON, TILE_OFFSETS, WIDTH,
+};
+use polaris_stream100::engine::{Command, Engine, Output};
+use polaris_stream100::report::KnobMap;
+use polaris_stream100::screen::{render, Knob, Painter, Screen, TILE_EVERY};
+use polaris_stream100::session::KEEPALIVE_EVERY;
+use polaris_stream100::settings::{DisplayMode, Settings};
+use std::time::{Duration, Instant};
+
+fn hex(text: &str) -> Vec<u8> {
+    (0..text.len())
+        .step_by(2)
+        .map(|at| u8::from_str_radix(&text[at..at + 2], 16).unwrap())
+        .collect()
+}
+
+/// Messages recorded from the official Windows software (CataclysmX/New-Hera-lunx,
+/// `driver/rust/hsm01-proto/src/frame.rs`, frames 311, 2079 and 2049 of its capture):
+/// the keep-alive, the start-up configuration, and an acknowledgement.
+const RECORDED_KEEPALIVE: &str =
+    "534d2200b89a010010010a000000f465c80251010000000000000000000000001100";
+const RECORDED_CONFIG: &str = "534d1e007a7c24001431010064380004ffffffffffffffff04ffffffff00";
+const RECORDED_ACK: &str = "534d0a00ad1a1d001400";
+
+fn sequence_of(message: &[u8]) -> u16 {
+    u16::from_le_bytes([message[6], message[7]])
+}
+
+#[test]
+fn the_recorded_initialization_messages_pass_the_checksum() {
+    for recorded in [RECORDED_KEEPALIVE, RECORDED_CONFIG, RECORDED_ACK] {
+        assert!(display::is_valid(&hex(recorded)), "{recorded}");
+    }
+}
+
+#[test]
+fn the_keep_alive_is_the_recorded_one_byte_for_byte() {
+    let recorded = hex(RECORDED_KEEPALIVE);
+    let mut sequence = Sequence::starting_at(sequence_of(&recorded));
+    assert_eq!(display::message(&HOST_KEEPALIVE, &mut sequence), recorded);
+}
+
+#[test]
+fn the_acknowledgement_is_the_recorded_one_byte_for_byte() {
+    let recorded = hex(RECORDED_ACK);
+    let mut sequence = Sequence::starting_at(sequence_of(&recorded));
+    assert_eq!(display::message(&[ACK, END], &mut sequence), recorded);
+}
+
+#[test]
+fn the_brightness_command_is_the_recorded_one() {
+    let recorded = hex(RECORDED_CONFIG);
+    // ack, brightness 100, configuration, end.
+    assert_eq!(&recorded[9..13], &display::brightness_command(100));
+    assert_eq!(display::brightness_command(250), [0x31, 0x01, 0x00, 100]);
+    let mut sequence = Sequence::default();
+    assert_eq!(display::brightness(80, &mut sequence).len(), 13);
+}
+
+#[test]
+fn the_custom_background_configuration_has_the_recorded_shape() {
+    let recorded = hex(RECORDED_CONFIG);
+    let configuration = &recorded[13..29];
+    assert_eq!(configuration[0], CUSTOM_BACKGROUND[0]);
+    assert_eq!(configuration.len(), CUSTOM_BACKGROUND.len());
+    // Recorded with the Hercules background (type 4); Polaris' own is 0xff.
+    assert_eq!(configuration[2], 0x04);
+    assert_eq!(CUSTOM_BACKGROUND[2], 0xff);
+    assert_eq!(SCREEN_ON, [0x12, 0, 0, 0, 0]);
+    assert_eq!(SCREEN_OFF, [0x13, 0, 0, 0, 0]);
+}
+
+#[test]
+fn a_transfer_starts_with_the_sync_packet() {
+    let mut sequence = Sequence::default();
+    let message = display::message(&HOST_KEEPALIVE, &mut sequence);
+    let transfer = display::transfer(&message).unwrap();
+    assert_eq!(transfer.len(), 2 * PACKET_SIZE);
+    assert_eq!(&transfer[..8], b"HERCULES");
+    assert!(transfer[8..PACKET_SIZE].iter().all(|byte| *byte == 0));
+    assert_eq!(
+        &transfer[PACKET_SIZE..PACKET_SIZE + message.len()],
+        &message[..]
+    );
+    assert!(transfer[PACKET_SIZE + message.len()..]
+        .iter()
+        .all(|byte| *byte == 0));
+    let longest = display::message(&vec![0u8; 9 * PACKET_SIZE - 8], &mut sequence);
+    assert_eq!(
+        display::transfer(&longest).unwrap().len(),
+        MAX_TRANSFER_PACKETS * PACKET_SIZE
+    );
+    let too_long = display::message(&vec![0u8; 9 * PACKET_SIZE], &mut sequence);
+    assert!(display::transfer(&too_long).is_none());
+}
+
+#[test]
+fn every_pixel_is_in_exactly_one_tile() {
+    let mut seen = [0u8; 32];
+    for (dx, dy) in TILE_OFFSETS {
+        seen[usize::from(dy) * 8 + usize::from(dx)] += 1;
+    }
+    assert!(seen.iter().all(|count| *count == 1));
+    assert_eq!(TILE_OFFSETS[0], (0, 0));
+}
+
+#[test]
+fn a_tile_samples_its_offset_across_the_whole_screen() {
+    // Each pixel holds its own offset inside its 8x4 block.
+    let pixels = (0..WIDTH * HEIGHT)
+        .map(|at| ((at % WIDTH) % 8 + 8 * ((at / WIDTH) % 4)) as u8)
+        .collect();
+    let frame = IndexedFrame {
+        palette: [0; 256],
+        pixels,
+    };
+    for (tile, (dx, dy)) in TILE_OFFSETS.iter().enumerate() {
+        let samples = frame.tile(tile);
+        assert_eq!(samples.len(), 4080);
+        let expected = dx + 8 * dy;
+        assert!(samples.iter().all(|sample| *sample == expected), "{tile}");
+    }
+}
+
+fn report_with_message(kind: u8, valid: bool) -> Vec<u8> {
+    let mut report = vec![0u8; 64];
+    report[0] = 12;
+    let mut message = vec![b's', b'm', 10, 0, 7, 0, kind, 0, 0, 0];
+    let sum = message
+        .iter()
+        .fold(0u8, |sum, byte| sum.wrapping_add(*byte));
+    message[9] = 0u8.wrapping_sub(sum).wrapping_add(u8::from(!valid));
+    report[12..22].copy_from_slice(&message);
+    report
+}
+
+#[test]
+fn only_a_device_information_message_asks_for_an_acknowledgement() {
+    assert!(display::asks_for_ack(&report_with_message(1, true)));
+    assert!(!display::asks_for_ack(&report_with_message(2, true)));
+    assert!(!display::asks_for_ack(&report_with_message(1, false)));
+    assert!(!display::asks_for_ack(&[12u8; 11]));
+    assert!(!display::asks_for_ack(&[]));
+    assert!(!display::asks_for_ack(&[200, 0, 0]));
+}
+
+fn knob(label: &str, volume: Option<u8>, muted: bool) -> Knob {
+    Knob {
+        label: label.to_owned(),
+        volume,
+        muted,
+    }
+}
+
+fn page(volume: u8) -> Screen {
+    Screen {
+        mode: DisplayMode::Mixer,
+        brightness: 80,
+        knobs: [
+            knob("Calls", Some(volume), false),
+            knob("Music", Some(100), true),
+            knob("Games", None, false),
+            knob("A very long program name", Some(0), false),
+        ],
+    }
+}
+
+/// The SM message inside a transfer.
+fn message_of(transfer: &[u8]) -> Vec<u8> {
+    assert_eq!(&transfer[..8], b"HERCULES");
+    let message = &transfer[PACKET_SIZE..];
+    let length = usize::from(u16::from_le_bytes([message[2], message[3]]));
+    message[..length].to_vec()
+}
+
+/// Everything the painter sends in `span`, stepping 1 ms at a time.
+fn run(painter: &mut Painter, start: Instant, span: Duration) -> Vec<Vec<u8>> {
+    let mut sent = Vec::new();
+    let mut at = Duration::ZERO;
+    while at <= span {
+        while let Some(transfer) = painter.next(start + at) {
+            assert_eq!(transfer.len() % PACKET_SIZE, 0);
+            assert!(transfer.len() <= MAX_TRANSFER_PACKETS * PACKET_SIZE);
+            let message = message_of(&transfer);
+            assert!(display::is_valid(&message));
+            sent.push(message);
+        }
+        at += Duration::from_millis(1);
+    }
+    sent
+}
+
+fn draws(sent: &[Vec<u8>]) -> Vec<&Vec<u8>> {
+    sent.iter()
+        .filter(|message| {
+            message[8..].windows(2).any(|w| w == [0x37, 0x01]) && message.len() > 4000
+        })
+        .collect()
+}
+
+#[test]
+fn a_session_keeps_alive_on_its_own() {
+    let mut painter = Painter::default();
+    let start = Instant::now();
+    let sent = run(&mut painter, start, Duration::from_millis(1_000));
+    let keepalives = sent
+        .iter()
+        .filter(|message| message[8..] == HOST_KEEPALIVE)
+        .count();
+    let heartbeats = sent.iter().filter(|message| message[8..] == [END]).count();
+    assert_eq!(keepalives + heartbeats, sent.len());
+    assert!((4..=5).contains(&keepalives), "{keepalives}");
+    // Never a quiet 20 ms slot.
+    assert!(sent.len() >= 50, "{}", sent.len());
+    let sequences: Vec<u16> = sent.iter().map(|message| sequence_of(message)).collect();
+    assert!(sequences.windows(2).all(|pair| pair[1] == pair[0] + 1));
+    assert!(KEEPALIVE_EVERY <= Duration::from_millis(500));
+}
+
+#[test]
+fn the_first_page_sets_the_screen_up_then_sends_thirty_two_tiles_in_order() {
+    let mut painter = Painter::default();
+    painter.show(&page(40));
+    let start = Instant::now();
+    let sent = run(&mut painter, start, TILE_EVERY * 40);
+    let tiles = draws(&sent);
+    assert_eq!(tiles.len(), CHUNK_COUNT);
+    let first = &tiles[0][8..];
+    let setup = [
+        &SCREEN_ON[..],
+        &display::brightness_command(80),
+        &CUSTOM_BACKGROUND,
+    ]
+    .concat();
+    assert_eq!(&first[..setup.len()], &setup[..]);
+    // Then the palette, then tile 0.
+    assert_eq!(first[setup.len()], 0x33);
+    // 8 header + 25 setup + 519 palette + 4089 tile + end.
+    assert_eq!(tiles[0].len(), 4642);
+    for (index, tile) in tiles.iter().enumerate().skip(1) {
+        assert_eq!(tile.len(), 4098);
+        assert_eq!(&tile[8..11], &[0x37, 0x01, index as u8]);
+    }
+    // Keep-alives still go out while it draws, all in one sequence.
+    assert!(sent.iter().any(|message| message[8..] == HOST_KEEPALIVE));
+    let sequences: Vec<u16> = sent.iter().map(|message| sequence_of(message)).collect();
+    assert!(sequences.windows(2).all(|pair| pair[1] == pair[0] + 1));
+    assert!(!painter.is_drawing());
+}
+
+#[test]
+fn tiles_are_spaced_so_the_panel_draws_each_one() {
+    let mut painter = Painter::default();
+    painter.show(&page(40));
+    let start = Instant::now();
+    // Within one tile period only the first tile (and a keep-alive) go out.
+    let sent = run(&mut painter, start, TILE_EVERY - Duration::from_millis(1));
+    assert_eq!(draws(&sent).len(), 1);
+    assert!(painter.wait(start + Duration::from_millis(1)) <= TILE_EVERY);
+}
+
+#[test]
+fn an_unchanged_page_costs_nothing_and_a_brightness_change_costs_one_command() {
+    let mut painter = Painter::default();
+    painter.show(&page(40));
+    let start = Instant::now();
+    run(&mut painter, start, TILE_EVERY * 40);
+    painter.show(&page(40));
+    assert!(!painter.is_drawing());
+    let mut brighter = page(40);
+    brighter.brightness = 30;
+    painter.show(&brighter);
+    let later = start + TILE_EVERY * 41;
+    let message = message_of(&painter.next(later).unwrap());
+    assert_eq!(&message[8..], &[0x31, 0x01, 0x00, 30, 0x00]);
+    assert!(!painter.is_drawing());
+}
+
+#[test]
+fn a_new_volume_redraws_without_setting_the_screen_up_again() {
+    let mut painter = Painter::default();
+    painter.show(&page(40));
+    let start = Instant::now();
+    run(&mut painter, start, TILE_EVERY * 40);
+    painter.show(&page(41));
+    let sent = run(&mut painter, start + TILE_EVERY * 41, TILE_EVERY * 40);
+    let tiles = draws(&sent);
+    assert_eq!(tiles.len(), CHUNK_COUNT);
+    assert!(tiles.iter().all(|tile| tile.len() == 4098));
+}
+
+#[test]
+fn a_page_that_comes_in_mid_draw_waits_for_it_to_finish() {
+    let mut painter = Painter::default();
+    painter.show(&page(40));
+    let start = Instant::now();
+    run(&mut painter, start, TILE_EVERY * 3);
+    painter.show(&page(50));
+    painter.show(&page(60));
+    let sent = run(&mut painter, start + TILE_EVERY * 4, TILE_EVERY * 80);
+    // The rest of the first page, then the newest page whole.
+    let tiles = draws(&sent);
+    assert_eq!(tiles.len(), CHUNK_COUNT - 4 + CHUNK_COUNT);
+}
+
+#[test]
+fn off_switches_the_screen_off_and_on_sets_it_up_again() {
+    let mut painter = Painter::default();
+    painter.show(&page(40));
+    let start = Instant::now();
+    run(&mut painter, start, TILE_EVERY * 40);
+    let mut off = page(40);
+    off.mode = DisplayMode::Off;
+    painter.show(&off);
+    let message = message_of(&painter.next(start + TILE_EVERY * 41).unwrap());
+    assert_eq!(&message[8..], &[&SCREEN_OFF[..], &[END]].concat()[..]);
+    painter.show(&page(40));
+    let sent = run(&mut painter, start + TILE_EVERY * 42, TILE_EVERY * 40);
+    let tiles = draws(&sent);
+    assert_eq!(tiles.len(), CHUNK_COUNT);
+    assert_eq!(&tiles[0][8..13], &SCREEN_ON);
+}
+
+#[test]
+fn an_acknowledgement_goes_out_first() {
+    let mut painter = Painter::default();
+    painter.show(&page(40));
+    painter.acknowledge();
+    assert_eq!(painter.wait(Instant::now()), Duration::ZERO);
+    let message = message_of(&painter.next(Instant::now()).unwrap());
+    assert_eq!(&message[8..], &[ACK, END]);
+}
+
+fn pixel(frame: &IndexedFrame, x: usize, y: usize) -> u8 {
+    frame.pixels[y * WIDTH + x]
+}
+
+#[test]
+fn the_page_shows_each_knob_volume_as_a_bar() {
+    let frame = render(&page(50)).unwrap();
+    let background = pixel(&frame, 2, 2);
+    // Knob 1 at 50%: the bar's lower half filled, its upper half empty track.
+    let center = 60;
+    let near_bottom = pixel(&frame, center, 250);
+    let near_top = pixel(&frame, center, 106);
+    assert_ne!(near_bottom, near_top);
+    assert_ne!(near_top, background);
+    // Knob 2 is muted at 100%: filled to the top, in another colour.
+    let muted_top = pixel(&frame, 180, 106);
+    assert_ne!(muted_top, near_top);
+    assert_ne!(muted_top, near_bottom);
+    // Knob 3 follows nothing playing: an empty track.
+    assert_eq!(pixel(&frame, 300, 250), near_top);
+    // Text is drawn under each label row.
+    for column in 0..4 {
+        let row = &frame.pixels[18 * WIDTH + column * 120..18 * WIDTH + column * 120 + 120];
+        let label_rows: Vec<u8> = (18..32)
+            .flat_map(|y| {
+                frame.pixels[y * WIDTH + column * 120..y * WIDTH + column * 120 + 120].to_vec()
+            })
+            .collect();
+        assert!(
+            row.len() == 120 && label_rows.iter().any(|value| *value != background),
+            "{column}"
+        );
+    }
+    // A long name stays inside its column.
+    for y in 18..32 {
+        assert_eq!(pixel(&frame, 361, y), background);
+        assert_eq!(pixel(&frame, 479, y), background);
+    }
+}
+
+#[test]
+fn a_different_volume_draws_a_different_page_and_off_draws_none() {
+    assert_ne!(render(&page(10)), render(&page(90)));
+    assert_eq!(render(&page(10)), render(&page(10)));
+    let mut off = page(10);
+    off.mode = DisplayMode::Off;
+    assert!(render(&off).is_none());
+}
+
+fn session(id: &str, program: &str, volume: u8, muted: bool) -> Session {
+    Session {
+        id: id.to_owned(),
+        program: program.to_owned(),
+        pid: 1,
+        system: false,
+        volume,
+        muted,
+    }
+}
+
+#[test]
+fn the_engine_shows_each_knob_after_this_report_applies() {
+    let engine = Engine::new(Settings::default(), KnobMap::default());
+    let sessions = [
+        session("a", "Discord.exe", 30, false),
+        session("b", "Spotify.exe", 70, true),
+    ];
+    let output = Output {
+        volume: 55,
+        muted: false,
+    };
+    let commands = [
+        Command::SetVolume {
+            id: "a".into(),
+            volume: 32,
+        },
+        Command::SetOutputVolume { volume: 57 },
+    ];
+    let screen = engine.screen(&sessions, output, &commands);
+    assert_eq!(screen.mode, DisplayMode::Mixer);
+    assert_eq!(screen.brightness, 80);
+    assert_eq!(screen.knobs[0], knob("Calls", Some(32), false));
+    assert_eq!(screen.knobs[1], knob("Music", Some(70), true));
+    assert_eq!(screen.knobs[2], knob("Games", None, false));
+    assert_eq!(screen.knobs[3], knob("Output", Some(57), false));
+}

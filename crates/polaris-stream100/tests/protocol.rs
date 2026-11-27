@@ -343,7 +343,8 @@ fn brightness_is_framed_and_capped() {
     let mut sequence = Sequence::default();
     let message = display::brightness(250, &mut sequence);
     assert!(display::is_valid(&message));
-    assert_eq!(&message[8..], &[0x31, 0x01, 0x00, 100]);
+    // Recorded from the official software as `31 01 00 VV` and the list's end.
+    assert_eq!(&message[8..], &[0x31, 0x01, 0x00, 100, 0x00]);
 }
 
 #[test]

@@ -14,6 +14,7 @@ use polaris_stream100::audio::{backend_status, AudioError, AudioSessions, Sessio
 use polaris_stream100::engine::{Command, Engine, Output};
 use polaris_stream100::native::input::Input;
 use polaris_stream100::report::KnobMap;
+use polaris_stream100::screen;
 use polaris_stream100::settings::{schema, Settings};
 use polaris_stream100::transport::TransportError;
 use polaris_stream100::{manifest, native, ownership, plugin};
@@ -123,6 +124,13 @@ impl Controller {
     #[napi(catch_unwind)]
     pub fn set_settings(&mut self, settings: String) {
         self.engine.set_settings(Settings::from_json(&settings));
+        // The screen follows a new mode or brightness without waiting for a
+        // knob; with no audio backend it follows at the next report instead.
+        if let Ok(mixer) = self.mixer() {
+            if let (Ok(sessions), Ok((volume, muted))) = (mixer.sessions(), mixer.output_volume()) {
+                screen::post(self.engine.screen(&sessions, Output { volume, muted }, &[]));
+            }
+        }
     }
 
     /// Program keys of the running games the desktop's game detection found.
@@ -160,6 +168,10 @@ impl Controller {
         let commands = self
             .engine
             .feed(&report, now, &sessions, Output { volume, muted });
+        screen::post(
+            self.engine
+                .screen(&sessions, Output { volume, muted }, &commands),
+        );
         let mixer = self.mixer()?;
         let mut actions = Vec::new();
         for command in commands {

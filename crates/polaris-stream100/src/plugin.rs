@@ -92,11 +92,7 @@ pub fn plugin_groups() -> Value {
         { "key": "knobs", "label": label("Knobs", "Ruedas"), "hint": label("What each knob turns up and down.", "Lo que sube y baja cada rueda."), "look": "dials" },
         { "key": "buttons", "label": label("Lit buttons", "Botones iluminados"), "hint": label("What each button does in a Polaris call.", "Lo que hace cada botón en una llamada de Polaris."), "look": "buttons" },
         { "key": "turning", "label": label("How the knobs turn", "Cómo giran las ruedas"), "look": "rows" },
-        // No route draws on the screen yet: the Hercules SDK exposes only its
-        // own panel elements (32x32 icons, 110x16 labels), and the image
-        // stream needs an initialization nobody has decoded
-        // (docs/devices/hercules-stream100.md, "What is not known yet").
-        { "key": "screen", "label": label("Screen", "Pantalla"), "hint": label("Polaris does not draw on the controller's screen yet. The preview shows what it will show.", "Polaris aún no dibuja en la pantalla del controlador. La vista previa muestra lo que mostrará."), "look": "rows" },
+        { "key": "screen", "label": label("Screen", "Pantalla"), "hint": label("What the controller's screen shows with Polaris' driver.", "Lo que muestra la pantalla del controlador con el driver de Polaris."), "look": "rows" },
     ])
 }
 

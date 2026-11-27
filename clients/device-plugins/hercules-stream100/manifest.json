@@ -46,8 +46,8 @@
         },
         {
             "hint": {
-                "en-US": "Polaris does not draw on the controller's screen yet. The preview shows what it will show.",
-                "es-ES": "Polaris aún no dibuja en la pantalla del controlador. La vista previa muestra lo que mostrará."
+                "en-US": "What the controller's screen shows with Polaris' driver.",
+                "es-ES": "Lo que muestra la pantalla del controlador con el driver de Polaris."
             },
             "key": "screen",
             "label": {
@@ -506,6 +506,6 @@
         }
     ],
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.12",
+    "version": "0.1.13",
     "view": "view/index.html"
 }
