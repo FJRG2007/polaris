@@ -18,7 +18,9 @@
  *
  * Polaris runs /goal itself for every CLI, the way Polar's chat does
  * (`lib/agents/session-goal.ts`), at the start too, plus /memory (the
- * repository's agent memory), /copy and /exit. The full inventory
+ * repository's agent memory), /copy and /exit. /btw is listed so it says why
+ * it cannot run here: the agent's own CLI holds the conversation, and a side
+ * question to it would be a turn of its own (Polar chat answers /btw itself). The full inventory
  * and why each other command is or is not here is in
  * `docs/polar-claude-code-parity.md` (section 8).
  *
@@ -47,6 +49,7 @@ export const CODE_COMMANDS = [
     "plan",
     "simplify",
     "copy",
+    "btw",
     "exit"
 ] as const;
 export type CodeCommand = (typeof CODE_COMMANDS)[number];
@@ -83,6 +86,7 @@ const LOCAL: Record<Exclude<CodeCommand, Forwarded>, readonly CodeCommandPlace[]
     memory: ["thread"],
     goal: ["start", "thread"],
     copy: ["thread"],
+    btw: ["thread"],
     exit: ["thread"]
 };
 

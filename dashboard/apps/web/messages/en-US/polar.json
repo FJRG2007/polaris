@@ -254,7 +254,9 @@
             "help": "Show every command",
             "resume": "Open your chats to pick one up",
             "stop": "Stop the answer on its way",
-            "copy": "Copy Polar's last answer"
+            "copy": "Copy Polar's last answer",
+            "btw": "Ask a side question without interrupting",
+            "recap": "Get a short recap of this chat"
         },
         "code": {
             "help": "Show every command",
@@ -285,7 +287,9 @@
             "copyFailed": "Couldn't copy. Try again.",
             "memory": "See what the agent remembers of this repository",
             "memoryNone": "This session has no repository to remember.",
-            "memoryClose": "Close memory"
+            "memoryClose": "Close memory",
+            "btw": "Ask a side question (in Polar chat)",
+            "btwHere": "Side questions work in Polar chat. Here the agent holds this conversation itself, so a question to it would become a turn of its own."
         }
     },
     "context": {
@@ -2740,5 +2744,46 @@
         "ms": "{ms} ms",
         "seconds": "{seconds} s",
         "untimed": "{count, plural, one {# answer was} other {# answers were}} not timed: earlier, or not a chat reply."
+    },
+    "btw": {
+        "title": "Side question",
+        "copy": "Copy",
+        "clear": "Clear earlier questions",
+        "dismiss": "Close",
+        "older": "{count, plural, one {# older question} other {# older questions}}",
+        "working": "Answering from this chat",
+        "note": "Not added to the chat. No tools: it answers only from what the chat already holds.",
+        "how": "Type your question after /btw.",
+        "noModel": "Pick a model first.",
+        "recap": "Recap of this chat",
+        "errors": {
+            "failed": "Couldn't answer the side question. Try again.",
+            "no_key": "No key can answer with this model. Pick another model.",
+            "unknown_model": "That model is no longer available. Pick another one.",
+            "unsupported_kind": "This model can't answer side questions. Pick another one.",
+            "usage_limit": "You've reached Polar's usage limit for now.",
+            "rate_limited": "Too many side questions at once. Wait a moment.",
+            "invalid": "That question is too long to send."
+        }
+    },
+    "tips": {
+        "label": "Tip: {tip}",
+        "btw": "Use /btw to ask a side question without interrupting Polar",
+        "recap": "Use /recap for a short recap of this chat",
+        "stop": "Use /stop to stop the answer on its way",
+        "goal": "Use /goal to keep Polar working until a condition is met",
+        "compact": "Use /compact to summarize a long chat and free up room",
+        "context": "Use /context to see how full this chat's context is",
+        "branch": "Use /branch to continue from here in a new chat",
+        "temp": "Use /temp for a chat that is not kept in your history",
+        "resume": "Use /resume to pick up one of your earlier chats",
+        "export": "Use /export to download this chat as Markdown",
+        "codePlan": "Use /plan to have the agent plan before it changes anything",
+        "codeDiff": "Use /diff to see the files and changes so far",
+        "codeContext": "Use /context to see how full the agent's context is",
+        "codeGoal": "Use /goal to keep the agent working until a condition holds",
+        "codeStop": "Use /stop to stop the agent's current turn",
+        "codeNew": "Use /new to start another task while this one keeps running",
+        "codeExport": "Use /export to download this session's transcript"
     }
 }

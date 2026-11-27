@@ -86,12 +86,16 @@ import {
     Minimize2,
     SquareSlash,
     Target,
+    MessageCircleQuestion,
+    ScrollText,
     Zap,
     Sparkles,
     RotateCw,
     X
 } from "lucide-react";
 import * as polarGoal from "@/components/polar/polar-goal";
+import * as polarBtw from "@/components/polar/polar-btw";
+import * as btw from "@/lib/polar/btw";
 import * as goals from "@/lib/polar/goals";
 import { PolarThreads } from "@/components/polar/polar-threads";
 import * as toolPrefs from "@/components/polar/tool-prefs";
@@ -124,6 +128,7 @@ import {
 } from "@/components/rich-text/suggestion-list";
 import { Shimmer } from "@/components/polar/elements/shimmer";
 import { BusyVerb } from "@/components/polar/elements/busy-verb";
+import { BusyTip } from "@/components/polar/elements/busy-tip";
 import { Work } from "@/components/polar/elements/work";
 import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useExitPresence } from "@/lib/use-exit-presence";
@@ -740,11 +745,13 @@ const CONTROL_ICONS: Record<Control, SuggestionListItem["icon"]> = {
     resume: History,
     stop: Square,
     copy: Copy,
+    btw: MessageCircleQuestion,
+    recap: ScrollText,
     help: CircleHelp
 };
 /** Control commands that take words after them, so picking one from the list
  *  puts it in the box instead of running it. */
-const TAKES_TEXT = new Set<Control>(["rename", "goal"]);
+const TAKES_TEXT = new Set<Control>(["rename", "goal", "btw"]);
 
 /** One row of the "/" list: a command of Polar's, one that acts on the chat
  *  itself, or one of the person's own. */
@@ -1172,6 +1179,7 @@ export function PolarChat({
     const messagesNow = useRef(0);
     messagesNow.current = chat.messages.length;
     const goalState = polarGoal.usePolarGoal(threadId);
+    const side = polarBtw.useSideQuestions(threadId);
     const conversationRef = useRef(onConversation);
     conversationRef.current = onConversation;
     useEffect(() => {
@@ -2036,6 +2044,27 @@ export function PolarChat({
         sendGoalTurn("set", asked.condition);
     };
 
+    /** `/btw` and `/recap`: a side question answered from the chat so far,
+     *  with no tools, shown in its own panel and never added to the chat. */
+    const askAside = (command: "btw" | "recap", rest: string) => {
+        if (command === "btw" && !rest) {
+            if (side.reopen()) return;
+            setInput("/btw ");
+            textarea.current?.focus();
+            return void toast.show({ title: t("btw.how") });
+        }
+        if (command === "recap" && chat.messages.length === 0) {
+            return void toast.show({ title: t("control.empty") });
+        }
+        if (!choice) return void toast.show({ title: t("btw.noModel") });
+        void side.ask({
+            question: command === "recap" ? btw.POLAR_RECAP_QUESTION : rest,
+            shown: command === "recap" ? t("btw.recap") : undefined,
+            context: btw.btwContext(chat.messages, busy),
+            choice
+        });
+    };
+
     /** What a command that acts on the chat itself does. Never sent as text. */
     const runControl = (command: Control, rest: string) => {
         setInput("");
@@ -2069,6 +2098,8 @@ export function PolarChat({
                 .then(() => toast.show({ title: t("control.copied") }))
                 .catch(() => toast.show({ title: t("control.copyFailed") }));
         }
+        // A side question runs beside the turn on its way, never in it.
+        if (command === "btw" || command === "recap") return askAside(command, rest);
         if (busy || compacting) return void toast.show({ title: t("control.busy") });
         if (chat.messages.length === 0) return void toast.show({ title: t("control.empty") });
         if (command === "compact") return void compact(rest || null, false);
@@ -2611,6 +2642,16 @@ export function PolarChat({
                 onContinue={(text) => void sendSpoken(text)}
                 onChanged={() => void subagentState.reload()}
             />
+            {busy && !inCall ? <BusyTip surface="chat" className="mb-1 px-1" /> : null}
+            {side.open && side.current && !inCall ? (
+                <polarBtw.PolarSideQuestion
+                    earlier={side.earlier}
+                    current={side.current}
+                    onDismiss={side.dismiss}
+                    onClearEarlier={side.clearEarlier}
+                    onCopied={(ok) => toast.show({ title: t(ok ? "control.copied" : "control.copyFailed") })}
+                />
+            ) : null}
             {goalState.goal && !inCall ? (
                 <polarGoal.PolarGoalBar
                     goal={goalState.goal}

@@ -605,7 +605,9 @@ export type BuiltinCommand = (typeof POLAR_BUILTIN_COMMANDS)[number];
  * /goal included (it sends its condition as the turn that starts it),
  * never reach the model as text, and no command of a person's can take their
  * name. /resume opens the history, /stop stops the answer on its way and
- * /copy copies the last answer, as Claude Code's do. Left out of its list:
+ * /copy copies the last answer, as Claude Code's do. /btw asks a side
+ * question and /recap asks for a short recap, both answered beside the chat
+ * (`btw.ts`) without entering it, even while an answer is on its way. Left out of its list:
  * /init and /rewind (a chat has no project files to set up or restore), and
  * /cost, which is /usage there too.
  */
@@ -623,6 +625,8 @@ export const POLAR_CONTROL_COMMANDS = [
     "resume",
     "stop",
     "copy",
+    "btw",
+    "recap",
     "help"
 ] as const;
 export type ControlCommand = (typeof POLAR_CONTROL_COMMANDS)[number];

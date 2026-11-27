@@ -482,8 +482,8 @@ Polar's skills and the person's own "/" commands, so they are not listed one by 
 | /branch [name], /fork [prompt] | Branch the conversation | Built (/branch) | Continue on an ended session | Not built for a running session: the CLI forks into its own background session Polaris does not track |
 | /memory | Edit CLAUDE.md, auto memory | Built | Built | Opens the session repository's agent memory (`AgentRepoMemory`, the same section as the repository dialog): what is kept and Clear; the CLI's editor is a picker and is never typed |
 | /rewind | Restore an earlier point | Not built | Not built | Picker in the terminal; checkpoints live in the CLI |
-| /btw [question] | Side question outside the conversation | n/a | Not built | Overlay in the terminal; ask Polar Chat beside the session instead |
-| /recap | One-line session summary | n/a | Not built | Printed in the terminal, never in the transcript Polaris reads |
+| /btw [question] | Side question outside the conversation | Built (`btw.ts`, 2026-11-27) | Says why not | Chat: the chat's model, no tools, the context the screen holds (mid-turn: the tool results so far, not the words still being written), shown in a dismissible panel, never stored; newest 20 earlier exchanges replayed. Code: the CLI holds the conversation, so a side question would be a turn of its own; the command says so |
+| /recap | One-line session summary | Built (2026-11-27) | Not built | Chat: a side question Polar asks itself, in the /btw panel. Code: printed in the terminal, never in the transcript Polaris reads |
 | /agents, /list-agents, /tasks, /subtask | Subagents and background work | n/a | Not built | Owned elsewhere (subagent tree) |
 | /mcp, /hooks, /skills, /plugin, /reload-*, /config, /status, /output-style | Configure the CLI | Polaris settings | Not applicable | Polaris writes the session's MCP config, hooks and skills at boot (`session-runtime.ts`); the dialogs are pickers |
 | /add-dir, /cd | Working directories | n/a | Not applicable | One checkout per session container |
