@@ -308,8 +308,11 @@ impl MainSettingsPageView {
             Box::new(AccountWidget::default()),
             Box::new(DividerWidget {}),
         ];
+        // Absent only where the app was started without it (tests, headless modes).
         #[cfg(feature = "local_fs")]
-        widgets.push(Box::new(PolarisAccountWidget::default()));
+        if ctx.has_singleton_model::<PolarisSignIn>() {
+            widgets.push(Box::new(PolarisAccountWidget::default()));
+        }
 
         widgets.push(Box::new(SettingsSyncWidget::default()));
 
@@ -362,6 +365,9 @@ impl MainSettingsPageView {
             editor.set_placeholder_text("polaris.example.com", ctx);
             editor
         });
+        if !ctx.has_singleton_model::<PolarisSignIn>() {
+            return input;
+        }
         if let Some(account) = PolarisSignIn::account(ctx) {
             input.update(ctx, |editor, ctx| {
                 editor.set_buffer_text(&account.origin, ctx)
