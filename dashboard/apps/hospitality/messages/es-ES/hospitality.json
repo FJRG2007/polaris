@@ -291,5 +291,12 @@
         "unlinkTitle": "Desvincular {name}?",
         "unlinkHint": "Deja de funcionar al momento y necesitara un codigo nuevo para volver a vincularse.",
         "cancel": "Cancelar"
+    },
+    "link": {
+        "title": "Vincular equipo",
+        "hint": "En la pestana Equipos de Hosteleria, escribe este codigo. La pantalla se abre en cuanto quede vinculado.",
+        "code": "Codigo",
+        "failed": "No se pudo pedir un codigo al servidor.",
+        "retry": "Reintentar"
     }
 }

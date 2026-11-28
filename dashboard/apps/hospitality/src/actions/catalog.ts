@@ -26,7 +26,11 @@ const venueQuery = z.object({ venueId: z.string().uuid().nullable() });
 export async function readMenuAction(raw: unknown): Promise<Outcome<{ menu: catalog.MenuView }>> {
     const input = venueQuery.safeParse(raw);
     if (!input.success) return invalid();
-    return outcome("hospitality.use", async (user) => (ownVenue(user, input.data.venueId), { menu: await catalog.readMenu(input.data.venueId) }));
+    return outcome("hospitality.use", async (user) => {
+        const venueId = user.device ? (input.data.venueId ?? user.venueId ?? null) : input.data.venueId;
+        if (user.device) ownVenue(user, venueId);
+        return { menu: await catalog.readMenu(venueId) };
+    });
 }
 
 export async function saveVenueAction(raw: unknown): Promise<Outcome<{ id: string }>> {

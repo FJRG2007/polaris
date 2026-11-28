@@ -31,7 +31,7 @@ export async function outcome<T extends object>(
     work: (user: Actor) => Promise<T>
 ): Promise<Outcome<T>> {
     try {
-        return { ok: true, ...(await work(await principal(permission))) };
+        return { ok: true, ...(await work(await actorFor(permission))) };
     } catch (caught) {
         if (caught instanceof HospitalityRefusal) {
             return { ok: false, error: (await hospitalityT())(caught.key) };
@@ -47,7 +47,7 @@ export async function outcome<T extends object>(
  * orders and payments for its venue and nothing else: never a manage action,
  * never another app, never the session of whoever linked it.
  */
-async function principal(permission: HospitalityPermission): Promise<Actor> {
+export async function actorFor(permission: HospitalityPermission): Promise<Actor> {
     if (permission === "hospitality.use") {
         const token = (await cookies()).get(DEVICE_COOKIE)?.value;
         const device = token ? await deviceFromToken(token) : null;

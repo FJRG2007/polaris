@@ -291,5 +291,12 @@
         "unlinkTitle": "Unlink {name}?",
         "unlinkHint": "It stops working at once and needs a new code to be linked again.",
         "cancel": "Cancel"
+    },
+    "link": {
+        "title": "Link this device",
+        "hint": "On the Devices tab of Hospitality, type this code. This screen opens the work as soon as it is linked.",
+        "code": "Link code",
+        "failed": "Could not get a code from the server.",
+        "retry": "Try again"
     }
 }

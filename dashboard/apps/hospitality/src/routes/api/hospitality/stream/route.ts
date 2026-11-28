@@ -6,7 +6,7 @@
  * no internet in the path.
  */
 
-import { host } from "@polaris/app-host";
+import { actorFor } from "../../../../lib/outcome";
 import { subscribeHospitalityChanges, type HospitalityChange } from "../../../../lib/live";
 
 /** A burst of changes (a whole order sent at once) is one wake-up. */
@@ -16,12 +16,15 @@ const HEARTBEAT_MS = 25_000;
 
 export async function GET(request: Request): Promise<Response> {
     let userId: string;
+    let venueId = new URL(request.url).searchParams.get("venue");
     try {
-        userId = (await host.session.requirePermission("hospitality.use")).id;
+        const actor = await actorFor("hospitality.use");
+        userId = actor.id;
+        // A linked device hears its own venue, whatever it asks for.
+        if (actor.device) venueId = actor.venueId ?? null;
     } catch {
         return new Response(null, { status: 401 });
     }
-    const venueId = new URL(request.url).searchParams.get("venue");
     const encoder = new TextEncoder();
     let unsubscribe: (() => void) | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
