@@ -233,3 +233,42 @@ condition on `difference`), and `hospitality.product-availability`
 (`setAvailability`). "Table waiting longer than X" has no event in the code
 yet and is left out. The hospitality code does not emit them yet: that needs the
 emit service above and a change in the hospitality app itself.
+
+## Every host surface: manifest or not yet
+
+The rule above holds for every place the host lists something per app, not only
+the ones already done. "Bundle" means the app's own bundle supplies it at
+runtime through `AppExtension` (`apps/web/src/lib/app-extensions/types.ts`):
+it already reaches an install without a Polaris update, but it is code, not a
+declared field, so the host cannot check its shape or gate it on a permission
+before the bundle loads. "Manifest" means a catalogue field, parsed by
+`runtime-catalog-schema.ts` and registered under the app's id and permissions.
+
+| Surface | Manifest field | State |
+| --- | --- | --- |
+| Permissions (roles editor, server checks) | `permissionDefs` | manifest |
+| Rail entry | `nav` (`category`, `permission`) | manifest |
+| Settings page | `settingsAt` | manifest |
+| Overview cards | bundle `overviewWidgets` (`permission`: own id) | bundle, gated |
+| Notification kinds | `notificationKinds` | manifest |
+| Automation trigger events | `events` (+ `permission`) | manifest, offered in the picker |
+| Automation steps | `automationSteps` | manifest |
+| Automation nodes with their own settings UI | bundle `automationNodes` / slots | bundle |
+| MCP tools | bundle `mcpTools` (scope from the scope table, labels `mcpToolLabels`) | bundle; to do: manifest `mcpTools` with typed input/output schema, run through the host under the caller's permissions |
+| MCP search providers | bundle `mcpSearch` | bundle; to do: manifest |
+| MCP resources and prompts | none | missing |
+| Polar agent tools and connectors | none found per app (Polar reaches apps through the MCP list) | to check |
+| Launcher / global search results | bundle `searchRecords`, `favorites` | bundle; to do: manifest launcher commands ("open table X") |
+| Deck (Stream Deck) actions | bundle `deckActions` | bundle |
+| Chat slash commands (`/app ...`) and message components | bundle `answerChatCommand` | bundle; to do: manifest command list with typed arguments |
+| Deep links, `polaris://` routes | `lib/open-in-app.ts`, `lib/desktop-bridge.ts` | to check: per-app routes hard-coded? |
+| Context menus, quick actions | `lib/context-menu/` | to check |
+| Share targets | none found | missing |
+| Whole-Polaris export/import sections | `lib/backups/sources/*` (built-in), bundle `backupSources` | bundle; to do: manifest declaration |
+| Audit event types | `audit-service.ts` | to check |
+| API key scopes | `api-key-scopes.ts` `SCOPE_LABELS: Record<Permission, ...>` (built-in only) | to do: an app's `permissionDefs` as scopes |
+| i18n catalogs | the app's own (`apps/<id>/src/lib/i18n.ts`), manifest words localized per field | manifest for declared words; bundle for screens |
+| TV / phone surfaces | not inventoried | to check |
+
+"To check" rows were found by name only and not yet read; each needs the file
+read before it can be called hard-coded or not.
