@@ -176,6 +176,7 @@
         "closed": "Ese pedido ya está cerrado.",
         "soldOut": "Hay algo agotado en él.",
         "modifiers": "Elige las opciones que necesita.",
+        "paidBeforeClose": "Parte de esta mesa se cobro antes del cierre de caja y no puede unirse a otra cuenta. Mueve solo lo que falta por cobrar.",
         "changed": "Otro dispositivo acaba de cambiar esta mesa. Ya esta al dia: revisala y vuelve a intentarlo.",
         "undoExpired": "Eso ya no se puede deshacer.",
         "removed": "{name} quitado",

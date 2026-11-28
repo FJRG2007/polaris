@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
     robots: { index: false, follow: false },
+    manifest: "/hospitality-link/manifest.webmanifest",
     // Added to the home screen, it opens full screen, like an app.
     appleWebApp: { capable: true, statusBarStyle: "black-translucent" }
 };

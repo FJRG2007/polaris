@@ -228,6 +228,13 @@ function createOrder(input: OpenOrderInput, actor: Actor) {
     });
 }
 
+async function paidInClosedShift(orderId: string): Promise<boolean> {
+    const payments = await prisma.hospitalityPayment.findMany({ where: { orderId, shiftId: { not: null } }, select: { shiftId: true } });
+    const shifts = [...new Set(payments.flatMap((p) => (p.shiftId ? [p.shiftId] : [])))];
+    if (shifts.length === 0) return false;
+    return (await prisma.hospitalityShift.count({ where: { id: { in: shifts }, closedAt: { not: null } } })) > 0;
+}
+
 async function liveOrder(orderId: string, actor: Actor) {
     const order = await prisma.hospitalityOrder.findUnique({
         where: { id: orderId },
@@ -419,6 +426,10 @@ export async function moveOrder(orderId: string, tableId: string, actor: Actor, 
         where: { tableId, status: { in: LIVE }, id: { not: orderId } },
         select: { id: true }
     });
+    // A payment taken before the till was closed stays with the shift that counted it
+    // (a closed Z never changes), so a part-paid order cannot be merged into another.
+    // Moving only the unpaid items is the way forward, and the sentence says so.
+    if (target && (await paidInClosedShift(orderId))) throw new HospitalityRefusal("orders.paidBeforeClose");
     await prisma.$transaction(async (tx) => {
         await touchOrder(tx, orderId, actor, seen);
         if (target) {

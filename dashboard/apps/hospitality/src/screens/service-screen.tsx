@@ -16,7 +16,7 @@ import { useMoney } from "./menu-screen";
 import { DiscountDialog, PayDialog } from "./till-screen";
 import { LineDialog, MoveDialog } from "./order-dialogs";
 import { chooseModifiers } from "../model/modifiers";
-import { repeatRound } from "../model/rounds";
+import { mostSoldFirst, repeatRound } from "../model/rounds";
 import { markBilledAction } from "../actions/till";
 import { lineTotal, orderTotals } from "../model/pricing";
 import { TABLE_SHAPES } from "../model/order-schemas";
@@ -332,7 +332,7 @@ function OrderPanel(props: {
     const [moving, setMoving] = useState(false);
     /** The product whose options are being picked, and the draft it edits (null: a new one). */
     const [picking, setPicking] = useState<{ product: ProductView; draft: Draft | null } | null>(null);
-    const products = props.menu.products.filter((p) => p.categoryId === category);
+    const products = mostSoldFirst(props.menu.products.filter((p) => p.categoryId === category));
     const sent = props.order?.lines.filter((l) => l.status !== "void") ?? [];
     const preview = orderTotals([
         ...sent,

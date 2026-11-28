@@ -177,6 +177,7 @@
         "soldOut": "Something on it is sold out.",
         "modifiers": "Pick the options this one needs.",
         "tableBusy": "A table you removed still has an open order.",
+        "paidBeforeClose": "Part of this table was paid before the till was closed, so it cannot join another order. Move only the unpaid items instead.",
         "changed": "Another device changed this table just now. It is up to date: check it and try again.",
         "undoExpired": "That can no longer be undone.",
         "removed": "{name} removed",

@@ -58,3 +58,15 @@ export function repeatRound<P extends Orderable>(lines: readonly FiredLine[], pr
     }
     return { lines: out, missing };
 }
+
+/**
+ * The buttons of a category with the venue's best sellers first, so the usual
+ * order is the first tap. Ties (and a new venue with no sales) keep the menu's
+ * own order, so the grid does not reshuffle for nothing.
+ */
+export function mostSoldFirst<P extends { readonly sold: number }>(products: readonly P[]): P[] {
+    return products
+        .map((product, index) => ({ product, index }))
+        .sort((a, b) => b.product.sold - a.product.sold || a.index - b.index)
+        .map((x) => x.product);
+}

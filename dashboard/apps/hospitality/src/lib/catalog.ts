@@ -48,6 +48,25 @@ export interface ProductView {
     readonly modifiers: ModifierGroup[];
     /** False when the menu or this venue has it off ("86"). */
     readonly available: boolean;
+    /** Units this venue sold in the last 30 days: service puts the best sellers first. */
+    readonly sold: number;
+}
+
+const SALES_WINDOW_MS = 30 * 24 * 60 * 60_000;
+
+/** Units sold per product at a venue over the last 30 days, from paid orders, in one grouped query. */
+async function salesOf(venueId: string): Promise<Map<string, number>> {
+    const rows = await prisma.hospitalityOrderLine.groupBy({
+        by: ["productId"],
+        where: {
+            productId: { not: null },
+            status: { not: "void" },
+            // Bounded through the order: paid at this venue within the window.
+            order: { venueId, status: "paid", closedAt: { gte: new Date(Date.now() - SALES_WINDOW_MS) } }
+        },
+        _sum: { quantity: true }
+    });
+    return new Map(rows.flatMap((r) => (r.productId ? [[r.productId, r._sum.quantity ?? 0] as const] : [])));
 }
 
 export interface MenuView {
@@ -90,9 +109,9 @@ export async function readMenu(venueId: string | null): Promise<MenuView> {
         })
     ]);
     const venue = venues.find((v) => v.id === venueId) ?? venues[0] ?? null;
-    const overrides = venue
-        ? await prisma.hospitalityPriceOverride.findMany({ where: { venueId: venue.id } })
-        : [];
+    const [overrides, sales] = venue
+        ? await Promise.all([prisma.hospitalityPriceOverride.findMany({ where: { venueId: venue.id } }), salesOf(venue.id)])
+        : [[], new Map<string, number>()];
     const byProduct = new Map(overrides.map((o) => [o.productId, o]));
     return {
         venues,
@@ -101,6 +120,7 @@ export async function readMenu(venueId: string | null): Promise<MenuView> {
         products: products.map((p) => {
             const own = byProduct.get(p.id);
             return {
+                sold: sales.get(p.id) ?? 0,
                 id: p.id,
                 categoryId: p.categoryId,
                 name: p.name,

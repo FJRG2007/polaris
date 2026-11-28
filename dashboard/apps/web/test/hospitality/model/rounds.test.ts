@@ -41,3 +41,17 @@ describe("hospitality repeat round", () => {
         expect(round.lines).toEqual([{ product: beer, quantity: 3, course: 0, note: "", modifierIds: ["o-lemon"] }]);
     });
 });
+
+describe("hospitality most sold first", () => {
+    it("puts best sellers first and keeps the menu order on ties", async () => {
+        const { mostSoldFirst } = await import("@polaris-app/hospitality/src/model/rounds");
+        const menu = [
+            { id: "a", sold: 0 },
+            { id: "b", sold: 5 },
+            { id: "c", sold: 0 },
+            { id: "d", sold: 9 }
+        ];
+        expect(mostSoldFirst(menu).map((p) => p.id)).toEqual(["d", "b", "a", "c"]);
+        expect(mostSoldFirst(menu.map((p) => ({ ...p, sold: 0 }))).map((p) => p.id)).toEqual(["a", "b", "c", "d"]);
+    });
+});
