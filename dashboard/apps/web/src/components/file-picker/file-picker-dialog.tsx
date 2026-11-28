@@ -17,7 +17,10 @@
 
 import type { PickedFile } from "./picked-file";
 import { DropZone } from "@/components/drop-zone";
+import { moveFocus } from "./grid-keys";
 import { CameraCapture } from "./camera-capture";
+import { WebImageSearch } from "./web-image-search";
+import { webImageTypes } from "./web-image-types";
 import { cameraAvailable, cameraKinds } from "./camera-kinds";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { GridIcon, type TileEntry } from "@/app/(app)/drive/grid-icon";
@@ -37,6 +40,7 @@ import {
     Clock,
     File as FileIcon,
     Folder,
+    Globe,
     HardDrive,
     Link2,
     Loader2,
@@ -46,7 +50,7 @@ import {
 } from "lucide-react";
 
 /** Where the dialog is looking. */
-export type FilePickerTab = "recent" | "mine" | "shared" | "upload" | "camera" | "url";
+export type FilePickerTab = "recent" | "mine" | "shared" | "upload" | "camera" | "web" | "url";
 
 /** Each is named as `files.tabs.<id>`. */
 const TABS: readonly { id: FilePickerTab; icon: typeof Clock }[] = [
@@ -55,6 +59,7 @@ const TABS: readonly { id: FilePickerTab; icon: typeof Clock }[] = [
     { id: "shared", icon: Users },
     { id: "upload", icon: Upload },
     { id: "camera", icon: Camera },
+    { id: "web", icon: Globe },
     { id: "url", icon: Link2 }
 ];
 
@@ -78,14 +83,6 @@ interface Source {
 /** The layouts the picker offers. Drive's photo view is for looking through a
  *  folder of pictures, not for choosing one. */
 const VIEWS: readonly DriveViewMode[] = ["list", "grid"];
-
-/** Columns in a grid, counted from where its tiles wrap. */
-function columnsOf(list: HTMLElement | null): number {
-    const tiles = list ? [...list.children] : [];
-    const top = (tiles[0] as HTMLElement | undefined)?.offsetTop;
-    const first = tiles.findIndex((one) => (one as HTMLElement).offsetTop !== top);
-    return Math.max(1, first < 0 ? tiles.length : first);
-}
 
 /** The kinds worth filtering by. Named for what somebody is looking for rather
  *  than for a MIME type, which is not a thing anybody thinks in. */
@@ -164,6 +161,9 @@ export function FilePickerDialog({
     // only on a device that has one; until that is known the tab stays hidden.
     const kinds = useMemo(() => cameraKinds(accept, storageOnly), [accept, storageOnly]);
     const [camera, setCamera] = useState<{ phone: boolean } | null>(null);
+    // Searching the web is offered to every screen that takes images it can
+    // hand back: a PNG, JPEG, WebP or GIF.
+    const webTypes = useMemo(() => webImageTypes(accept, storageOnly), [accept, storageOnly]);
     useEffect(() => {
         if (!kinds.photo && !kinds.video) return;
         let gone = false;
@@ -258,21 +258,7 @@ export function FilePickerDialog({
     /** Arrow keys move between entries: one at a time in the list, by row and
      *  column in the grid. Enter and Space press the focused one as usual. */
     function onEntryKeys(event: React.KeyboardEvent<HTMLUListElement>): void {
-        const across = columnsOf(listing.current);
-        const steps: Record<string, number> =
-            view === "grid"
-                ? { ArrowRight: 1, ArrowLeft: -1, ArrowDown: across, ArrowUp: -across }
-                : { ArrowDown: 1, ArrowUp: -1 };
-        const step = steps[event.key];
-        if (!step) return;
-        const buttons = [
-            ...(listing.current?.querySelectorAll<HTMLButtonElement>("[data-picker-entry]") ?? [])
-        ];
-        const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
-        const next = buttons[at < 0 ? 0 : Math.min(buttons.length - 1, Math.max(0, at + step))];
-        if (!next) return;
-        event.preventDefault();
-        next.focus();
+        moveFocus(event, listing.current, "[data-picker-entry]", view === "grid");
     }
 
     /** Whether one name is something the screen asked for. Nothing when it asked
@@ -359,7 +345,8 @@ export function FilePickerDialog({
                                 (entry) =>
                                     (!storageOnly ||
                                         (entry.id !== "upload" && entry.id !== "url")) &&
-                                    (entry.id !== "camera" || camera !== null)
+                                    (entry.id !== "camera" || camera !== null) &&
+                                    (entry.id !== "web" || webTypes.length > 0)
                             ).map((entry) => (
                                 <button
                                     key={entry.id}
@@ -624,6 +611,16 @@ export function FilePickerDialog({
                                     kinds={kinds}
                                     phone={camera.phone}
                                     onFiles={(files) => fromComputer(files)}
+                                />
+                            ) : tab === "web" && webTypes.length > 0 ? (
+                                <WebImageSearch
+                                    types={webTypes}
+                                    multiple={multiple}
+                                    onPick={(picks) => {
+                                        onPick(picks);
+                                        onClose();
+                                    }}
+                                    onCancel={onClose}
                                 />
                             ) : (
                                 <div className="m-3 flex-1">

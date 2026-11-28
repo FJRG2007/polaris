@@ -535,6 +535,7 @@
             "shared": "Shared with me",
             "upload": "Upload",
             "camera": "Camera",
+            "web": "Search the web",
             "url": "By address"
         },
         "kinds": {
@@ -578,6 +579,25 @@
             "starting": "Starting the camera",
             "denied": "The camera is blocked. Allow it in the browser to use it here.",
             "failed": "That could not be captured. Try again."
+        },
+        "web": {
+            "search": "Search for images",
+            "safe": "SafeSearch",
+            "results": "Images found on the web",
+            "result": "{title}, {license}",
+            "untitled": "Untitled image",
+            "by": "by {creator}",
+            "start": "Search openly licensed images",
+            "startHint": "Polaris fetches every image, so the sites they come from never see you.",
+            "none": "No images match \"{query}\"",
+            "noneHint": "Try other words, or fewer of them.",
+            "failed": "Image search is not answering",
+            "busy": "Too many searches for now",
+            "failedHint": "Try again in a moment.",
+            "retry": "Try again",
+            "fetching": "Fetching the image",
+            "fetchFailed": "That image could not be fetched. Choose another one.",
+            "wrongType": "This screen cannot take that kind of image. Choose another one."
         }
     },
     "transfers": {

@@ -9,9 +9,14 @@
  * pulling a client component in behind it.
  */
 
+import type { WebImageCredit } from "@/lib/web-images/shape";
+
 export type PickedFile =
-    /** Off the machine the reader is sitting at. The bytes are in the browser. */
-    | { readonly kind: "upload"; readonly file: File }
+    /** Off the machine the reader is sitting at, or an image found on the web
+     *  and fetched by this server. The bytes are in the browser either way.
+     *  `credit` is who made a web image and on what license, for a screen that
+     *  keeps it with the file. */
+    | { readonly kind: "upload"; readonly file: File; readonly credit?: WebImageCredit }
     /** Already on a storage Polaris can reach. Nothing has moved yet: what
      *  travels is where it is, and whoever asked decides what to do with it. */
     | {

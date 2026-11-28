@@ -535,6 +535,7 @@
             "shared": "Compartido conmigo",
             "upload": "Subir",
             "camera": "Cámara",
+            "web": "Buscar en la web",
             "url": "Por dirección"
         },
         "kinds": {
@@ -578,6 +579,25 @@
             "starting": "Iniciando la cámara",
             "denied": "La cámara está bloqueada. Permítela en el navegador para usarla aquí.",
             "failed": "No se pudo capturar. Vuelve a intentarlo."
+        },
+        "web": {
+            "search": "Buscar imágenes",
+            "safe": "SafeSearch",
+            "results": "Imágenes de la web",
+            "result": "{title}, {license}",
+            "untitled": "Imagen sin título",
+            "by": "de {creator}",
+            "start": "Busca imágenes de licencia abierta",
+            "startHint": "Polaris trae cada imagen, así los sitios de origen nunca te ven.",
+            "none": "Ninguna imagen coincide con \"{query}\"",
+            "noneHint": "Prueba otras palabras, o menos.",
+            "failed": "La búsqueda de imágenes no responde",
+            "busy": "Demasiadas búsquedas por ahora",
+            "failedHint": "Vuelve a probar en un momento.",
+            "retry": "Reintentar",
+            "fetching": "Trayendo la imagen",
+            "fetchFailed": "No se pudo traer esa imagen. Elige otra.",
+            "wrongType": "Esta pantalla no admite ese tipo de imagen. Elige otra."
         }
     },
     "transfers": {
