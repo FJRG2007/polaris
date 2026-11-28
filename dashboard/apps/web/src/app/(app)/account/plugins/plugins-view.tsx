@@ -144,7 +144,7 @@ function OfferButton({ offer, href, onInstall, size = "sm" }: { offer: PluginOff
             );
         case "installed":
             return (
-                <Button asChild size={size} variant="secondary">
+                <Button asChild size={size}>
                     <Link href={href}>{say(t, "card.open")}</Link>
                 </Button>
             );

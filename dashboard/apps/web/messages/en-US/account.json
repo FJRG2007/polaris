@@ -2532,7 +2532,7 @@
         "card": {
             "install": "Install",
             "update": "Update to {version}",
-            "open": "Configure",
+            "open": "Open",
             "installing": "Installing {percent}%",
             "preparing": "Installing",
             "updating": "Updating",
