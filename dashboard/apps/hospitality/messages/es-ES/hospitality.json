@@ -218,7 +218,7 @@
         "sales": "Ventas",
         "discounts": "Descuentos",
         "tips": "Propinas",
-        "tax": "IVA {rate} %",
+        "tax": "IVA {rate}",
         "noShift": "Abre antes la caja.",
         "shiftOpen": "La caja ya está abierta.",
         "overpaid": "Es más de lo que queda."

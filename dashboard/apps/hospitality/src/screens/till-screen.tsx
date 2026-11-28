@@ -19,6 +19,7 @@ import type { OrderView } from "../lib/orders";
 import { useOfflineQueue, type OfflineQueue } from "./offline";
 import { changeDue, itemsDue, lineTotal, quickTenders, splitEvenly } from "../model/pricing";
 import { readCache, unwrap, useHospitalityT } from "./i18n";
+import { useHospitalityFormat } from "./format";
 import { LoadFailed, NoVenue } from "./states";
 import { Banknote, CreditCard, Minus, Percent, Plus } from "lucide-react";
 import { closeShiftAction, openShiftAction, payAction, readTillScreenAction, setDiscountAction } from "../actions/till";
@@ -161,6 +162,7 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 
 function Report({ report, money, hideExpected }: { report: NonNullable<Till>["report"]; money: (c: number) => string; hideExpected?: boolean }) {
     const t = useHospitalityT();
+    const format = useHospitalityFormat();
     return (
         <div className="flex flex-col gap-1 text-sm">
             <Row label={t("till.orders")} value={String(report.orders)} />
@@ -173,7 +175,7 @@ function Report({ report, money, hideExpected }: { report: NonNullable<Till>["re
             <Row label={t("till.in")} value={money(report.cashIn)} />
             <Row label={t("till.out")} value={money(report.cashOut)} />
             {report.taxes.map((x) => (
-                <Row key={x.rateBp} label={t("till.tax", { rate: x.rateBp / 100 })} value={money(x.amount)} />
+                <Row key={x.rateBp} label={t("till.tax", { rate: format.rate(x.rateBp) })} value={money(x.amount)} />
             ))}
             {hideExpected ? null : <Row label={t("till.expected")} value={money(report.expected)} />}
         </div>
@@ -192,6 +194,7 @@ type PayMode = "whole" | "items" | "even";
 export function PayDialog(props: { order: OrderView; currency: string; queue: OfflineQueue; onClose: () => void; onPaid: (ticketNo: string | null) => void; }) {
     const t = useHospitalityT();
     const toast = useToast();
+    const format = useHospitalityFormat();
     const money = useMoney(props.currency);
     const left = Math.max(0, props.order.totals.total - props.order.paid);
     const live = props.order.lines.filter((l) => l.status !== "void");
@@ -320,7 +323,7 @@ export function PayDialog(props: { order: OrderView; currency: string; queue: Of
                         </Button>
                         {TIP_PERCENTS.map((p) => (
                             <Button className={TOUCH} key={p} size="sm" variant={tipPercent === p ? "primary" : "outline"} onClick={() => { setTipPercent(p); setTipTyped(""); }}>
-                                {p} %
+                                {format.rate(p * 100)}
                             </Button>
                         ))}
                         <Input

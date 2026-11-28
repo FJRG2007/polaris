@@ -6,7 +6,7 @@
  */
 import { TOUCH } from "./touch";
 import type { DeviceView } from "../lib/devices";
-import { hostUi } from "@polaris/app-host/client";
+import { useHospitalityFormat } from "./format";
 import { readMenuAction } from "../actions/catalog";
 import { Link2, Pencil, Unlink } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -18,7 +18,7 @@ import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, EmptyState, I
 export function DevicesScreen() {
     const t = useHospitalityT();
     const toast = useToast();
-    const locale = hostUi.i18nProvider.useLocale();
+    const format = useHospitalityFormat();
     const [venueId, setVenueId] = useState<string | null | undefined>(undefined);
     const [devices, setDevices] = useState<DeviceView[] | undefined>(undefined);
     const [code, setCode] = useState("");
@@ -42,7 +42,7 @@ export function DevicesScreen() {
     useEffect(load, [load]);
 
     const seen = (at: string | null) =>
-        at ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(at)) : t("devices.neverSeen");
+        at ? format.dateTime(at) : t("devices.neverSeen");
     const ready = code.trim().length > 0 && name.trim().length > 0 && !linking;
 
     const link = () => {

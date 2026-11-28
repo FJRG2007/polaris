@@ -46,7 +46,8 @@ import { CATEGORY_COLORS } from "../model/schemas";
 import { ALLERGEN_KEYS, type Allergen } from "../model/allergens";
 import { useHospitalityLive, useHospitalityMode } from "./live-client";
 import type { CategoryView, MenuView, ProductView } from "../lib/catalog";
-import { readCache, unwrap, useHospitalityLocale, useHospitalityT, writeCache } from "./i18n";
+import { useHospitalityFormat } from "./format";
+import { readCache, unwrap, useHospitalityT, writeCache } from "./i18n";
 
 /** Tailwind classes per category colour; listed whole so the build keeps them. */
 const SWATCH: Record<string, string> = {
@@ -65,12 +66,10 @@ const SWATCH: Record<string, string> = {
 
 const TAX_RATES = [0, 400, 1000, 2100];
 
+/** Cents in the venue's currency, written the way the reader's display preferences say. */
 export function useMoney(currency: string) {
-    const locale = useHospitalityLocale();
-    return useMemo(() => {
-        const format = new Intl.NumberFormat(locale, { style: "currency", currency });
-        return (cents: number) => format.format(cents / 100);
-    }, [locale, currency]);
+    const format = useHospitalityFormat();
+    return useMemo(() => (cents: number) => format.money(cents, currency), [format, currency]);
 }
 
 function download(name: string, content: string | Uint8Array) {
@@ -383,10 +382,11 @@ function ProductDialog(props: {
     onSaved: () => void;
 }) {
     const t = useHospitalityT();
+    const format = useHospitalityFormat();
     const p = props.product;
     const [name, setName] = useState(p?.name ?? "");
     const [categoryId, setCategoryId] = useState(p?.categoryId ?? props.defaultCategory);
-    const [price, setPrice] = useState(p ? (p.menuPrice / 100).toFixed(2) : "");
+    const [price, setPrice] = useState(p ? format.typed(p.menuPrice) : "");
     const [tax, setTax] = useState(String(p?.taxRateBp ?? 1000));
     const [description, setDescription] = useState(p?.description ?? "");
     const [sku, setSku] = useState(p?.sku ?? "");
@@ -428,7 +428,7 @@ function ProductDialog(props: {
                     <Input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" placeholder="0,00" />
                 </Field>
                 <Field label={t("product.tax")}>
-                    <Select value={tax} onValueChange={setTax} options={TAX_RATES.map((r) => ({ value: String(r), label: `${r / 100} %` }))} />
+                    <Select value={tax} onValueChange={setTax} options={TAX_RATES.map((r) => ({ value: String(r), label: format.rate(r) }))} />
                 </Field>
             </div>
             <Field label={`${t("product.category")} *`}>

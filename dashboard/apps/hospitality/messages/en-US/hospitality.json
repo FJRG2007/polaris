@@ -218,7 +218,7 @@
         "sales": "Sales",
         "discounts": "Discounts",
         "tips": "Tips taken",
-        "tax": "VAT {rate} %",
+        "tax": "VAT {rate}",
         "noShift": "Open the till first.",
         "shiftOpen": "The till is already open.",
         "overpaid": "That is more than is left to pay."
