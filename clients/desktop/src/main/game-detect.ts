@@ -143,7 +143,7 @@ function folderKey(path: string): string {
 const SHARED_FOLDERS = new Set([
     "program files", "program files (x86)", "programdata", "windows", "users", "appdata", "games", "common",
     "steamapps", "steamlibrary", "steam", "epic games", "gog games", "gog galaxy", "ubisoft", "ubisoft game launcher",
-    "xboxgames", "windowsapps"
+    "xboxgames", "windowsapps", "rockstar games", "ea games", "ea", "origin games", "battle.net", "blizzard", "blizzard entertainment"
 ]);
 
 /** Programs that run from a game's folder without being the game: crash
@@ -266,6 +266,28 @@ export function gameKindRules(listed: readonly ListedProgram[], kinds: ReadonlyM
         if (program.folder) notFolders.push(...storeGameFolders([{ name: program.label, folder: program.folder }]).map((game) => game.folder));
     }
     return { games, notPrograms, notFolders };
+}
+
+/**
+ * The installed game a listed program belongs to, or null: the one whose folder
+ * holds the program's own folder, the file it starts or the shortcut itself.
+ * This is the one answer both the launcher (Game or Application) and the
+ * watcher's folders give, whichever source listed the program - a Start menu
+ * shortcut, an uninstall entry or the store itself. `folders` is
+ * `storeGameFolders` output.
+ */
+export function listedGame(program: ListedProgram, folders: readonly StoreGame[]): StoreGame | null {
+    if (folders.length === 0) return null;
+    if (program.folder) {
+        const own = folderKey(program.folder);
+        const found = folders.find((game) => own === game.folder || own.startsWith(`${game.folder}\\`));
+        if (found) return found;
+    }
+    for (const file of [program.launch?.kind === "exe" ? program.launch.path : undefined, program.target, program.path]) {
+        const game = typeof file === "string" && /^[a-z]:[\\/]/i.test(file.trim()) ? storeGameOf(file, folders) : null;
+        if (game) return game;
+    }
+    return null;
 }
 
 /** The programs the watcher may count, without those treated as applications. */
