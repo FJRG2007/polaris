@@ -19,12 +19,14 @@ export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
     const user = await requirePermission("tasks.read");
-    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const scope = await shelfScope(actor);
+    const [mayManage, scope, prefs] = await Promise.all([
+        sessionCan(user, "tasks.manage"),
+        shelfScope(actor),
+        resolveDisplayPreferencesFor(user.id)
+    ]);
 
     const now = new Date();
-    const prefs = await resolveDisplayPreferencesFor(user.id);
     const weekStartsOn = weekStartIndex(prefs.weekStart);
     // The reader's week, not the server's: this page is drawn where the clock is UTC.
     const weekStart = startOfWeek(now, weekStartsOn, prefs.timeZone);

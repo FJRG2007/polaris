@@ -22,13 +22,14 @@ export default async function TimesheetPage({
 }: {
     searchParams: Promise<{ week?: string }>;
 }) {
-    const { week } = await searchParams;
-    const user = await requirePermission("tasks.read");
-    const mayManage = await sessionCan(user, "tasks.manage");
+    const [{ week }, user] = await Promise.all([searchParams, requirePermission("tasks.read")]);
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const scope = await shelfScope(actor);
-
-    const prefs = await resolveDisplayPreferencesFor(user.id);
+    // Independent of each other: asked together rather than one after another.
+    const [mayManage, scope, prefs] = await Promise.all([
+        sessionCan(user, "tasks.manage"),
+        shelfScope(actor),
+        resolveDisplayPreferencesFor(user.id)
+    ]);
     const weekStartsOn = weekStartIndex(prefs.weekStart);
     const zone = prefs.timeZone;
     const offset = Number(week ?? "0");

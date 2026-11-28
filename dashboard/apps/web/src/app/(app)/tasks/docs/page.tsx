@@ -14,11 +14,10 @@ export const dynamic = "force-dynamic";
 export default async function DocsPage({ searchParams }: { searchParams: Promise<{ doc?: string }> }) {
     const { doc: docId } = await searchParams;
     const user = await requirePermission("tasks.read");
-    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     // A page the space shares needs the space. A page written inside a folder
     // belongs to that branch, so a folder grant reaches it and nothing beside it.
-    const scope = await shelfScope(actor);
+    const [mayManage, scope] = await Promise.all([sessionCan(user, "tasks.manage"), shelfScope(actor)]);
     const { spaceIds } = scope;
     const grantedFolderIds = Object.keys(scope.folderRoles);
 

@@ -34,13 +34,13 @@ export default async function EverythingPage({
 }: {
     searchParams: Promise<{ assignee?: string }>;
 }) {
-    const user = await requirePermission("tasks.read");
-    // Seeing every space's work does not mean being allowed to change any of it.
-    const mayManage = await sessionCan(user, "tasks.manage");
-    const wanted = assigneeParam.safeParse((await searchParams).assignee);
+    const [user, params] = await Promise.all([requirePermission("tasks.read"), searchParams]);
+    const wanted = assigneeParam.safeParse(params.assignee);
     const assigneeId = wanted.success ? wanted.data : null;
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const scope = await shelfScope(actor);
+    // Seeing every space's work does not mean being allowed to change any of it.
+    // Asked together with the scope rather than before it.
+    const [mayManage, scope] = await Promise.all([sessionCan(user, "tasks.manage"), shelfScope(actor)]);
     // The vocabulary (statuses, tags, fields) is drawn from every space the
     // reader touches, including one they only reach through a folder - without
     // its statuses the tasks from that branch would have no column to sit in.

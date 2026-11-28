@@ -22,9 +22,8 @@ export const dynamic = "force-dynamic";
 
 export default async function TasksHomePage() {
     const user = await requirePermission("tasks.read");
-    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const scope = await shelfScope(actor);
+    const [mayManage, scope] = await Promise.all([sessionCan(user, "tasks.manage"), shelfScope(actor)]);
 
     const [tree, tasks, counts, timer, lists] = await Promise.all([
         listSpaceTree(user.id, scope, user.isAdmin),

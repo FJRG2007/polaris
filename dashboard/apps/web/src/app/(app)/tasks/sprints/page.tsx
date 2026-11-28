@@ -16,9 +16,8 @@ export const dynamic = "force-dynamic";
 
 export default async function SprintsPage() {
     const user = await requirePermission("tasks.read");
-    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const scope = await shelfScope(actor);
+    const [mayManage, scope] = await Promise.all([sessionCan(user, "tasks.manage"), shelfScope(actor)]);
     // A space-wide sprint needs the space. A sprint planning one folder is
     // reached by whoever was granted that folder, and by nobody beside them.
     const grantedFolderIds = Object.keys(scope.folderRoles);

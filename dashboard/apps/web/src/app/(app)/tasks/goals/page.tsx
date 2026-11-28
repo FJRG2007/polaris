@@ -14,11 +14,10 @@ export const dynamic = "force-dynamic";
 
 export default async function GoalsPage() {
     const user = await requirePermission("tasks.read");
-    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     // A goal is a space-level plan, so only the spaces the reader holds
     // outright contribute one - a folder grant reaches work, not planning.
-    const scope = await shelfScope(actor);
+    const [mayManage, scope] = await Promise.all([sessionCan(user, "tasks.manage"), shelfScope(actor)]);
 
     const [tree, goals, spaces, lists] = await Promise.all([
         listSpaceTree(user.id, scope, user.isAdmin),
