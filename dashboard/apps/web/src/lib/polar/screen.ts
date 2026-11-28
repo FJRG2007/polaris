@@ -108,7 +108,9 @@ export const SCREEN_RECORDS: readonly ScreenRecord[] = [
     { route: "/telemetry/[project]/[[...rest]]", kind: "telemetry project", id: "project" },
     { route: "/translate/[[...path]]", kind: null },
     { route: "/wall/[id]", kind: "wall panel", id: "id" },
-    { route: "/watch/[kind]/[id]", kind: "watched resource", id: "id" }
+    { route: "/watch/[kind]/[id]", kind: "watched resource", id: "id" },
+    // An app the published catalogue delivered: its screens are its own, named by the app.
+    { route: "/x/[appId]/[[...path]]", kind: null }
 ];
 
 /** A route as the file tree spells it, as a pattern over real addresses, with
