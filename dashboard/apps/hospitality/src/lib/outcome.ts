@@ -9,6 +9,10 @@
 
 import { hospitalityT } from "./i18n";
 import { host } from "@polaris/app-host";
+import { cookies } from "next/headers";
+import type { Actor } from "./audit";
+import { deviceFromToken } from "./devices";
+import { DEVICE_COOKIE } from "../model/device-link";
 import type { HospitalityKey } from "../../messages";
 
 export type Outcome<T> = ({ readonly ok: true } & T) | { readonly ok: false; readonly error: string };
@@ -24,11 +28,10 @@ export class HospitalityRefusal extends Error {
 
 export async function outcome<T extends object>(
     permission: HospitalityPermission,
-    work: (user: { id: string; name: string }) => Promise<T>
+    work: (user: Actor) => Promise<T>
 ): Promise<Outcome<T>> {
     try {
-        const user = await host.session.requirePermission(permission);
-        return { ok: true, ...(await work({ id: user.id, name: user.name ?? "" })) };
+        return { ok: true, ...(await work(await principal(permission))) };
     } catch (caught) {
         if (caught instanceof HospitalityRefusal) {
             return { ok: false, error: (await hospitalityT())(caught.key) };
@@ -37,6 +40,21 @@ export async function outcome<T extends object>(
         console.error("polaris: a hospitality action failed:", caught);
         return { ok: false, error: (await hospitalityT())("errors.generic") };
     }
+}
+
+/**
+ * Who is acting. A linked device (its token in an httpOnly cookie) can take
+ * orders and payments for its venue and nothing else: never a manage action,
+ * never another app, never the session of whoever linked it.
+ */
+async function principal(permission: HospitalityPermission): Promise<Actor> {
+    if (permission === "hospitality.use") {
+        const token = (await cookies()).get(DEVICE_COOKIE)?.value;
+        const device = token ? await deviceFromToken(token) : null;
+        if (device) return { id: device.id, name: device.name, device: true, venueId: device.venueId };
+    }
+    const user = await host.session.requirePermission(permission);
+    return { id: user.id, name: user.name ?? "" };
 }
 
 export async function invalid(): Promise<{ readonly ok: false; readonly error: string }> {

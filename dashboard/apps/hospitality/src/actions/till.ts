@@ -8,6 +8,7 @@
  */
 
 import * as till from "../lib/till";
+import { ownVenue } from "../lib/audit";
 import { venueOnly } from "../model/order-schemas";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 import { cashMoveInput, discountInput, kitchenInput, markInput, orderOnly, payInput, shiftCloseInput, shiftOpenInput } from "../model/till-schemas";
@@ -15,7 +16,7 @@ import { cashMoveInput, discountInput, kitchenInput, markInput, orderOnly, payIn
 export async function readKitchenAction(raw: unknown): Promise<Outcome<{ tickets: till.KitchenTicket[] }>> {
     const input = kitchenInput.safeParse(raw);
     if (!input.success) return invalid();
-    return outcome("hospitality.use", async () => ({ tickets: await till.readKitchen(input.data.venueId, input.data.station) }));
+    return outcome("hospitality.use", async (user) => (ownVenue(user, input.data.venueId), { tickets: await till.readKitchen(input.data.venueId, input.data.station) }));
 }
 
 export async function markLinesAction(raw: unknown): Promise<Outcome<object>> {

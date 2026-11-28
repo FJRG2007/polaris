@@ -16,7 +16,7 @@ import { chooseModifiers } from "../model/modifiers";
 import { modifierGroupSchema } from "../model/schemas";
 import { Prisma, prisma } from "@polaris/db";
 import { HospitalityRefusal } from "./outcome";
-import { audit, LIVE, touchOrder, type Actor } from "./audit";
+import { audit, LIVE, ownVenue, touchOrder, type Actor } from "./audit";
 import { publishHospitalityChange } from "./live";
 import type { AddLinesInput, FloorInput, OpenOrderInput, SplitInput } from "../model/order-schemas";
 import { orderTotals, type Discount, type OrderTotals, type PricedModifier } from "../model/pricing";
@@ -174,8 +174,12 @@ export async function readService(venueId: string): Promise<ServiceView> {
  * tapping the same free table at once end up on the same order, not two.
  */
 export async function openOrder(input: OpenOrderInput, actor: Actor): Promise<string> {
-    const existing = await prisma.hospitalityOrder.findUnique({ where: { id: input.id }, select: { id: true } });
-    if (existing) return existing.id;
+    ownVenue(actor, input.venueId);
+    const existing = await prisma.hospitalityOrder.findUnique({ where: { id: input.id }, select: { id: true, venueId: true } });
+    if (existing) {
+        ownVenue(actor, existing.venueId);
+        return existing.id;
+    }
     if (input.tableId) {
         const table = await prisma.hospitalityTable.findFirst({
             where: { id: input.tableId, room: { venueId: input.venueId } },
@@ -224,12 +228,13 @@ function createOrder(input: OpenOrderInput, actor: Actor) {
     });
 }
 
-async function liveOrder(orderId: string) {
+async function liveOrder(orderId: string, actor: Actor) {
     const order = await prisma.hospitalityOrder.findUnique({
         where: { id: orderId },
         select: { id: true, venueId: true, status: true }
     });
     if (!order) throw new HospitalityRefusal("orders.gone");
+    ownVenue(actor, order.venueId);
     if (!LIVE.includes(order.status)) throw new HospitalityRefusal("orders.closed");
     return order;
 }
@@ -241,7 +246,7 @@ async function liveOrder(orderId: string) {
  * needs the version the device saw: two waiters adding to one table both land.
  */
 export async function addLines(input: AddLinesInput, actor: Actor): Promise<void> {
-    const order = await liveOrder(input.orderId);
+    const order = await liveOrder(input.orderId, actor);
     const ids = [...new Set(input.lines.map((l) => l.productId))];
     const [products, overrides, stored] = await Promise.all([
         prisma.hospitalityProduct.findMany({
@@ -302,7 +307,7 @@ export async function addLines(input: AddLinesInput, actor: Actor): Promise<void
 
 /** Fires what is still pending ("marchar"): all of it, or one course. */
 export async function sendLines(orderId: string, course: number | null, actor: Actor): Promise<number> {
-    const order = await liveOrder(orderId);
+    const order = await liveOrder(orderId, actor);
     const count = await prisma.$transaction(async (tx) => {
         await touchOrder(tx, orderId, actor);
         const sent = await tx.hospitalityOrderLine.updateMany({
@@ -326,7 +331,7 @@ const UNDO_WINDOW_MS = 10 * 60_000;
 export async function removeLine(lineId: string, actor: Actor, seen?: number): Promise<void> {
     const line = await prisma.hospitalityOrderLine.findUnique({ where: { id: lineId } });
     if (!line || line.status === "void") return;
-    const order = await liveOrder(line.orderId);
+    const order = await liveOrder(line.orderId, actor);
     await prisma.$transaction(async (tx) => {
         await touchOrder(tx, order.id, actor, seen);
         if (line.status === "pending") await tx.hospitalityOrderLine.delete({ where: { id: lineId } });
@@ -372,7 +377,7 @@ export async function restoreLine(lineId: string, actor: Actor): Promise<void> {
     const parsed = removedLineSchema.safeParse(event?.payload);
     if (!event || !parsed.success) throw new HospitalityRefusal("orders.undoExpired");
     const was = parsed.data.line;
-    const order = await liveOrder(was.orderId);
+    const order = await liveOrder(was.orderId, actor);
     const restored = await prisma.$transaction(async (tx) => {
         await touchOrder(tx, order.id, actor);
         const now = await tx.hospitalityOrderLine.findUnique({ where: { id: lineId }, select: { status: true } });
@@ -407,7 +412,7 @@ export async function restoreLine(lineId: string, actor: Actor): Promise<void> {
 
 /** Moves an order to another free table, or merges it into the order already there. */
 export async function moveOrder(orderId: string, tableId: string, actor: Actor, seen?: number): Promise<string> {
-    const order = await liveOrder(orderId);
+    const order = await liveOrder(orderId, actor);
     const table = await prisma.hospitalityTable.findFirst({ where: { id: tableId, room: { venueId: order.venueId } }, select: { id: true } });
     if (!table) throw new HospitalityRefusal("orders.tableGone");
     const target = await prisma.hospitalityOrder.findFirst({
@@ -437,7 +442,7 @@ export async function moveOrder(orderId: string, tableId: string, actor: Actor, 
  * the device made, so a replay finds it stored and moves nothing twice.
  */
 export async function splitOrder(input: SplitInput, actor: Actor): Promise<string> {
-    const order = await liveOrder(input.orderId);
+    const order = await liveOrder(input.orderId, actor);
     const table = await prisma.hospitalityTable.findFirst({ where: { id: input.tableId, room: { venueId: order.venueId } }, select: { id: true } });
     if (!table) throw new HospitalityRefusal("orders.tableGone");
     const already = await prisma.hospitalityOrderLine.findMany({ where: { id: { in: input.lines.map((l) => l.newLineId) } }, select: { orderId: true } });

@@ -15,6 +15,16 @@ export interface Actor {
     readonly name: string;
     /** A linked device acting without a Polaris account. */
     readonly device?: boolean;
+    /** The one venue a linked device may touch. */
+    readonly venueId?: string;
+}
+
+/**
+ * A linked device acts only on its own venue. Anything else answers as if it
+ * did not exist, so a device cannot learn what another venue holds.
+ */
+export function ownVenue(actor: Actor, venueId: string | null | undefined): void {
+    if (actor.device && actor.venueId !== venueId) throw new HospitalityRefusal("orders.gone");
 }
 
 export const LIVE = ["open", "billed"];

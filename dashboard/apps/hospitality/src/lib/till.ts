@@ -16,7 +16,7 @@
 import { Prisma, prisma } from "@polaris/db";
 import { readDiscount } from "./orders";
 import { HospitalityRefusal } from "./outcome";
-import { audit, touchOrder, type Actor } from "./audit";
+import { audit, ownVenue, touchOrder, type Actor } from "./audit";
 import { publishHospitalityChange } from "./live";
 import { lineTotal, orderTotals, type Discount } from "../model/pricing";
 import { shiftReport, type ShiftReport } from "../model/cash";
@@ -83,10 +83,10 @@ export async function readKitchen(venueId: string, station: string | null): Prom
 export async function markLines(lineIds: readonly string[], ready: boolean, actor: Actor): Promise<void> {
     const lines = await prisma.hospitalityOrderLine.findMany({
         where: { id: { in: [...lineIds] } },
-        select: { orderId: true, order: { select: { venueId: true } } },
-        take: 1
+        select: { orderId: true, order: { select: { venueId: true } } }
     });
     const venueId = lines[0]?.order.venueId ?? null;
+    for (const line of lines) ownVenue(actor, line.order.venueId);
     await prisma.$transaction(async (tx) => {
         const done = await tx.hospitalityOrderLine.updateMany({
             where: { id: { in: [...lineIds] }, status: ready ? "sent" : "ready" },
@@ -140,6 +140,7 @@ async function nextNumber(tx: Prisma.TransactionClient, key: string): Promise<nu
 export async function pay(input: PayInput, actor: Actor): Promise<{ closed: boolean; ticketNo: string | null; due: number; }> {
     const head = await prisma.hospitalityOrder.findUnique({ where: { id: input.orderId }, select: { venueId: true, status: true, ticketNo: true } });
     if (!head) throw new HospitalityRefusal("orders.gone");
+    ownVenue(actor, head.venueId);
     if (head.status === "void") throw new HospitalityRefusal("orders.closed");
     const shift = await openShift(head.venueId);
     if (!shift) throw new HospitalityRefusal("till.noShift");
@@ -219,6 +220,7 @@ export async function pay(input: PayInput, actor: Actor): Promise<{ closed: bool
 export async function markBilled(orderId: string, actor: Actor): Promise<void> {
     const order = await prisma.hospitalityOrder.findUnique({ where: { id: orderId }, select: { venueId: true } });
     if (!order) throw new HospitalityRefusal("orders.gone");
+    ownVenue(actor, order.venueId);
     await prisma.$transaction(async (tx) => {
         await touchOrder(tx, orderId, actor);
         await tx.hospitalityOrder.update({ where: { id: orderId }, data: { status: "billed" } });

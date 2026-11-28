@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import * as catalog from "../lib/catalog";
+import { ownVenue } from "../lib/audit";
 import { hospitalityT } from "../lib/i18n";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 import {
@@ -25,7 +26,7 @@ const venueQuery = z.object({ venueId: z.string().uuid().nullable() });
 export async function readMenuAction(raw: unknown): Promise<Outcome<{ menu: catalog.MenuView }>> {
     const input = venueQuery.safeParse(raw);
     if (!input.success) return invalid();
-    return outcome("hospitality.use", async () => ({ menu: await catalog.readMenu(input.data.venueId) }));
+    return outcome("hospitality.use", async (user) => (ownVenue(user, input.data.venueId), { menu: await catalog.readMenu(input.data.venueId) }));
 }
 
 export async function saveVenueAction(raw: unknown): Promise<Outcome<{ id: string }>> {

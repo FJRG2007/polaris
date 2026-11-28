@@ -5,6 +5,7 @@
  * room's plan needs `hospitality.manage`. Every input is validated first.
  */
 
+import { ownVenue } from "../lib/audit";
 import * as orders from "../lib/orders";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 import { addLinesInput, floorInput, lineOnly, moveInput, openOrderInput, sendInput, splitInput, venueOnly } from "../model/order-schemas";
@@ -12,7 +13,7 @@ import { addLinesInput, floorInput, lineOnly, moveInput, openOrderInput, sendInp
 export async function readServiceAction(raw: unknown): Promise<Outcome<{ service: orders.ServiceView }>> {
     const input = venueOnly.safeParse(raw);
     if (!input.success) return invalid();
-    return outcome("hospitality.use", async () => ({ service: await orders.readService(input.data.venueId) }));
+    return outcome("hospitality.use", async (user) => (ownVenue(user, input.data.venueId), { service: await orders.readService(input.data.venueId) }));
 }
 
 export async function openOrderAction(raw: unknown): Promise<Outcome<{ id: string }>> {
