@@ -19849,3 +19849,52 @@ model ChatHistoryKey {
 
     @@id([channelId, epoch, recipient])
 }
+
+// A receipt or kitchen printer the dashboard prints to (lib/receipt-print).
+// Instance-wide, like the venue it serves. `address` is a literal LAN IPv4 for
+// transport "lan"; the sender refuses anything else.
+model ReceiptPrinter {
+    id             String            @id @default(uuid(7)) @db.Uuid
+    name           String
+    // "lan" (raw TCP, port 9100). Others are added as their senders ship.
+    transport      String            @default("lan")
+    address        String            @default("")
+    port           Int               @default(9100)
+    // "58" | "76" | "80" (mm).
+    paper          String            @default("80")
+    columns        Int?
+    codepage       String            @default("cp858")
+    codepageNumber Int?
+    impact         Boolean           @default(false)
+    // "receipt" | "kitchen" | "bar".
+    role           String            @default("receipt")
+    // Last status read from the printer: null when ready, else a PrinterProblem.
+    problem        String?
+    checkedAt      DateTime?
+    createdAt      DateTime          @default(now())
+    updatedAt      DateTime          @updatedAt
+    jobs           ReceiptPrintJob[]
+}
+
+// One print job. `jobKey` is the caller's idempotency key: a second request
+// with the same key for the same printer finds this row and prints nothing.
+// `state`: queued -> sending -> printed | failed. A job found in "sending" by a
+// later process may already be on paper, so it becomes "uncertain" and is
+// never resent on its own.
+model ReceiptPrintJob {
+    id        String         @id @default(uuid(7)) @db.Uuid
+    printerId String         @db.Uuid
+    printer   ReceiptPrinter @relation(fields: [printerId], references: [id], onDelete: Cascade)
+    jobKey    String
+    state     String         @default("queued")
+    payload   Bytes
+    attempts  Int            @default(0)
+    problem   String?
+    nextAt    DateTime       @default(now())
+    createdAt DateTime       @default(now())
+    printedAt DateTime?
+
+    @@unique([printerId, jobKey])
+    @@index([printerId, state, nextAt])
+    @@index([createdAt])
+}
