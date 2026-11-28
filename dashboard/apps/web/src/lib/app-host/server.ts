@@ -43,6 +43,7 @@ import type {
     AppWidgetDefinition,
     AppStepHandler,
     AppMcpToolHandler,
+    AppChatCommandHandler,
     AppWidgetView,
     AppSlot,
     CallActivityHost,
@@ -676,6 +677,7 @@ declare module "@polaris/app-host" {
         AppWidgetDefinition: AppWidgetDefinition;
         AppStepHandler: AppStepHandler;
         AppMcpToolHandler: AppMcpToolHandler;
+        AppChatCommandHandler: AppChatCommandHandler;
         AppWidgetView: AppWidgetView;
         AppSlot: AppSlot;
         ConnectionsViewer: ConnectionsViewer;

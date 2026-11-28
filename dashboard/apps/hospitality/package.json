@@ -313,6 +313,91 @@
                         "available": "boolean"
                     }
                 }
+            ],
+            "sections": [
+                {
+                    "label": {
+                        "en-US": "Service",
+                        "es-ES": "Servicio"
+                    },
+                    "path": "/x/hospitality",
+                    "keywords": [
+                        {
+                            "en-US": "tables",
+                            "es-ES": "mesas"
+                        },
+                        {
+                            "en-US": "orders",
+                            "es-ES": "comandas"
+                        }
+                    ]
+                },
+                {
+                    "label": {
+                        "en-US": "Kitchen",
+                        "es-ES": "Cocina"
+                    },
+                    "path": "/x/hospitality/kitchen",
+                    "keywords": [
+                        {
+                            "en-US": "tickets",
+                            "es-ES": "tickets"
+                        },
+                        {
+                            "en-US": "kds",
+                            "es-ES": "kds"
+                        }
+                    ]
+                },
+                {
+                    "label": {
+                        "en-US": "Till",
+                        "es-ES": "Caja"
+                    },
+                    "path": "/x/hospitality/till",
+                    "keywords": [
+                        {
+                            "en-US": "z report",
+                            "es-ES": "cierre z"
+                        },
+                        {
+                            "en-US": "payments",
+                            "es-ES": "cobros"
+                        }
+                    ],
+                    "permission": "hospitality.manage"
+                },
+                {
+                    "label": {
+                        "en-US": "Menu",
+                        "es-ES": "Carta"
+                    },
+                    "path": "/x/hospitality/menu",
+                    "keywords": [
+                        {
+                            "en-US": "products",
+                            "es-ES": "productos"
+                        },
+                        {
+                            "en-US": "prices",
+                            "es-ES": "precios"
+                        }
+                    ]
+                }
+            ],
+            "chatCommands": [
+                {
+                    "name": "table",
+                    "description": {
+                        "en-US": "Whether a table has an order open, and how it stands",
+                        "es-ES": "Si una mesa tiene una comanda abierta y cómo va"
+                    },
+                    "hint": {
+                        "en-US": "table",
+                        "es-ES": "mesa"
+                    },
+                    "permission": "hospitality.use"
+                }
             ]
         }
     },

@@ -706,6 +706,19 @@ export async function chatGameLinks(channelIds: readonly string[]): Promise<Chat
 }
 
 /** Every installed app's answers to a command written in a conversation. */
+/** What answers an app's declared Chat command, while the app is installed; null otherwise. */
+export async function appChatCommandHandler(
+    app: string,
+    name: string
+): Promise<import("./types").AppChatCommandHandler | null> {
+    const extension = (await installedWith("chatCommandHandlers")).find((one) => one.id === app);
+    const handlers = await extension?.chatCommandHandlers?.().catch((caught: unknown) => {
+        console.error(`polaris: ${app} could not load its Chat commands:`, caught);
+        return null;
+    });
+    return handlers?.[name] ?? null;
+}
+
 export async function answerChatCommand(input: {
     readonly channelId: string;
     readonly command: string;

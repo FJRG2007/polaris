@@ -14,6 +14,7 @@
  */
 
 import { can } from "@polaris/auth";
+import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { chatWordsFor } from "./text";
 import { appCommandIn } from "./chat-command";
@@ -41,14 +42,27 @@ async function mayRun(userId: string, name: string): Promise<boolean> {
         return (await polarAccessFor(userId)).use;
     }
     if (name === "task") return can(userId, "tasks.manage");
-    return false;
+    // One an installed app's manifest declares: behind its own permission, while it is installed.
+    const declared = core.appChatCommand(name);
+    if (!declared) return false;
+    const { isAppInstalled } = await import("@/lib/apps/install-presence");
+    if (!(await isAppInstalled(declared.app).catch(() => false))) return false;
+    return can(userId, declared.permission as core.Permission);
 }
 
 /** The commands this person may run, in their language. Never throws: a list is not worth the composer. */
 export async function appCommandsFor(userId: string): Promise<AppCommandView[]> {
     try {
         const words = await chatWordsFor(userId);
-        const [polar, task] = await Promise.all([mayRun(userId, "polar"), mayRun(userId, "task")]);
+        const declared = core.appChatCommands();
+        const [polar, task, ...apps] = await Promise.all([
+            mayRun(userId, "polar"),
+            mayRun(userId, "task"),
+            ...declared.map((command) => mayRun(userId, command.name).catch(() => false))
+        ]);
+        const fromApps = declared
+            .filter((_, index) => apps[index])
+            .map((command) => ({ name: command.name, description: command.description, hint: command.hint ?? null, app: command.appName }));
         return [
             ...(polar
                 ? [
@@ -69,7 +83,8 @@ export async function appCommandsFor(userId: string): Promise<AppCommandView[]> 
                           app: words("appCommands.task.app")
                       }
                   ]
-                : [])
+                : []),
+            ...fromApps
         ];
     } catch (error) {
         console.error("chat: the app commands could not be listed:", error);
@@ -106,10 +121,49 @@ export async function runAppCommand(messageId: string, actorId: string): Promise
             });
             return;
         }
+        const declared = core.appChatCommand(command.name);
+        if (declared) {
+            await answerAppCommand(declared, { channelId: message.channelId, parentId: message.parentId, messageId }, actorId, command.text);
+            return;
+        }
         await offerTaskForm({ channelId: message.channelId, parentId: message.parentId, messageId }, actorId, command.text);
     } catch (error) {
         console.error("chat: an app command could not be run:", error);
     }
+}
+
+/**
+ * Ask the app that declared a command for its answer and post it as a reply
+ * under the app's name; a refusal is shown to the writer alone. Anything the
+ * app throws is logged and answered with nothing.
+ */
+async function answerAppCommand(
+    command: core.RegisteredAppChatCommand,
+    where: { readonly channelId: string; readonly parentId: string | null; readonly messageId: string },
+    actorId: string,
+    text: string
+): Promise<void> {
+    const { appChatCommandHandler } = await import("@/lib/app-extensions/registry");
+    const handler = await appChatCommandHandler(command.app, command.name);
+    if (!handler) return;
+    let answer: Awaited<ReturnType<typeof handler>>;
+    try {
+        answer = await handler({ text: text.slice(0, 2_000), channelId: where.channelId, userId: actorId });
+    } catch (caught) {
+        console.error(`chat: ${command.app}'s /${command.name} failed:`, caught);
+        return;
+    }
+    const body = (answer.refused ?? answer.reply ?? "").trim().slice(0, 4_000);
+    if (!body) return;
+    await postAgentMessage({
+        channelId: where.channelId,
+        parentId: where.parentId,
+        replyToId: where.messageId,
+        agent: command.app,
+        label: command.appName,
+        body,
+        ...(answer.refused ? { audience: [actorId] } : {})
+    });
 }
 
 /** The lists this person can reach, as form choices: `Space / List`. */

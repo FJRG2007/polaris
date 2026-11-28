@@ -274,5 +274,11 @@
     },
     "automation": {
         "productGone": "That product or venue is not on the menu any more"
+    },
+    "chat": {
+        "tableWhich": "Say which table: /table 4",
+        "tableUnknown": "There is no table called {name}",
+        "tableFree": "{name} is free",
+        "tableOpen": "{name}: {covers} covers, {total} so far, served by {waiter}"
     }
 }

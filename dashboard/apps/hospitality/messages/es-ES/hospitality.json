@@ -274,5 +274,11 @@
     },
     "automation": {
         "productGone": "Ese producto o local ya no está en la carta"
+    },
+    "chat": {
+        "tableWhich": "Di qué mesa: /table 4",
+        "tableUnknown": "No hay ninguna mesa llamada {name}",
+        "tableFree": "{name} está libre",
+        "tableOpen": "{name}: {covers} comensales, {total} por ahora, la atiende {waiter}"
     }
 }

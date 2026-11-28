@@ -343,6 +343,14 @@ export interface AppExtension {
     readonly mcpToolHandlers?: () => Promise<Readonly<Record<string, AppMcpToolHandler>>>;
 
     /**
+     * What answers each Chat slash command its manifest declares
+     * (`chatCommands`), by name. Chat has already checked the writer is in the
+     * conversation, holds the command's permission and is within the rate
+     * limit; the answer is posted under the app's name as a reply.
+     */
+    readonly chatCommandHandlers?: () => Promise<Readonly<Record<string, AppChatCommandHandler>>>;
+
+    /**
      * What a person reads for each of those tools, by tool name, in their
      * language: the list behind a permission's info button on the consent
      * screen and on a connected app's permissions. One for every tool it
@@ -699,6 +707,15 @@ export type AppStepHandler = (
         readonly trigger: Readonly<Record<string, unknown>>;
     }
 ) => Promise<{ readonly output?: Record<string, unknown>; readonly refused?: string }>;
+
+/** One manifest-declared Chat command's answer: a reply, or a refusal only the writer sees. */
+export type AppChatCommandHandler = (input: {
+    /** What followed the command's name, trimmed. */
+    readonly text: string;
+    readonly channelId: string;
+    /** The writer, already holding the command's permission. */
+    readonly userId: string;
+}) => Promise<{ readonly reply?: string; readonly refused?: string }>;
 
 /** One manifest-declared MCP tool's work, handed input already checked. */
 export type AppMcpToolHandler = (

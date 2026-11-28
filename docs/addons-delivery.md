@@ -248,25 +248,27 @@ before the bundle loads. "Manifest" means a catalogue field, parsed by
 | --- | --- | --- |
 | Permissions (roles editor, server checks) | `permissionDefs` | manifest |
 | Rail entry | `nav` (`category`, `permission`) | manifest |
+| Nav sections, search and launcher pages | `sections` (label, `/x/<id>/...` path, own `permission`, keywords) -> `APP_SECTIONS` in `runtime-apps.ts` | manifest: the rail, global search and the launcher list them; a page or permission outside the app is left out; an app built into the image keeps its own |
 | Settings page | `settingsAt` | manifest |
 | Overview cards | bundle `overviewWidgets` (`permission`: own id) | bundle, gated |
 | Notification kinds | `notificationKinds` | manifest |
 | Automation trigger events | `events` (+ `permission`) | manifest, offered in the picker |
 | Automation steps | `automationSteps` | manifest |
 | Automation nodes with their own settings UI | bundle `automationNodes` / slots | bundle |
-| MCP tools | bundle `mcpTools` (scope from the scope table, labels `mcpToolLabels`) | bundle; to do: manifest `mcpTools` with typed input/output schema, run through the host under the caller's permissions |
+| MCP tools | `mcpTools` (`<id>_<name>`, own `permission` = scope, typed `fields`, `output`, optional `items`) -> `core/src/app-mcp-tools.ts`; bundle `mcpToolHandlers` does the work (`lib/mcp/app-manifest-tools.ts`) | manifest: input checked by the server, answer checked against the declared shape; a delivered app's undeclared bundle `mcpTools` are not listed; apps built into the image keep `mcpTools` in code |
 | MCP search providers | bundle `mcpSearch` | bundle; to do: manifest |
-| MCP resources and prompts | none | missing |
+| MCP resources and prompts | none | Polaris's MCP server speaks tools only (no `resources/*` or `prompts/*` methods in `lib/mcp/protocol.ts`), so there is nothing for an app to declare until the server serves them |
 | Polar agent tools and connectors | none found per app (Polar reaches apps through the MCP list) | to check |
 | Launcher / global search results | bundle `searchRecords`, `favorites` | bundle; to do: manifest launcher commands ("open table X") |
 | Deck (Stream Deck) actions | bundle `deckActions` | bundle |
-| Chat slash commands (`/app ...`) and message components | bundle `answerChatCommand` | bundle; to do: manifest command list with typed arguments |
+| Chat slash commands (`/<name> ...`) | `chatCommands` (name, description, hint, own `permission`) -> `core/src/app-chat-commands.ts`; bundle `chatCommandHandlers` answers (`lib/chat/app-commands.ts`) | manifest: listed in the composer and run only for a writer holding the permission while the app is installed, rate limited, reply posted under the app's name, a refusal shown to the writer alone; reserved and taken names are refused. Linked game servers' `answerChatCommand` stays bundle |
+| Chat message components | none per app | to do |
 | Deep links, `polaris://` routes | `lib/open-in-app.ts`, `lib/desktop-bridge.ts` | to check: per-app routes hard-coded? |
 | Context menus, quick actions | `lib/context-menu/` | to check |
 | Share targets | none found | missing |
 | Whole-Polaris export/import sections | `lib/backups/sources/*` (built-in), bundle `backupSources` | bundle; to do: manifest declaration |
 | Audit event types | `audit-service.ts` | to check |
-| API key scopes | `api-key-scopes.ts` `SCOPE_LABELS: Record<Permission, ...>` (built-in only) | to do: an app's `permissionDefs` as scopes |
+| API key scopes | `permissionDefs` (`scopeLabel`/`scopeAppArea` in `api-key-scopes.ts`, `appScopes` in `lib/mcp/scope-table.ts`) | manifest already: an app's permissions are offered as key and MCP scopes under its name |
 | i18n catalogs | the app's own (`apps/<id>/src/lib/i18n.ts`), manifest words localized per field | manifest for declared words; bundle for screens |
 | TV / phone surfaces | not inventoried | to check |
 

@@ -18,6 +18,8 @@ export const hospitalityExtension: AppExtension = {
     automationSteps: async () => (await import("./automation-steps")).hospitalitySteps,
     // The MCP tools its manifest declares, done once the host has checked them.
     mcpToolHandlers: async () => (await import("./mcp-tools")).hospitalityMcpTools,
+    // The Chat commands its manifest declares, answered once Chat has checked them.
+    chatCommandHandlers: async () => (await import("./chat-commands")).hospitalityChatCommands,
     // Its Overview card, read only once somebody has it on screen.
     overviewWidgets: () => [
         {

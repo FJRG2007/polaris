@@ -5,6 +5,8 @@
  * every message without loading the app registry for the ones that are not.
  */
 
+import { appChatCommand } from "@polaris/core";
+
 /** A command as it is written. */
 const COMMAND = /^\/([a-z][a-z0-9_-]{0,31})$/i;
 
@@ -24,6 +26,7 @@ const APP_COMMAND = /^\/([a-z][a-z0-9_-]{0,31})(?:\s+([\s\S]*))?$/i;
 export function appCommandIn(body: string): { readonly name: string; readonly text: string } | null {
     const found = APP_COMMAND.exec(body.trim());
     const name = found?.[1]?.toLowerCase();
-    if (!name || !APP_COMMAND_NAMES.has(name)) return null;
+    // Polaris's own, or one an installed app's manifest declares.
+    if (!name || !(APP_COMMAND_NAMES.has(name) || appChatCommand(name))) return null;
     return { name, text: (found?.[2] ?? "").trim() };
 }

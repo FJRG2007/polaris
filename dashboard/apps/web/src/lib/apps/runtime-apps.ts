@@ -8,12 +8,14 @@
 
 import { Package } from "lucide-react";
 import { setRuntimeApps } from "./catalog";
-import { APP_CATEGORIES, POLARIS_APPS, type AppEntry } from "@/lib/apps";
+import { APP_CATEGORIES, APP_SECTIONS, POLARIS_APPS, type AppEntry, type AppSection } from "@/lib/apps";
 import type { RuntimeAppView } from "./runtime-catalog-schema";
 import {
     registerAppEvents,
     registerAppMcpTools,
     retainAppMcpTools,
+    registerAppChatCommands,
+    retainAppChatCommands,
     registerAppNotificationKinds,
     registerAppSteps,
     registerAppPermissions,
@@ -28,6 +30,8 @@ const RAIL_CATEGORIES: ReadonlySet<string> = new Set(APP_CATEGORIES.map((categor
 
 /** Ids this module put on the rail, so a later registration replaces them rather than adding twice. */
 const railed = new Set<string>();
+/** Ids whose screens this module filed, so a later registration replaces them. */
+const sectioned = new Set<string>();
 
 let last = "";
 
@@ -36,11 +40,14 @@ export function registerRuntimeApps(views: readonly RuntimeAppView[]): void {
     const key = JSON.stringify(views);
     if (key === last) return;
     last = key;
-    setRuntimeApps(views.map(({ nav: _nav, permissionDefs: _permissions, events: _events, notificationKinds: _kinds, automationSteps: _steps, mcpTools: _tools, ...view }) => ({ ...view, icon: Package })));
+    setRuntimeApps(views.map(({ nav: _nav, permissionDefs: _permissions, events: _events, notificationKinds: _kinds, automationSteps: _steps, mcpTools: _tools, sections: _sections, chatCommands: _commands, ...view }) => ({ ...view, icon: Package })));
     // Its automation triggers: a withdrawn app's go with it, and a trigger naming one is refused with the reason.
     retainAppEvents(views.filter((view) => view.events).map((view) => view.id));
     for (const view of views) if (view.events) registerAppEvents(view.id, view.events, view.name);
     // Its automation steps, offered in the editor under the app and run through its bundle.
+    // Its Chat slash commands: listed and checked before its bundle loads.
+    retainAppChatCommands(views.filter((view) => view.chatCommands).map((view) => view.id));
+    for (const view of views) if (view.chatCommands) registerAppChatCommands(view.id, view.name, view.chatCommands);
     // Its MCP tools: their shape and gate known before its bundle loads.
     retainAppMcpTools(views.filter((view) => view.mcpTools).map((view) => view.id));
     for (const view of views) if (view.mcpTools) registerAppMcpTools(view.id, view.mcpTools);
@@ -52,6 +59,23 @@ export function registerRuntimeApps(views: readonly RuntimeAppView[]): void {
     // Each app's own permissions, filed under its name; a withdrawn app's go with it.
     retainAppPermissions(views.filter((view) => view.permissionDefs).map((view) => view.id));
     for (const view of views) if (view.permissionDefs) registerAppPermissions(view.id, view.name, view.permissionDefs);
+    // Its screens: its rail, search and the launcher read them like any app's.
+    for (const id of sectioned) delete APP_SECTIONS[id];
+    sectioned.clear();
+    for (const view of views) {
+        if (!view.sections || Object.hasOwn(APP_SECTIONS, view.id)) continue;
+        APP_SECTIONS[view.id] = view.sections.map(
+            (section): AppSection => ({
+                label: section.label,
+                href: section.href,
+                icon: Package,
+                keywords: [...section.keywords],
+                ...(section.hidden ? { hidden: true } : {}),
+                ...(section.permission ? { needs: section.permission as Permission } : {})
+            })
+        );
+        sectioned.add(view.id);
+    }
     for (let index = POLARIS_APPS.length - 1; index >= 0; index--) {
         if (railed.has(POLARIS_APPS[index]?.id ?? "")) POLARIS_APPS.splice(index, 1);
     }

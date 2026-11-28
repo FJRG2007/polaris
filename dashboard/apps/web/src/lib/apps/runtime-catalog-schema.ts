@@ -14,7 +14,7 @@
  * newer Polaris"; it never takes the rest of the catalogue down with it.
  */
 
-import type { AppMcpToolDefinition, AppStepDefinition, AppStepField } from "@polaris/core";
+import type { AppChatCommandDefinition, AppMcpToolDefinition, AppStepDefinition, AppStepField } from "@polaris/core";
 import { z } from "zod";
 import { Package } from "lucide-react";
 import type { AppCategory, AppManifest } from "./catalog";
@@ -154,6 +154,35 @@ export const runtimeAppEntrySchema = z.object({
         )
         .max(32)
         .default([]),
+    /**
+     * Its screens, for its rail and for search and the launcher: each one of its
+     * own pages (`/x/<id>/...`), behind one of its own permissions when it needs
+     * more than the app does. A page outside its own is left out.
+     */
+    sections: z
+        .array(
+            z.object({
+                label: localized(40),
+                path: z.string().regex(/^\/x\/[a-z][a-z0-9-]{1,47}(\/[a-z0-9-]{1,48}){0,4}$/),
+                permission: z.string().regex(PERMISSION).optional(),
+                keywords: z.array(localized(40)).max(8).default([]),
+                hidden: z.boolean().default(false)
+            })
+        )
+        .max(16)
+        .default([]),
+    /** Its Chat slash commands (`/<name>`), behind one of its own permissions; its bundle answers them. */
+    chatCommands: z
+        .array(
+            z.object({
+                name: z.string().regex(/^[a-z][a-z0-9-]{1,31}$/),
+                description: localized(200),
+                hint: localized(40).optional(),
+                permission: z.string().regex(PERMISSION)
+            })
+        )
+        .max(16)
+        .default([]),
     /** The kinds of alert it raises, each `<id>.<kind>`, opening one of its own pages. */
     notificationKinds: z
         .array(
@@ -290,6 +319,10 @@ export type RuntimeAppView = Omit<AppManifest, "icon"> & {
     }[];
     /** Its automation steps, labelled in the reader's language. */
     readonly automationSteps?: readonly AppStepDefinition[];
+    /** Its screens, worded in the reader's language; only its own pages. */
+    readonly sections?: readonly { label: string; href: string; permission?: string; keywords: readonly string[]; hidden: boolean }[];
+    /** Its Chat slash commands, worded in the reader's language. */
+    readonly chatCommands?: readonly AppChatCommandDefinition[];
     /** Its MCP tools, worded in the reader's language. */
     readonly mcpTools?: readonly AppMcpToolDefinition[];
     /** Its kinds of alert, labelled in the reader's language. */
@@ -359,6 +392,24 @@ export function runtimeViews(catalog: RuntimeAppCatalog | null, known: ReadonlyS
             output: step.output,
             fields: fieldsIn(step.fields, locale)
         }));
+        // Only its own pages, and only behind its own permissions.
+        const own = `${RUNTIME_APP_BASE}/${entry.id}`;
+        const sections = entry.sections
+            .filter((section) => section.path === own || section.path.startsWith(`${own}/`))
+            .filter((section) => !section.permission || section.permission.startsWith(`${entry.id}.`))
+            .map((section) => ({
+                label: entryText(section.label, locale),
+                href: section.path,
+                ...(section.permission ? { permission: section.permission } : {}),
+                keywords: section.keywords.map((keyword) => entryText(keyword, locale)),
+                hidden: section.hidden
+            }));
+        const chatCommands: AppChatCommandDefinition[] = entry.chatCommands.map((command) => ({
+            name: command.name,
+            description: entryText(command.description, locale),
+            ...(command.hint ? { hint: entryText(command.hint, locale) } : {}),
+            permission: command.permission
+        }));
         const mcpTools: AppMcpToolDefinition[] = entry.mcpTools.map((tool) => ({
             name: tool.name,
             title: entryText(tool.title, locale),
@@ -375,6 +426,8 @@ export function runtimeViews(catalog: RuntimeAppCatalog | null, known: ReadonlyS
             ...(notificationKinds.length ? { notificationKinds } : {}),
             ...(automationSteps.length ? { automationSteps } : {}),
             ...(mcpTools.length ? { mcpTools } : {}),
+            ...(sections.length ? { sections } : {}),
+            ...(chatCommands.length ? { chatCommands } : {}),
             ...(entry.nav ? { nav: entry.nav } : {}),
             ...(permissionDefs.length ? { permissionDefs } : {}),
             ...(events.length ? { events } : {})
