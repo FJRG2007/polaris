@@ -28,7 +28,7 @@ import {
 } from "@polaris/core";
 import { findApp } from "@/lib/apps/catalog";
 import { SCOPE_LABELS, scopeAppArea, scopeLabel } from "@/lib/api-key-scopes";
-import { isMcpScope, mcpScopeListSchema, mcpScopes, scopeCategory } from "@/lib/mcp/scope-table";
+import { isMcpScope, mcpScopeListSchema, offeredMcpScopes, scopeCategory } from "@/lib/mcp/scope-table";
 import { registerRuntimeApps } from "@/lib/apps/runtime-apps";
 import { KNOWN_PERMISSIONS } from "@/lib/apps/runtime-catalog";
 import { readAppCatalog, runtimeViews } from "@/lib/apps/runtime-catalog-schema";
@@ -125,7 +125,7 @@ describe("an app's own permissions, from its manifest", () => {
 
     it("is offered everywhere a built-in permission is: MCP scopes, API keys, sharing, policy templates", () => {
         deliver([bakery]);
-        expect(mcpScopes()).toEqual(expect.arrayContaining(["bakery.use", "bakery.manage"]));
+        expect(offeredMcpScopes()).toEqual(expect.arrayContaining(["bakery.use", "bakery.manage"]));
         expect(isMcpScope("bakery.use")).toBe(true);
         expect(scopeCategory("bakery.use" as Permission)).toBe("productivity");
         expect(mcpScopeListSchema.safeParse(["bakery.use"]).success).toBe(true);
@@ -144,7 +144,7 @@ describe("an app's own permissions, from its manifest", () => {
     it("drops out of the scopes it was offered in when the app is withdrawn", () => {
         deliver([bakery]);
         deliver([]);
-        expect(mcpScopes()).not.toContain("bakery.use");
+        expect(offeredMcpScopes()).not.toContain("bakery.use");
         expect(isMcpScope("bakery.use")).toBe(false);
     });
 

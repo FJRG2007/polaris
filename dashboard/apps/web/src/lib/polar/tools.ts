@@ -28,7 +28,7 @@ import { mcpTools } from "@/lib/mcp/catalog";
 import { connectInProcess } from "@/lib/mcp/in-process";
 import { sessionCan, type SessionUser } from "@/lib/session";
 import {
-    mcpScopes,
+    offeredMcpScopes,
     scopeRequires,
     type McpCategory,
     type McpScope
@@ -44,7 +44,7 @@ import { POLARIS_SERVER } from "@/lib/polar/tool-servers";
 export async function sessionScopes(user: SessionUser): Promise<McpScope[]> {
     const held = new Map<string, boolean>();
     const scopes: McpScope[] = [];
-    for (const scope of mcpScopes()) {
+    for (const scope of offeredMcpScopes()) {
         const permission = scopeRequires(scope);
         if (!held.has(permission)) held.set(permission, await sessionCan(user, permission));
         if (held.get(permission)) scopes.push(scope);

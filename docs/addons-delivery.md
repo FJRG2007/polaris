@@ -132,7 +132,8 @@ An app's permissions are offered everywhere a built-in one is:
 A grant of a permission no app registers now - one whose app the catalogue
 dropped, or one not read yet - is stored and inert. Saving a role, a key or a
 share that holds it is neither refused nor stripped (`permissionSchema` accepts
-any `<app>.<action>` shape, `expandPermissions` keeps it), and `hasPermission`
+any `<app>.<action>` shape outside a built-in area such as `drive.`, and
+`expandPermissions` keeps it), and `hasPermission`
 grants nothing for it, not even to the wildcard, until the app is back.
 
 ## Limits

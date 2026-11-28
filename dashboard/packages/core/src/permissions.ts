@@ -425,6 +425,7 @@ const appRegistry = ((globalThis as Record<symbol, unknown>)[Symbol.for("polaris
     new Map()) as AppPermissionRegistry;
 
 const BUILT_IN: ReadonlySet<string> = new Set(PERMISSIONS);
+const BUILT_IN_AREAS: ReadonlySet<string> = new Set(PERMISSIONS.map((permission) => permission.slice(0, permission.indexOf("."))));
 const APP_KEY = /^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,47}$/;
 
 /**
@@ -434,7 +435,7 @@ const APP_KEY = /^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,47}$/;
  */
 export function registerAppPermissions(app: string, area: string, definitions: readonly AppPermissionDefinition[]): void {
     const own = definitions.filter(
-        (definition) => APP_KEY.test(definition.key) && definition.key.startsWith(`${app}.`) && !BUILT_IN.has(definition.key)
+        (definition) => definition.key.startsWith(`${app}.`) && isAppScopedPermission(definition.key)
     );
     const keys = new Set(own.map((definition) => definition.key));
     const kept = own.map((definition) => ({
@@ -473,7 +474,8 @@ export function knownPermissions(): Permission[] {
  * a permission this Polaris does not know.
  */
 export function isAppScopedPermission(permission: string): boolean {
-    return APP_KEY.test(permission) && !BUILT_IN.has(permission);
+    // Under a built-in area (`drive.`, `chat.`) it is a typo or a forgery, not an app's.
+    return APP_KEY.test(permission) && !BUILT_IN_AREAS.has(permission.slice(0, permission.indexOf(".")));
 }
 
 /** The registered app permissions that change something, for the read-only template. */

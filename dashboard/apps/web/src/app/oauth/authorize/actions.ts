@@ -21,7 +21,7 @@ import { mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { getTranslations } from "@/lib/i18n/request";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { currentOrigin } from "@/lib/mcp/oauth/origin";
-import { expandScopes, mcpScopeListSchema, scopeRequires, type McpScope } from "@/lib/mcp/scope-table";
+import { expandScopes, mcpScopeListSchema, scopeRequires } from "@/lib/mcp/scope-table";
 import { localized } from "@/app/(app)/account/security/action-messages";
 import { answerUrl, checkAuthorizationRequest, readParams } from "@/lib/mcp/oauth/authorize";
 

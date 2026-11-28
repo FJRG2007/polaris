@@ -28,7 +28,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { mcpTools } from "@/lib/mcp/catalog";
 import { readCappedBody } from "@/lib/request-body";
-import { mcpScopes, type McpScope } from "@/lib/mcp/scope-table";
+import { offeredMcpScopes, type McpScope } from "@/lib/mcp/scope-table";
 import { TURN_TOKEN_PREFIX, readTurnToken } from "@/lib/polar/claude-subscription/mcp-token";
 import { authenticateApiKey } from "@/lib/api-key-auth";
 import { withKeyUsage } from "@/lib/api-usage/recorder";
@@ -143,7 +143,7 @@ const SESSION_SCOPES: McpScope[] = ["tasks.read", "tasks.manage", "agents.read"]
  *  in Polar Chat, except starting and steering agents, for the same reason a
  *  session may not. */
 const turnScopes = (): McpScope[] =>
-    mcpScopes().filter(
+    offeredMcpScopes().filter(
         (scope) => scope !== "agents.manage" && scope !== "agents.coordinate" && scope !== "agents.report"
     );
 

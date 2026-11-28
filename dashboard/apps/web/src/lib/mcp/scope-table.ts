@@ -238,7 +238,7 @@ function appScopes(): McpScope[] {
 }
 
 /** Every scope this Polaris offers now: the built-in ones and each installed app's own permissions. */
-export function mcpScopes(): McpScope[] {
+export function offeredMcpScopes(): McpScope[] {
     const apps = appScopes();
     return apps.length === 0 ? [...MCP_SCOPES] : [...MCP_SCOPES, ...apps];
 }
