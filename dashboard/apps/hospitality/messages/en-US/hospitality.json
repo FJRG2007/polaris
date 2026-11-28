@@ -31,7 +31,9 @@
         "empty": "Nothing here yet",
         "emptyManager": "Add a product or import a spreadsheet.",
         "exportFile": "menu.csv",
-        "categoryNotEmpty": "Move or delete its products first."
+        "categoryNotEmpty": "Move or delete its products first.",
+        "exportXlsx": "menu.xlsx",
+        "exportCsv": "CSV"
     },
     "setup": {
         "title": "Set up your venue",
@@ -79,9 +81,10 @@
     "import": {
         "title": "Import menu",
         "run": "Import",
-        "hint": "A CSV with the columns category, name, price, tax, allergens, code. Products already there are updated.",
+        "hint": "A CSV or Excel file with the columns category, name, price, tax, allergens, code. Products already there are updated.",
         "done": "{created} added, {updated} updated",
-        "skipped": "Rows skipped: {rows}"
+        "skipped": "Rows skipped: {rows}",
+        "unreadable": "That file could not be read."
     },
     "allergens": {
         "gluten": "Gluten",
@@ -252,5 +255,12 @@
         "joins": "{table} is open: these join its order.",
         "confirm": "Move",
         "done": "Moved to {table}"
+    },
+    "picture": {
+        "choose": "Choose picture",
+        "camera": "Camera",
+        "remove": "Remove",
+        "hint": "Or drop or paste one here",
+        "failed": "The picture could not be stored."
     }
 }

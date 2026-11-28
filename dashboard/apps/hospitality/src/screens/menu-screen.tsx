@@ -38,7 +38,9 @@ import {
     seedSampleAction,
     setAvailabilityAction
 } from "../actions/catalog";
+import { PictureField } from "./picture-field";
 import { parsePrice } from "../model/catalog-csv";
+import { csvToXlsx, xlsxToCsv } from "../model/catalog-xlsx";
 import { CATEGORY_COLORS } from "../model/schemas";
 import { ALLERGEN_KEYS, type Allergen } from "../model/allergens";
 import { useHospitalityLive, useHospitalityMode } from "./live-client";
@@ -70,8 +72,9 @@ export function useMoney(currency: string) {
     }, [locale, currency]);
 }
 
-function download(name: string, text: string) {
-    const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+function download(name: string, content: string | Uint8Array) {
+    const type = typeof content === "string" ? "text/csv;charset=utf-8" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const url = URL.createObjectURL(new Blob([content as BlobPart], { type }));
     const link = document.createElement("a");
     link.href = url;
     link.download = name;
@@ -133,9 +136,13 @@ export function HospitalityScreen({ manager }: { manager: boolean }) {
             .finally(() => setSeeding(false));
     };
 
-    const exportCsv = () =>
+    const exportCatalog = (format: "csv" | "xlsx") =>
         unwrap(() => exportCatalogAction(), t("errors.loadFailed"))
-            .then((answer) => download(t("menu.exportFile"), answer.csv))
+            .then(async (answer) =>
+                format === "csv"
+                    ? download(t("menu.exportFile"), answer.csv)
+                    : download(t("menu.exportXlsx"), await csvToXlsx(answer.csv, t("tabs.menu")))
+            )
             .catch((caught: Error) => toast.show({ title: t("errors.loadFailed"), body: caught.message }));
 
     return (
@@ -164,8 +171,11 @@ export function HospitalityScreen({ manager }: { manager: boolean }) {
                                 <Button variant="outline" onClick={() => setImporting(true)}>
                                     <Upload aria-hidden /> {t("menu.import")}
                                 </Button>
-                                <Button variant="outline" onClick={exportCsv}>
+                                <Button variant="outline" onClick={() => exportCatalog("xlsx")}>
                                     <Download aria-hidden /> {t("menu.export")}
+                                </Button>
+                                <Button variant="ghost" onClick={() => exportCatalog("csv")}>
+                                    {t("menu.exportCsv")}
                                 </Button>
                                 <Button variant="outline" onClick={() => setPricing(true)}>
                                     <Percent aria-hidden /> {t("menu.prices")}
@@ -430,9 +440,10 @@ function ProductDialog(props: {
                 <Field label={t("product.sku")}>
                     <Input value={sku} onChange={(e) => setSku(e.target.value)} maxLength={64} />
                 </Field>
-                <Field label={t("product.image")}>
-                    <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} maxLength={500} placeholder="https://" />
-                </Field>
+            </div>
+            <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium">{t("product.image")}</span>
+                <PictureField value={imageUrl} onChange={setImageUrl} />
             </div>
             <fieldset className="flex flex-col gap-2">
                 <legend className="text-sm font-medium">{t("product.allergens")}</legend>
@@ -585,12 +596,14 @@ function ImportDialog(props: { onClose: () => void; onSaved: () => void }) {
             <p className="text-sm text-muted-foreground">{t("import.hint")}</p>
             <Input
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onChange={(e) => {
                     const picked = e.target.files?.[0];
                     if (!picked) return;
                     setFile(picked.name);
-                    void picked.text().then(setCsv);
+                    setCsv(null);
+                    const read = /\.xlsx$/i.test(picked.name) ? picked.arrayBuffer().then((bytes) => xlsxToCsv(bytes)) : picked.text();
+                    read.then(setCsv).catch(() => toast.show({ title: t("import.unreadable") }));
                 }}
             />
             {file ? <p className="truncate text-sm" title={file}>{file}</p> : null}

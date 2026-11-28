@@ -31,7 +31,9 @@
         "empty": "Aún no hay nada",
         "emptyManager": "Añade un producto o importa una hoja.",
         "exportFile": "carta.csv",
-        "categoryNotEmpty": "Mueve o borra antes sus productos."
+        "categoryNotEmpty": "Mueve o borra antes sus productos.",
+        "exportXlsx": "carta.xlsx",
+        "exportCsv": "CSV"
     },
     "setup": {
         "title": "Prepara tu local",
@@ -79,9 +81,10 @@
     "import": {
         "title": "Importar carta",
         "run": "Importar",
-        "hint": "Un CSV con columnas familia, nombre, precio, iva, alérgenos, código. Lo que ya existe se actualiza.",
+        "hint": "Un CSV o Excel con columnas familia, nombre, precio, iva, alérgenos, código. Lo que ya existe se actualiza.",
         "done": "{created} nuevos, {updated} cambiados",
-        "skipped": "Filas saltadas: {rows}"
+        "skipped": "Filas saltadas: {rows}",
+        "unreadable": "No se pudo leer ese archivo."
     },
     "allergens": {
         "gluten": "Gluten",
@@ -252,5 +255,12 @@
         "joins": "{table} está abierta: se suman a su cuenta.",
         "confirm": "Mover",
         "done": "Pasado a {table}"
+    },
+    "picture": {
+        "choose": "Elegir foto",
+        "camera": "Cámara",
+        "remove": "Quitar",
+        "hint": "O suéltala o pégala aquí",
+        "failed": "No se pudo guardar la foto."
     }
 }
