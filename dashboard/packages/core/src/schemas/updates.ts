@@ -20,6 +20,7 @@
  */
 
 import { z } from "zod";
+import { SECURITY_SEVERITIES, type SecuritySeverity } from "../changelog.js";
 
 /**
  * Where an update comes from.
@@ -189,6 +190,27 @@ export const DEFAULT_SECURITY_UPDATE: SecurityUpdatePolicy = {
 /** Whether this policy leaves a critical or high fix waiting on somebody. */
 export function securityPolicyTakesRisk(policy: Pick<SecurityUpdatePolicy, "critical" | "high">): boolean {
     return policy.critical !== "immediate" || policy.high !== "immediate";
+}
+
+/**
+ * What Polaris recommends, though it is not the default: every severity at the
+ * quietest hour, so installing a fix never cuts a service or a call in
+ * progress. Critical and high stay `immediate` until an administrator applies
+ * this; applying it records them in `riskAccepted`, which is the authorization.
+ */
+export const RECOMMENDED_SECURITY_TIMING: SecurityUpdateTiming = "quiet";
+
+/** Whether Polaris has a recommendation to offer for this policy: critical or
+ *  high still install the moment a fix is published, restart included. */
+export function securityPolicyCanFollowRecommendation(
+    policy: Pick<SecurityUpdatePolicy, "critical" | "high">
+): boolean {
+    return policy.critical === "immediate" || policy.high === "immediate";
+}
+
+/** Whether every severity installs as recommended. */
+export function securityPolicyFollowsRecommendation(policy: Pick<SecurityUpdatePolicy, SecuritySeverity>): boolean {
+    return SECURITY_SEVERITIES.every((severity) => policy[severity] === RECOMMENDED_SECURITY_TIMING);
 }
 
 /** How long a timing leaves a fix waiting, shortest first. */

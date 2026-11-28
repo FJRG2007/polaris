@@ -133,9 +133,16 @@ const lastUpdateOutcome = vi.fn(
 );
 let status: UpdateStatus;
 
+/** What is live right now: an order line, a payment, a seat on a call. */
+const live = vi.hoisted(() => ({ line: false, payment: false, seat: false }));
+const present = (on: boolean) => (on ? { id: "row-1" } : null);
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         setting,
+        hospitalityOrderLine: { findFirst: async () => present(live.line) },
+        hospitalityPayment: { findFirst: async () => present(live.payment) },
+        meetingParticipant: { findFirst: async () => present(live.seat) },
         notification: {
             updateMany: notificationUpdateMany,
             deleteMany: notificationDeleteMany,
@@ -203,6 +210,9 @@ beforeEach(async () => {
     status = available();
     changelog.security = null;
     changelog.hour = 4;
+    live.line = false;
+    live.payment = false;
+    live.seat = false;
     vi.useRealTimers();
     // Nothing stored: the deployment follows the default.
     setCapabilities(FULL);
@@ -307,5 +317,45 @@ describe("installing at the quietest hour", () => {
         await checkForUpdate();
         expect(startHostUpdate).not.toHaveBeenCalled();
         expect(raised("system.updated")).toHaveLength(0);
+    });
+
+    it("steps back while a venue is in service or a call is on, then installs", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        changelog.hour = 2;
+        vi.setSystemTime(new Date(2026, 10, 12, 14, 0));
+        await checkForUpdate();
+        live.line = true;
+        vi.setSystemTime(new Date(2026, 10, 13, 2, 1));
+        await checkForUpdate();
+        live.line = false;
+        live.seat = true;
+        vi.setSystemTime(new Date(2026, 10, 13, 2, 16));
+        await checkForUpdate();
+        expect(startHostUpdate).not.toHaveBeenCalled();
+        live.seat = false;
+        vi.setSystemTime(new Date(2026, 10, 13, 2, 31));
+        await checkForUpdate();
+        expect(startHostUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it("installs anyway once the cap past the quiet hour has run out", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        changelog.hour = 2;
+        vi.setSystemTime(new Date(2026, 10, 12, 14, 0));
+        await checkForUpdate();
+        live.payment = true;
+        vi.setSystemTime(new Date(2026, 10, 13, 3, 59));
+        await checkForUpdate();
+        expect(startHostUpdate).not.toHaveBeenCalled();
+        vi.setSystemTime(new Date(2026, 10, 13, 4, 0));
+        await checkForUpdate();
+        expect(startHostUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it("never holds back an install set to happen immediately", async () => {
+        await saveAutoUpdatePolicy({ mode: "immediate", at: "05:00" });
+        live.seat = true;
+        await checkForUpdate();
+        expect(startHostUpdate).toHaveBeenCalledTimes(1);
     });
 });
