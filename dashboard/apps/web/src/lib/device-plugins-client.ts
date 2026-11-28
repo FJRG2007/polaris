@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PolarisDesktop } from "@/lib/desktop-bridge";
 import { useDesktopBridge } from "@/components/desktop-app";
 import {
@@ -18,7 +18,10 @@ import {
     comparePluginVersions,
     readPluginsSnapshot,
     pluginStatusText,
+    readPluginSettingValues,
     type PluginEntry,
+    type PluginSetting,
+    type PluginSettingValue,
     type PluginManifest,
     type PluginPermission,
     type PluginsSnapshot,
@@ -113,6 +116,137 @@ export function usePlugins(): PluginsState {
     if (!desktop) return { kind: "browser" };
     if (!bridge) return { kind: "old-app" };
     return snapshot ? { kind: "ready", bridge, snapshot } : { kind: "loading", bridge };
+}
+
+/**
+ * A plugin's stored settings as the page last read them, per id and installed
+ * version, so its settings draw at once on the next visit (stale while
+ * revalidate): kept for the tab in memory and, for the next page load, in this
+ * browser's storage; read again from the app in the background, and swapped in
+ * only when they differ. A version that changed reads as nothing kept, since
+ * its settings may not be the same ones.
+ */
+export type PluginSettingValues = Record<string, PluginSettingValue>;
+
+const SETTINGS_STORE = "polaris.plugin-settings.v1:";
+const keptSettings = new Map<string, { readonly version: string; readonly values: PluginSettingValues; readonly said: string }>();
+const settingsListeners = new Map<string, Set<() => void>>();
+/** A local change counts up, so a read that began before it cannot put the old values back. */
+const settingsWrites = new Map<string, number>();
+const settingsReads = new Map<string, Promise<void>>();
+const settingsAgain = new Set<string>();
+
+function storedSettings(id: string, version: string): PluginSettingValues | null {
+    try {
+        const raw = window.localStorage.getItem(`${SETTINGS_STORE}${id}`);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as { version?: unknown; values?: unknown };
+        if (parsed.version !== version || !parsed.values || typeof parsed.values !== "object") return null;
+        return parsed.values as PluginSettingValues;
+    } catch {
+        return null;
+    }
+}
+
+/** The values kept for this id and version, or null when none are. */
+export function cachedPluginSettings(id: string, version: string, settings?: readonly PluginSetting[]): PluginSettingValues | null {
+    const kept = keptSettings.get(id);
+    if (kept) return kept.version === version ? kept.values : null;
+    const stored = typeof window === "undefined" ? null : storedSettings(id, version);
+    if (!stored) return null;
+    // What storage gave back is read like the app's answer: only the declared settings, each of its own kind.
+    const values = settings ? readPluginSettingValues(settings, stored) : stored;
+    keptSettings.set(id, { version, values, said: JSON.stringify(values) });
+    return values;
+}
+
+/** Keep `values` for this id and version; tells whoever draws them only when they changed. True when they did. */
+export function keepPluginSettings(id: string, version: string, values: PluginSettingValues): boolean {
+    const said = JSON.stringify(values);
+    const kept = keptSettings.get(id);
+    if (kept && kept.version === version && kept.said === said) return false;
+    keptSettings.set(id, { version, values, said });
+    try {
+        window.localStorage.setItem(`${SETTINGS_STORE}${id}`, JSON.stringify({ version, values }));
+    } catch {
+        // Storage is a convenience: without it the next page load reads the app first.
+    }
+    for (const listener of settingsListeners.get(id) ?? []) listener();
+    return true;
+}
+
+/** A change made on this page: kept at once, and any read already under way no longer counts. */
+export function changePluginSettings(id: string, version: string, values: PluginSettingValues): void {
+    settingsWrites.set(id, (settingsWrites.get(id) ?? 0) + 1);
+    keepPluginSettings(id, version, values);
+}
+
+/**
+ * Read the stored values from the app and keep them. One read per plugin at a
+ * time: everyone asking meanwhile shares it. A read a local change overtook is
+ * dropped (the change's own answer is the newer one).
+ */
+export function refreshPluginSettings(bridge: Pick<PluginsBridge, "settings">, id: string, version: string, settings: readonly PluginSetting[]): Promise<void> {
+    const running = settingsReads.get(id);
+    if (running) {
+        // Asked during a read: what changed may be newer than it, so one more read follows it.
+        settingsAgain.add(id);
+        return running;
+    }
+    const writes = settingsWrites.get(id) ?? 0;
+    const read = bridge
+        .settings(id)
+        .then((stored) => {
+            if (stored && (settingsWrites.get(id) ?? 0) === writes) keepPluginSettings(id, version, readPluginSettingValues(settings, stored));
+        })
+        .catch(() => undefined)
+        .finally(() => {
+            settingsReads.delete(id);
+            if (settingsAgain.delete(id)) void refreshPluginSettings(bridge, id, version, settings);
+        });
+    settingsReads.set(id, read);
+    return read;
+}
+
+/** Forget every kept value. For tests. */
+export function resetPluginSettingsCache(): void {
+    keptSettings.clear();
+    settingsListeners.clear();
+    settingsWrites.clear();
+    settingsReads.clear();
+    settingsAgain.clear();
+}
+
+/**
+ * One plugin's stored settings: what was kept at once (null only on a first
+ * visit), read again in the background on mount and whenever the app says
+ * something changed. Keyed on the id and version, never on the manifest
+ * object, which is a new one after every change the app announces.
+ */
+export function usePluginSettings(bridge: PluginsBridge, manifest: Pick<PluginManifest, "id" | "version" | "settings">): PluginSettingValues | null {
+    const { id, version } = manifest;
+    const declared = useRef(manifest.settings);
+    declared.current = manifest.settings;
+    const [values, setValues] = useState<PluginSettingValues | null>(() => cachedPluginSettings(id, version, manifest.settings));
+
+    useEffect(() => {
+        const follow = () => setValues(cachedPluginSettings(id, version, declared.current));
+        follow();
+        const listeners = settingsListeners.get(id) ?? new Set<() => void>();
+        settingsListeners.set(id, listeners);
+        listeners.add(follow);
+        return () => {
+            listeners.delete(follow);
+        };
+    }, [id, version]);
+
+    useEffect(() => {
+        const read = () => void refreshPluginSettings(bridge, id, version, declared.current);
+        read();
+        return bridge.onChange ? bridge.onChange(read) : undefined;
+    }, [bridge, id, version]);
+
+    return values;
 }
 
 /** What a card or a page offers first for one plugin. */

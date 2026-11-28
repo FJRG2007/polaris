@@ -22,10 +22,19 @@ vi.mock("@/components/i18n/i18n-provider", () => ({
 const desktop = vi.hoisted(() => ({ bridge: null as unknown }));
 vi.mock("@/components/desktop-app", () => ({ useDesktopBridge: () => desktop.bridge }));
 vi.mock("@polaris/ui", async (importOriginal) => ({ ...(await importOriginal<object>()), useToast: () => ({ show: vi.fn() }) }));
-vi.mock("@/components/confirm-dialog", () => ({ useConfirm: () => [async () => false, null] }));
+const asked = vi.hoisted(() => ({ answer: false, options: [] as unknown[] }));
+vi.mock("@/components/confirm-dialog", () => ({
+    useConfirm: () => [
+        async (options: unknown) => {
+            asked.options.push(options);
+            return asked.answer;
+        },
+        null
+    ]
+}));
 
 const { PluginPage } = await import("@/app/(app)/account/plugins/plugins-view");
-const { resetPluginsCache } = await import("@/lib/device-plugins-client");
+const { resetPluginsCache, resetPluginSettingsCache } = await import("@/lib/device-plugins-client");
 
 const raw = JSON.parse(readFileSync(join(process.cwd(), "../../../clients/device-plugins/hercules-stream100/manifest.json"), "utf8")) as Record<string, unknown>;
 const manifest = readPluginManifest(raw)!;
@@ -54,6 +63,9 @@ function open(rawManifest: unknown, extra: { actions?: unknown[]; runAction?: (i
 afterEach(() => {
     cleanup();
     resetPluginsCache();
+    resetPluginSettingsCache();
+    asked.answer = false;
+    asked.options = [];
 });
 
 describe("a plugin's settings", () => {
@@ -116,6 +128,21 @@ describe("a plugin's settings", () => {
         expect(await screen.findByText("El Stream 100 usa otro driver.")).toBeTruthy();
         fireEvent.click(screen.getByRole("button", { name: "Instalar el driver" }));
         await waitFor(() => expect(runAction).toHaveBeenCalledWith(manifest.id, "driver"));
+    });
+
+    it("say the vendor program is using the controller, and close it only once the person says yes", async () => {
+        const runAction = vi.fn(async () => true);
+        const action = { id: "useInPolaris", subject: "Hercules Stream Control", label: { "en-US": "Use it in Polaris" }, detail: { "en-US": "Hercules Stream Control is using the controller." } };
+        open(raw, { actions: [action], runAction });
+        // The page's own words, in the reader's language (keys here).
+        expect(await screen.findByText("plugins.hostAction.useInPolaris.detail")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "plugins.hostAction.useInPolaris.label" }));
+        await waitFor(() => expect(asked.options).toHaveLength(1));
+        expect(asked.options[0]).toMatchObject({ title: "plugins.hostAction.useInPolaris.title", confirmLabel: "plugins.hostAction.useInPolaris.confirm" });
+        expect(runAction).not.toHaveBeenCalled();
+        asked.answer = true;
+        fireEvent.click(screen.getByRole("button", { name: "plugins.hostAction.useInPolaris.label" }));
+        await waitFor(() => expect(runAction).toHaveBeenCalledWith(manifest.id, "useInPolaris"));
     });
 
     it("offer no host action to an app that cannot run one", async () => {

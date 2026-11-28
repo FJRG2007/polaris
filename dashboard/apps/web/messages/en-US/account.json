@@ -2715,6 +2715,16 @@
                 "declined": "The administrator prompt was declined, so nothing was changed.",
                 "failed": "The official app could not be restored. Try again."
             }
+        },
+        "hostAction": {
+            "useInPolaris": {
+                "label": "Use it in Polaris",
+                "detail": "{app} is using the controller, so Polaris cannot read it.",
+                "title": "Close {app}?",
+                "body": "Polaris closes {app} and takes over the {device}. If the {device} still has its maker's driver, Windows asks once to put Polaris' driver on it.",
+                "confirm": "Close it and use Polaris",
+                "failed": "{app} did not close. Close it yourself, then try again."
+            }
         }
     }
 }

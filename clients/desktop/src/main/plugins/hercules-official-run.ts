@@ -398,6 +398,12 @@ export function createOfficialRunner(host: OfficialHost, paths: OfficialPaths, n
             return { ...result, ok: true };
         },
 
+        /**
+         * Closes Stream Control, nothing else: asked first, forced only when it is
+         * still there a few seconds later (`stopProcess`). True once it is gone.
+         */
+        close: () => stopProcess(),
+
         /** Starts Stream Control from where its Run value points, and nothing else. */
         async launch(): Promise<boolean> {
             const file = await program();

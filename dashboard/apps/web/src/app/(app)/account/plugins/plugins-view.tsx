@@ -42,6 +42,7 @@ import {
     readPluginSettingValues,
     readPluginsSnapshot,
     type PluginEntry,
+    type PluginHostAction,
     type PluginManifest,
     type PluginSetting,
     type PluginSettingGroup,
@@ -53,6 +54,9 @@ import {
     pluginListings,
     pluginOffer,
     usePlugins,
+    usePluginSettings,
+    changePluginSettings,
+    keepPluginSettings,
     useInstallPlugin,
     statusDetail,
     PERMISSION_KEY,
@@ -724,20 +728,9 @@ function PluginSettings({ bridge, manifest }: { bridge: PluginsBridge; manifest:
     const t = useTranslations("account");
     const locale = useLocale();
     const toast = useToast();
-    const [values, setValues] = useState<Record<string, PluginSettingValue> | null>(null);
-
-    useEffect(() => {
-        let live = true;
-        void bridge
-            .settings(manifest.id)
-            .then((stored) => {
-                if (live && stored) setValues(readPluginSettingValues(manifest.settings, stored));
-            })
-            .catch(() => undefined);
-        return () => {
-            live = false;
-        };
-    }, [bridge, manifest]);
+    // What was kept from the last visit draws at once; the app's answer replaces it only when it differs.
+    const values = usePluginSettings(bridge, manifest);
+    const setValues = (next: Record<string, PluginSettingValue>) => changePluginSettings(manifest.id, manifest.version, next);
 
     // A search result names one setting or group (`#setting-<key>`, `#group-<key>`); they are drawn only once the values arrive.
     const loaded = values !== null;
@@ -758,7 +751,7 @@ function PluginSettings({ bridge, manifest }: { bridge: PluginsBridge; manifest:
             .setSetting(manifest.id, key, value)
             .then((after) => {
                 if (!after) throw new Error("refused");
-                setValues(readPluginSettingValues(manifest.settings, after));
+                keepPluginSettings(manifest.id, manifest.version, readPluginSettingValues(manifest.settings, after));
             })
             .catch(() => {
                 setValues(before);
@@ -784,6 +777,9 @@ function PluginSettings({ bridge, manifest }: { bridge: PluginsBridge; manifest:
     );
 }
 
+/** Each view's last reported height, for the tab's lifetime. */
+const viewHeights = new Map<string, number>();
+
 /**
  * The plugin's own view, for what its declared settings cannot draw (a preview,
  * never a control: those are declared settings, drawn below it). A frame
@@ -798,7 +794,8 @@ export function PluginView({ bridge, manifest, view }: { bridge: PluginsBridge; 
     const t = useTranslations("account");
     const locale = useLocale();
     const frame = useRef<HTMLIFrameElement>(null);
-    const [height, setHeight] = useState<number>(PLUGIN_VIEW_HEIGHT.min * 2);
+    // The height it last reported, so it opens at its size instead of growing into it.
+    const [height, setHeight] = useState<number>(() => viewHeights.get(manifest.id) ?? PLUGIN_VIEW_HEIGHT.min * 2);
     const viewCall = bridge.viewCall;
     // The hello is built from the latest locale, and sent again only when it differs
     // from the last one the view got, so an unrelated class on the root reaches nobody.
@@ -821,23 +818,22 @@ export function PluginView({ bridge, manifest, view }: { bridge: PluginsBridge; 
         sendHello(false);
     }, [locale, sendHello]);
 
-    // Settings changed elsewhere (the list above, another window) reach an open view:
-    // every change to the plugin brings a new manifest here, and the values are read again.
+    // Settings changed elsewhere (the list below, another window) reach an open view: it shares
+    // the one kept copy the list draws from (`usePluginSettings`), so no read of its own.
+    const values = usePluginSettings(bridge, manifest);
+    const valuesNow = useRef(values);
+    valuesNow.current = values;
     const lastSettings = useRef("");
     const sendSettings = useCallback(() => {
-        void bridge
-            .settings(manifest.id)
-            .then((values) => {
-                const target = frame.current?.contentWindow;
-                if (!values || !target || !ready.current) return;
-                const said = JSON.stringify(values);
-                if (said === lastSettings.current) return;
-                lastSettings.current = said;
-                target.postMessage({ type: "settings", values }, "*");
-            })
-            .catch(() => undefined);
-    }, [bridge, manifest]);
-    useEffect(() => sendSettings(), [sendSettings]);
+        const target = frame.current?.contentWindow;
+        const current = valuesNow.current;
+        if (!current || !target || !ready.current) return;
+        const said = JSON.stringify(current);
+        if (said === lastSettings.current) return;
+        lastSettings.current = said;
+        target.postMessage({ type: "settings", values: current }, "*");
+    }, []);
+    useEffect(() => sendSettings(), [values, sendSettings]);
 
     useEffect(() => {
         if (!viewCall) return;
@@ -857,7 +853,9 @@ export function PluginView({ bridge, manifest, view }: { bridge: PluginsBridge; 
                 return;
             }
             if (message.type === "resize") {
-                setHeight(pluginViewHeight(message.height));
+                const next = pluginViewHeight(message.height);
+                viewHeights.set(manifest.id, next);
+                setHeight(next);
                 return;
             }
             void viewCall(manifest.id, message.method, message.params)
@@ -884,13 +882,34 @@ export function PluginView({ bridge, manifest, view }: { bridge: PluginsBridge; 
 }
 
 /** Runs what the app offers to do for a plugin; one at a time, the snapshot that follows says how it went. */
-function useHostAction(bridge: PluginsBridge | null): { running: string | null; run: (id: string, action: string) => void } {
+function useHostAction(bridge: PluginsBridge | null): { running: string | null; run: (id: string, action: string, failed?: () => void) => void } {
     const [running, setRunning] = useState<string | null>(null);
-    const run = (id: string, action: string) => {
+    const run = (id: string, action: string, failed?: () => void) => {
         setRunning(action);
-        void (bridge?.runAction?.(id, action) ?? Promise.resolve(false)).catch(() => false).finally(() => setRunning(null));
+        void (bridge?.runAction?.(id, action) ?? Promise.resolve(false))
+            .catch(() => false)
+            .then((done) => {
+                if (done !== true) failed?.();
+            })
+            .finally(() => setRunning(null));
     };
     return { running, run };
+}
+
+/**
+ * The host action that closes the device's own vendor program and gives the
+ * device to Polaris (desktop `plugins/collision.ts`). The page words it itself
+ * and asks first; any other action is drawn in the words it comes with.
+ */
+const TAKE_OVER_ACTION = "useInPolaris";
+
+/** What the host action reads as: the page's own words for one it knows, the action's otherwise. */
+function hostActionWords(t: Words, action: PluginHostAction, locale: string): { label: string; detail: string | null } {
+    if (action.id === TAKE_OVER_ACTION) {
+        const app = action.subject ?? say(t, "official.appName");
+        return { label: say(t, "hostAction.useInPolaris.label"), detail: say(t, "hostAction.useInPolaris.detail", { app }) };
+    }
+    return { label: pluginText(action.label, locale), detail: action.detail ? pluginText(action.detail, locale) : null };
 }
 
 /** A catalog screenshot as the store's gallery takes one: the same picture in both themes and on a phone. */
@@ -916,6 +935,7 @@ export function PluginPage({ id }: { id: string; }) {
     const [startUninstall, confirmElement] = useUninstall(bridge);
     const [startInstall, installDialog] = useInstallFlow(bridge, state.kind === "ready" ? state.snapshot : null);
     const hostAction = useHostAction(bridge);
+    const [confirmAction, confirmActionElement] = useConfirm();
 
     const back = <DetailBack href="/account/plugins">{say(t, "page.back")}</DetailBack>;
     if (state.kind === "browser" || state.kind === "old-app") {
@@ -963,6 +983,18 @@ export function PluginPage({ id }: { id: string; }) {
     const releases = entry ? pluginReleases(entry) : [];
     const actions = installed && state.bridge.runAction ? installed.actions : [];
     const busy = offer.kind === "installing";
+    const runHostAction = (action: PluginHostAction) => {
+        if (action.id !== TAKE_OVER_ACTION) return hostAction.run(id, action.id);
+        const app = action.subject ?? say(t, "official.appName");
+        void (async () => {
+            const ok = await confirmAction({
+                title: say(t, "hostAction.useInPolaris.title", { app }),
+                description: say(t, "hostAction.useInPolaris.body", { app, device: manifest.name }),
+                confirmLabel: say(t, "hostAction.useInPolaris.confirm")
+            });
+            if (ok) hostAction.run(id, action.id, () => toast.show({ title: say(t, "hostAction.useInPolaris.failed", { app }) }));
+        })();
+    };
 
     const toggle = (enabled: boolean) => {
         void state.bridge
@@ -996,9 +1028,9 @@ export function PluginPage({ id }: { id: string; }) {
                         </Button>
                     ) : null}
                     {actions.map((action) => (
-                        <Button key={action.id} variant="secondary" disabled={hostAction.running !== null || busy} onClick={() => hostAction.run(id, action.id)}>
+                        <Button key={action.id} variant="secondary" disabled={hostAction.running !== null || busy} onClick={() => runHostAction(action)}>
                             {hostAction.running === action.id ? <Loader2 aria-hidden className="size-4 shrink-0 animate-spin" /> : null}
-                            {pluginText(action.label, locale)}
+                            {hostActionWords(t, action, locale).label}
                         </Button>
                     ))}
                     {installed ? (
@@ -1008,13 +1040,14 @@ export function PluginPage({ id }: { id: string; }) {
                         </Button>
                     ) : null}
                 </div>
-                {actions.map((action) =>
-                    action.detail ? (
+                {actions.map((action) => {
+                    const detail = hostActionWords(t, action, locale).detail;
+                    return detail ? (
                         <p key={action.id} className={cn(settingType.body, "text-muted-foreground break-words")}>
-                            {pluginText(action.detail, locale)}
+                            {detail}
                         </p>
-                    ) : null
-                )}
+                    ) : null;
+                })}
                 {installed ? (
                     <label className="flex min-w-0 items-center justify-between gap-3 sm:justify-start">
                         <span className={cn(settingType.body, "min-w-0")}>{say(t, "detail.enabled")}</span>
@@ -1093,6 +1126,7 @@ export function PluginPage({ id }: { id: string; }) {
                 </DetailFacts>
             </DetailSection>
             {confirmElement}
+            {confirmActionElement}
             {installDialog}
         </div>
     );

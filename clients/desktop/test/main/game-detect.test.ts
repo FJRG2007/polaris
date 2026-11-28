@@ -322,6 +322,15 @@ describe("listing programs on Windows", () => {
         expect(shell.child.killed).toBe(true);
     });
 
+    it("rejects instead of asking tasklist when a frequent look says so", async () => {
+        const shell = fakeShell({ flood: true });
+        const fallback = vi.fn(async () => ["from-tasklist.exe"]);
+        const lister = new WindowsLister(() => shell.child, fallback);
+        await expect(lister.list(false)).rejects.toThrow();
+        expect(fallback).not.toHaveBeenCalled();
+        expect(shell.child.killed).toBe(true);
+    });
+
     it("keeps one shell open and asks it again", async () => {
         const shells: ReturnType<typeof fakeShell>[] = [];
         const lister = new WindowsLister(() => {

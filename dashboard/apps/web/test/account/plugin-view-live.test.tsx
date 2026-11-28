@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "@testing-library/react";
 import type { PluginManifest } from "@polaris/core/device-plugins";
-import type { PluginsBridge } from "@/lib/device-plugins-client";
+import { resetPluginSettingsCache, type PluginsBridge } from "@/lib/device-plugins-client";
 
 const words = vi.hoisted(() => ({ locale: "en" }));
 vi.mock("@/components/i18n/i18n-provider", () => ({
@@ -19,9 +19,17 @@ vi.mock("@/components/i18n/i18n-provider", () => ({
 
 const { PluginView } = await import("@/app/(app)/account/plugins/plugins-view");
 
-const manifest = { id: "pedal", name: "Pedal" } as unknown as PluginManifest;
+const manifest = { id: "pedal", name: "Pedal", version: "1.0.0", settings: [{ key: "knob1", kind: "choice", label: { "en-US": "Knob 1" }, default: "music", options: [{ value: "music", label: { "en-US": "Music" } }, { value: "games", label: { "en-US": "Games" } }] }] } as unknown as PluginManifest;
 const stored = vi.hoisted(() => ({ values: { knob1: "music" } as Record<string, unknown> }));
-const bridge = { viewCall: vi.fn(async () => ({ ok: true, value: null })), settings: vi.fn(async () => ({ ...stored.values })) } as unknown as PluginsBridge;
+const changes = vi.hoisted(() => ({ listeners: new Set<() => void>() }));
+const bridge = {
+    viewCall: vi.fn(async () => ({ ok: true, value: null })),
+    settings: vi.fn(async () => ({ ...stored.values })),
+    onChange: (listener: () => void) => {
+        changes.listeners.add(listener);
+        return () => changes.listeners.delete(listener);
+    }
+} as unknown as PluginsBridge;
 
 function hellos(post: ReturnType<typeof vi.fn>): Array<{ locale: string; theme: string; tokens: Record<string, string> }> {
     return post.mock.calls.map((call) => call[0]).filter((message) => message?.type === "hello");
@@ -41,6 +49,8 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 afterEach(() => {
     cleanup();
+    resetPluginSettingsCache();
+    changes.listeners.clear();
     words.locale = "en";
     stored.values = { knob1: "music" };
     document.documentElement.className = "";
@@ -90,8 +100,9 @@ describe("an open plugin view", () => {
         view.rerender(<PluginView bridge={bridge} manifest={{ ...manifest }} view="view/index.html" />);
         await settle();
         expect(settings().length).toBe(1);
+        // The app says something changed: the values are read again behind what is drawn.
         stored.values = { knob1: "games" };
-        view.rerender(<PluginView bridge={bridge} manifest={{ ...manifest }} view="view/index.html" />);
+        for (const listener of changes.listeners) listener();
         await settle();
         expect(settings().at(-1)).toEqual({ type: "settings", values: { knob1: "games" } });
     });

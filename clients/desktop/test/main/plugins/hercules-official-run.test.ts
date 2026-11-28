@@ -152,6 +152,23 @@ describe("carrying out a choice", () => {
         expect(calls.findIndex((c) => c.tool === "taskkill.exe")).toBeGreaterThan(-1);
     });
 
+    it("closes Stream Control and nothing else for Use it in Polaris, with argument lists only", async () => {
+        const { runner, calls, state, files } = machine();
+        expect(await runner.close()).toBe(true);
+        expect(state.running).toBe(false);
+        expect(state.autostart).toBe(true);
+        expect(files.has(run.backupPath(PATHS))).toBe(false);
+        expect(calls.map((c) => c.tool)).toEqual(["taskkill.exe", "tasklist.exe"]);
+        expect(calls[0]?.args).toEqual(["/im", "Stream-control.exe"]);
+    });
+
+    it("forces Stream Control closed for Use it in Polaris only when it stays open", async () => {
+        const { runner, calls, state } = machine({ closesOnAsk: false });
+        expect(await runner.close()).toBe(true);
+        expect(state.running).toBe(false);
+        expect(calls.filter((c) => c.tool === "taskkill.exe").map((c) => c.args)).toEqual([["/im", "Stream-control.exe"], ["/f", "/im", "Stream-control.exe"]]);
+    });
+
     it("forces Stream Control closed only when it stays open", async () => {
         const { runner, calls } = machine({ closesOnAsk: false });
         await runner.execute("stop");

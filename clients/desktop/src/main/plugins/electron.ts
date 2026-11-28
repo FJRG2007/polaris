@@ -17,6 +17,8 @@ import { pluginShortcuts, sameShortcuts, type PluginShortcuts } from "./ways-in"
 import type { PluginChild, WantedPlugin } from "./supervisor";
 import { createPluginManager, type PluginManager } from "./manager";
 import { createRequirements, type EnsureReason, type Requirements } from "./requirements";
+import { sharedWindowsLister } from "../game-detect";
+import { createCollisionWatch, takeOverAction, TAKE_OVER_ACTION, type CollisionWatch } from "./collision";
 import { answerOfficial, DRIVER_REQUIREMENT, driverRunnerFor, lookDriver, officialRequestSchema, officialRunnerFor, requirementRunnerFor, udevRunnerFor } from "./official";
 import { showNotice } from "../notices";
 import { newsWords } from "./updates";
@@ -30,6 +32,8 @@ let manager: PluginManager | null = null;
 /** The program keys of the games this app sees running, sent as `games` in a `polaris.state` answer. */
 let runningGames: () => readonly string[] = () => [];
 let requirements: Requirements | null = null;
+/** A device's own vendor program holding it (`collision.ts`); Windows only. */
+let collisions: CollisionWatch | null = null;
 /** Requirement setups run one after another, so no two permission prompts are open at once. */
 let ensuring: Promise<void> = Promise.resolve();
 let usb: UsbWatch | null = null;
@@ -64,9 +68,38 @@ function ensureRequirements(reason: EnsureReason, id?: string): Promise<void> {
 async function snapshotWithActions(running: PluginManager): Promise<unknown> {
     const snapshot = await running.snapshot();
     const installed = await Promise.all(
-        snapshot.installed.map(async (plugin) => ({ ...plugin, actions: plugin.manifest && requirements ? await requirements.actions(plugin.id, plugin.manifest) : [] }))
+        snapshot.installed.map(async (plugin) => {
+            const program = collisions?.program(plugin.id) ?? null;
+            const own = plugin.manifest && requirements ? await requirements.actions(plugin.id, plugin.manifest) : [];
+            return { ...plugin, actions: program ? [takeOverAction(program), ...own].slice(0, 8) : own };
+        })
     );
     return { ...snapshot, installed };
+}
+
+/**
+ * "Use it in Polaris": close the vendor program that holds the device, and only
+ * on the person's click (after the page asked them). The plugin lets go of the
+ * device meanwhile and opens it again the moment the program is gone; when the
+ * vendor's driver is still on it, Polaris' own goes on (Windows' one prompt), so
+ * the program cannot take it back the next time it starts.
+ */
+async function takeOver(running: PluginManager, id: string, found: PluginManifest): Promise<boolean> {
+    const official = officialRunnerFor(id, pluginsDir());
+    if (!official) return false;
+    const closed = await running.whileStopped(id, () => official.close()).catch(() => false);
+    // A person's click: the driver is looked at again, not read from the last look.
+    const state = closed ? await driverRunnerFor(id, pluginsDir())?.state().catch(() => null) : null;
+    await collisions?.tick();
+    if (!closed) return false;
+    const held = requirements;
+    if (held && state && (state.state === "needed" || state.state === "repair")) {
+        const run = ensuring.then(() => held.run(id, found, DRIVER_REQUIREMENT));
+        ensuring = run.then(() => undefined, () => undefined);
+        await run.catch(() => false);
+    }
+    broadcast(CHANNELS.pluginsChanged);
+    return true;
 }
 
 /** Starts the device's official app for a plugin, when one is registered for it here (`official.ts`). */
@@ -295,9 +328,23 @@ export function startDevicePlugins(showPolaris: (path?: string) => void, games: 
         }
     });
     servePluginViews();
+    if (process.platform === "win32") {
+        collisions = createCollisionWatch({
+            // Plugged in and switched on; where plugs cannot be heard, every installed one.
+            watched: () => (devices ? shortcuts.plugged : shortcuts.installed).map((item) => item.id),
+            // The game watcher's open shell; a look that does not answer is skipped rather than paid for with `tasklist`.
+            list: () => sharedWindowsLister().list(false),
+            driver: (id) => driverRunnerFor(id, pluginsDir())?.knownState() ?? null,
+            changed: () => broadcast(CHANNELS.pluginsChanged)
+        });
+        collisions.start();
+    }
     usb = watchUsb((next) => {
         devices = next;
-        void created.devicesChanged(next).finally(() => lookAtShortcuts(showPolaris));
+        void created.devicesChanged(next).finally(() => {
+            lookAtShortcuts(showPolaris);
+            void collisions?.tick();
+        });
         // A device plugged in with another driver on it gets the plugin's back.
         void ensureRequirements("plugged");
     });
@@ -313,6 +360,8 @@ export function startDevicePlugins(showPolaris: (path?: string) => void, games: 
 export function stopDevicePlugins(): void {
     usb?.close();
     usb = null;
+    collisions?.stop();
+    collisions = null;
     manager?.stop();
 }
 
@@ -355,6 +404,7 @@ export function registerPluginIpc(
         ready();
         const found = await installedManifest(parsedId.data);
         const held = requirements;
+        if (found && parsedAction.data === TAKE_OVER_ACTION) return collisions?.holding(parsedId.data) ? takeOver(ready(), parsedId.data, found) : false;
         if (!found || !held) return false;
         // After any automatic setup already under way, so only one prompt is open.
         const run = ensuring.then(() => held.run(parsedId.data, found, parsedAction.data));
@@ -430,7 +480,8 @@ export function registerPluginIpc(
                     await writeFile(join(dataDir, name), text, "utf8");
                 },
                 (requires) => installedWith(parsedId.data, requires),
-                async () => (await driverRunnerFor(parsedId.data, pluginsDir())?.state())?.state === "installed"
+                // The last look, never a new one: this answers every time the page opens.
+                async () => (await driverRunnerFor(parsedId.data, pluginsDir())?.lastState())?.state === "installed"
             );
         } catch (error) {
             console.error(`[plugin ${parsedId.data}] official software: ${error instanceof Error ? error.message : String(error)}`);

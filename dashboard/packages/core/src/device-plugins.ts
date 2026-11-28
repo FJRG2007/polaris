@@ -496,7 +496,9 @@ export const pluginHostActionSchema = z.object({
     id: settingKeySchema,
     label: pluginTextSchema,
     /** What is wrong while the action is offered. */
-    detail: pluginTextSchema.optional()
+    detail: pluginTextSchema.optional(),
+    /** What the action is about, by name (the program holding a device, say), for a page that words a known action itself. */
+    subject: z.string().trim().min(1).max(100).optional()
 });
 
 export type PluginHostAction = z.infer<typeof pluginHostActionSchema>;

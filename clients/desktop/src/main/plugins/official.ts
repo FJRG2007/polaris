@@ -16,6 +16,7 @@ import type { RequirementRunner } from "./requirements";
 import { createUdevRunner, udevRequirement, type UdevRunner } from "./hercules-udev";
 import { createAudioCaptureRunner, installedModuleLoader, AUDIO_CAPTURE_SETTINGS, type AudioCaptureDeps } from "./mac-audio-capture";
 import { createDriverRunner, type DriverFailure, type DriverRunner, type DriverState } from "./hercules-driver";
+import { createLastKnown, type LastKnown } from "./last-known";
 
 /** The plugins whose device ships official software Polaris knows how to find. */
 export const OFFICIAL_PLUGINS = ["hercules-stream100"] as const;
@@ -95,11 +96,37 @@ export function officialRunnerFor(id: string, pluginsDir: string, platform: Node
     });
 }
 
+/**
+ * Where each plugin's driver stood at the last look. A look is one cold
+ * PowerShell walking every device (`hercules-driver.ts`, seconds), so only a
+ * change looks again: the app starting, the device plugged in, a setup, or the
+ * person's click; a page opening reads what is kept (`lastState`).
+ */
+const knownDrivers = createLastKnown<DriverState>();
+
+/** A driver runner whose every `state()` is kept, with `lastState()` answering from what was kept. */
+export interface KeptDriverRunner extends DriverRunner {
+    /** The state at the last look, or one look when there has been none yet. */
+    lastState(): Promise<DriverState>;
+    /** The state at the last look, or null, without looking. */
+    knownState(): DriverState | null;
+}
+
+/** `runner`'s looks kept under `id` in `kept`. Pure, for the tests. */
+export function keptDriver(runner: DriverRunner, id: string, kept: LastKnown<DriverState> = knownDrivers): KeptDriverRunner {
+    return {
+        ...runner,
+        state: () => kept.fresh(id, () => runner.state()),
+        lastState: () => kept.read(id, () => runner.state()),
+        knownState: () => kept.known(id)
+    };
+}
+
 /** The Stream 100's own WinUSB driver on this machine, or null off Windows or for another plugin. */
-export function driverRunnerFor(id: string, pluginsDir: string, platform: NodeJS.Platform = process.platform, host: OfficialHost = nodeOfficialHost()): DriverRunner | null {
+export function driverRunnerFor(id: string, pluginsDir: string, platform: NodeJS.Platform = process.platform, host: OfficialHost = nodeOfficialHost()): KeptDriverRunner | null {
     if (platform !== "win32" || id !== "hercules-stream100") return null;
     const env = process.env;
-    return createDriverRunner(host, { systemRoot: env.SystemRoot ?? env.WINDIR ?? "C:\\Windows", programData: env.ProgramData ?? "C:\\ProgramData", dataDir: join(pluginsDir, "official", id) }, platform);
+    return keptDriver(createDriverRunner(host, { systemRoot: env.SystemRoot ?? env.WINDIR ?? "C:\\Windows", programData: env.ProgramData ?? "C:\\ProgramData", dataDir: join(pluginsDir, "official", id) }, platform), id);
 }
 
 /** The key the Stream 100's manifest lists its driver under (`requires`, Windows only). */
@@ -165,10 +192,15 @@ export function requirementRunnerFor(id: string, key: string, pluginsDir: string
     return driver ? driverRequirement(driver) : null;
 }
 
-/** The Stream 100 view's `driver.look`: where the driver stands and why its last setup did not go through. */
-export async function lookDriver(driver: DriverRunner | null, failure: string | null): Promise<(DriverState & { readonly failure: DriverFailure | null }) | null> {
+/**
+ * The Stream 100 view's `driver.look`: where the driver stands and why its last
+ * setup did not go through. Read from the last look (`lastState`), so opening
+ * the page never starts one; a runner without kept looks looks now.
+ */
+export async function lookDriver(driver: DriverRunner | KeptDriverRunner | null, failure: string | null): Promise<(DriverState & { readonly failure: DriverFailure | null }) | null> {
     if (!driver) return null;
-    return { ...(await driver.state()), failure: (failure as DriverFailure | null) ?? null };
+    const state = "lastState" in driver ? await driver.lastState() : await driver.state();
+    return { ...state, failure: (failure as DriverFailure | null) ?? null };
 }
 
 /**

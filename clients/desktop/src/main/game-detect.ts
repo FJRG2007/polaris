@@ -381,17 +381,24 @@ export class WindowsLister {
         private readonly fallback: () => Promise<string[]> = async () => parseTasklist(await run("tasklist", ["/fo", "csv", "/nh"]))
     ) {}
 
-    /** One list; a second asked while one is on its way gets the same answer. */
-    list(): Promise<RunningProcess[]> {
-        this.pending ??= this.ask()
-            .catch(async () => {
+    /**
+     * One list; a second asked while one is on its way gets the same answer.
+     * `fallback: false` is for a frequent look that would rather miss one than
+     * pay for `tasklist`: a shell that does not answer is a rejection instead.
+     */
+    list(fallback = true): Promise<RunningProcess[]> {
+        if (this.pending) return this.pending;
+        const asked: Promise<RunningProcess[]> = this.ask()
+            .catch(async (error: unknown) => {
                 this.stop();
+                if (!fallback) throw error;
                 return (await this.fallback()).map((name) => ({ name }));
             })
             .finally(() => {
-                this.pending = null;
+                if (this.pending === asked) this.pending = null;
             });
-        return this.pending;
+        this.pending = asked;
+        return asked;
     }
 
     stop(): void {
@@ -456,11 +463,21 @@ export class WindowsLister {
     }
 }
 
+let sharedLister: WindowsLister | null = null;
+
+/**
+ * The one open shell this app lists programs with on Windows: the game watcher
+ * and the device plugins' look for a program holding a device ask the same one,
+ * so a second watcher never means a second PowerShell.
+ */
+export function sharedWindowsLister(): WindowsLister {
+    return (sharedLister ??= new WindowsLister());
+}
+
 /** The watcher's look: the open shell on Windows, `runningPrograms` elsewhere. */
 function watchedPrograms(): () => Promise<readonly Seen[]> {
     if (process.platform !== "win32") return () => runningPrograms();
-    const lister = new WindowsLister();
-    return () => lister.list();
+    return () => sharedWindowsLister().list();
 }
 
 /**

@@ -15,17 +15,31 @@ import { lookOfficial, readOfficialRestore, type PluginsBridge, type OfficialLoo
 
 type Say = (key: string, values?: Record<string, string | number>) => string;
 
+/** The last look per plugin for the tab's lifetime: the line draws at once on the next visit, and is looked at again behind it. */
+const lastLooks = new Map<string, OfficialLook | null>();
+
 export function OfficialSoftware({ id, bridge }: { id: string; bridge: PluginsBridge }) {
     const t = useTranslations("account");
     const say = useCallback<Say>((key, values) => (t as unknown as Say)(`plugins.${key}`, values), [t]);
     const toast = useToast();
-    const [look, setLook] = useState<OfficialLook | null>(null);
+    const [look, setLook] = useState<OfficialLook | null>(() => lastLooks.get(id) ?? null);
     const [busy, setBusy] = useState<"restore" | "launch" | null>(null);
 
-    const load = useCallback(() => lookOfficial(bridge, id).then(setLook), [bridge, id]);
+    const load = useCallback(
+        () =>
+            lookOfficial(bridge, id).then((value) => {
+                lastLooks.set(id, value);
+                setLook(value);
+            }),
+        [bridge, id]
+    );
     useEffect(() => {
         let live = true;
-        void lookOfficial(bridge, id).then((value) => live && setLook(value));
+        setLook(lastLooks.get(id) ?? null);
+        void lookOfficial(bridge, id).then((value) => {
+            lastLooks.set(id, value);
+            if (live) setLook(value);
+        });
         return () => {
             live = false;
         };

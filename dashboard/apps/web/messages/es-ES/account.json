@@ -2715,6 +2715,16 @@
                 "declined": "Se rechazó el aviso de administrador, así que no se cambió nada.",
                 "failed": "No se pudo restaurar la app oficial. Vuelve a intentarlo."
             }
+        },
+        "hostAction": {
+            "useInPolaris": {
+                "label": "Usarlo en Polaris",
+                "detail": "{app} está usando el controlador, así que Polaris no puede leerlo.",
+                "title": "¿Cerrar {app}?",
+                "body": "Polaris cierra {app} y se queda con el {device}. Si el {device} aún tiene el driver del fabricante, Windows pide permiso una vez para poner el de Polaris.",
+                "confirm": "Cerrarlo y usar Polaris",
+                "failed": "{app} no se cerró. Ciérralo tú y vuelve a intentarlo."
+            }
         }
     }
 }
