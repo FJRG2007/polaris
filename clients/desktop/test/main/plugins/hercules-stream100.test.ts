@@ -250,7 +250,7 @@ describe("Hercules Stream 100 plugin", () => {
         const manifest = readPluginManifest(JSON.parse(readFileSync(new URL("manifest.json", folder), "utf8")))!;
         const root = fileURLToPath(new URL("any/", folder));
         const view = createRequire(import.meta.url)(fileURLToPath(new URL("any/view/view.js", folder))) as {
-            wordsFor(locale: string): { categories: Record<string, string>; displays: Record<string, string>; caption: string; driver: Record<string, unknown> & { failed: Record<string, string> } };
+            wordsFor(locale: string): { categories: Record<string, string>; displays: Record<string, string>; labelSizes: Record<string, string>; caption: string; driver: Record<string, unknown> & { failed: Record<string, string> } };
             readDriver(value: unknown): { state: string; hercules: boolean; installed: boolean; failure: string | null } | null;
             driverSentence(driver: unknown): string | null;
             DRIVER_FAILURES: readonly string[];
