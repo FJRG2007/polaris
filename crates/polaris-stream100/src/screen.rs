@@ -377,7 +377,11 @@ impl<'a> Canvas<'a> {
         let theme = self.theme;
         IndexedFrame {
             palette: theme.palette,
-            pixels: self.pixels.iter().map(|color| theme.index_of(*color)).collect(),
+            pixels: self
+                .pixels
+                .iter()
+                .map(|color| theme.index_of(*color))
+                .collect(),
         }
     }
 }
@@ -469,7 +473,13 @@ fn idle_page(canvas: &mut Canvas<'_>, idle: &Idle) {
         if let Some(percent) = row.percent {
             let width = WIDTH - 2 * MARGIN;
             canvas.rect(MARGIN, top + 28, width, 4, TRACK);
-            canvas.rect(MARGIN, top + 28, width * usize::from(percent.min(100)) / 100, 4, FILL);
+            canvas.rect(
+                MARGIN,
+                top + 28,
+                width * usize::from(percent.min(100)) / 100,
+                4,
+                FILL,
+            );
         }
     }
 }
@@ -693,7 +703,10 @@ impl Painter {
             return;
         }
         let both_idle = screen.idle.is_some()
-            && self.shown.as_ref().is_some_and(|shown| shown.idle.is_some())
+            && self
+                .shown
+                .as_ref()
+                .is_some_and(|shown| shown.idle.is_some())
             && self.set_up;
         if both_idle {
             self.pending = Some(screen.clone());

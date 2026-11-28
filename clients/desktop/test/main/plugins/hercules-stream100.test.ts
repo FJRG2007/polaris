@@ -275,7 +275,7 @@ describe("Hercules Stream 100 plugin", () => {
             const words = view.wordsFor("en-US");
             for (const setting of manifest.settings) {
                 if (setting.kind === "choice") {
-                    const labels = setting.key === "display" ? words.displays : words.categories;
+                    const labels = setting.key === "display" ? words.displays : setting.key === "labelSize" ? words.labelSizes : words.categories;
                     expect(Object.keys(labels).sort(), setting.key).toEqual(setting.options.map((option) => option.value).sort());
                 }
                 if (setting.key in view.DEFAULTS) expect(view.DEFAULTS[setting.key], setting.key).toBe(setting.default);

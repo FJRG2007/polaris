@@ -482,14 +482,31 @@ mod tests {
         engine.set_settings(settings);
         let _ = engine.feed(&report(0, [0; 4]), 0, &[], Output::default());
         let bit = KnobMap::default().0[1];
-        let commands = engine.feed(&report(bit, [0; 4]), 10, &[session("a", "Spotify.exe", 50, false)], Output::default());
-        assert_eq!(commands, vec![Command::Action { id: "custom:obs".into() }]);
+        let commands = engine.feed(
+            &report(bit, [0; 4]),
+            10,
+            &[session("a", "Spotify.exe", 50, false)],
+            Output::default(),
+        );
+        assert_eq!(
+            commands,
+            vec![Command::Action {
+                id: "custom:obs".into()
+            }]
+        );
     }
 
     #[test]
     fn the_idle_page_replaces_the_chosen_one_until_it_is_cleared() {
         let mut engine = Engine::new(Settings::default(), KnobMap::default());
-        let idle = Idle { clock: "12:30".into(), rows: vec![crate::screen::IdleRow { label: "CPU".into(), value: "12%".into(), percent: Some(12) }] };
+        let idle = Idle {
+            clock: "12:30".into(),
+            rows: vec![crate::screen::IdleRow {
+                label: "CPU".into(),
+                value: "12%".into(),
+                percent: Some(12),
+            }],
+        };
         assert!(engine.set_idle(Some(idle.clone())));
         assert!(!engine.set_idle(Some(idle)));
         assert!(engine.screen(&[], Output::default(), &[]).idle.is_some());

@@ -189,7 +189,9 @@ impl Controller {
     /// `null` to go back to it: the plugin decides when nobody is touching.
     #[napi(catch_unwind)]
     pub fn set_idle(&mut self, idle: String) {
-        let idle = serde_json::from_str::<Option<screen::Idle>>(&idle).ok().flatten();
+        let idle = serde_json::from_str::<Option<screen::Idle>>(&idle)
+            .ok()
+            .flatten();
         if self.engine.set_idle(idle) {
             self.repaint();
         }

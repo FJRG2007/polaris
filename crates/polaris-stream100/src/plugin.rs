@@ -286,7 +286,13 @@ pub fn settings_from_plugin(values: &Map<String, Value>) -> Settings {
 /// does not read keeps today's look.
 pub fn look_from_plugin(values: &Map<String, Value>) -> crate::theme::Look {
     use crate::theme::{Fit, LabelSize, Look};
-    let text = |key: &str| values.get(key).and_then(Value::as_str).unwrap_or_default().to_owned();
+    let text = |key: &str| {
+        values
+            .get(key)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
+    };
     let defaults = Look::default();
     Look {
         background_color: text("backgroundColor"),

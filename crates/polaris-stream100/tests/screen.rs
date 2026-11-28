@@ -14,10 +14,10 @@ use polaris_stream100::report::KnobMap;
 use polaris_stream100::screen::{
     render, Call, Idle, IdleRow, Knob, NowPlaying, Painter, Person, Screen, IDLE_HOLD, TILE_EVERY,
 };
-use polaris_stream100::theme::{self, Look, Theme};
-use std::sync::Arc;
 use polaris_stream100::session::KEEPALIVE_EVERY;
 use polaris_stream100::settings::{DisplayMode, Settings};
+use polaris_stream100::theme::{self, Look, Theme};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 fn hex(text: &str) -> Vec<u8> {
@@ -759,7 +759,11 @@ fn an_idle_page_that_changes_every_second_is_still_seen_whole() {
     assert_eq!(first.len(), CHUNK_COUNT);
     let tens = render(&idle_page(10)).unwrap();
     for (tile, samples) in &first {
-        assert_eq!(samples, &tens.tile(*tile), "tile {tile} is of the first page");
+        assert_eq!(
+            samples,
+            &tens.tile(*tile),
+            "tile {tile} is of the first page"
+        );
     }
     let mut panel = Panel::new(true);
     panel.apply(&sent);
@@ -782,7 +786,11 @@ fn touching_a_control_leaves_the_idle_page_at_once() {
     painter.show(&idle_page(10));
     let begun = run(&mut painter, start, TILE_EVERY * 5);
     painter.show(&page(70));
-    let rest = run(&mut painter, start + TILE_EVERY * 6, TILE_EVERY - Duration::from_millis(1));
+    let rest = run(
+        &mut painter,
+        start + TILE_EVERY * 6,
+        TILE_EVERY - Duration::from_millis(1),
+    );
     let seventy = render(&page(70)).unwrap();
     let tiles = tiles_in(&rest);
     assert_eq!(tiles.len(), 1);
@@ -838,7 +846,9 @@ fn letters_have_smooth_edges_in_the_palette_shades() {
         }
     }
     assert!(seen.len() > 4, "{seen:?}");
-    assert!(seen.iter().all(|index| usize::from(*index) < theme::PICTURE_SLOTS_FROM));
+    assert!(seen
+        .iter()
+        .all(|index| usize::from(*index) < theme::PICTURE_SLOTS_FROM));
     assert_eq!(frame.palette, theme.palette);
 }
 
@@ -871,7 +881,10 @@ fn image_png(width: u32, height: u32, color: [u8; 4]) -> String {
     let picture = image::RgbaImage::from_pixel(width, height, image::Rgba(color));
     let mut bytes = Vec::new();
     picture
-        .write_to(&mut std::io::Cursor::new(&mut bytes), image::ImageFormat::Png)
+        .write_to(
+            &mut std::io::Cursor::new(&mut bytes),
+            image::ImageFormat::Png,
+        )
         .unwrap();
     base64::engine::general_purpose::STANDARD.encode(bytes)
 }
