@@ -5,7 +5,7 @@
         "failed": "Could not read the network details."
     },
     "camera": {
-        "batteryNoPicture": "No picture. Open its settings to test it.",
+        "batteryNoPicture": "No image. Open its settings to test it.",
         "batteryOpenToWatch": "On battery - open it to watch",
         "notAnswering": "Not answering",
         "notAnsweringSince": "Not answering since {since}",
@@ -101,7 +101,7 @@
             "summary": "Let the camera decide something moved and tell Polaris. Most cameras made in the last ten years can."
         },
         "faces": {
-            "cost": "Highest, and rarest: it runs on the people already found rather than on the whole picture.",
+            "cost": "Highest, and rarest: it runs on the people already found rather than on the whole image.",
             "label": "Who it is",
             "requires": "Face recognition, which is off until you turn it on under Settings. While it is off this camera still reports that somebody is there - just not who.",
             "summary": "When somebody is seen, compare their face against the people you have taught it. Everybody else is reported as a stranger."
@@ -119,7 +119,7 @@
         "objects": {
             "cost": "Moderate, and only while something is actually happening. Idle the rest of the time.",
             "label": "People, vehicles and animals",
-            "summary": "When something moves, Polaris looks properly for as long as it is there, and says what it was and whereabouts in the picture. One arrival is one entry, with the clearest frame of it. This is what stops a swaying branch waking the house. It says a person is there, never which person - that is the rung below."
+            "summary": "When something moves, Polaris looks properly for as long as it is there, and says what it was and whereabouts in the image. One arrival is one entry, with the clearest frame of it. This is what stops a swaying branch waking the house. It says a person is there, never which person - that is the rung below."
         }
     },
     "modelPicker": {
@@ -136,7 +136,7 @@
         "brandOther": "Other",
         "conditionalNote": "This one answers RTSP only when it is wired for power, has the jumper fitted, and is set to stay awake in the Tapo app. On its battery it publishes nothing, and Polaris reaches it over TP-Link's own protocol instead.",
         "tips": {
-            "frameRate25": "Recommended: in the Tapo app, open the camera's Device Settings > Video & Display and set Frame Rate to 25 fps. At its default 15 the picture stutters in Polaris."
+            "frameRate25": "Recommended: in the Tapo app, open the camera's Device Settings > Video & Display and set Frame Rate to 25 fps. At its default 15 the video stutters in Polaris."
         },
         "names": {
             "amcrest-other": "Any Amcrest camera",
@@ -248,7 +248,7 @@
             "add": "Add a camera",
             "more": "{count, plural, one {# more camera} other {# more cameras}}",
             "watch": "Watch {name}",
-            "noPicture": "No picture",
+            "noPicture": "No image",
             "connecting": "Connecting..."
         },
         "routines": {
@@ -301,7 +301,7 @@
         "notes": {
             "battery": "Polaris connects only while you are looking. It will not check on it and it will not watch for movement, because both of those mean holding the stream open, which is what empties the battery.",
             "battery-solar": "The same as on a battery. A panel replaces what a day costs, not what a permanent connection costs, so nothing here holds one open.",
-            "mains": "Polaris treats it like any other camera: it keeps the picture up to date and tells you when it stops answering."
+            "mains": "Polaris treats it like any other camera: it keeps the image up to date and tells you when it stops answering."
         }
     },
     "ptz": {
@@ -373,9 +373,9 @@
         "fullscreen": "Fullscreen",
         "leaveFullscreen": "Leave fullscreen",
         "mute": "Mute",
-        "notAnswering": "Camera not sending a picture - reconnecting",
+        "notAnswering": "Camera not sending video - reconnecting",
         "pause": "Pause",
-        "picturesOnly": "Pictures only - the live stream would not start<retry>Try again</retry>",
+        "picturesOnly": "Still images only - the live stream would not start<retry>Try again</retry>",
         "play": "Play",
         "unmute": "Turn the sound on",
         "zoomIn": "Zoom in",
@@ -477,7 +477,7 @@
         "something": "something",
         "limited": "It is {reason}.",
         "noModel": "this machine has no detection model, so movement only",
-        "noSize": "the camera would not say how big its picture is, so movement only",
+        "noSize": "the camera would not say how big its image is, so movement only",
         "minutesAgo": "{count, plural, one {# minute ago} other {# minutes ago}}",
         "hoursAgo": "{count, plural, one {# hour ago} other {# hours ago}}",
         "daysAgo": "{count, plural, one {# day ago} other {# days ago}}",
@@ -1312,11 +1312,11 @@
         "placeLocation": "That location is not valid."
     },
     "settings": {
-        "footageBody": "Recordings and the pictures that go with events are written to <em>{storage}</em>. That is set for the whole instance under Uploads, beside where photos and attachments go - one place for one decision. A camera that wants its own disk says so on its own settings.",
+        "footageBody": "Recordings and the images that go with events are written to <em>{storage}</em>. That is set for the whole instance under Uploads, beside where photos and attachments go - one place for one decision. A camera that wants its own disk says so on its own settings.",
         "sensitivityBody": "Nobody guesses these right the first time, and they are not the same for a hallway and a garden facing a hedge. Set them once here, from the camera you have already tuned, and every camera added afterward starts there. Each camera can still disagree.",
         "settleHint": "Seconds. This is the one that stops moths, gusts and passing trucks: nearly every false alarm is over within a second or two, and a person is not.",
         "gapHint": "Seconds. Somebody standing at a door is one thing that happened, not sixty.",
-        "facesBody": "Off unless you turn it on. It puts names to the people you have taught it under People, and only after a camera has already seen somebody - the pictures and what is learned from them stay on the machine it runs on. While it is on it holds its models in memory, so leave it off if you only want cameras to say that somebody is there.",
+        "facesBody": "Off unless you turn it on. It puts names to the people you have taught it under People, and only after a camera has already seen somebody - the images and what is learned from them stay on the machine it runs on. While it is on it holds its models in memory, so leave it off if you only want cameras to say that somebody is there.",
         "offButRunning": "Off, but still running on {server}.",
         "offButRunningHint": "Nothing is asking it anything. Stopping it gives back the memory it holds its models in; turning recognition back on starts it again.",
         "offHint": "Cameras report that somebody is there, and never who. Nothing is running for it.",
@@ -1404,8 +1404,8 @@
         "clearFilters": "Clear filters",
         "deleteThese": "Delete these",
         "emptyTitle": "Nothing yet",
-        "emptyBody": "When a camera notices something, it turns up here with the picture it took.",
-        "noPicture": "No picture kept",
+        "emptyBody": "When a camera notices something, it turns up here with the image it took.",
+        "noPicture": "No image kept",
         "noFootage": "No footage of this moment was kept",
         "score": "How sure the detector was",
         "markSeen": "Mark as seen",
@@ -1413,7 +1413,7 @@
         "deleteNothing": "Delete - it was nothing",
         "theseDetections": "these detections",
         "deleteAllTitle": "Delete the detections on screen?",
-        "deleteAllBody": "Everything the current filters match is removed, along with its pictures. Footage is not touched.",
+        "deleteAllBody": "Everything the current filters match is removed, along with its images. Footage is not touched.",
         "deleteThem": "Delete them",
         "see": "See {camera} at {at}"
     },
@@ -1432,7 +1432,7 @@
             }
         },
         "title": "Areas on {name}",
-        "intro": "Draw the parts of the picture that matter. Click the frame to place each corner. Until you draw one, the whole picture counts.",
+        "intro": "Draw the parts of the image that matter. Click the frame to place each corner. Until you draw one, the whole image counts.",
         "undo": "Undo corner",
         "startOver": "Start over",
         "reading": "Reading them...",
@@ -1450,7 +1450,7 @@
         "done": "Done",
         "save": "Save area",
         "add": "Add area",
-        "noPicture": "No picture from this camera right now. You can still draw on the frame - an area is a fraction of the picture, not a set of pixels."
+        "noPicture": "No image from this camera right now. You can still draw on the frame - an area is a fraction of the image, not a set of pixels."
     },
     "alerts": {
         "intro": "Everything the cameras see is in Events either way. An alert is what you want telling about: it arrives as a message in a conversation with the people you pick.",
@@ -3187,7 +3187,7 @@
         "positions": "Positions",
         "reading": "Asking the camera",
         "restart": "Restart",
-        "restartQuestion": "Restart {name}? The picture stops for about a minute.",
+        "restartQuestion": "Restart {name}? The video stops for about a minute.",
         "restartTitle": "Restart the camera",
         "restarting": "Restarting the camera",
         "retry": "Try again",

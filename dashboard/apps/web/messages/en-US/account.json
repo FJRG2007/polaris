@@ -113,7 +113,7 @@
     },
     "deviceCache": {
         "title": "This device",
-        "body": "{surface, select, app {Polaris keeps a few things in this app so screens open faster - pictures, how loud each person is in a call, playback speed. Clear them if something looks out of date and a reload has not fixed it. Your other devices are not affected, and you stay signed in.} other {Polaris keeps a few things in this browser so screens open faster - pictures, how loud each person is in a call, playback speed. Clear them if something looks out of date and a reload has not fixed it. Your other devices are not affected, and you stay signed in.}}",
+        "body": "{surface, select, app {Polaris keeps a few things in this app so screens open faster - images, how loud each person is in a call, playback speed. Clear them if something looks out of date and a reload has not fixed it. Your other devices are not affected, and you stay signed in.} other {Polaris keeps a few things in this browser so screens open faster - images, how loud each person is in a call, playback speed. Clear them if something looks out of date and a reload has not fixed it. Your other devices are not affected, and you stay signed in.}}",
         "clear": "Clear cached data",
         "clearing": "Clearing"
     },
@@ -971,11 +971,11 @@
             "closed": "Nothing is opened until you press it, and it closes when you leave this screen.",
             "inCall": "This is the camera your call is sending, background and all.",
             "background": "Background",
-            "pictures": "Pictures",
-            "changePicture": "Change your picture",
-            "ownPicture": "Use a picture of your own",
-            "pictureStays": "{surface, select, app {A picture of your own stays in this app and is sent nowhere.} other {A picture of your own stays in this browser and is sent nowhere.}}",
-            "pictureFailed": "Polaris could not use that picture.",
+            "pictures": "Images",
+            "changePicture": "Change your image",
+            "ownPicture": "Use an image of your own",
+            "pictureStays": "{surface, select, app {An image of your own stays in this app and is sent nowhere.} other {An image of your own stays in this browser and is sent nowhere.}}",
+            "pictureFailed": "Polaris could not use that image.",
             "starting": "Starting. The first one on a machine downloads the model.",
             "failed": "It could not start, so nothing is applied to your camera: {problem}",
             "running": "Running. This is what a call sends."
@@ -1228,20 +1228,20 @@
         "errors": {
             "notSaved": "Could not save that",
             "unreachable": "Could not reach the server",
-            "reopen": "Could not open that picture again",
-            "animated": "A moving picture cannot be reframed - replace it to change how it sits"
+            "reopen": "Could not open that image again",
+            "animated": "A moving image cannot be reframed - replace it to change how it sits"
         },
         "reframe": "Reframe",
         "reframeNote": "Move and scale what is already there",
         "replace": "Replace",
         "upload": "Upload {kind, select, banner {banner} other {photo}}",
-        "uploadNote": "Choose a picture from this device - a GIF keeps moving",
+        "uploadNote": "Choose an image from this device - a GIF keeps moving",
         "remove": "Remove",
         "removeNote": "Go back to the default {kind, select, banner {banner} other {photo}}",
         "edit": "Edit {kind, select, banner {banner} other {photo}}",
         "title": "{kind, select, banner {Banner} other {Photo}}",
         "cardTitle": "Photo and banner",
-        "personHint": "How your profile looks to everybody else. Without a photo, Polaris uses the picture your email address has on Gravatar and your initials if it has none; without a banner, a color taken from your photo.",
+        "personHint": "How your profile looks to everybody else. Without a photo, Polaris uses the photo your email address has on Gravatar and your initials if it has none; without a banner, a color taken from your photo.",
         "orgHint": "How this organization looks wherever it appears - the switcher, its people's rosters, and its own page. Without a photo, Polaris draws its initials; without a banner, a color taken from the photo."
     },
     "appearance": {
@@ -1254,7 +1254,7 @@
         "clearAll": "Clear it all",
         "banner": {
             "label": "Banner",
-            "hint": "The band across the top of your profile, under your banner picture.",
+            "hint": "The band across the top of your profile, under your banner image.",
             "fromPhoto": "From your photo",
             "oneColour": "One color",
             "twoColours": "Two colors",
@@ -1264,7 +1264,7 @@
         },
         "decoration": {
             "label": "Avatar decoration",
-            "hint": "Drawn on your picture wherever you're introduced - your profile, messages, member lists - not in pickers or tables. Every one of them is free.",
+            "hint": "Drawn on your photo wherever you're introduced - your profile, messages, member lists - not in pickers or tables. Every one of them is free.",
             "moves": "Moves"
         },
         "nameplate": {
@@ -2853,12 +2853,12 @@
             "holds": "{name}: {value}"
         },
         "look": {
-            "choose": "Choose picture",
+            "choose": "Choose image",
             "replace": "Replace",
-            "remove": "Remove picture",
+            "remove": "Remove image",
             "defaultColor": "Default color",
             "useDefault": "Use the default color",
-            "unreadable": "That picture could not be read",
+            "unreadable": "That image could not be read",
             "preview": "Preview of the device's screen"
         }
     }

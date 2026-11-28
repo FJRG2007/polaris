@@ -265,7 +265,7 @@ describe("the Overview", () => {
     it("asks a camera again within seconds when its picture does not arrive", async () => {
         // After an update the relay restarts and every camera dials afresh; the
         // first frame often misses. Waiting for the 30 s refresh to ask again
-        // was a card saying "No picture" for a camera that was fine.
+        // was a card saying "No image" for a camera that was fine.
         served = {
             ...HOUSE,
             cameras: [{ id: "cam-1", name: "Garden", enabled: true, power: "mains" } as never]
@@ -278,7 +278,7 @@ describe("the Overview", () => {
             const first = picture().getAttribute("src");
             fireEvent.error(picture());
             expect(card.textContent).toContain("Connecting...");
-            expect(card.textContent).not.toContain("No picture");
+            expect(card.textContent).not.toContain("No image");
             await act(async () => {
                 vi.advanceTimersByTime(5_000);
             });
@@ -293,7 +293,7 @@ describe("the Overview", () => {
                     vi.advanceTimersByTime(5_000);
                 });
             }
-            expect(card.textContent).toContain("No picture");
+            expect(card.textContent).toContain("No image");
             expect(card.querySelector("img")).toBeNull();
         } finally {
             vi.useRealTimers();

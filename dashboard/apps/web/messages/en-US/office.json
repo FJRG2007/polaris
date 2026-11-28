@@ -266,9 +266,9 @@
         "image": {
             "insert": "Image",
             "name": "Image",
-            "notAPicture": "That file is not a picture.",
-            "tooLarge": "That picture is too large to add to a slide.",
-            "unreadable": "That picture could not be read."
+            "notAPicture": "That file is not an image.",
+            "tooLarge": "That image is too large to add to a slide.",
+            "unreadable": "That image could not be read."
         },
         "format": {
             "fontSize": "Font size",

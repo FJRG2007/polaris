@@ -281,7 +281,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         opensAt: "/tools",
         summary: "Convert, resize, optimize, trim and translate - without leaving Polaris.",
         description:
-            "The jobs people open a random website for, and hand somebody else's server their files to do: turning a PDF into a Word document, an image into another format, a spreadsheet into a CSV. Resize and optimize pictures, read what a file actually contains, trim and mute a video, shorten a link, translate a passage. The files stay on your own machine, and nothing is uploaded anywhere it was not already.", // i18n-ignore
+            "The jobs people open a random website for, and hand somebody else's server their files to do: turning a PDF into a Word document, an image into another format, a spreadsheet into a CSV. Resize and optimize images, read what a file actually contains, trim and mute a video, shorten a link, translate a passage. The files stay on your own machine, and nothing is uploaded anywhere it was not already.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",
@@ -1590,7 +1590,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: ScanFace,
         summary: "Watches for movement, then looks properly at what it was.",
         description:
-            "The part of Places that looks at pixels. It reads the small stream from the relay - never the camera - and while nothing is happening that is all it does. When something moves in a part of the picture you care about, it looks properly: full frames through a detection model, following whatever it found for as long as it is there, so one arrival is one event with one good picture of it. It sits idle the rest of the time, and it runs on the machine you chose rather than on the one Polaris is on.", // i18n-ignore
+            "The part of Places that looks at pixels. It reads the small stream from the relay - never the camera - and while nothing is happening that is all it does. When something moves in a part of the image you care about, it looks properly: full frames through a detection model, following whatever it found for as long as it is there, so one arrival is one event with one good image of it. It sits idle the rest of the time, and it runs on the machine you chose rather than on the one Polaris is on.", // i18n-ignore
         installMethod: "compose-template",
         capabilities: ["tool"],
         dashboard: "generic",

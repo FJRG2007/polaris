@@ -210,19 +210,19 @@
         "modes": {
             "block": {
                 "title": "Never load anything from outside",
-                "body": "The strictest. Some messages will look broken, because they are mostly pictures."
+                "body": "The strictest. Some messages will look broken, because they are mostly images."
             },
             "trusted": {
                 "title": "Only from senders I have allowed",
-                "body": "Stricter than it needs to be now that pictures come through Polaris, and slower to read: nothing is drawn until you allow that sender."
+                "body": "Stricter than it needs to be now that images come through Polaris, and slower to read: nothing is drawn until you allow that sender."
             },
             "always": {
-                "title": "Show pictures",
+                "title": "Show images",
                 "body": "The usual choice. Polaris fetches them on your behalf, so the sender never learns your address, your browser, or when you opened it."
             }
         },
-        "title": "Pictures and anything else a message loads",
-        "lead": "A message can carry an invisible picture that tells its sender the moment you opened it, from where, and on what. Polaris fetches every one of them for you, so what they get is a request from this server rather than anything about you.",
+        "title": "Images and anything else a message loads",
+        "lead": "A message can carry an invisible image that tells its sender the moment you opened it, from where, and on what. Polaris fetches every one of them for you, so what they get is a request from this server rather than anything about you.",
         "nameTrackersLabel": "Name the trackers",
         "nameTrackers": "Say which companies were tracking",
         "nameTrackersHint": "A message says how many trackers it carried and who they belong to, rather than only that something was blocked.",
@@ -235,9 +235,9 @@
         "codesHint": "A verification code stops working in a few minutes and then sits in your mailbox for years. Off by default: this deletes mail, so it is something to switch on rather than something to switch off.",
         "keepLabel": "How long a code is kept",
         "thenTrash": "then to the trash, where you can still get it back.",
-        "trusted": "Senders whose pictures load",
+        "trusted": "Senders whose images load",
         "trustedEmpty": "Nobody yet. Allowing a sender from inside a message adds them here.",
-        "untrust": "Stop loading pictures from {address}"
+        "untrust": "Stop loading images from {address}"
     },
     "accounts": {
         "linked": "{provider} account authorized. Add the mailbox below and it will be offered without a password.",

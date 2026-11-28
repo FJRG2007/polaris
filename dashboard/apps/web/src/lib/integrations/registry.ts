@@ -674,7 +674,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         summary: "Search GIFs and stickers from the chat composer.",
         description:
             // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
-            "Adds a GIF and sticker search to the picker in Chat. Without it the picker still works - emoji, the pictures each person has kept, and anything sent by pasting its address - and only the search tab is missing. A chosen GIF is fetched once and stored here like any other attachment, so a conversation never asks Tenor for anything and nobody is told who read what.",
+            "Adds a GIF and sticker search to the picker in Chat. Without it the picker still works - emoji, the images each person has kept, and anything sent by pasting its address - and only the search tab is missing. A chosen GIF is fetched once and stored here like any other attachment, so a conversation never asks Tenor for anything and nobody is told who read what.",
         docsUrl: "https://developers.google.com/tenor/guides/quickstart",
         setupLinks: [
             {

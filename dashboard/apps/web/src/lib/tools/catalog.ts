@@ -39,7 +39,7 @@ export const TOOL_GROUPS: readonly ToolGroup[] = [
     {
         id: "images",
         name: "Images",
-        subject: "A picture",
+        subject: "An image",
         icon: ImageIcon,
         href: "/tools/images",
         does: [

@@ -573,7 +573,7 @@ const snapshotInput = z.object({
         .uuid()
         .optional()
         .describe(
-            "The camera, as this tool listed it. Absent lists the cameras this account can watch, with no picture."
+            "The camera, as this tool listed it. Absent lists the cameras this account can watch, with no image."
         ),
     width: z
         .number()
@@ -581,17 +581,17 @@ const snapshotInput = z.object({
         .min(SNAPSHOT_SMALLEST)
         .max(1280)
         .default(SNAPSHOT_WIDTH)
-        .describe("How wide the picture is, in pixels. Smaller is cheaper to read.")
+        .describe("How wide the image is, in pixels. Smaller is cheaper to read.")
 });
 
 const snapshotTool = () =>
     host.mcp.defineTool({
         name: "places_camera_snapshot",
         // i18n-ignore shown by the calling client, which has no locale to ask for
-        title: "Camera picture",
+        title: "Camera snapshot",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "A still picture from one camera in this account's places, as it is right now. Without cameraId, lists the cameras this account can watch. No video and no recordings. Read-only.",
+            "A still image from one camera in this account's places, as it is right now. Without cameraId, lists the cameras this account can watch. No video and no recordings. Read-only.",
         input: snapshotInput,
         scope: "places.cameras",
         category: "home",
@@ -647,7 +647,7 @@ const snapshotTool = () =>
                     // Asleep, starting or switched off: the tile's own sentence.
                     if (caught instanceof CameraOfflineError) refuse(caught.message);
                     if (caught instanceof Error && caught.name === "TimeoutError")
-                        refuse("The camera did not send a picture in time.");
+                        refuse("The camera did not send an image in time.");
                     throw caught;
                 }
             };
@@ -655,7 +655,7 @@ const snapshotTool = () =>
             if (image.length > SNAPSHOT_MAX_BYTES && input.width > SNAPSHOT_SMALLEST)
                 image = await still(SNAPSHOT_SMALLEST);
             if (image.length > SNAPSHOT_MAX_BYTES)
-                refuse("The camera's picture is too large to send, even at its smallest size.");
+                refuse("The camera's image is too large to send, even at its smallest size.");
             const takenAt = new Date().toISOString();
             return {
                 text: `${camera.name}, ${takenAt}.`,

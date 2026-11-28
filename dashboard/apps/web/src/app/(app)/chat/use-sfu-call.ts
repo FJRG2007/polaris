@@ -1958,7 +1958,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     strained.current = true;
                     void track.prioritizePerformance().catch(() => undefined);
                     setError(
-                        "This device cannot encode video at the size it was sending, so the picture has been made smaller. Closing other applications, or choosing a lower video quality, gives it back."
+                        "This device cannot encode video at the size it was sending, so the video has been made smaller. Closing other applications, or choosing a lower video quality, gives it back."
                     );
                 }
             );

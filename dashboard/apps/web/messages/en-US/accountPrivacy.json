@@ -122,7 +122,7 @@
         },
         "photoFullSize": {
             "label": "Opening your photo",
-            "note": "Who can open your photo and look at it full size. Anybody who cannot still sees it beside your name - this is a rule about the press, not a second copy of the picture."
+            "note": "Who can open your photo and look at it full size. Anybody who cannot still sees it beside your name - this is a rule about the press, not a second copy of the photo."
         },
         "fullName": {
             "label": "Your full name",
@@ -351,7 +351,7 @@
         }
     },
     "autoDownload": {
-        "label": "Pictures that load on their own in Chat",
+        "label": "Images that load on their own in Chat",
         "hint": "Others wait behind a button with their size. Videos, voice and files already wait for you.",
         "default": "Default ({choice})",
         "choice": {

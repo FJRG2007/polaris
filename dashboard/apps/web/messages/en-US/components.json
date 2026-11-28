@@ -660,10 +660,10 @@
     },
     "cropper": {
         "intro": "What is inside the frame is what everybody else sees. Drag it to move, and use the slider to zoom.",
-        "saveFailed": "{surface, select, app {This app could not save that picture} other {This browser could not save that picture}}",
+        "saveFailed": "{surface, select, app {This app could not save that image} other {This browser could not save that image}}",
         "unreadable": "That file could not be read as an image",
-        "title": "Frame the picture",
-        "move": "Move the picture inside the frame with the arrow keys",
+        "title": "Frame the image",
+        "move": "Move the image inside the frame with the arrow keys",
         "zoom": "Zoom",
         "save": "Save"
     },
@@ -674,11 +674,11 @@
         "play": "Play the video",
         "zoomOut": "Zoom out",
         "zoomIn": "Zoom in",
-        "more": "More for this picture",
+        "more": "More for this image",
         "moreVideo": "More for this video",
         "close": "Close",
-        "previous": "Previous picture",
-        "next": "Next picture",
+        "previous": "Previous image",
+        "next": "Next image",
         "position": "{index} of {count}"
     },
     "mutual": {
@@ -984,7 +984,7 @@
             },
             "livekit": {
                 "label": "Calls server",
-                "summary": "Carries the sound and the picture in a call."
+                "summary": "Carries the sound and the video in a call."
             },
             "mdns": {
                 "label": "Local DNS",

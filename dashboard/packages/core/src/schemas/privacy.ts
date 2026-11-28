@@ -172,7 +172,7 @@ export const PRIVACY_FIELD_NOTES = {
     fullName:
         "Who sees the name on your account rather than the name you show. Anybody who cannot sees your display name, which is what every screen draws anyway.",
     photoFullSize:
-        "Who can open your photo and look at it full size. Anybody who cannot still sees it beside your name - this is a rule about the press, not a second copy of the picture.",
+        "Who can open your photo and look at it full size. Anybody who cannot still sees it beside your name - this is a rule about the press, not a second copy of the photo.",
     email: "Who sees the address you sign in with. Anybody who cannot sees your name and username, which is enough to write to you here.",
     phone: "The number kept for sign-in codes. Nobody is shown it unless you say so.",
     companies:

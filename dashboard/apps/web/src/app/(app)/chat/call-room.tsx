@@ -1839,7 +1839,7 @@ function Split({
             setPickProblem(null);
             void onPickBackground(file).catch((caught: unknown) =>
                 setPickProblem(
-                    caught instanceof Error ? caught.message : "Polaris could not use that picture."
+                    caught instanceof Error ? caught.message : "Polaris could not use that image."
                 )
             );
         });

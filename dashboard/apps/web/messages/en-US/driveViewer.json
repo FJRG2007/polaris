@@ -109,7 +109,7 @@
         "textSize": "Text size",
         "penWidth": "Pen width",
         "highlighterWidth": "Highlighter width",
-        "clickAPageToPlace": "Click a page to place a picture.",
+        "clickAPageToPlace": "Click a page to place an image.",
         "done": "Done",
         "tools": {
             "select": "Select",
@@ -213,7 +213,7 @@
     "picture": {
         "zoomIn": "Zoom in",
         "zoomOut": "Zoom out",
-        "fit": "Fit the picture again",
+        "fit": "Fit the image again",
         "more": "More",
         "close": "Close"
     }

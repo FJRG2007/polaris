@@ -420,7 +420,7 @@
         },
         "private": {
             "title": "Nothing loads until you say so",
-            "body": "Polaris fetches every picture for you, so a sender learns that a server asked and nothing about you - not your address, not your browser, not when you opened it."
+            "body": "Polaris fetches every image for you, so a sender learns that a server asked and nothing about you - not your address, not your browser, not when you opened it."
         },
         "local": {
             "title": "It stays on your Polaris",
@@ -844,12 +844,12 @@
         "machinePath": "A link points into a part of a site that is meant for machines, not people",
         "mostlyLinks": "It is mostly links",
         "alert": "The subject is dressed up as an alert",
-        "pictures": "The subject is decorated with pictures",
+        "pictures": "The subject is decorated with images",
         "money": "The subject promises an amount of money",
         "confirmAccount": "It asks you to go and confirm your account details",
         "capitals": "The subject is all capitals",
         "shouting": "The subject is shouting",
-        "onlyPictures": "It has no text in it at all, only pictures",
+        "onlyPictures": "It has no text in it at all, only images",
         "nobody": "It is not addressed to anybody",
         "deadLinks": "Its Privacy and Terms links do not go anywhere",
         "sameLink": "Every link under it goes to the same page, whatever it says",

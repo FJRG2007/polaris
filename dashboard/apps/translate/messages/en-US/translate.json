@@ -1,6 +1,6 @@
 {
     "title": "Translate",
-    "description": "Translate text, pictures, documents, speech and web pages into another language.",
+    "description": "Translate text, images, documents, speech and web pages into another language.",
     "pane": {
         "source": "Text to translate",
         "target": "Translation",
@@ -108,7 +108,7 @@
         "forbidden": "Your role does not include Translate.",
         "overLimit": "That is longer than the {limit} characters allowed here.",
         "fileTooLarge": "That file is too large to read here.",
-        "imageType": "That file is not a PNG, JPEG, WebP or GIF picture.",
+        "imageType": "That file is not a PNG, JPEG, WebP or GIF image.",
         "audioType": "That file is not a recording this can read (WebM, Ogg, WAV, MP3 or M4A).",
         "audioTooLong": "That recording is longer than 5 minutes. Trim it and try again.",
         "documentType": "That file is not a document this can translate.",
@@ -126,26 +126,26 @@
         "website": "Website"
     },
     "reads": {
-        "imagesManager": "Reading pictures needs a Polar model that can read images.",
-        "imagesReader": "Reading pictures is not set up here yet. The administrators look after that.",
+        "imagesManager": "Reading images needs a Polar model that can read images.",
+        "imagesReader": "Reading images is not set up here yet. The administrators look after that.",
         "audioManager": "Transcribing needs a Polar model that can transcribe speech.",
         "audioReader": "Transcribing is not set up here yet. The administrators look after that.",
         "setUp": "Set up Polar's models"
     },
     "image": {
-        "drop": "Drop, paste or choose a picture",
-        "choose": "Choose a picture",
+        "drop": "Drop, paste or choose an image",
+        "choose": "Choose an image",
         "hint": "Screenshots and photos, up to 8 MB.",
         "reading": "Reading the text...",
         "translated": "Translated",
         "originalPicture": "Original",
-        "altTranslated": "The picture with its text translated",
+        "altTranslated": "The image with its text translated",
         "view": "How to show it",
         "original": "Original text",
         "copyOriginal": "Copy original text",
-        "clear": "Remove picture",
-        "alt": "The picture being translated",
-        "none": "No text was found in this picture."
+        "clear": "Remove the image",
+        "alt": "The image being translated",
+        "none": "No text was found in this image."
     },
     "camera": {
         "start": "Start camera",

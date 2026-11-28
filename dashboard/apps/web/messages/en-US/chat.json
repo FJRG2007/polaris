@@ -65,8 +65,8 @@
         "messageMissing": "That message is not there",
         "messageDeleted": "That message was deleted",
         "personNotInGroup": "That person is not in this group",
-        "pictureGone": "That picture is gone",
-        "pictureNotStored": "That picture is no longer stored here",
+        "pictureGone": "That image is gone",
+        "pictureNotStored": "That image is no longer stored here",
         "pollClosed": "That poll has closed",
         "pollGone": "That poll is gone",
         "pollDeleted": "That poll was deleted",
@@ -128,7 +128,7 @@
         "reportPleasantry": "That message is a greeting, so there is nothing for a moderator to decide about it. Report the message that is actually the problem.",
         "reportSealedUnreadable": "That message could not be opened for the moderators here. Reload the page and report it again.",
         "roomMentionOwnerOnly": "Only the owner of this group can use @everyone and @here",
-        "savedPicturesFull": "You can keep {count} pictures. Remove one first.",
+        "savedPicturesFull": "You can keep {count} images. Remove one first.",
         "schedule": {
             "noDate": "Pick a date and a time",
             "tooSoon": "Pick a time at least a minute from now",
@@ -296,7 +296,7 @@
             "postsOnly": "In a forum, start a post or answer inside one.",
             "unknownTag": "One of those tags is no longer in this forum.",
             "tagRequired": "This forum needs at least one tag on each post.",
-            "mediaRequired": "In a media channel, each post opens with a picture or a video.",
+            "mediaRequired": "In a media channel, each post opens with an image or a video.",
             "titleRequired": "Give the post a title of up to 100 characters.",
             "postGone": "This post is no longer here.",
             "notYours": "Only its author or an administrator can change this post.",
@@ -355,7 +355,7 @@
                 "help": "The same, blurred until nothing behind you can be read."
             },
             "image": {
-                "label": "Use a picture",
+                "label": "Use an image",
                 "help": "Replaces the room with an image of yours. It stays on this machine."
             },
             "off": {
@@ -390,7 +390,7 @@
         },
         "look": {
             "title": "Look",
-            "help": "Applied on this device before the picture is sent. Framing uses the same model as backgrounds.",
+            "help": "Applied on this device before the image is sent. Framing uses the same model as backgrounds.",
             "light": {
                 "title": "Lighting",
                 "off": "As it is",
@@ -492,7 +492,7 @@
         "writeThisCallToA": "{surface, select, app {Write this call to a video file in this app} other {Write this call to a video file in this browser}}",
         "addPeople": "Add people",
         "shareALinkToThis": "Share a link to this call",
-        "whatYouAreSharingHas": "What you are sharing has stopped sending new pictures, so everybody sees the last one. If it is a minimized window - a game in full screen minimizes when you switch away - bring it back, run the game in a window, or share your whole screen.",
+        "whatYouAreSharingHas": "What you are sharing has stopped sending new frames, so everybody sees the last one. If it is a minimized window - a game in full screen minimizes when you switch away - bring it back, run the game in a window, or share your whole screen.",
         "stillSharingYouAreNot": "Still sharing. You are not watching.",
         "watch": "Watch",
         "mute": "Mute",
@@ -529,14 +529,14 @@
         "theRecordingIsMadeIn": "{surface, select, app {The recording is made in this app, from what it can see and hear, and it stops if you leave the call or close the window. Everybody in the call is told while it runs. When you stop, you choose whether it goes into the conversation or stays on this machine.} other {The recording is made in this browser, from what it can see and hear, and it stops if you leave the call or close the tab. Everybody in the call is told while it runs. When you stop, you choose whether it goes into the conversation or stays on this machine.}}",
         "cancel": "Cancel",
         "startRecording": "Start recording",
-        "mirrorMyPicture": "Mirror my picture",
+        "mirrorMyPicture": "Mirror my video",
         "onlyHowYouSeeYourself": "Only how you see yourself. Everybody else sees you the way round your camera does.",
         "automatic": "Automatic",
         "dropsWhenTheConnectionStruggles": "Drops when the connection struggles and comes back when it recovers.",
         "leastData": "Least data",
-        "bestPicture": "Best picture",
+        "bestPicture": "Best quality",
         "background": "Background",
-        "useAPictureOfYour": "Use a picture of your own",
+        "useAPictureOfYour": "Use an image of your own",
         "startingTheModelDownloadsOnce": "Starting. The model downloads once.",
         "backgroundNoise": "Background noise",
         "thisMachineIsRunningThe": "This machine is running the lighter model.",
@@ -552,7 +552,7 @@
         "bringTheConversationBack": "Bring the conversation back",
         "fillTheColumn": "Fill the column",
         "fillTheColumnTheConversation": "Fill the column - the conversation goes behind the call",
-        "fitThePictureAgain": "Fit the picture again",
+        "fitThePictureAgain": "Fit the video again",
         "leaveFullScreen": "Leave full screen",
         "fullScreen": "Full screen",
         "anybodyWithALink": "Anybody with a link",
@@ -664,8 +664,8 @@
         "moreForThisMessage": "More for this message",
         "edit": "Edit",
         "delete": "Delete",
-        "stopKeepingThisPicture": "Stop keeping this picture",
-        "keepThisPicture": "Keep this picture",
+        "stopKeepingThisPicture": "Stop keeping this image",
+        "keepThisPicture": "Keep this image",
         "keptItIsInYour": "Kept. It is in your picker.",
         "keepThis": "Keep this",
         "nobodyInHere": "Nobody in here",
@@ -703,7 +703,7 @@
         },
         "appHint": "Written by a Polaris app, not by a person",
         "systemMessage": "system message",
-        "loadPicture": "{kind} picture, {size}",
+        "loadPicture": "{kind} image, {size}",
         "loadPictureNamed": "Load {name}"
     },
     "attachSheet": {
@@ -882,7 +882,7 @@
         "copyLink": "Copy link",
         "nickname": "Nickname",
         "nameThisGroup": "Name this group",
-        "groupPicture": "Group picture",
+        "groupPicture": "Group photo",
         "groupSettings": "Group settings",
         "leaveThisGroup": "Leave this group",
         "reopenChannel": "Reopen channel",
@@ -986,15 +986,15 @@
         "noEmojiMatchesThat": "No emoji matches that.",
         "recent": "Recent",
         "looking": "Looking",
-        "nothingKeptYetTheStar": "Nothing kept yet. The star in the corner of any picture puts it here - in a message, or in the GIFs beside this.",
+        "nothingKeptYetTheStar": "Nothing kept yet. The star in the corner of any image puts it here - in a message, or in the GIFs beside this.",
         "searchingForGifsAndStickers": "Searching for GIFs and stickers is switched off here. An administrator can turn it on.",
         "trending": "Trending",
         "nothingCameBackForThat": "Nothing came back for that.",
-        "sendAPictureOrGif": "Send a picture or GIF by its address",
+        "sendAPictureOrGif": "Send an image or GIF by its address",
         "send": "Send",
         "sendThis": "Send this",
-        "stopKeepingThisPicture": "Stop keeping this picture",
-        "keepThisPicture": "Keep this picture",
+        "stopKeepingThisPicture": "Stop keeping this image",
+        "keepThisPicture": "Keep this image",
         "keptItIsInYour": "Kept. It is in your picker.",
         "keepThis": "Keep this",
         "tabEmoji": "Emoji",
@@ -1132,7 +1132,7 @@
         "microphoneOn": "Microphone on",
         "microphoneOff": "Microphone off",
         "microphone": "Microphone",
-        "yourBrowserAsksWhichScreen": "Your browser asks which screen or window to record. The camera goes in the corner of the picture.",
+        "yourBrowserAsksWhichScreen": "Your browser asks which screen or window to record. The camera goes in the corner of the video.",
         "recordingYourScreen": "Recording your screen",
         "startRecording": "Start recording",
         "waitingForTheScreen": "Waiting for the screen...",
@@ -1149,7 +1149,7 @@
             "unsupported": "{clientKind, select, desktop {This app cannot record video. Try it from a browser.} phone {This phone cannot record video here. Try it from a computer.} other {This browser cannot record video. Try another browser.}}",
             "withoutCamera": "Recording without the camera: it could not be opened.",
             "withoutMicrophone": "Recording without the microphone: it could not be opened.",
-            "noPicture": "{clientKind, select, desktop {This app could not put the picture together. Try again, or use a browser.} phone {This phone could not put the picture together. Try again, or use a computer.} other {This browser could not put the picture together. Try again, or use another browser.}}",
+            "noPicture": "{clientKind, select, desktop {This app could not put the video together. Try again, or use a browser.} phone {This phone could not put the video together. Try again, or use a computer.} other {This browser could not put the video together. Try again, or use another browser.}}",
             "notStarted": "{clientKind, select, desktop {This app could not start recording the screen. Try again, or use a browser.} phone {This phone could not start recording the screen. Try again, or use a computer.} other {This browser could not start recording the screen. Try again, or use another browser.}}",
             "notEncoded": "{clientKind, select, desktop {This app could not record the screen, so nothing was saved. Try again, or use a browser.} phone {This phone could not record the screen, so nothing was saved. Try again, or use a computer.} other {This browser could not record the screen, so nothing was saved. Try again, or use another browser.}}",
             "tooLarge": "Stopped: the recording reached the size a message can carry."
@@ -1203,8 +1203,8 @@
             "age": "Age-restricted"
         },
         "modeHints": {
-            "default": "Pictures, videos and link cards show as they were sent.",
-            "spoiler": "Every picture, video and link card starts covered, and a press shows it.",
+            "default": "Images, videos and link cards show as they were sent.",
+            "spoiler": "Every image, video and link card starts covered, and a press shows it.",
             "age": "Anyone opening it confirms they are an adult first, once per channel."
         },
         "archiveTitle": "Archive channel",
@@ -1270,7 +1270,7 @@
         "newcomerHistoryDefault": "Server default: new members see earlier messages",
         "newcomerHistoryDefaultHint": "Applies to every channel that uses the server default.",
         "newcomerHistoryDefaultLocked": "Only server admins can change the default.",
-        "webhookPicture": "Change picture",
+        "webhookPicture": "Change image",
         "privateSealedNote": "Private channels are end-to-end encrypted. Making it public stops encrypting new messages; earlier ones stay encrypted.",
         "roomMentions": "Members can use @everyone and @here",
         "roomMentionsHint": "Off: only admins can notify the whole space at once.",
@@ -1357,7 +1357,7 @@
         "types": {
             "text": {
                 "name": "Text",
-                "hint": "Messages, pictures, links and threads"
+                "hint": "Messages, images, links and threads"
             },
             "voice": {
                 "name": "Voice",
@@ -1377,7 +1377,7 @@
             },
             "media": {
                 "name": "Media",
-                "hint": "Pictures and videos, shown as a gallery"
+                "hint": "Images and videos, shown as a gallery"
             }
         }
     },
@@ -1485,7 +1485,7 @@
     "groupSettings": {
         "groupSettings": "Group settings",
         "yoursBecauseYouRunThis": "Yours, because you run this group. Everything else about it is everybody's.",
-        "letAnybodyChangeTheName": "Let anybody change the name and picture",
+        "letAnybodyChangeTheName": "Let anybody change the name and photo",
         "offOnlyYouCanOn": "Off, only you can. On, anybody in the group can.",
         "letAnybodyAddPeople": "Let anybody add people",
         "offOnlyYouCanAdd": "Off, only you can add people to this group.",
@@ -1512,8 +1512,8 @@
         "directMessage": "Direct message",
         "group": "Group",
         "whoToMessage": "Who to message",
-        "changeTheGroupPicture": "Change the group picture",
-        "addAGroupPicture": "Add a group picture",
+        "changeTheGroupPicture": "Change the group photo",
+        "addAGroupPicture": "Add a group photo",
         "whatThisGroupIsCalled": "What this group is called",
         "cancel": "Cancel",
         "startGroup": "Start group"
@@ -1635,7 +1635,7 @@
         "close": "Close",
         "errors": {
             "unsupported": "{surface, select, app {This app cannot record video.} other {This browser cannot record video.}}",
-            "noPicture": "{surface, select, app {This app could not put the picture together.} other {This browser could not put the picture together.}}",
+            "noPicture": "{surface, select, app {This app could not put the video together.} other {This browser could not put the video together.}}",
             "notStarted": "{surface, select, app {This app could not start recording the call.} other {This browser could not start recording the call.}}",
             "notEncoded": "{surface, select, app {This app could not record the call.} other {This browser could not record the call.}}",
             "tooLarge": "Stopped: the recording reached the size a message can carry."
@@ -1687,7 +1687,7 @@
         "newSpace": "New space",
         "invitePeople": "Invite people",
         "newChannel": "New channel",
-        "spacePicture": "Space picture",
+        "spacePicture": "Space image",
         "teamsAndRoles": "Teams and roles",
         "keptOut": "Kept out",
         "leaveThisSpace": "Leave this space",
@@ -1875,12 +1875,12 @@
         "createGroup": "Create group"
     },
     "picture": {
-        "spacePicture": "Space picture",
-        "groupPicture": "Group picture",
+        "spacePicture": "Space image",
+        "groupPicture": "Group photo",
         "shownInTheColumnOn": "Shown in the column on the left, in place of the initials.",
         "shownWhereverThisConversationAppears": "Shown wherever this conversation appears. Without one, the faces of the people in it.",
         "pngJpegWebpOrGif": "PNG, JPEG, WebP or GIF. You choose which part of it is used.",
-        "webhookPicture": "Webhook picture",
+        "webhookPicture": "Webhook image",
         "webhookPictureHint": "Shown on its messages unless a request sends its own avatar_url."
     },
     "micSettings": {
@@ -1919,7 +1919,7 @@
     "spoiler": {
         "showTheHiddenText": "Show the hidden text",
         "spoiler": "Spoiler",
-        "showThis": "Show this {kind, select, picture {picture} video {video} file {file} text {text} content {content} link {link} other {{kind}}}"
+        "showThis": "Show this {kind, select, picture {image} video {video} file {file} text {text} content {content} link {link} other {{kind}}}"
     },
     "noAudio": {
         "yourMicrophoneHasNotPicked": "Your microphone has not picked anything up for a while. Check that it is not muted on the machine itself, and that the right one is chosen under Account > Devices.",
@@ -2436,7 +2436,7 @@
         "muteAudio": "Mute stream audio",
         "advanced": "Advanced",
         "hidePreview": "Hide stream preview",
-        "definition": "Picture quality",
+        "definition": "Video quality",
         "sd": "SD",
         "hd": "HD"
     },
@@ -2502,7 +2502,7 @@
         "back": "Back",
         "notYours": "You cannot change this group's icon",
         "tooBig": "That GIF is too large for an icon",
-        "notAnImage": "That is not a picture"
+        "notAnImage": "That is not an image"
     },
     "listView": {
         "label": "List view",
@@ -2922,13 +2922,13 @@
         "safetyUnverify": "Remove verification",
         "safetyScan": "Scan their code",
         "safetyScanTitle": "Scan their safety number",
-        "safetyScanIntro": "Point the camera at the code on {name}'s screen, paste a screenshot of it with Ctrl+V, or choose the picture. {surface, select, app {Nothing leaves this app.} other {Nothing leaves this browser.}}",
+        "safetyScanIntro": "Point the camera at the code on {name}'s screen, paste a screenshot of it with Ctrl+V, or choose the image. {surface, select, app {Nothing leaves this app.} other {Nothing leaves this browser.}}",
         "safetyScanStart": "Use the camera",
         "safetyScanStop": "Stop the camera",
         "safetyScanUpload": "Upload a screenshot",
         "safetyScanNoCamera": "The camera is not available here. Browsers only allow it over a secure (https) address - upload a screenshot of the code instead.",
-        "safetyScanNotFound": "No code was found in that picture. A tighter crop usually does it.",
-        "safetyScanNotPicture": "That file could not be read as a picture.",
+        "safetyScanNotFound": "No code was found in that image. A tighter crop usually does it.",
+        "safetyScanNotPicture": "That file could not be read as an image.",
         "safetyScanMatch": "The numbers match - {name} is verified.",
         "safetyScanMismatch": "That code does not match. Either it is not from your conversation with {name}, or one of the keys was swapped - ask them to open this conversation and try again.",
         "safetyScanOther": "That is not a safety number code.",
@@ -3071,11 +3071,11 @@
         "goTo": "Go to group"
     },
     "forum": {
-        "media": "Pictures or videos",
-        "mediaHint": "Each post opens with at least one picture or video.",
+        "media": "Images or videos",
+        "mediaHint": "Each post opens with at least one image or video.",
         "addMedia": "Add files",
         "removeMedia": "Remove {name}",
-        "noMediaYet": "No pictures yet",
+        "noMediaYet": "No images yet",
         "caption": "Caption",
         "guidelines": "Guidelines",
         "searchPosts": "Search posts",
@@ -3153,14 +3153,14 @@
         "open": "Open",
         "spoilers": {
             "title": "Show spoilers without asking",
-            "body": "{surface, select, app {Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This app only.} other {Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This browser only.}}"
+            "body": "{surface, select, app {Images and messages somebody sent covered are drawn straight away instead of waiting for a press. This app only.} other {Images and messages somebody sent covered are drawn straight away instead of waiting for a press. This browser only.}}"
         },
         "media": {
             "title": "Media auto-download",
             "body": "{surface, select, app {Photos, videos and documents from recent messages are saved on this device ahead of time, so chats open without a connection. Anything not saved still loads when you open it. This app only.} other {Photos, videos and documents from recent messages are saved on this device ahead of time, so chats open without a connection. Anything not saved still loads when you open it. This browser only.}}",
             "whenHint": "Always saves on any connection, mobile data included. Wi-Fi only waits for Wi-Fi or a cable. Never saves nothing ahead of time.",
             "photos": "Photos",
-            "photosHint": "Pictures sent in your chats.",
+            "photosHint": "Images sent in your chats.",
             "videos": "Videos",
             "videosHint": "Video clips. They take the most space.",
             "files": "Documents",

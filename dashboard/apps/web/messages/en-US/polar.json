@@ -2033,7 +2033,7 @@
             "hint": "Files the agent delivers in .polaris/deliverables",
             "capture": "Check for changes",
             "failed": "The artifacts could not be read.",
-            "empty": "Nothing delivered yet. Ask the agent to put a report, page or picture in .polaris/deliverables.",
+            "empty": "Nothing delivered yet. Ask the agent to put a report, page or image in .polaris/deliverables.",
             "pick": "Pick a file to see it",
             "meta": "v{version} - {size}",
             "full": "This session holds as much as it may keep; newer changes were not saved.",

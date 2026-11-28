@@ -42,11 +42,11 @@
         }
     },
     "images": {
-        "description": "Convert, resize and make a picture smaller - and see what each choice costs.",
-        "notAPicture": "That file is not a picture.",
-        "convertFailed": "That picture could not be converted.",
-        "drop": "Drop a picture here, or choose one",
-        "converted": "The converted picture",
+        "description": "Convert, resize and make an image smaller - and see what each choice costs.",
+        "notAPicture": "That file is not an image.",
+        "convertFailed": "That image could not be converted.",
+        "drop": "Drop an image here, or choose one",
+        "converted": "The converted image",
         "working": "Working",
         "was": "Was",
         "now": "Now",
@@ -54,7 +54,7 @@
         "saved": "Saved",
         "taken": "Taken",
         "notRecorded": "Not recorded",
-        "locationWarning": "This picture records where it was taken, and keeping its information keeps that too.",
+        "locationWarning": "This image records where it was taken, and keeping its information keeps that too.",
         "format": "Format",
         "quality": "Quality",
         "pngNoQuality": "PNG keeps every pixel exactly, so it has no quality to set.",
@@ -63,16 +63,16 @@
         "longestLabel": "Longest side in pixels",
         "keepInfo": "Keep its information",
         "keepInfoHint": "The date, the camera and, on a phone photo, the place.",
-        "keepInfoLabel": "Keep the picture's information",
+        "keepInfoLabel": "Keep the image's information",
         "download": "Download",
-        "another": "Use another picture"
+        "another": "Use another image"
     },
     "errors": {
         "notAllowed": "Not allowed.",
         "notInstalled": "Tools is not installed.",
-        "tooLarge": "This picture is too large.",
-        "noPicture": "No picture was sent.",
+        "tooLarge": "This image is too large.",
+        "noPicture": "No image was sent.",
         "unknownFormat": "Unknown format.",
-        "unreadable": "That picture could not be read."
+        "unreadable": "That image could not be read."
     }
 }

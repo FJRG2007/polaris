@@ -279,7 +279,7 @@
         "pasteRefused": "{surface, select, app {The app did not share the clipboard. Press {keys} to paste.} other {The browser did not share the clipboard. Press {keys} to paste.}}",
         "pasteEmpty": "Nothing to paste",
         "pasteNoText": "Only text can be pasted here",
-        "pasteNoPicture": "No picture on the clipboard to upload",
+        "pasteNoPicture": "No image on the clipboard to upload",
         "pasteBlocked": "Clipboard blocked here. Press {keys}.",
         "noSuggestions": "No spelling suggestions",
         "addToDictionary": "Add to dictionary",

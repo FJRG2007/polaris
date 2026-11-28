@@ -173,7 +173,7 @@ describe("the profile pictures card", () => {
         render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />, { wrapper: MessagesWrapper });
         await chooseInDialog("Edit photo", /^Reframe/);
 
-        expect(await screen.findByText("Frame the picture")).toBeDefined();
+        expect(await screen.findByText("Frame the image")).toBeDefined();
         expect(asked).toEqual([`/api/avatar/${PERSON.userId}`]);
     });
 
@@ -187,7 +187,7 @@ describe("the profile pictures card", () => {
         render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />, { wrapper: MessagesWrapper });
         await chooseInDialog("Edit photo", /^Reframe/);
 
-        expect(await screen.findByText("Could not open that picture again")).toBeDefined();
-        expect(screen.queryByText("Frame the picture")).toBeNull();
+        expect(await screen.findByText("Could not open that image again")).toBeDefined();
+        expect(screen.queryByText("Frame the image")).toBeNull();
     });
 });

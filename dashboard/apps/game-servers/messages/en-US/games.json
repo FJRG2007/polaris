@@ -631,7 +631,7 @@
         "chooseAnItem": "Choose an item.",
         "searchItemsOrWriteMinecraft": "Search items, or write minecraft:diamond",
         "moreThan": "More than {count} match. Type more to narrow it.",
-        "minecraftMissing": "The item pictures did not load, so type the id - it looks like minecraft:diamond.",
+        "minecraftMissing": "The item images did not load, so type the id - it looks like minecraft:diamond.",
         "arkMissing": "The item list did not load. Reload the page to try again.",
         "modNotes": {
             "found": "Also searching {count} items this server's mods add. Type a mod's name for just those.",

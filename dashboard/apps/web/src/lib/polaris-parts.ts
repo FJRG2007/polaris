@@ -81,7 +81,7 @@ const PARTS: Record<string, { label: string; summary: string }> = {
     // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     hostd: { label: "Host daemon", summary: "Mounts, host files and the Docker proxy." },
     // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
-    livekit: { label: "Call server", summary: "Carries the sound and the picture in a call." },
+    livekit: { label: "Call server", summary: "Carries the sound and the video in a call." },
     // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     mdns: { label: "Local discovery", summary: "Answers to polaris.local on the network." },
     // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)

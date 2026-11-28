@@ -115,14 +115,14 @@ afterEach(cleanup);
 describe("a channel of spoilers", () => {
     it("covers every picture until it is pressed", () => {
         list([message()], true);
-        const cover = screen.getByRole("button", { name: "Show this picture" });
+        const cover = screen.getByRole("button", { name: "Show this image" });
         fireEvent.click(cover);
-        expect(screen.queryByRole("button", { name: "Show this picture" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Show this image" })).toBeNull();
     });
 
     it("covers nothing in an ordinary channel", () => {
         list([message()]);
-        expect(screen.queryByRole("button", { name: "Show this picture" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Show this image" })).toBeNull();
     });
 });
 

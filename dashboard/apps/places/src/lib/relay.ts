@@ -575,7 +575,7 @@ export async function frameOrReason(
 ): Promise<{ frame: Buffer } | { reason: string }> {
     const query = new URLSearchParams({ src: streamName(cameraId, quality) });
     const response = await askFrame(endpoint, query, 15_000);
-    if (response === "paused") return { reason: "The camera is not sending a picture." };
+    if (response === "paused") return { reason: "The camera is not sending video." };
     if (!response) return { reason: "The relay did not answer." };
     if (response.ok) {
         const frame = response.body;

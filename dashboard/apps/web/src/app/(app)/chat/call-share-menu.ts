@@ -109,7 +109,7 @@ export async function swapScreen(deps: {
     if (!(await deps.publishVideo(video))) {
         video.stop();
         audio?.stop();
-        return { kind: "failed", error: new Error("The new picture could not be sent.") };
+        return { kind: "failed", error: new Error("The new video could not be sent.") };
     }
     if (audio || deps.current.audio) await deps.publishAudio(audio);
     if (deps.current.video !== video) deps.current.video.stop();

@@ -4,11 +4,11 @@
     "releases": [
         {
             "version": "0.1.25",
-            "notes": "the screen's look, like Stream Control's graphic settings: pick a background colour or picture, the text and volume bar colours, and an icon above each knob, with a live preview on the drawing of the device. Needs Polaris for desktop 0.1.138 or later."
+            "notes": "the screen's look, like Stream Control's graphic settings: pick a background color or image, the text and volume bar colours, and an icon above each knob, with a live preview on the drawing of the device. Needs Polaris for desktop 0.1.138 or later."
         },
         {
             "version": "0.1.24",
-            "notes": "a sharper, steadier screen: letters are drawn smooth at the panel's own resolution instead of blown-up blocks, the idle screen is always seen whole instead of redrawing half-finished every second, and you can pick the size of each knob's name. A background colour or picture and a picture per knob are drawn too, once Polaris' page offers them."
+            "notes": "a sharper, steadier screen: letters are drawn smooth at the panel's own resolution instead of blown-up blocks, the idle screen is always seen whole instead of redrawing half-finished every second, and you can pick the size of each knob's name. A background color or image and an image per knob are drawn too, once Polaris' page offers them."
         },
         {
             "version": "0.1.23",

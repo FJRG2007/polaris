@@ -128,7 +128,7 @@ export async function cameraStill(
     // Second call only on the cameras where the first found nothing, and their
     // sub stream is not going to start existing later.
     const image = (await ask("sub")) ?? (await ask("main"));
-    if (!image) throw new CameraOfflineError("The camera did not send a picture");
+    if (!image) throw new CameraOfflineError("The camera did not send an image");
     return image;
 }
 

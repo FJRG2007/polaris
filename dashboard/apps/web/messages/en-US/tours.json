@@ -131,7 +131,7 @@
         "steps": {
             "profile": {
                 "title": "Profile",
-                "body": "How you appear to others: name, picture and details."
+                "body": "How you appear to others: name, photo and details."
             },
             "sections": {
                 "title": "Settings",
@@ -143,7 +143,7 @@
             },
             "account": {
                 "title": "Shortcut",
-                "body": "Your picture opens these settings from any screen."
+                "body": "Your photo opens these settings from any screen."
             }
         }
     }

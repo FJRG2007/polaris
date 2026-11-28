@@ -591,7 +591,7 @@ describe("sharing a window that stopped sending pictures", () => {
         );
         // One line of the call's notices now: its words, and the whole sentence
         // read with them, announced politely.
-        const line = screen.getByText(/stopped sending new pictures/).closest("[role]");
+        const line = screen.getByText(/stopped sending new frames/).closest("[role]");
         expect(line?.getAttribute("role")).toBe("status");
         expect(line?.textContent).toContain("Your share stopped updating");
         rerender(
@@ -602,6 +602,6 @@ describe("sharing a window that stopped sending pictures", () => {
                 onLeave={() => undefined}
             />
         );
-        expect(screen.queryByText(/stopped sending new pictures/)).toBeNull();
+        expect(screen.queryByText(/stopped sending new frames/)).toBeNull();
     });
 });

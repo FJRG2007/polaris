@@ -95,7 +95,7 @@ describe("the picture behind the setting", () => {
 describe("a file somebody picks", () => {
     it("has to be a picture, whatever it is called", async () => {
         const file = new File(["not a picture"], "holiday.jpg", { type: "text/plain" });
-        await expect(rememberBackgroundImage(file)).rejects.toThrow(/not a picture/i);
+        await expect(rememberBackgroundImage(file)).rejects.toThrow(/not an image/i);
     });
 
     it("has to be small enough to decode", async () => {

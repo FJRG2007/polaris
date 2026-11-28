@@ -8,6 +8,11 @@
  * fails with the file, the key and the word. Keys, placeholders (`{offences}`)
  * and other locales are never read.
  *
+ * "Picture" is not the word here either: a value says image, photo (a person's
+ * own) or preview, so `picture` fails the same way. An ICU selector named
+ * `picture` is a key, not text, and is left alone. The device plugins' en-US
+ * manifest strings are read with the catalogs.
+ *
  * A word that is right in US English but looks British (a product name, a
  * Minecraft advancement) goes in `ALLOWED`, which names the whole phrase so the
  * spelling cannot come back anywhere else.
@@ -19,6 +24,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 const DASHBOARD = resolve(__dirname, "../../../..");
 const APPS = join(DASHBOARD, "apps");
+const PLUGINS = resolve(DASHBOARD, "../clients/device-plugins");
 
 /**
  * Apps whose catalog another change is moving to US English right now. Each
@@ -52,6 +58,10 @@ const BRITISH: Record<string, string> = {
     tick: "check", ticked: "checked", unticked: "unchecked", till: "register", "per cent": "percent",
     "recycle bin": "trash", "the bin": "the trash"
 };
+
+/** Words the English UI does not use, and what it says instead. */
+const AVOIDED: Record<string, string> = { picture: "image, photo or preview", pictures: "images, photos or previews" };
+const AVOID = /\bpictures?\b(?!\s*\{)/gi;
 
 /** `-ise` words that keep their `s` in US English too. */
 const KEEPS_S = new Set(
@@ -89,7 +99,24 @@ export function britishIn(value: string): string[] {
     for (const phrase of ALLOWED) text = text.split(phrase).join(" ");
     const found = [...text.matchAll(PHRASE)].map((m) => m[0]);
     for (const m of text.matchAll(IZE)) if (!KEEPS_S.has(m[0].toLowerCase())) found.push(m[0]);
+    for (const m of text.matchAll(AVOID)) found.push(m[0]);
     return found;
+}
+
+/** What the English UI writes in place of a word `britishIn` found. */
+function instead(word: string): string {
+    const key = word.toLowerCase().replace(/\s+/g, " ");
+    return BRITISH[key] ?? AVOIDED[key] ?? "-ize";
+}
+
+/** `[key, value]` for every en-US string a device plugin's manifest holds. */
+function pluginValues(node: unknown, key: string, out: Array<[string, string]>): void {
+    if (Array.isArray(node)) node.forEach((item, i) => pluginValues(item, `${key}[${i}]`, out));
+    else if (node && typeof node === "object")
+        for (const [k, v] of Object.entries(node)) {
+            if (k === "en-US" && typeof v === "string") out.push([key, v]);
+            else pluginValues(v, key ? `${key}.${k}` : k, out);
+        }
 }
 
 function walk(node: unknown, key: string, out: Array<[string, string]>): void {
@@ -146,7 +173,20 @@ describe("US English catalogs", () => {
             else walk(JSON.parse(source), "", entries);
             for (const [key, value] of entries)
                 for (const word of britishIn(value))
-                    found.push(`${file}:${key}: "${word}" -> "${BRITISH[word.toLowerCase().replace(/\s+/g, " ")] ?? "-ize"}"`);
+                    found.push(`${file}:${key}: "${word}" -> "${instead(word)}"`);
+        }
+        expect(found).toEqual([]);
+    });
+
+    it("say the device plugins' screens the US way", () => {
+        const plugins = readdirSync(PLUGINS).filter((dir) => existsSync(join(PLUGINS, dir, "manifest.json")));
+        expect(plugins).toContain("hercules-stream100");
+        const found: string[] = [];
+        for (const plugin of plugins) {
+            const entries: Array<[string, string]> = [];
+            pluginValues(JSON.parse(readFileSync(join(PLUGINS, plugin, "manifest.json"), "utf8")), "", entries);
+            for (const [key, value] of entries)
+                for (const word of britishIn(value)) found.push(`${plugin}:${key}: "${word}" -> "${instead(word)}"`);
         }
         expect(found).toEqual([]);
     });
@@ -171,5 +211,8 @@ describe("US English catalogs", () => {
         expect(britishIn("Otherwise advertise the sunrise, organized and canceled")).toEqual([]);
         expect(britishIn("Countdown tick")).toEqual([]);
         expect(britishIn("Browse books from a Calibre library")).toEqual([]);
+        expect(britishIn("Choose a picture")).toEqual(["picture"]);
+        expect(britishIn("Pictures that load on their own")).toEqual(["Pictures"]);
+        expect(britishIn("Show this {kind, select, picture {image} other {file}}")).toEqual([]);
     });
 });

@@ -882,7 +882,7 @@
         "copyLink": "Copiar URL",
         "nickname": "Apodo",
         "nameThisGroup": "Poner nombre",
-        "groupPicture": "Imagen del grupo",
+        "groupPicture": "Foto del grupo",
         "groupSettings": "Ajustes del grupo",
         "leaveThisGroup": "Salir del grupo",
         "reopenChannel": "Reabrir canal",
@@ -1876,7 +1876,7 @@
     },
     "picture": {
         "spacePicture": "Imagen de espacio",
-        "groupPicture": "Imagen del grupo",
+        "groupPicture": "Foto del grupo",
         "shownInTheColumnOn": "Se muestra en la columna de la izquierda, en lugar de las iniciales.",
         "shownWhereverThisConversationAppears": "Se muestra donde aparezca esta conversación. Sin ella, las caras de quienes están.",
         "pngJpegWebpOrGif": "PNG, JPEG, WebP o GIF. Tú eliges qué parte se usa.",

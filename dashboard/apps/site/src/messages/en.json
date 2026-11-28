@@ -178,10 +178,10 @@
     "viewer": {
         "zoomIn": "Zoom in",
         "zoomOut": "Zoom out",
-        "more": "More for this picture",
+        "more": "More for this image",
         "close": "Close",
-        "previous": "Previous picture",
-        "next": "Next picture",
+        "previous": "Previous image",
+        "next": "Next image",
         "position": "{index} of {count}",
         "open": "Enlarge"
     },

@@ -337,7 +337,7 @@
         },
         "ShowMapPlayerLocation": {
             "label": "Show players where they are",
-            "hint": "Their own position, and their tribe's, on the map. Off, the map is a picture."
+            "hint": "Their own position, and their tribe's, on the map. Off, the map is an image."
         },
         "AllowThirdPersonPlayer": {
             "label": "Third person camera"

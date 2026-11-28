@@ -397,7 +397,7 @@
             "threshold": "Different people",
             "windowDays": "Within days",
             "hours": "Restricted for hours",
-            "autoDownload": "Pictures that load on their own",
+            "autoDownload": "Images that load on their own",
             "autoDownloadHint": "For anybody who has not chosen. Others wait behind a button.",
             "autoDownloadChoice": {
                 "all": "From everyone",
@@ -1684,15 +1684,15 @@
             "descriptionHint": "Shown in an empty chat with the bot.",
             "shortDescription": "Short description",
             "shortDescriptionHint": "Shown on the bot's profile and in shared links.",
-            "picture": "Picture",
+            "picture": "Image",
             "pictureSet": "Set",
             "pictureNone": "None",
             "usePolaris": "Use Polaris branding",
-            "usePolarisHint": "Sets the Polaris name and picture, and descriptions in English and Spanish.",
+            "usePolarisHint": "Sets the Polaris name and photo, and descriptions in English and Spanish.",
             "save": "Save to Telegram",
             "updated": "Changed",
             "offerTitle": "Brand your bot",
-            "offerDescription": "Give the bot the Polaris name and picture on Telegram. You can change them later.",
+            "offerDescription": "Give the bot the Polaris name and photo on Telegram. You can change them later.",
             "done": "Done",
             "retry": "Try again",
             "errors": {
@@ -2440,7 +2440,7 @@
             },
             "tenor": {
                 "summary": "Search GIFs and stickers from the chat composer.",
-                "description": "Adds a GIF and sticker search to the picker in Chat. Without it the picker still works - emoji, the pictures each person has kept, and anything sent by pasting its address - and only the search tab is missing. A chosen GIF is fetched once and stored here like any other attachment, so a conversation never asks Tenor for anything and nobody is told who read what.",
+                "description": "Adds a GIF and sticker search to the picker in Chat. Without it the picker still works - emoji, the images each person has kept, and anything sent by pasting its address - and only the search tab is missing. A chosen GIF is fetched once and stored here like any other attachment, so a conversation never asks Tenor for anything and nobody is told who read what.",
                 "apiKeyLabel": "API key",
                 "apiKeyHelp": "A Google Cloud API key with the Tenor API enabled on its project.",
                 "links": {
@@ -3408,7 +3408,7 @@
         },
         "photos": {
             "title": "Profile photos",
-            "intro": "The picture on somebody’s account. Capped at 2 MB and squared by the browser before it is sent, so these stay small wherever they go.",
+            "intro": "The photo on somebody’s account. Capped at 2 MB and squared by the browser before it is sent, so these stay small wherever they go.",
             "hint": "Photos already uploaded stay where they were written; this decides where the next ones go.",
             "gravatar": "Use Gravatar",
             "gravatarHint": "For accounts with no photo of their own, show the one their email address has on Gravatar. Polaris asks for it, not the browser, so no address leaves this server and nobody is told who is looking. Off means initials until somebody uploads a photo."
@@ -3434,7 +3434,7 @@
         },
         "footage": {
             "title": "Camera footage",
-            "intro": "Recordings and the pictures that go with what the cameras notice. A NAS is the right answer if you have one: this is the only thing here that grows whether or not anybody uses it.",
+            "intro": "Recordings and the images that go with what the cameras notice. A NAS is the right answer if you have one: this is the only thing here that grows whether or not anybody uses it.",
             "where": "Where to keep it",
             "hint": "Footage already recorded stays where it was written. A camera can override this on its own settings."
         },

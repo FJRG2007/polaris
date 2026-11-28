@@ -261,14 +261,14 @@ export function setBackgroundScene(scene: BackgroundScene): void {
  */
 export async function rememberBackgroundImage(file: File): Promise<string> {
     if (!file.type.startsWith("image/")) {
-        throw new Error("That file is not a picture.");
+        throw new Error("That file is not an image.");
     }
     if (file.size > IMAGE_BYTES) {
-        throw new Error("That picture is too large to use as a background.");
+        throw new Error("That image is too large to use as a background.");
     }
 
     const bitmap = await createImageBitmap(file).catch(() => null);
-    if (!bitmap) throw new Error("Polaris could not read that picture.");
+    if (!bitmap) throw new Error("Polaris could not read that image.");
 
     // Covering rather than fitting: a background with bars down the sides is a
     // background that reads as a mistake, and the crop is off the edges of a
@@ -277,7 +277,7 @@ export async function rememberBackgroundImage(file: File): Promise<string> {
     canvas.width = IMAGE_WIDTH;
     canvas.height = IMAGE_HEIGHT;
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("Polaris could not read that picture.");
+    if (!context) throw new Error("Polaris could not read that image.");
 
     const scale = Math.max(IMAGE_WIDTH / bitmap.width, IMAGE_HEIGHT / bitmap.height);
     const width = bitmap.width * scale;

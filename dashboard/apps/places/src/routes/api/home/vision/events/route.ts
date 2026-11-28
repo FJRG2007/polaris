@@ -81,7 +81,7 @@ export async function POST(request: Request): Promise<Response> {
         const bytes = Buffer.from(parsed.data.still, "base64");
         if (bytes.byteLength > MAX_STILL_BYTES) {
             // i18n-ignore: read by the vision worker, not by a person
-            return Response.json({ error: "That picture is too large." }, { status: 413 });
+            return Response.json({ error: "That image is too large." }, { status: 413 });
         }
         stillKey = await storeStill(camera, bytes).catch(() => null);
     }
