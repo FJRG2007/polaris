@@ -45,6 +45,7 @@ fn main() {
             knob("Games", None, false),
             knob("Output", Some(35), false),
         ],
+        buttons: ["Mute mic", "Deafen", "Camera", "Hang up"].map(String::from),
         locale: Locale::EnUs,
         call: None,
         playing: None,

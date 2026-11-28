@@ -13,6 +13,7 @@ const entry = createRequire(import.meta.url)(fileURLToPath(new URL("any/main.cjs
     describe(error: string, ownership: unknown): { state: string; detail?: string; code?: string; };
     connectedStatus(access: string): { state: string; detail?: string; code?: string; };
     gamesOf(value: unknown): string[] | null;
+    actionNamesOf(value: unknown): string | null;
 };
 
 type Read = { report?: Uint8Array; error?: string; };
@@ -24,6 +25,7 @@ function fakeNative(reads: Read[], actions: string[][] = [], playing: () => Prom
     const setCall = vi.fn();
     const setNowPlaying = vi.fn();
     const setGames = vi.fn();
+    const setActionNames = vi.fn();
     const nowPlaying = vi.fn(playing);
     const setSettings = vi.fn();
     const reset = vi.fn();
@@ -45,12 +47,13 @@ function fakeNative(reads: Read[], actions: string[][] = [], playing: () => Prom
             setCall = setCall;
             setNowPlaying = setNowPlaying;
             setGames = setGames;
+            setActionNames = setActionNames;
         },
         nowPlaying,
         settingsFromPlugin: (values: string) => `full:${values}`,
         ownershipJson: () => JSON.stringify({ observed: {}, ownership: { state: "herculesSdk" } })
     };
-    return { native, feed, setSettings, reset, close, setLocale, setCall, setNowPlaying, setGames, nowPlaying };
+    return { native, feed, setSettings, reset, close, setLocale, setCall, setNowPlaying, setGames, setActionNames, nowPlaying };
 }
 
 function fakePort() {
@@ -199,6 +202,44 @@ describe("Hercules Stream 100 plugin", () => {
         await flush();
         expect(asked()).toHaveLength(2);
         expect(entry.gamesOf({ games: "eldenring.exe" })).toBeNull();
+    });
+
+    it("names a button's custom action on the screen from the app's answer, and asks only while a button holds one", async () => {
+        const fake = fakeNative([]);
+        const { port, sent, deliver } = fakePort();
+        const ticks: (() => void)[] = [];
+        let clock = 0;
+        entry.run({ port, native: fake.native, now: () => clock, every: (tick: () => void) => ticks.push(tick), exit: vi.fn() });
+        deliver({ type: "start", id: "hercules-stream100", version: "0.1.0", permissions: ["polaris-actions"], devices: [], settings: { button2: "custom:obs" } });
+        const asked = () => sent.filter((message) => (message as { method?: string; }).method === "polaris.state") as { id: number; }[];
+        expect(asked()).toHaveLength(1);
+        deliver({ type: "reply", id: asked()[0]!.id, ok: true, value: { call: null, actions: { "custom:obs": "Start stream", "launcher:x": 7 } } });
+        await flush();
+        expect(fake.setActionNames).toHaveBeenLastCalledWith(JSON.stringify({ "custom:obs": "Start stream" }));
+        // A call page is not drawn for a names-only read.
+        expect(fake.setCall).not.toHaveBeenCalled();
+
+        // Not asked again within ten seconds; a renamed action shows after them.
+        ticks[0]!();
+        await flush();
+        expect(asked()).toHaveLength(1);
+        clock = 10_000;
+        ticks[0]!();
+        expect(asked()).toHaveLength(2);
+        // An app older than `actions` leaves the names alone.
+        deliver({ type: "reply", id: asked()[1]!.id, ok: true, value: { call: null } });
+        await flush();
+        expect(fake.setActionNames).toHaveBeenCalledTimes(1);
+
+        // A button newly given one asks at once; only call actions: never asked.
+        deliver({ type: "settings", settings: { button1: "launcher:system:lock" } });
+        expect(asked()).toHaveLength(3);
+        deliver({ type: "settings", settings: { button1: "call.mic" } });
+        clock = 60_000;
+        ticks[0]!();
+        await flush();
+        expect(asked()).toHaveLength(3);
+        expect(entry.actionNamesOf({ actions: ["x"] })).toBeNull();
     });
 
     it("shows what the system says is playing on the now-playing page, and nothing when it cannot say", async () => {

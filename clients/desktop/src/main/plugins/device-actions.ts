@@ -20,7 +20,7 @@
 
 import { z } from "zod";
 import { createHash } from "node:crypto";
-import { deviceActionSchema, MAX_DEVICE_ACTIONS, type DeviceAction, type DeviceActionStep } from "@polaris/core/device-plugins";
+import { deviceActionSchema, MAX_DEVICE_ACTIONS, readActionRef, type DeviceAction, type DeviceActionStep } from "@polaris/core/device-plugins";
 
 /** What the store file holds. */
 export interface ActionStore {
@@ -56,6 +56,23 @@ export function readActionStore(raw: unknown): ActionStore {
     }
     const keep = <T>(record: Record<string, T>) => Object.fromEntries(Object.entries(record).filter(([id]) => seen.has(id)));
     return { actions, confirmed: keep(shape.data.confirmed), on: keep(shape.data.on) };
+}
+
+/**
+ * The names of this app's own actions that `values` (a plugin's settings)
+ * hold, by the id a control keeps (`custom:<id>`, `launcher:<entry>`), for a
+ * device that shows what its buttons do. Only the ones held, so the answer
+ * stays as small as the device's controls; an id nothing names is left out.
+ */
+export function heldActionNames(values: Readonly<Record<string, unknown>>, actions: readonly Pick<DeviceAction, "id" | "name">[], launcherLabel: (entry: string) => string | undefined): Record<string, string> {
+    const names: Record<string, string> = {};
+    for (const value of Object.values(values)) {
+        if (typeof value !== "string" || Object.hasOwn(names, value)) continue;
+        const ref = readActionRef(value);
+        const name = ref?.kind === "custom" ? actions.find((action) => action.id === ref.id)?.name : ref?.kind === "launcher" ? launcherLabel(ref.entry) : undefined;
+        if (name) names[value] = name;
+    }
+    return names;
 }
 
 /** What the owner said yes to: the steps of both states, so a renamed action does not ask again and any other change does. */

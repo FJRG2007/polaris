@@ -175,6 +175,7 @@ fn page(volume: u8) -> Screen {
             knob("Games", None, false),
             knob("A very long program name", Some(0), false),
         ],
+        buttons: Default::default(),
         locale: Locale::EnUs,
         call: None,
         playing: None,
@@ -956,4 +957,31 @@ fn image_png(width: u32, height: u32, color: [u8; 4]) -> String {
         )
         .unwrap();
     base64::engine::general_purpose::STANDARD.encode(bytes)
+}
+
+/// The four buttons' names sit in an action zone under the bars, as on
+/// Stream Control's screen; a page with none keeps the bars whole.
+#[test]
+fn named_buttons_get_an_action_zone_under_the_bars() {
+    let plain = render(&page(100)).unwrap();
+    let mut named = page(100);
+    named.buttons = ["Mute mic", "", "Camera", ""].map(String::from);
+    let zoned = render(&named).unwrap();
+    let background = pixel(&plain, 2, 2);
+    let zone = (252 - 34)..252;
+    // The first knob's bar (full) reaches the bottom without a zone, stops above it with one.
+    let bar_x = WIDTH / 8;
+    assert_ne!(pixel(&plain, bar_x, 248), background);
+    assert_eq!(pixel(&zoned, bar_x, zone.start + 2), background);
+    // Letters are drawn in the zone under a named button and nothing under one with no name.
+    let inked = |frame: &IndexedFrame, column: usize| {
+        zone.clone().any(|y| {
+            (column * WIDTH / 4 + 8..(column + 1) * WIDTH / 4 - 8)
+                .any(|x| pixel(frame, x, y) != background)
+        })
+    };
+    assert!(inked(&zoned, 0));
+    assert!(inked(&zoned, 2));
+    assert!(!inked(&zoned, 1));
+    assert!(!inked(&zoned, 3));
 }

@@ -197,6 +197,18 @@ impl Controller {
         }
     }
 
+    /// The names of the app's own actions, as JSON `{"custom:<id>": "name"}`
+    /// (`actions` in the app's `polaris.state` answer), for the action zone.
+    /// Anything not of that shape names nothing.
+    #[napi(catch_unwind)]
+    pub fn set_action_names(&mut self, names: String) {
+        let names = serde_json::from_str::<std::collections::HashMap<String, String>>(&names)
+            .unwrap_or_default();
+        if self.engine.set_action_names(names) {
+            self.repaint();
+        }
+    }
+
     /// Program keys of the running games the desktop's game detection found.
     #[napi(catch_unwind)]
     pub fn set_games(&mut self, keys: Vec<String>) {

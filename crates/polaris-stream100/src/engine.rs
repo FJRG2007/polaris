@@ -9,12 +9,12 @@
 
 use crate::audio::{resolve, Session, Target};
 use crate::encoder::{apply, Encoder};
-use crate::plugin::{knob_value, screen_name, Locale};
+use crate::plugin::{action_name, knob_value, screen_name, Locale};
 use crate::report::{Decoder, Event, KnobMap, Report};
 use crate::screen::{Call, Idle, Knob, NowPlaying, Screen};
 use crate::settings::Settings;
 use serde::Serialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -46,6 +46,11 @@ pub struct Output {
     pub muted: bool,
 }
 
+/// Most names of the app's own actions kept.
+const MAX_ACTION_NAMES: usize = 256;
+/// Longest action name kept, in characters.
+const MAX_ACTION_NAME: usize = 40;
+
 #[derive(Debug)]
 pub struct Engine {
     settings: Settings,
@@ -56,6 +61,8 @@ pub struct Engine {
     call: Option<Call>,
     playing: Option<NowPlaying>,
     idle: Option<Idle>,
+    /// The names the app gave its own actions (`custom:<id>`, `launcher:<entry>`).
+    action_names: HashMap<String, String>,
     /// The look decoded once (pictures scaled, palette built), not per page.
     theme: std::sync::Arc<crate::theme::Theme>,
 }
@@ -72,6 +79,7 @@ impl Engine {
             call: None,
             playing: None,
             idle: None,
+            action_names: HashMap::new(),
         }
     }
 
@@ -135,6 +143,45 @@ impl Engine {
         }
         self.idle = idle;
         true
+    }
+
+    /// The names of the app's own actions, by the id a button holds
+    /// (`custom:<id>`, `launcher:<entry>`), for the action zone. Kept to
+    /// [`MAX_ACTION_NAMES`], each cut to [`MAX_ACTION_NAME`] characters with
+    /// control characters dropped. Answers whether it changed.
+    pub fn set_action_names(&mut self, names: impl IntoIterator<Item = (String, String)>) -> bool {
+        let names: HashMap<String, String> = names
+            .into_iter()
+            .filter(|(id, _)| id.len() <= 64)
+            .map(|(id, name)| {
+                let name: String = name
+                    .chars()
+                    .filter(|c| !c.is_control())
+                    .take(MAX_ACTION_NAME)
+                    .collect();
+                (id, name.trim().to_owned())
+            })
+            .filter(|(_, name)| !name.is_empty())
+            .take(MAX_ACTION_NAMES)
+            .collect();
+        if names == self.action_names {
+            return false;
+        }
+        self.action_names = names;
+        true
+    }
+
+    /// What each button shows in the action zone: a call action in the
+    /// screen's language, the app's own name for one of its actions, or
+    /// nothing (no action, or one the app has not named).
+    fn button_names(&self) -> [String; 4] {
+        std::array::from_fn(|index| {
+            let id = self.settings.buttons[index].trim();
+            match action_name(id) {
+                Some((en, es)) => self.locale.pick(en, es).to_owned(),
+                None => self.action_names.get(id).cloned().unwrap_or_default(),
+            }
+        })
     }
 
     /// Forgets the decoder baseline and pending counts (reconnect, lock).
@@ -307,6 +354,7 @@ impl Engine {
             mode: self.settings.display,
             brightness: self.settings.brightness,
             knobs,
+            buttons: self.button_names(),
             locale: self.locale,
             call: self.call.clone(),
             playing: self.playing.clone(),
@@ -506,6 +554,35 @@ mod tests {
             Output::default(),
         );
         assert!(commands.is_empty(), "{commands:?}");
+    }
+
+    #[test]
+    fn the_action_zone_names_call_actions_and_the_apps_own() {
+        let settings = Settings {
+            buttons: ["call.mic", "custom:obs", "launcher:x", ""].map(String::from),
+            ..Settings::default()
+        };
+        let mut engine = engine();
+        engine.set_settings(settings);
+        assert!(engine.set_action_names([
+            ("custom:obs".to_owned(), "Start\u{7}stream".to_owned()),
+            ("launcher:y".to_owned(), "Other".to_owned()),
+        ]));
+        assert!(!engine.set_action_names([
+            ("custom:obs".to_owned(), "Startstream".to_owned()),
+            ("launcher:y".to_owned(), "Other".to_owned()),
+        ]));
+        let screen = engine.screen(&[], Output::default(), &[]);
+        // An action nobody named shows nothing rather than its id.
+        assert_eq!(
+            screen.buttons,
+            ["Mute mic", "Startstream", "", ""].map(String::from)
+        );
+        engine.set_locale(Locale::EsEs);
+        assert_eq!(
+            engine.screen(&[], Output::default(), &[]).buttons[0],
+            "Silenciar"
+        );
     }
 
     #[test]

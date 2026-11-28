@@ -62,7 +62,7 @@
         },
         {
             "hint": {
-                "en-US": "Colours and pictures on the screen, like Stream Control's graphic settings.",
+                "en-US": "Colors and images on the screen, like Stream Control's graphic settings.",
                 "es-ES": "Colores e imágenes de la pantalla, como los ajustes gráficos de Stream Control."
             },
             "key": "look",
@@ -743,7 +743,7 @@
             "key": "backgroundColor",
             "kind": "color",
             "label": {
-                "en-US": "Background colour",
+                "en-US": "Background color",
                 "es-ES": "Color de fondo"
             }
         },
@@ -754,7 +754,7 @@
             "key": "textColor",
             "kind": "color",
             "label": {
-                "en-US": "Text colour",
+                "en-US": "Text color",
                 "es-ES": "Color del texto"
             }
         },
@@ -765,7 +765,7 @@
             "key": "accentColor",
             "kind": "color",
             "label": {
-                "en-US": "Volume bar colour",
+                "en-US": "Volume bar color",
                 "es-ES": "Color de la barra de volumen"
             }
         },
@@ -780,7 +780,7 @@
             "key": "backgroundImage",
             "kind": "image",
             "label": {
-                "en-US": "Background picture",
+                "en-US": "Background image",
                 "es-ES": "Imagen de fondo"
             },
             "width": 480
@@ -791,7 +791,7 @@
             "key": "backgroundFit",
             "kind": "choice",
             "label": {
-                "en-US": "Background picture fit",
+                "en-US": "Background image fit",
                 "es-ES": "Ajuste de la imagen de fondo"
             },
             "options": [

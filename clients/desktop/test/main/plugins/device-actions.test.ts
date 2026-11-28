@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionFingerprint, describeStep, DeviceActions, readActionStore, runSteps, windowsKeyCodes, type ActionStore, type StepRunner } from "@/main/plugins/device-actions";
+import { actionFingerprint, describeStep, DeviceActions, heldActionNames, readActionStore, runSteps, windowsKeyCodes, type ActionStore, type StepRunner } from "@/main/plugins/device-actions";
 
 function fakes() {
     const log: string[] = [];
@@ -21,6 +21,12 @@ function fakes() {
 const action = { id: "rec", name: "Record", steps: [{ kind: "hotkey" as const, key: "f9", ctrl: false, alt: false, shift: false, meta: false }], off: [{ kind: "hotkey" as const, key: "f10", ctrl: false, alt: false, shift: false, meta: false }] };
 
 describe("device actions", () => {
+    it("names only the app's own actions a plugin's controls hold, for its screen", () => {
+        const values = { button1: "call.mic", button2: "custom:obs", button3: "launcher:system:lock", button4: "custom:gone", press1: "custom:obs", brightness: 80, knob1: "games" };
+        const names = heldActionNames(values, [{ id: "obs", name: "Start stream" }, { id: "other", name: "Unused" }], (entry) => (entry === "system:lock" ? "Lock" : undefined));
+        expect(names).toEqual({ "custom:obs": "Start stream", "launcher:system:lock": "Lock" });
+    });
+
     it("runs a macro in order on a fake clock and goes on after a failed step", async () => {
         const { log, runner, sleep } = fakes();
         const ok = await runSteps(

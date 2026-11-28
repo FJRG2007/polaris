@@ -182,6 +182,13 @@ export function DeviceReplica({ manifest, layout, values, live = null, levels = 
         return actionOptions(t, extra, value).find((option) => option.value === held)?.label ?? held;
     };
 
+    // What the device's action zone shows under each knob: a lit button's action, by name; nothing for one with none or one nobody knows.
+    const actionNames = layout.buttons.map((button) => {
+        const held = actionPickValue(Object.hasOwn(values, button.key) ? (values[button.key] ?? null) : button.default);
+        if (held === NONE) return "";
+        return actionOptions(t, extra, held).find((option) => option.value === held && option.label !== say(t, "action.missing"))?.label ?? "";
+    });
+
     const turnOptions = layout.knobs.find((knob) => knob.turn)?.turn?.options ?? [];
     const query = find.trim().toLowerCase();
     const matches = (label: string) => !query || label.toLowerCase().includes(query);
@@ -277,7 +284,7 @@ export function DeviceReplica({ manifest, layout, values, live = null, levels = 
                 <div className="flex min-w-0 flex-col gap-4">
                     <div className="mx-auto flex w-full min-w-0 max-w-xl flex-col items-center gap-4 rounded-3xl border-2 border-border bg-muted p-4 sm:p-6">
                         {declaresLook(manifest) ? (
-                            <ScreenPreview manifest={manifest} values={values} names={layout.knobs.map((knob) => (knob.turn ? valueLabel(knob.turn) : ""))} live={live} levels={levels} />
+                            <ScreenPreview manifest={manifest} values={values} names={layout.knobs.map((knob) => (knob.turn ? valueLabel(knob.turn) : ""))} actions={actionNames} live={live} levels={levels} />
                         ) : (
                             <div aria-hidden className="aspect-[480/272] w-3/5 max-w-64 rounded-md border-2 border-border bg-foreground/85" />
                         )}

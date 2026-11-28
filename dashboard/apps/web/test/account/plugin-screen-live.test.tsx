@@ -114,6 +114,16 @@ describe("the device's screen on its page", () => {
         expect(listeners.size).toBe(0);
     });
 
+    it("shows each button's action under its knob, as the device's action zone does, and no zone with none", () => {
+        const view = render(<ScreenPreview manifest={manifest} values={{}} names={["Calls", "Music", "Games", "Output"]} actions={["Mute mic", "", "Start stream", ""]} />);
+        expect(view.container.querySelector("[data-action='0']")?.textContent).toBe("Mute mic");
+        expect(view.container.querySelector("[data-action='2']")?.textContent).toBe("Start stream");
+        expect(view.container.querySelector("[data-action='1']")?.textContent).toBe("\u00a0");
+        cleanup();
+        const plain = render(<ScreenPreview manifest={manifest} values={{}} names={["Calls", "Music", "Games", "Output"]} actions={["", "", "", ""]} />);
+        expect(plain.container.querySelector("[data-action]")).toBeNull();
+    });
+
     it("reads only knobs of the right shape", () => {
         expect(readPluginLive(knobs(50))).toEqual(knobs(50));
         expect(readPluginLive({ knobs: [{ label: "x", volume: 101, muted: false }] })).toBeNull();

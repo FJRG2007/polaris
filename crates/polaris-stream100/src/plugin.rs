@@ -53,6 +53,20 @@ impl Locale {
     }
 }
 
+/// A call action's name on the screen's action zone, in English and Spanish
+/// (the plugin page's words, shortened where a column would cut them), or
+/// `None` for anything that is not one.
+pub fn action_name(id: &str) -> Option<(&'static str, &'static str)> {
+    Some(match id {
+        "call.mic" => ("Mute mic", "Silenciar"),
+        "call.deafen" => ("Deafen", "Sin audio"),
+        "call.camera" => ("Camera", "Cámara"),
+        "call.share" => ("Share screen", "Compartir"),
+        "call.hangup" | "call.leave" => ("Hang up", "Colgar"),
+        _ => return None,
+    })
+}
+
 /// A knob choice's name on the controller's screen, where a column fits nine
 /// characters: the page's own label where it fits, a shorter word where not.
 pub fn screen_name(value: &str) -> (&'static str, &'static str) {
@@ -135,7 +149,7 @@ pub fn plugin_groups() -> Value {
         { "key": "buttons", "label": label("Lit buttons", "Botones iluminados"), "hint": label("What each button does in a Polaris call.", "Lo que hace cada botón en una llamada de Polaris."), "look": "buttons" },
         { "key": "turning", "label": label("How the knobs turn", "Cómo giran las ruedas"), "look": "rows" },
         { "key": "screen", "label": label("Screen", "Pantalla"), "hint": label("What the controller's screen shows with Polaris' driver.", "Lo que muestra la pantalla del controlador con el driver de Polaris."), "look": "rows" },
-        { "key": "look", "label": label("Look", "Aspecto"), "hint": label("Colours and pictures on the screen, like Stream Control's graphic settings.", "Colores e imágenes de la pantalla, como los ajustes gráficos de Stream Control."), "look": "rows" },
+        { "key": "look", "label": label("Look", "Aspecto"), "hint": label("Colors and images on the screen, like Stream Control's graphic settings.", "Colores e imágenes de la pantalla, como los ajustes gráficos de Stream Control."), "look": "rows" },
     ])
 }
 
@@ -223,13 +237,13 @@ fn look_settings() -> Vec<Value> {
         ], "default": default })
     };
     let mut list = vec![
-        json!({ "kind": "color", "key": "backgroundColor", "group": "look", "label": label("Background colour", "Color de fondo"), "fallback": default_color(BACKGROUND), "default": "" }),
-        json!({ "kind": "color", "key": "textColor", "group": "look", "label": label("Text colour", "Color del texto"), "fallback": default_color(TEXT), "default": "" }),
-        json!({ "kind": "color", "key": "accentColor", "group": "look", "label": label("Volume bar colour", "Color de la barra de volumen"), "fallback": default_color(FILL), "default": "" }),
-        json!({ "kind": "image", "key": "backgroundImage", "group": "look", "label": label("Background picture", "Imagen de fondo"), "hint": label("Drawn behind everything at 480 x 272, like Stream Control's background.", "Se dibuja detrás de todo a 480 x 272, como el fondo de Stream Control."), "width": crate::display::WIDTH, "height": crate::display::HEIGHT, "default": "" }),
+        json!({ "kind": "color", "key": "backgroundColor", "group": "look", "label": label("Background color", "Color de fondo"), "fallback": default_color(BACKGROUND), "default": "" }),
+        json!({ "kind": "color", "key": "textColor", "group": "look", "label": label("Text color", "Color del texto"), "fallback": default_color(TEXT), "default": "" }),
+        json!({ "kind": "color", "key": "accentColor", "group": "look", "label": label("Volume bar color", "Color de la barra de volumen"), "fallback": default_color(FILL), "default": "" }),
+        json!({ "kind": "image", "key": "backgroundImage", "group": "look", "label": label("Background image", "Imagen de fondo"), "hint": label("Drawn behind everything at 480 x 272, like Stream Control's background.", "Se dibuja detrás de todo a 480 x 272, como el fondo de Stream Control."), "width": crate::display::WIDTH, "height": crate::display::HEIGHT, "default": "" }),
         fit(
             "backgroundFit",
-            "Background picture fit",
+            "Background image fit",
             "Ajuste de la imagen de fondo",
             "cover",
         ),

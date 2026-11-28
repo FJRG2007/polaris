@@ -11,7 +11,7 @@ import { packageDir, pluginsFolder } from "./packages";
 import { judgeViewCall, readViewUrl, resolveViewFile, viewContentType, VIEW_CSP, VIEW_SCHEMES } from "./view";
 import { CHANNELS } from "@/shared/bridge";
 import type { PluginAction, PluginLive } from "@/shared/plugin-protocol";
-import { DeviceActions, windowsKeyCodes } from "./device-actions";
+import { DeviceActions, heldActionNames, windowsKeyCodes } from "./device-actions";
 import { openExternal } from "../open-external";
 import { launcherEntries, runLauncherEntry } from "../launcher";
 import { startProgram } from "../launcher-apps";
@@ -254,6 +254,17 @@ function actionsNow(): DeviceActions {
     return deviceActions;
 }
 
+/**
+ * A `polaris.state` answer: the call, the running games, and the names of
+ * this app's own actions the plugin's controls hold, so a device can show
+ * what each button does.
+ */
+async function polarisState(id: string) {
+    const values = (await manager?.settings(id)) ?? {};
+    const actions = heldActionNames(values, await actionsNow().list().catch(() => []), (entry) => launcherEntries().find((item) => item.entry === entry)?.label);
+    return { call: voiceStateNow(), games: runningGames(), actions };
+}
+
 /** What a plugin's `polaris.action` names: a call action, a custom action or a launcher entry. */
 async function runActionRef(value: string): Promise<boolean> {
     const ref = readActionRef(value);
@@ -361,7 +372,7 @@ export function startDevicePlugins(showPolaris: (path?: string) => void, games: 
         onLevels: (id, levels) => broadcast(CHANNELS.pluginsLevels, id, levels),
         call: async (id, method, params) => {
             if (method === "settings.get") return manager?.settings(id) ?? null;
-            if (method === "polaris.state") return { call: voiceStateNow(), games: runningGames() };
+            if (method === "polaris.state") return polarisState(id);
             if (method === "system.launchOfficial") return launchOfficial(id);
             // judgeCall checked the shape: a call action, or a custom or launcher one.
             return runActionRef((params as { action: string }).action);
@@ -581,7 +592,7 @@ export function registerPluginIpc(
             // Only the Stream 100 has a driver of its own; any other view gets null.
             if (verdict.kind === "driver") return { ok: true, value: await lookDriver(driverRunnerFor(parsed.data, pluginsDir()), requirements?.failure(parsed.data, DRIVER_REQUIREMENT) ?? null) };
             if (verdict.method === "settings.get") return { ok: true, value: await running.settings(parsed.data) };
-            if (verdict.method === "polaris.state") return { ok: true, value: { call: voiceStateNow(), games: runningGames() } };
+            if (verdict.method === "polaris.state") return { ok: true, value: await polarisState(parsed.data) };
             if (verdict.method === "system.launchOfficial") return { ok: true, value: await launchOfficial(parsed.data) };
             // A view's button runs what a device button does, custom actions asking first just the same.
             return { ok: true, value: await runActionRef((verdict.params as { action: string }).action) };

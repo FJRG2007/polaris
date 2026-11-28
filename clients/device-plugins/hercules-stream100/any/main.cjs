@@ -41,6 +41,30 @@ const WATCH_MS = 1_000;
 const GAMES_EVERY_MS = 15_000;
 const MAX_GAMES = 64;
 const KNOBS = ["knob1", "knob2", "knob3", "knob4"];
+const BUTTONS = ["button1", "button2", "button3", "button4"];
+/** A renamed action shows its new name on the screen within this long. */
+const NAMES_EVERY_MS = 10_000;
+const MAX_NAMES = 256;
+
+/**
+ * The names of the app's own actions in a `polaris.state` answer's `actions`
+ * (`{"custom:<id>": "name"}`), as the JSON the native module reads, or null
+ * when the app sends none (an older app: its buttons keep an empty zone).
+ */
+function actionNamesOf(value) {
+    const actions = value?.actions;
+    if (!actions || typeof actions !== "object" || Array.isArray(actions)) return null;
+    const names = {};
+    for (const [id, name] of Object.entries(actions).slice(0, MAX_NAMES)) {
+        if (typeof name === "string" && id.length <= 64) names[id] = name.slice(0, 80);
+    }
+    return JSON.stringify(names);
+}
+
+/** Whether a button holds one of the app's own actions, whose name only the app knows. */
+function holdsOwnAction(values) {
+    return BUTTONS.some((key) => typeof values[key] === "string" && /^(custom|launcher):/.test(values[key]));
+}
 
 /** The program keys in a `polaris.state` answer's `games`, or null when it sends none. */
 function gamesOf(value) {
@@ -263,6 +287,7 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     let lastLevels = "";
     let watching = false;
     let gamesAt = -Infinity;
+    let namesAt = -Infinity;
     let nextCall = 1;
     const pending = new Map();
     let lastReport = null;
@@ -352,16 +377,17 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
         if (watching || !running) return;
         watching = true;
         try {
-            if (values.display === "call") {
+            const wantsGames = KNOBS.some((knob) => values[knob] === "games") && now() - gamesAt >= GAMES_EVERY_MS;
+            const wantsNames = holdsOwnAction(values) && now() - namesAt >= NAMES_EVERY_MS;
+            if (values.display === "call" || wantsGames || wantsNames) {
+                if (wantsGames) gamesAt = now();
+                if (wantsNames) namesAt = now();
                 const reply = await call("polaris.state");
                 // An app older than `polaris.state`, or one that refused it: no call.
-                const state = reply.ok ? reply.value?.call ?? null : null;
-                if (running) ensureController().setCall(JSON.stringify(state));
+                if (values.display === "call" && running) ensureController().setCall(JSON.stringify(reply.ok ? reply.value?.call ?? null : null));
                 if (reply.ok) followGames(reply.value);
-            } else if (KNOBS.some((knob) => values[knob] === "games") && now() - gamesAt >= GAMES_EVERY_MS) {
-                gamesAt = now();
-                const reply = await call("polaris.state");
-                if (reply.ok) followGames(reply.value);
+                const names = reply.ok ? actionNamesOf(reply.value) : null;
+                if (names !== null && running && typeof controller?.setActionNames === "function") controller.setActionNames(names);
             }
             if (values.display === "nowPlaying") {
                 let playing = "null";
@@ -535,6 +561,8 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
         } else if (message.type === "settings") {
             values = message.settings ?? {};
             controller?.setSettings(settingsJson());
+            // A button just given one of the app's actions shows its name now, not in ten seconds.
+            namesAt = -Infinity;
             // A changed setting is somebody at the page: the chosen page comes back, and the wait starts again.
             touchedAt = now();
             if (idle) showIdle(false);
@@ -546,7 +574,7 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     });
 }
 
-module.exports = { run, describe, connectedStatus, systemLocale, gamesOf, RENAMED, idleAfterMs, sameReport, parseNetDev, createStats, formatIdle };
+module.exports = { run, describe, connectedStatus, systemLocale, gamesOf, actionNamesOf, holdsOwnAction, RENAMED, idleAfterMs, sameReport, parseNetDev, createStats, formatIdle };
 
 /** Started by the plugin host: load the native module, or say plainly that it did not load. */
 function main(port) {

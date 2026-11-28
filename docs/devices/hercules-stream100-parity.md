@@ -26,7 +26,7 @@ Status: **have** (before this change), **added** (this change), **not yet**
 | ON / OFF status icon (OFF shown while muted) | - | not yet: one picture per knob; a muted one turns the value and bar red instead |
 | Inactive source greyed | a dash when nothing it follows plays | have |
 | Track name, up to 10 characters | the name of what it follows (Calls, Music, ...) | not yet: no free-text setting kind |
-| Action icon and name on the screen above each button | - | not yet: Polaris' page draws the knob columns only |
+| Action icon and name on the screen above each button | the action zone: each lit button's action name under its knob, on the device and on the page's drawing (call actions named by the plugin, custom and launcher actions by the app in `polaris.state` `actions`) | added (0.1.26, name only; no action icon yet) |
 | Volume shown for 1.5 s while turning | the volume is always shown | have |
 | Live preview while editing | the drawing of the device shows the look as it is changed | added |
 | Screen brightness (back button, short press) | `brightness` | have |

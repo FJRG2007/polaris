@@ -150,6 +150,10 @@ pub struct Screen {
     pub mode: DisplayMode,
     pub brightness: u8,
     pub knobs: [Knob; 4],
+    /// What each lit button runs, by name, for the action zone under the
+    /// knobs (Stream Control's); empty for a button with nothing or with an
+    /// action nobody has named. All empty: no action zone.
+    pub buttons: [String; 4],
     /// The language its words are drawn in.
     pub locale: Locale,
     /// The call `Call` mode shows; with none it shows the knobs.
@@ -411,12 +415,25 @@ pub fn render(screen: &Screen) -> Option<IndexedFrame> {
         (DisplayMode::NowPlaying, _, Some(playing)) => {
             playing_page(&mut canvas, playing, screen.locale)
         }
-        _ => mixer_page(&mut canvas, &screen.knobs),
+        _ => mixer_page(&mut canvas, &screen.knobs, &screen.buttons),
     }
     Some(canvas.finish())
 }
 
-fn mixer_page(canvas: &mut Canvas<'_>, knobs: &[Knob; 4]) {
+/// The action zone's height at the bottom of the knobs page, when it has one.
+const ACTION_ZONE: usize = 34;
+/// The action names' cap height: small, as under Stream Control's knobs.
+const ACTION_CAP: usize = 10;
+
+fn mixer_page(canvas: &mut Canvas<'_>, knobs: &[Knob; 4], buttons: &[String; 4]) {
+    // The bars give up the bottom of the screen to the four buttons' names
+    // only when one of them has a name to show.
+    let zone = buttons.iter().any(|name| !name.trim().is_empty());
+    let bar_height = if zone {
+        BAR_HEIGHT - ACTION_ZONE
+    } else {
+        BAR_HEIGHT
+    };
     for (index, knob) in knobs.iter().enumerate() {
         let left = index * COLUMN;
         let center = left + COLUMN / 2;
@@ -439,17 +456,21 @@ fn mixer_page(canvas: &mut Canvas<'_>, knobs: &[Knob; 4]) {
         };
         canvas.text(&value, center, VALUE_Y, 4, 4, color);
         let bar_left = center - BAR_WIDTH / 2;
-        canvas.rect(bar_left, BAR_TOP, BAR_WIDTH, BAR_HEIGHT, TRACK);
+        canvas.rect(bar_left, BAR_TOP, BAR_WIDTH, bar_height, TRACK);
         if let Some(volume) = knob.volume {
-            let filled = BAR_HEIGHT * usize::from(volume.min(100)) / 100;
+            let filled = bar_height * usize::from(volume.min(100)) / 100;
             let fill = if knob.muted { MUTED } else { FILL };
             canvas.rect(
                 bar_left,
-                BAR_TOP + BAR_HEIGHT - filled,
+                BAR_TOP + bar_height - filled,
                 BAR_WIDTH,
                 filled,
                 fill,
             );
+        }
+        if zone {
+            let top = BAR_TOP + bar_height + (ACTION_ZONE - ACTION_CAP) / 2;
+            canvas.text_cap(buttons[index].trim(), center, top, ACTION_CAP, 12, TEXT);
         }
     }
 }

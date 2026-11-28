@@ -150,7 +150,22 @@ export function declaresLook(manifest: Pick<PluginManifest, "settings">): boolea
  * colour. The names are what each knob follows; the volumes are the
  * device's own, live, while it runs (a sample before it shows anything).
  */
-export function ScreenPreview({ manifest, values, names, live = null, levels = null }: { manifest: Pick<PluginManifest, "settings">; values: Values; names: readonly string[]; live?: PluginLive | null; levels?: PluginLevels | null }) {
+export function ScreenPreview({
+    manifest,
+    values,
+    names,
+    actions = [],
+    live = null,
+    levels = null
+}: {
+    manifest: Pick<PluginManifest, "settings">;
+    values: Values;
+    names: readonly string[];
+    /** What each button does, under its knob, as the device's action zone shows it; empty for one with nothing. */
+    actions?: readonly string[];
+    live?: PluginLive | null;
+    levels?: PluginLevels | null;
+}) {
     const t = useTranslations("account");
     const color = (key: string) => lookColor(manifest.settings.find((setting): setting is ColorSetting => setting.key === key && setting.kind === "color"), values[key] ?? "");
     const background = color("backgroundColor") ?? "#101216";
@@ -161,6 +176,8 @@ export function ScreenPreview({ manifest, values, names, live = null, levels = n
     // A drawing of the device's screen, scaled with it: its letters follow the device's sizes, not the page's type scale.
     const nameSize = values.labelSize === "small" ? "0.5rem" : values.labelSize === "large" ? "0.75rem" : "0.625rem";
     const sample = [72, 45, 88, 30];
+    // The device gives the bottom of its screen to the buttons' names only when one has a name.
+    const zone = actions.some((action) => action.trim() !== "");
     return (
         <div
             role="img"
@@ -190,7 +207,7 @@ export function ScreenPreview({ manifest, values, names, live = null, levels = n
                         <span className="font-semibold leading-tight tabular-nums" style={{ fontSize: "0.625rem", color: muted ? MUTED : undefined }}>
                             {volume === null ? "-" : `${volume}%`}
                         </span>
-                        <span className="mt-auto flex h-1/2 w-2/5 min-w-3 items-end justify-center gap-[8%]">
+                        <span className={cn("mt-auto flex w-2/5 min-w-3 items-end justify-center gap-[8%]", zone ? "h-2/5" : "h-1/2")}>
                             <span className="relative h-full w-3/5 rounded-[1px]" style={{ backgroundColor: `${text}26` }}>
                                 <span className="absolute inset-x-0 bottom-0 rounded-[1px]" style={{ height: `${volume ?? 0}%`, backgroundColor: muted ? MUTED : accent }} />
                             </span>
@@ -204,6 +221,11 @@ export function ScreenPreview({ manifest, values, names, live = null, levels = n
                                 </span>
                             ) : null}
                         </span>
+                        {zone ? (
+                            <span className="w-full truncate text-center font-medium uppercase leading-tight" style={{ fontSize: "0.5rem" }} title={actions[index]} data-action={index}>
+                                {actions[index]?.trim() || "\u00a0"}
+                            </span>
+                        ) : null}
                     </div>
                 );
             })}
