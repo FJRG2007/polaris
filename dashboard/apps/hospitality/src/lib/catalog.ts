@@ -9,6 +9,7 @@ import { z } from "zod";
 import { Prisma, prisma } from "@polaris/db";
 import { HospitalityRefusal } from "./outcome";
 import { changedPrice } from "../model/pricing";
+import * as events from "./events";
 import { publishHospitalityChange } from "./live";
 import type { Allergen } from "../model/allergens";
 import { readCatalogCsv, writeCatalogCsv, type CsvProduct } from "../model/catalog-csv";
@@ -174,6 +175,7 @@ export async function setAvailability(productId: string, venueId: string | null,
         await prisma.hospitalityProduct.update({ where: { id: productId }, data: { available } });
     }
     publishHospitalityChange({ venueId, actorId, topic: "menu" });
+    events.productAvailability(productId, venueId, available, new Date());
 }
 
 /** One price change over a category (or the whole menu), in one transaction. */

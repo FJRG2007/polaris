@@ -100,6 +100,37 @@
                         "venueId": "string",
                         "available": "boolean"
                     }
+                },
+                {
+                    "name": "hospitality.table-waiting",
+                    "label": {
+                        "en-US": "Table waiting to be served",
+                        "es-ES": "Mesa esperando a ser servida"
+                    },
+                    "fields": {
+                        "orderId": "id",
+                        "venueId": "id",
+                        "ready": "number"
+                    }
+                }
+            ],
+            "notificationKinds": [
+                {
+                    "id": "hospitality.table-waiting",
+                    "label": {
+                        "en-US": "Your table is ready to serve",
+                        "es-ES": "Tu mesa está lista para servir"
+                    },
+                    "description": {
+                        "en-US": "What you took for a table is ready at the pass.",
+                        "es-ES": "Lo que pediste para una mesa está listo en el pase."
+                    },
+                    "level": "info",
+                    "target": "/hospitality",
+                    "defaults": {
+                        "inapp": true,
+                        "email": false
+                    }
                 }
             ]
         }

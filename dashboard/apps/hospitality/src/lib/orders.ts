@@ -17,6 +17,7 @@ import { modifierGroupSchema } from "../model/schemas";
 import { Prisma, prisma } from "@polaris/db";
 import { HospitalityRefusal } from "./outcome";
 import { publishHospitalityChange } from "./live";
+import * as events from "./events";
 import type { AddLinesInput, FloorInput, OpenOrderInput, SplitInput } from "../model/order-schemas";
 import { orderTotals, type Discount, type OrderTotals, type PricedModifier } from "../model/pricing";
 
@@ -268,11 +269,13 @@ export async function addLines(input: AddLinesInput, actor: { id: string; name: 
 /** Fires what is still pending ("marchar"): all of it, or one course. */
 export async function sendLines(orderId: string, course: number | null, actorId: string): Promise<number> {
     const order = await liveOrder(orderId);
+    const sentAt = new Date();
     const sent = await prisma.hospitalityOrderLine.updateMany({
         where: { orderId, status: "pending", ...(course === null ? {} : { course }) },
-        data: { status: "sent", sentAt: new Date() }
+        data: { status: "sent", sentAt }
     });
     publishHospitalityChange({ venueId: order.venueId, actorId, topic: "kitchen" });
+    events.orderSent(orderId, order.venueId, sent.count, sentAt);
     return sent.count;
 }
 

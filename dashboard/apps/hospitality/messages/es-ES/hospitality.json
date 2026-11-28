@@ -262,5 +262,14 @@
         "remove": "Quitar",
         "hint": "O suéltala o pégala aquí",
         "failed": "No se pudo guardar la foto."
+    },
+    "overview": {
+        "label": "Servicio",
+        "hint": "Mesas abiertas, comensales y lo que espera en el pase.",
+        "busy": "En servicio",
+        "quiet": "Tranquilo",
+        "open": "Mesas abiertas",
+        "covers": "Comensales",
+        "waiting": "En el pase"
     }
 }

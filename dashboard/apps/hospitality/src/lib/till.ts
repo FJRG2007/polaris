@@ -16,6 +16,7 @@
 import { Prisma, prisma } from "@polaris/db";
 import { readDiscount } from "./orders";
 import { HospitalityRefusal } from "./outcome";
+import * as events from "./events";
 import { publishHospitalityChange } from "./live";
 import { lineTotal, orderTotals, type Discount } from "../model/pricing";
 import { shiftReport, type ShiftReport } from "../model/cash";
@@ -79,18 +80,46 @@ export async function readKitchen(venueId: string, station: string | null): Prom
 }
 
 /** Bump (ready) or recall (back to sent) lines on the kitchen display. */
+interface MovingLine {
+    readonly orderId: string;
+    readonly order: { readonly venueId: string; readonly label: string; readonly waiterId: string | null; readonly tableId: string | null };
+}
+
+/** One "table waiting" per order whose lines just went ready, named by its table or its label. */
+async function tellTablesWaiting(lines: readonly MovingLine[], actorId: string, at: Date): Promise<void> {
+    const byOrder = new Map<string, { order: MovingLine["order"]; count: number }>();
+    for (const line of lines) {
+        const entry = byOrder.get(line.orderId) ?? { order: line.order, count: 0 };
+        entry.count += 1;
+        byOrder.set(line.orderId, entry);
+    }
+    if (byOrder.size === 0) return;
+    const tableIds = [...new Set([...byOrder.values()].flatMap(({ order }) => (order.tableId ? [order.tableId] : [])))];
+    const tables = tableIds.length
+        ? await prisma.hospitalityTable.findMany({ where: { id: { in: tableIds } }, select: { id: true, name: true } }).catch(() => [])
+        : [];
+    const names = new Map(tables.map((table) => [table.id, table.name]));
+    for (const [id, { order, count }] of byOrder) {
+        const name = (order.tableId && names.get(order.tableId)) || order.label;
+        events.tableWaiting({ id, venueId: order.venueId, name, waiterId: order.waiterId }, count, actorId, at);
+    }
+}
+
 export async function markLines(lineIds: readonly string[], ready: boolean, actorId: string): Promise<void> {
-    const lines = await prisma.hospitalityOrderLine.findMany({
-        where: { id: { in: [...lineIds] } },
-        select: { order: { select: { venueId: true } } },
-        take: 1
+    const readyAt = new Date();
+    // Only the lines this press moves: one already ready, pressed again, tells nobody.
+    const moving = await prisma.hospitalityOrderLine.findMany({
+        where: { id: { in: [...lineIds] }, status: ready ? "sent" : "ready" },
+        select: { orderId: true, order: { select: { venueId: true, label: true, waiterId: true, tableId: true } } },
+        take: 500
     });
     await prisma.hospitalityOrderLine.updateMany({
         where: { id: { in: [...lineIds] }, status: ready ? "sent" : "ready" },
-        data: ready ? { status: "ready", readyAt: new Date() } : { status: "sent", readyAt: null }
+        data: ready ? { status: "ready", readyAt } : { status: "sent", readyAt: null }
     });
-    const venueId = lines[0]?.order.venueId ?? null;
+    const venueId = moving[0]?.order.venueId ?? null;
     publishHospitalityChange({ venueId, actorId, topic: "kitchen" });
+    if (ready) await tellTablesWaiting(moving, actorId, readyAt);
 }
 
 /** A discount on the whole order or on one line; `discount: null` removes it. */
@@ -177,7 +206,9 @@ export async function pay(input: PayInput, actor: { id: string; name: string }):
         return number;
     });
     publishHospitalityChange({ venueId: order.venueId, actorId: actor.id, topic: "cash" });
-    return { closed: closes, ticketNo, due: Math.max(0, totals.total - paidBefore - paidNow) };
+    const due = Math.max(0, totals.total - paidBefore - paidNow);
+    events.billPaid(order.id, order.venueId, due, closes, fresh.map((p) => p.id));
+    return { closed: closes, ticketNo, due };
 }
 
 /** The bill asked for: the table shows it, nothing else changes. */
@@ -257,5 +288,6 @@ export async function closeShift(venueId: string, counted: number, actor: { id: 
         return n;
     });
     publishHospitalityChange({ venueId, actorId: actor.id, topic: "cash" });
+    events.shiftClosed(shift.id, venueId, zNumber, counted, expected);
     return { zNumber, counted, expected, difference: counted - expected, report };
 }

@@ -262,5 +262,14 @@
         "remove": "Remove",
         "hint": "Or drop or paste one here",
         "failed": "The picture could not be stored."
+    },
+    "overview": {
+        "label": "Service",
+        "hint": "Open tables, covers and what is waiting at the pass.",
+        "busy": "In service",
+        "quiet": "Quiet",
+        "open": "Open tables",
+        "covers": "Covers",
+        "waiting": "At the pass"
     }
 }

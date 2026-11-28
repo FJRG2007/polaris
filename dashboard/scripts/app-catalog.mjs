@@ -84,6 +84,9 @@ export function catalogEntry(pkg, bundle, hostApi, published) {
         permissions: about.permissions ?? [],
         permissionDefs: about.permissionDefs ?? [],
         events: about.events ?? [],
+        notificationKinds: about.notificationKinds ?? [],
+        automationSteps: about.automationSteps ?? [],
+        ...(about.settingsAt ? { settingsAt: about.settingsAt } : {}),
         bundle: { file: bundle.file, digest: bundle.digest, size: bundle.size },
         coreTables: Boolean(about.coreTables),
         published
