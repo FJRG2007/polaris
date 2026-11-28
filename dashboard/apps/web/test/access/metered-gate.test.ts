@@ -9,7 +9,7 @@
 
 import { join, relative, sep } from "node:path";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 let settings = new Map<string, string>();
 let sent = 0;
@@ -130,6 +130,12 @@ describe("a VirusTotal scan", () => {
     });
 
     it("counts every poll against the day", async () => {
+        // One day throughout: a run that crosses midnight UTC starts a new count
+        // half way and the total no longer matches what was sent. Only Date is
+        // faked, so the polls still wait on real timers.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-06-15T12:00:00Z"));
+        onTestFinished(() => vi.useRealTimers());
         answers(() => Response.json({ data: { attributes: { status: "queued" } } }));
         const verdict = await scan();
         expect(verdict.kind).toBe("unknown");

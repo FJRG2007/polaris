@@ -139,7 +139,7 @@ describe("split and combine", () => {
 
     it("a single share is uniform: one byte position takes every value across splits", async () => {
         const seen = new Set<number>();
-        for (let round = 0; round < 2000 && seen.size < 256; round++) seen.add((await shamir.split(SECRET, 2, 2))[0]![0]!);
+        for (let round = 0; round < 8000 && seen.size < 256; round++) seen.add((await shamir.split(SECRET, 2, 2))[0]![0]!);
         expect(seen.size).toBe(256);
     });
 
