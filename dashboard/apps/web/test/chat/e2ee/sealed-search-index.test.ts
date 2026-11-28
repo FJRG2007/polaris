@@ -38,6 +38,14 @@ describe("SealedSearchIndex", () => {
         index.close();
     });
 
+    it("drops a write that arrives after it closed, instead of failing on the closed database", async () => {
+        const index = await SealedSearchIndex.open("search-closed");
+        const pending = index.record({ id: "m-late", channelId: "c1", editedAt: "2026-11-20T10:00:00.000Z", body: "a late invoice" });
+        index.close();
+        await expect(pending).resolves.toBeUndefined();
+        await expect(index.record({ id: "m-after", channelId: "c1", body: "after close" })).resolves.toBeUndefined();
+    });
+
     it("keeps the text across a reopen, sealed at rest", async () => {
         const index = await SealedSearchIndex.open("search-b");
         await index.record({ id: id(1), channelId: HERE, body: "the vault code is 7741" });

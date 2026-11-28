@@ -99,13 +99,15 @@ export class SealedSearchIndex {
     /** Everything this page knows the index holds, by message id. */
     private readonly entries = new Map<string, IndexedSealed & { readonly folded: string }>();
     private loading: Promise<void> | null = null;
+    /** Closed: by sign-out or another tab's upgrade. A write still on its way then has nowhere to go and is dropped. */
+    private closed = false;
 
     private constructor(
         private readonly db: IDBDatabase,
         private readonly device: string,
         private readonly wrap: CryptoKey
     ) {
-        db.onversionchange = () => db.close();
+        db.onversionchange = () => this.close();
     }
 
     /** Open the device's index, making its key on first use. */
@@ -136,6 +138,7 @@ export class SealedSearchIndex {
 
     /** Keep an opened message searchable; an older version than the one kept is ignored. */
     async record(entry: IndexedSealed): Promise<void> {
+        if (this.closed) return;
         const kept = this.entries.get(entry.id);
         if (kept && (kept.editedAt === entry.editedAt || !newerOrSame(entry.editedAt, kept.editedAt))) return;
         if (!kept) {
@@ -149,6 +152,8 @@ export class SealedSearchIndex {
         const plain = new TextEncoder().encode(JSON.stringify({ c: entry.channelId, e: entry.editedAt ?? null, b: entry.body }));
         const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: this.aad(entry.id) }, this.wrap, plain));
         plain.fill(0);
+        // Closed while it was being sealed: the database refuses a transaction now.
+        if (this.closed) return;
         const transaction = this.db.transaction(ENTRIES, "readwrite");
         transaction.objectStore(ENTRIES).put({ iv, sealed, version: entry.editedAt ?? "" } satisfies StoredEntry, entry.id);
         await finished(transaction);
@@ -199,6 +204,7 @@ export class SealedSearchIndex {
     }
 
     close(): void {
+        this.closed = true;
         this.db.close();
     }
 
