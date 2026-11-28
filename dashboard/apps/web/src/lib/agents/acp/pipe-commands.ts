@@ -107,6 +107,15 @@ export const ACP_LAUNCH_SCRIPT = [
     // keeps this environment, and the tmux window's is root's.
     ...commands.AGENT_HOME_ENV,
     'if [ -d "$POLARIS_STATE_DIR/bin" ]; then PATH="$POLARIS_STATE_DIR/bin:$PATH"; export PATH; fi',
+    // Chat is a conversation, not a change to check: Enigma's turn-end hook
+    // (`enigma __verify-hook`, which also runs its self-audit) denied a stop
+    // that asked the person a question only they could answer, and the reply
+    // they saw next argued with the hook (BUG-0074). That hook returns before
+    // reading anything when `ENIGMA_GATE` is "1" (`isGateAgentRun`, Enigma
+    // 1.72 through 1.80). Exported here, so it reaches only this agent and the
+    // hooks it runs: the account's home and `.enigma.json` are shared with the
+    // terminal's agent, which keeps the check.
+    "ENIGMA_GATE=1; export ENIGMA_GATE",
     'a="$POLARIS_STATE_DIR/acp"',
     'line="$(cat "$a/argv")"',
     'rm -f "$a/rc" "$a/pipe"',

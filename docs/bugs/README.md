@@ -80,3 +80,4 @@ Security findings are not kept here; they live in
 | BUG-0071 | Opening a link from the desktop app shows Windows' "cannot access the specified device, path, or file" box | Desktop | Fixed, watching | clients/desktop/src/main/open-external.ts | 2026-11-27 |
 | BUG-0072 | Setting up the Stream 100 driver opens a PowerShell window, and the controls are not found after it | Device plugins | Fixed, watching | clients/desktop/src/main/plugins/hercules-driver.ts | 2026-11-27 |
 | BUG-0073 | Polar's answer shows control tags such as `<final_answer>` while it streams and once saved | Polar | Fixed, watching | dashboard/apps/web/src/lib/polar/control-tags.ts | 2026-11-27 |
+| BUG-0074 | A Chat reply that asks the person a question is sent back by Enigma, and a second, odd answer follows | Polar | Fixed, watching | dashboard/apps/web/src/lib/agents/acp/pipe-commands.ts | 2026-11-28 |

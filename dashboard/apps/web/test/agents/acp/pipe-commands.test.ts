@@ -17,6 +17,7 @@ import {
     parseAcpRead,
     terminalAgentStopCommand
 } from "@/lib/agents/acp/pipe-commands";
+import * as commands from "@/lib/agents/session-commands";
 import { CAPTURE_BYTES, INTERFACE_WINDOW, RUNNER_READY_FILE, RUNNER_WINDOW } from "@/lib/agents/session-commands";
 
 const STATE = "/session/polaris";
@@ -68,6 +69,35 @@ describe("acpLaunchCommand", () => {
         expect(seenHome).toBe(shPath(home));
         expect(prefixDir).toBe(`${shPath(home)}/.npm-global`);
         expect(path!.startsWith(`${shPath(home)}/.local/bin:${shPath(home)}/.npm-global/bin:`)).toBe(true);
+    });
+
+    // BUG-0074, session 6879e6dd (2026-11-28): Enigma's turn-end hook denied a
+    // Chat reply that asked the person which speakers they would buy, and the
+    // person saw a second answer arguing with the hook.
+    it.runIf(hasSh())("hands the chat agent's hooks the marker that stands Enigma's turn-end check down", () => {
+        const home = mkdtempSync(join(tmpdir(), "polaris-acp-gate-"));
+        const lines = ACP_LAUNCH_SCRIPT.split("\n");
+        const before = lines.indexOf('a="$POLARIS_STATE_DIR/acp"');
+        // A child process, as the adapter, Claude and its hook each are: only an
+        // exported value reaches the hook.
+        const prefix = [...lines.slice(0, before), `sh -c 'printf %s "\${ENIGMA_GATE-unset}"'`].join("\n");
+        const env: NodeJS.ProcessEnv = { ...process.env, POLARIS_HOME: shPath(home), POLARIS_STATE_DIR: shPath(home) };
+        delete env.ENIGMA_GATE;
+        expect(execFileSync("sh", ["-c", prefix], { windowsHide: true, encoding: "utf8", env })).toBe("1");
+    });
+
+    it("leaves the terminal's agent, and every Code session, to Enigma's turn-end check", () => {
+        for (const script of [
+            commands.LAUNCH_SCRIPT,
+            commands.RUNNER_SCRIPT,
+            commands.INTERFACE_SCRIPT,
+            commands.RELAUNCH_SCRIPT,
+            commands.LAUNCH_AGENT,
+            commands.SESSION_SETUP,
+            commands.SESSION_BOOT,
+            commands.SESSION_BOOT_FOR_HOST
+        ])
+            expect([script].flat().join("\n")).not.toContain("ENIGMA_GATE");
     });
 });
 
