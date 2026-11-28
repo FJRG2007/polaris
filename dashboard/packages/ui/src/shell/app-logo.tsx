@@ -254,15 +254,15 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
-    // A plate with a fork and a knife.
+    // A serving cloche on its tray, with a highlight on the dome.
     hospitality: {
         palette: ["#FCA5A5", "#B91C1C", "#7F1D1D"],
         draw: ({ base, face }) => (
             <>
-                <circle cx="16" cy="16" r="12" fill={base} />
-                <circle cx="16" cy="16" r="7.5" fill={face} />
-                <rect x="6.2" y="8" width="2" height="16" rx="1" fill={WHITE} />
-                <rect x="23.8" y="8" width="2" height="16" rx="1" fill={WHITE} />
+                <circle cx="16" cy="7.6" r="2.8" fill={face} />
+                <path d="M3.5 23a12.5 12.5 0 0 1 25 0z" fill={base} />
+                <rect x="2" y="23.8" width="28" height="4.2" rx="2.1" fill={face} />
+                <path d="M8.6 19.6a8.2 8.2 0 0 1 5.4-6" fill="none" stroke={WHITE} strokeWidth="2.4" strokeLinecap="round" opacity="0.9" />
             </>
         )
     },
