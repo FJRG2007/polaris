@@ -9,9 +9,8 @@
 
 import { Check, Undo2 } from "lucide-react";
 import type { KitchenTicket } from "../lib/till";
-import { readMenuAction } from "../actions/catalog";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { readKitchenAction } from "../actions/till";
+import { readKitchenScreenAction } from "../actions/till";
 import { useOfflineQueue } from "./offline";
 import { useHospitalityLive, useHospitalityMode } from "./live-client";
 import { readCache, unwrap, useHospitalityT, writeCache } from "./i18n";
@@ -37,18 +36,15 @@ export function KitchenScreen() {
     shown.current = tickets;
 
     const load = useCallback(() => {
-        unwrap(() => readMenuAction({ venueId: readCache<string>("venue") }), t("errors.loadFailed"))
+        unwrap(
+            () => readKitchenScreenAction({ venueId: readCache<string>("venue"), station: station === "all" ? null : station }),
+            t("errors.loadFailed")
+        )
             .then((answer) => {
-                setVenueId(answer.menu.venueId);
+                setVenueId(answer.venueId);
                 setFailed(null);
-                if (!answer.menu.venueId) return setTickets([]);
-                return unwrap(
-                    () => readKitchenAction({ venueId: answer.menu.venueId, station: station === "all" ? null : station }),
-                    t("errors.loadFailed")
-                ).then((k) => {
-                    setTickets(k.tickets);
-                    writeCache(`kitchen:${station}`, k.tickets);
-                });
+                setTickets(answer.tickets);
+                writeCache(`kitchen:${station}`, answer.tickets);
             })
             // With nothing on screen yet the failure takes the screen; with tickets showing, they stay and a toast says it.
             .catch((caught: Error) => (shown.current === null ? setFailed(caught.message) : toast.show({ title: t("errors.loadFailed"), body: caught.message })));

@@ -95,7 +95,45 @@ const VENUE_SELECT = {
     ticketPrefix: true
 } as const;
 
+/**
+ * The venue a screen works on: the one asked for when it exists, else the
+ * first. One indexed row, for screens that need the venue and not its menu.
+ */
+export async function resolveVenue(venueId: string | null): Promise<{ id: string; currency: string } | null> {
+    const select = { id: true, currency: true } as const;
+    const own = venueId ? await prisma.hospitalityVenue.findUnique({ where: { id: venueId }, select }) : null;
+    return own ?? prisma.hospitalityVenue.findFirst({ select, orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
+}
+
+/** A venue's own prices and its best sellers: what the menu needs beyond the shared catalogue. */
+function venueExtras(venueId: string) {
+    return Promise.all([prisma.hospitalityPriceOverride.findMany({ where: { venueId } }), salesOf(venueId)]);
+}
+
+const PRODUCT_SELECT = {
+    id: true,
+    categoryId: true,
+    name: true,
+    description: true,
+    price: true,
+    taxRateBp: true,
+    allergens: true,
+    sku: true,
+    station: true,
+    imageUrl: true,
+    modifiers: true,
+    available: true
+} as const;
+
+/**
+ * The menu as one venue sells it. When the caller already knows the venue (the
+ * one this device used last) its prices and best sellers are read alongside
+ * the catalogue instead of after it, so the whole read is one database round.
+ */
 export async function readMenu(venueId: string | null): Promise<MenuView> {
+    const early = venueId ? venueExtras(venueId) : null;
+    // Read only if the venue turns out to exist; never left to reject unobserved.
+    early?.catch(() => undefined);
     const [venues, categories, products] = await Promise.all([
         prisma.hospitalityVenue.findMany({ select: VENUE_SELECT, orderBy: [{ position: "asc" }, { createdAt: "asc" }], take: 200 }),
         prisma.hospitalityCategory.findMany({
@@ -104,14 +142,17 @@ export async function readMenu(venueId: string | null): Promise<MenuView> {
             take: 500
         }),
         prisma.hospitalityProduct.findMany({
+            select: PRODUCT_SELECT,
             orderBy: [{ position: "asc" }, { createdAt: "asc" }],
             take: 5000
         })
     ]);
     const venue = venues.find((v) => v.id === venueId) ?? venues[0] ?? null;
-    const [overrides, sales] = venue
-        ? await Promise.all([prisma.hospitalityPriceOverride.findMany({ where: { venueId: venue.id } }), salesOf(venue.id)])
-        : [[], new Map<string, number>()];
+    const [overrides, sales] = !venue
+        ? [[], new Map<string, number>()]
+        : early && venue.id === venueId
+          ? await early
+          : await venueExtras(venue.id);
     const byProduct = new Map(overrides.map((o) => [o.productId, o]));
     return {
         venues,

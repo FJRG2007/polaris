@@ -10,6 +10,11 @@ const cents = z.number().int().min(0).max(100_000_000);
 
 export const kitchenInput = z.object({ venueId: id, station: z.string().trim().min(1).max(40).nullable().default(null) });
 
+/** A screen's own load: the venue it used last (null: none yet), resolved on the server. */
+export const kitchenScreenInput = kitchenInput.extend({ venueId: id.nullable() });
+
+export const tillScreenInput = z.object({ venueId: id.nullable() });
+
 export const markInput = z.object({ lineIds: z.array(id).min(1).max(200), ready: z.boolean() });
 
 export const discountInput = z.object({

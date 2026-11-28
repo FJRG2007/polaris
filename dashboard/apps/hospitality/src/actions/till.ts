@@ -8,15 +8,28 @@
  */
 
 import * as till from "../lib/till";
+import { resolveVenue } from "../lib/catalog";
 import { ownVenue } from "../lib/audit";
 import { venueOnly } from "../model/order-schemas";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
-import { cashMoveInput, discountInput, kitchenInput, markInput, orderOnly, payInput, shiftCloseInput, shiftOpenInput } from "../model/till-schemas";
+import { cashMoveInput, discountInput, kitchenInput, kitchenScreenInput, markInput, orderOnly, payInput, shiftCloseInput, shiftOpenInput, tillScreenInput } from "../model/till-schemas";
 
 export async function readKitchenAction(raw: unknown): Promise<Outcome<{ tickets: till.KitchenTicket[] }>> {
     const input = kitchenInput.safeParse(raw);
     if (!input.success) return invalid();
     return outcome("hospitality.use", async (user) => (ownVenue(user, input.data.venueId), { tickets: await till.readKitchen(input.data.venueId, input.data.station) }));
+}
+
+/** The kitchen screen's load in one request: which venue, and its tickets. */
+export async function readKitchenScreenAction(raw: unknown): Promise<Outcome<{ venueId: string | null; tickets: till.KitchenTicket[] }>> {
+    const input = kitchenScreenInput.safeParse(raw);
+    if (!input.success) return invalid();
+    return outcome("hospitality.use", async (user) => {
+        const venue = await resolveVenue(user.device ? (user.venueId ?? null) : input.data.venueId);
+        if (!venue) return { venueId: null, tickets: [] };
+        ownVenue(user, venue.id);
+        return { venueId: venue.id, tickets: await till.readKitchen(venue.id, input.data.station) };
+    });
 }
 
 export async function markLinesAction(raw: unknown): Promise<Outcome<object>> {
@@ -47,6 +60,18 @@ export async function readTillAction(raw: unknown): Promise<Outcome<{ till: Awai
     const input = venueOnly.safeParse(raw);
     if (!input.success) return invalid();
     return outcome("hospitality.manage", async () => ({ till: await till.xReport(input.data.venueId) }));
+}
+
+/** The till screen's load in one request: which venue (and its currency), and its X report. */
+export async function readTillScreenAction(raw: unknown): Promise<
+    Outcome<{ venue: { id: string; currency: string } | null; till: Awaited<ReturnType<typeof till.xReport>> | null }>
+> {
+    const input = tillScreenInput.safeParse(raw);
+    if (!input.success) return invalid();
+    return outcome("hospitality.manage", async () => {
+        const venue = await resolveVenue(input.data.venueId);
+        return { venue, till: venue ? await till.xReport(venue.id) : null };
+    });
 }
 
 export async function openShiftAction(raw: unknown): Promise<Outcome<{ id: string }>> {

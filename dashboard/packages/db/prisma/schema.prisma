@@ -19975,6 +19975,7 @@ model HospitalityOrder {
     payments HospitalityPayment[]
 
     @@index([venueId, status, openedAt])
+    @@index([venueId, status, closedAt])
     @@index([tableId, status])
     @@index([areaId])
     @@index([shiftId])

@@ -13,7 +13,6 @@ import { TOUCH } from "./touch";
 import { useMoney } from "./menu-screen";
 import { parsePrice } from "../model/catalog-csv";
 import { useHospitalityLive } from "./live-client";
-import { readMenuAction } from "../actions/catalog";
 import type { closeShift, xReport } from "../lib/till";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { OrderView } from "../lib/orders";
@@ -22,7 +21,7 @@ import { changeDue, itemsDue, lineTotal, quickTenders, splitEvenly } from "../mo
 import { readCache, unwrap, useHospitalityT } from "./i18n";
 import { LoadFailed, NoVenue } from "./states";
 import { Banknote, CreditCard, Minus, Percent, Plus } from "lucide-react";
-import { closeShiftAction, openShiftAction, payAction, readTillAction, setDiscountAction } from "../actions/till";
+import { closeShiftAction, openShiftAction, payAction, readTillScreenAction, setDiscountAction } from "../actions/till";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
 
 type Till = Awaited<ReturnType<typeof xReport>>;
@@ -44,13 +43,11 @@ export function TillScreen({ manager }: { manager: boolean }) {
     const moveId = useRef(crypto.randomUUID());
 
     const load = useCallback(() => {
-        unwrap(() => readMenuAction({ venueId: readCache<string>("venue") }), t("errors.loadFailed"))
+        unwrap(() => readTillScreenAction({ venueId: readCache<string>("venue") }), t("errors.loadFailed"))
             .then((answer) => {
                 setFailed(null);
-                const v = answer.menu.venues.find((x) => x.id === answer.menu.venueId);
-                if (!v) return setTill(null);
-                setVenue({ id: v.id, currency: v.currency });
-                return unwrap(() => readTillAction({ venueId: v.id }), t("errors.loadFailed")).then((x) => setTill(x.till));
+                if (answer.venue) setVenue(answer.venue);
+                setTill(answer.till);
             })
             .catch((caught: Error) => setFailed(caught.message));
     }, [t]);

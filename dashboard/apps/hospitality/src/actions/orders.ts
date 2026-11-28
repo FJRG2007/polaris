@@ -5,8 +5,10 @@
  * room's plan needs `hospitality.manage`. Every input is validated first.
  */
 
+import { z } from "zod";
 import { ownVenue } from "../lib/audit";
 import * as orders from "../lib/orders";
+import * as load from "../lib/service-load";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 import { addLinesInput, floorInput, lineOnly, moveInput, openOrderInput, sendInput, splitInput, venueOnly } from "../model/order-schemas";
 
@@ -14,6 +16,20 @@ export async function readServiceAction(raw: unknown): Promise<Outcome<{ service
     const input = venueOnly.safeParse(raw);
     if (!input.success) return invalid();
     return outcome("hospitality.use", async (user) => (ownVenue(user, input.data.venueId), { service: await orders.readService(input.data.venueId) }));
+}
+
+const screenQuery = z.object({ venueId: z.string().uuid().nullable() });
+
+/** The Service screen's whole first load (menu, floor, open orders) in one request. */
+export async function readServiceScreenAction(raw: unknown): Promise<Outcome<load.ServiceScreenView>> {
+    const input = screenQuery.safeParse(raw);
+    if (!input.success) return invalid();
+    return outcome("hospitality.use", async (user) => {
+        // A linked device only ever sees its own venue, whatever it asks for.
+        const venueId = user.device ? (input.data.venueId ?? user.venueId ?? null) : input.data.venueId;
+        if (user.device) ownVenue(user, venueId);
+        return load.readServiceScreen(venueId);
+    });
 }
 
 export async function openOrderAction(raw: unknown): Promise<Outcome<{ id: string }>> {

@@ -20,7 +20,6 @@ import { mostSoldFirst, repeatRound } from "../model/rounds";
 import { markBilledAction } from "../actions/till";
 import { lineTotal, orderTotals } from "../model/pricing";
 import { TABLE_SHAPES } from "../model/order-schemas";
-import { readMenuAction } from "../actions/catalog";
 import type { MenuView, ProductView } from "../lib/catalog";
 import { useHospitalityLive, useHospitalityMode } from "./live-client";
 import { readCache, unwrap, useHospitalityT, writeCache } from "./i18n";
@@ -28,7 +27,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRightLeft, Euro, Minus, Move, Percent, Plus, Receipt, Repeat, Save, Send, Trash2 } from "lucide-react";
 import type { LineView, OrderView, RoomView, ServiceView, TableView } from "../lib/orders";
 import { Button, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
-import { readServiceAction, removeLineAction, restoreLineAction, saveFloorAction } from "../actions/orders";
+import { readServiceScreenAction, removeLineAction, restoreLineAction, saveFloorAction } from "../actions/orders";
 import { useOfflineQueue } from "./offline";
 import { LoadFailed, NoVenue } from "./states";
 
@@ -73,17 +72,16 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
     const [failed, setFailed] = useState<string | null>(null);
     const venueId = menu?.venueId ?? null;
 
+    // One request for everything this screen draws; the cached copy shows meanwhile.
     const load = useCallback(() => {
-        unwrap(() => readMenuAction({ venueId: readCache<string>("venue") }), t("errors.loadFailed"))
+        unwrap(() => readServiceScreenAction({ venueId: readCache<string>("venue") }), t("errors.loadFailed"))
             .then((answer) => {
                 setMenu(answer.menu);
                 setFailed(null);
                 writeCache("menu", answer.menu);
-                if (!answer.menu.venueId) return;
-                return unwrap(() => readServiceAction({ venueId: answer.menu.venueId }), t("errors.loadFailed")).then((s) => {
-                    setService(s.service);
-                    writeCache("service", s.service);
-                });
+                if (!answer.service) return;
+                setService(answer.service);
+                writeCache("service", answer.service);
             })
             .catch((caught: Error) => setFailed(caught.message));
     }, [t]);
