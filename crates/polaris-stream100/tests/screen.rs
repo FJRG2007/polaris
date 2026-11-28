@@ -12,10 +12,12 @@ use polaris_stream100::engine::{Command, Engine, Output};
 use polaris_stream100::plugin::Locale;
 use polaris_stream100::report::KnobMap;
 use polaris_stream100::screen::{
-    render, Call, Knob, NowPlaying, Painter, Person, Screen, TILE_EVERY,
+    render, Call, Idle, IdleRow, Knob, NowPlaying, Painter, Person, Screen, IDLE_HOLD, TILE_EVERY,
 };
 use polaris_stream100::session::KEEPALIVE_EVERY;
 use polaris_stream100::settings::{DisplayMode, Settings};
+use polaris_stream100::theme::{self, Look, Theme};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 fn hex(text: &str) -> Vec<u8> {
@@ -177,6 +179,7 @@ fn page(volume: u8) -> Screen {
         call: None,
         playing: None,
         idle: None,
+        theme: Default::default(),
     }
 }
 
@@ -596,9 +599,10 @@ fn spanish_accents_are_drawn_and_differ_from_the_plain_letters() {
     accented.knobs[1].label = "Música".to_owned();
     let (plain, accented) = (render(&plain).unwrap(), render(&accented).unwrap());
     assert_ne!(plain, accented);
-    // The label's letters start at row 18; the accent is drawn in 14..18 (x 120 is the divider).
-    assert_eq!(lit(&plain, 121..240, 14..18), 0);
-    assert!(lit(&accented, 121..240, 14..18) > 0);
+    // The label's capitals start at row 18; the accent is drawn above them,
+    // clear of the capitals' smoothed top edge (x 120 is the divider).
+    assert_eq!(lit(&plain, 121..240, 6..17), 0);
+    assert!(lit(&accented, 121..240, 6..17) > 0);
     // Every Spanish letter has a glyph of its own, none is the unknown box.
     let unknown = {
         let mut screen = page(50);
@@ -716,4 +720,171 @@ fn a_new_call_or_track_redraws_the_page() {
         Duration::from_secs(3),
     );
     assert_eq!(draws(&second).len(), 32);
+}
+
+fn idle_page(cpu: u8) -> Screen {
+    let mut screen = page(50);
+    screen.idle = Some(Idle {
+        clock: "12:34".to_owned(),
+        rows: vec![IdleRow {
+            label: "CPU".to_owned(),
+            value: format!("{cpu}%"),
+            percent: Some(cpu),
+        }],
+    });
+    screen
+}
+
+fn palettes_in(sent: &[Vec<u8>]) -> usize {
+    sent.iter()
+        .filter(|message| {
+            message[8..]
+                .windows(7)
+                .any(|w| w == [0x33, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00])
+        })
+        .count()
+}
+
+#[test]
+fn an_idle_page_that_changes_every_second_is_still_seen_whole() {
+    let mut painter = Painter::default();
+    let start = Instant::now();
+    painter.show(&idle_page(10));
+    let mut sent = run(&mut painter, start, TILE_EVERY * 10);
+    // A new reading mid-draw: the page being drawn is finished first, not
+    // restarted from its coarse tiles (which left the panel blocky for good).
+    painter.show(&idle_page(20));
+    sent.extend(run(&mut painter, start + TILE_EVERY * 11, TILE_EVERY * 40));
+    let first = tiles_in(&sent);
+    assert_eq!(first.len(), CHUNK_COUNT);
+    let tens = render(&idle_page(10)).unwrap();
+    for (tile, samples) in &first {
+        assert_eq!(
+            samples,
+            &tens.tile(*tile),
+            "tile {tile} is of the first page"
+        );
+    }
+    let mut panel = Panel::new(true);
+    panel.apply(&sent);
+    assert!(panel.shows(&idle_page(10)));
+    // It stays whole for the hold, then the newest reading is drawn, to the end.
+    let finished = start + TILE_EVERY * 51;
+    let held = run(&mut painter, finished, IDLE_HOLD - TILE_EVERY * 30);
+    assert!(draws(&held).is_empty());
+    let next = run(&mut painter, finished + IDLE_HOLD, TILE_EVERY * 40);
+    assert!(!draws(&next).is_empty());
+    panel.apply(&next);
+    assert!(panel.shows(&idle_page(20)));
+    assert!(!painter.is_drawing());
+}
+
+#[test]
+fn touching_a_control_leaves_the_idle_page_at_once() {
+    let mut painter = Painter::default();
+    let start = Instant::now();
+    painter.show(&idle_page(10));
+    let begun = run(&mut painter, start, TILE_EVERY * 5);
+    painter.show(&page(70));
+    let rest = run(
+        &mut painter,
+        start + TILE_EVERY * 6,
+        TILE_EVERY - Duration::from_millis(1),
+    );
+    let seventy = render(&page(70)).unwrap();
+    let tiles = tiles_in(&rest);
+    assert_eq!(tiles.len(), 1);
+    assert_eq!(tiles[0].1, seventy.tile(tiles[0].0));
+    let mut panel = Panel::new(true);
+    panel.apply(&begun);
+    panel.apply(&rest);
+    panel.apply(&run(&mut painter, start + TILE_EVERY * 8, TILE_EVERY * 40));
+    assert!(panel.shows(&page(70)));
+}
+
+fn themed(volume: u8, look: &Look) -> Screen {
+    let mut screen = page(volume);
+    screen.theme = Arc::new(Theme::new(look));
+    screen
+}
+
+#[test]
+fn a_new_look_sends_its_palette_once_and_redraws_the_whole_page() {
+    let mut painter = Painter::default();
+    let start = Instant::now();
+    painter.show(&page(40));
+    let first = run(&mut painter, start, TILE_EVERY * 40);
+    assert_eq!(palettes_in(&first), 1);
+    // The same look, another volume: never the palette again.
+    painter.show(&page(41));
+    let later = run(&mut painter, start + TILE_EVERY * 41, TILE_EVERY * 40);
+    assert_eq!(palettes_in(&later), 0);
+    // A new background colour: its palette rides on the first tile, and the
+    // page is drawn whole in it.
+    let look = Look {
+        background_color: "#203040".into(),
+        ..Look::default()
+    };
+    painter.show(&themed(41, &look));
+    let changed = run(&mut painter, start + TILE_EVERY * 82, TILE_EVERY * 40);
+    assert_eq!(palettes_in(&changed), 1);
+    assert_eq!(palettes_in(&[draws(&changed)[0].clone()]), 1);
+    assert_eq!(draws(&changed).len(), CHUNK_COUNT);
+    assert!(!painter.is_drawing());
+}
+
+#[test]
+fn letters_have_smooth_edges_in_the_palette_shades() {
+    let frame = render(&page(50)).unwrap();
+    let theme = Theme::default();
+    // The value "50%" under knob 1 (rows 52..80): more than the two flat
+    // colours a blown-up bitmap gives, and every one a palette colour.
+    let mut seen = std::collections::BTreeSet::new();
+    for y in 52..80 {
+        for x in 0..120 {
+            seen.insert(pixel(&frame, x, y));
+        }
+    }
+    assert!(seen.len() > 4, "{seen:?}");
+    assert!(seen
+        .iter()
+        .all(|index| usize::from(*index) < theme::PICTURE_SLOTS_FROM));
+    assert_eq!(frame.palette, theme.palette);
+}
+
+#[test]
+fn a_look_recolours_the_page_and_a_knob_picture_takes_the_top_of_its_column() {
+    let picture = {
+        let image = image_png(8, 8, [250, 200, 0, 255]);
+        format!("data:image/png;base64,{image}")
+    };
+    let look = Look {
+        background_color: "#ffffff".into(),
+        accent_color: "#00aa00".into(),
+        knob_images: [picture, String::new(), String::new(), String::new()],
+        ..Look::default()
+    };
+    let screen = themed(50, &look);
+    let frame = render(&screen).unwrap();
+    let rgb = |index: u8| frame.palette[usize::from(index)];
+    assert_eq!(rgb(pixel(&frame, 2, 2)), display::rgb565(255, 255, 255));
+    assert_eq!(rgb(pixel(&frame, 60, 250)), display::rgb565(0, 170, 0));
+    // The picture sits in a 40 px square at the top of knob 1's column.
+    assert_eq!(rgb(pixel(&frame, 60, 26)), display::rgb565(250, 200, 0));
+    // Knob 2 has none: its name is where it always was.
+    assert_ne!(rgb(pixel(&frame, 180, 26)), display::rgb565(250, 200, 0));
+}
+
+/// A solid PNG, base64.
+fn image_png(width: u32, height: u32, color: [u8; 4]) -> String {
+    use base64::Engine as _;
+    let picture = image::RgbaImage::from_pixel(width, height, image::Rgba(color));
+    let mut bytes = Vec::new();
+    picture
+        .write_to(
+            &mut std::io::Cursor::new(&mut bytes),
+            image::ImageFormat::Png,
+        )
+        .unwrap();
+    base64::engine::general_purpose::STANDARD.encode(bytes)
 }
