@@ -50,8 +50,11 @@ import {
     HardDrive,
     CalendarClock,
     FolderGit2,
+    Puzzle,
     type LucideIcon
 } from "lucide-react";
+import { rememberAppSteps } from "../app-step-words";
+import type { AppStepView } from "@/lib/automations/app-steps";
 import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { JsonEditor, JsonView } from "@/components/json-view";
@@ -731,6 +734,7 @@ export function CanvasEditor({
                 open={palette}
                 stepsOnly={insertOn !== null}
                 apps={[...Object.keys(detail.appNodes ?? {}), ...(detail.eventApps ?? [])]}
+                appSteps={detail.appSteps}
                 assist={
                     readOnly ? undefined : (
                         <PolarAssist
@@ -815,7 +819,7 @@ function RenameDialog({
     );
 }
 
-const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
+const GROUP_ICONS: Partial<Record<catalog.CatalogGroupId, LucideIcon>> = {
     basics: Zap,
     polaris: Server,
     automations: Workflow,
@@ -844,6 +848,7 @@ export function Palette({
     triggersOnly = false,
     title,
     apps,
+    appSteps = [],
     assist,
     onOpenChange,
     onPick
@@ -856,19 +861,24 @@ export function Palette({
     triggersOnly?: boolean;
     title?: string;
     apps: readonly string[];
+    /** The steps installed apps declare in their manifests, this account may add. */
+    appSteps?: readonly AppStepView[];
     onOpenChange: (open: boolean) => void;
     onPick: (value: string) => void;
 }) {
     const t = useTranslations("automations");
+    rememberAppSteps(appSteps);
+    const stepApps = new Map(appSteps.map((step) => [step.app, step.appName]));
     const groups = useMemo<AddGroup[]>(
         () =>
             catalog
-                .catalogGroups({ triggers: !stepsOnly, steps: !triggersOnly, apps })
+                .catalogGroups({ triggers: !stepsOnly, steps: !triggersOnly, apps, appSteps })
                 .map((group) => {
-                    const Icon = GROUP_ICONS[group.id];
+                    const Icon = GROUP_ICONS[group.id] ?? Puzzle;
+                    const appName = stepApps.get(group.id);
                     return {
                         id: group.id,
-                        label: t(`picker.groups.${group.id}`),
+                        label: appName ?? t(`picker.groups.${group.id}` as "picker.groups.basics"),
                         icon:
                             group.id === "polaris" ? (
                                 <PolarisMark nameClassName="hidden" />
@@ -906,7 +916,7 @@ export function Palette({
                         }))
                     };
                 }),
-        [stepsOnly, triggersOnly, apps.join(","), t]
+        [stepsOnly, triggersOnly, apps.join(","), appSteps, t]
     );
     return (
         <AddBlockDialog

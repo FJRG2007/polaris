@@ -41,6 +41,7 @@ import type {
     AppExtension,
     AppJob,
     AppWidgetDefinition,
+    AppStepHandler,
     AppWidgetView,
     AppSlot,
     CallActivityHost,
@@ -672,6 +673,7 @@ declare module "@polaris/app-host" {
         AppDeckAction: AppDeckAction;
         AppJob: AppJob;
         AppWidgetDefinition: AppWidgetDefinition;
+        AppStepHandler: AppStepHandler;
         AppWidgetView: AppWidgetView;
         AppSlot: AppSlot;
         ConnectionsViewer: ConnectionsViewer;

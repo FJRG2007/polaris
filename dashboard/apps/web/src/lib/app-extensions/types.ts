@@ -196,6 +196,15 @@ export interface AppExtension {
     readonly automationNodes?: () => Promise<readonly AutomationServerNode[]>;
 
     /**
+     * What does each automation step its manifest declares (`automationSteps`),
+     * by step type. The dashboard checks the settings against the declared
+     * fields, the run-as account against the step's permission and the answer
+     * against its declared output before and after asking; a handler only does
+     * the work. Import the implementations lazily inside.
+     */
+    readonly automationSteps?: () => Promise<Readonly<Record<string, AppStepHandler>>>;
+
+    /**
      * The runs an automation it moved to the central engine had before the
      * move, newest first, read-only: `legacyRef` is the one it imported it with.
      */
@@ -670,6 +679,18 @@ export interface RelayedChatMessage {
  * Every function runs inside the reader's request, so an app checks the session
  * the way its own screens and actions do.
  */
+/** One manifest-declared automation step's work, handed settings already checked. */
+export type AppStepHandler = (
+    input: Readonly<Record<string, unknown>>,
+    context: {
+        /** The account the automation runs as, already holding the step's permission. */
+        readonly actorId: string;
+        readonly automationId: string;
+        /** What started the run: the trigger's payload. */
+        readonly trigger: Readonly<Record<string, unknown>>;
+    }
+) => Promise<{ readonly output?: Record<string, unknown>; readonly refused?: string }>;
+
 export interface AppWidgetDefinition {
     /** Unique within the app, and stable: it is stored in layouts. */
     readonly kind: string;

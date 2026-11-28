@@ -468,6 +468,10 @@
         "crmRunner": "The account it runs as can no longer use the CRM",
         "crmForbidden": "The account it runs as cannot change those records",
         "crmActionFailed": "The CRM did not do it",
+        "appStepForbidden": "The account it runs as cannot do that in the app",
+        "appStepRefused": "The app turned it down; its reason is in the step",
+        "appStepFailed": "The app could not do it",
+        "appStepAnswer": "The app answered something this step does not declare",
         "callLoop": "Stopped: that automation is already running earlier in this chain",
         "polarModelGone": "That model is no longer available to the account this runs as",
         "polarTimeout": "The AI step ran out of time",
@@ -1511,5 +1515,9 @@
         "selfTrigger": "Would start \"{trigger}\" again, with no condition in between",
         "selfCall": "Runs the automation it is in",
         "contradiction": "Its conditions can never all hold"
+    },
+    "appSteps": {
+        "choose": "Choose one",
+        "invalid": "This does not fit what the step takes"
     }
 }

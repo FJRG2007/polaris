@@ -6,6 +6,7 @@
  * what they would refuse, and every read is bounded.
  */
 
+import type { AppStepView } from "./app-steps";
 import type { AppSlot } from "@/lib/app-extensions/types";
 import { prisma } from "@polaris/db";
 import { cancelRun, loadGraph } from "./engine";
@@ -182,6 +183,8 @@ export interface AutomationDetail {
     readonly appNodes?: Readonly<Record<string, AppSlot>>;
     /** The apps whose events this viewer may start automations on; filled in by the screen's action. */
     readonly eventApps?: readonly core.AppEventApp[];
+    /** The steps installed apps declare in their manifests, this account may add. */
+    readonly appSteps?: readonly AppStepView[];
     /** Still under the name it was created with, in any language; filled in by the screen's action. */
     readonly unnamed?: boolean;
     readonly id: string;

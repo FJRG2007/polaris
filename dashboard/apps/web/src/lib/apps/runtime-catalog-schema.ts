@@ -14,6 +14,7 @@
  * newer Polaris"; it never takes the rest of the catalogue down with it.
  */
 
+import type { AppStepDefinition } from "@polaris/core";
 import { z } from "zod";
 import { Package } from "lucide-react";
 import type { AppCategory, AppManifest } from "./catalog";
@@ -90,6 +91,37 @@ export const runtimeAppEntrySchema = z.object({
                 name: z.string().regex(/^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,63}$/),
                 label: localized(80),
                 fields: z.record(z.enum(["string", "number", "boolean", "id"])).default({})
+            })
+        )
+        .max(32)
+        .default([]),
+    /** The automation steps it does, each `<id>.action.<name>`, with typed settings and answer. */
+    automationSteps: z
+        .array(
+            z.object({
+                type: z.string().regex(/^[a-z][a-z0-9-]{1,47}\.action\.[a-z][a-zA-Z0-9-]{0,47}$/),
+                label: localized(80),
+                description: localized(200),
+                permission: z.string().regex(/^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,63}$/),
+                fields: z
+                    .array(
+                        z.object({
+                            key: z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/),
+                            kind: z.enum(["string", "text", "number", "boolean", "id", "choice"]),
+                            label: localized(60),
+                            hint: localized(160).optional(),
+                            required: z.boolean().default(false),
+                            min: z.number().finite().optional(),
+                            max: z.number().finite().optional(),
+                            options: z
+                                .array(z.object({ value: z.string().min(1).max(64), label: localized(60) }))
+                                .max(50)
+                                .optional()
+                        })
+                    )
+                    .max(16)
+                    .default([]),
+                output: z.record(z.enum(["string", "number", "boolean", "id"])).default({})
             })
         )
         .max(32)
@@ -223,6 +255,8 @@ export type RuntimeAppView = Omit<AppManifest, "icon"> & {
     readonly permissionDefs?: readonly { key: string; label: string; implies: readonly string[]; writes: boolean }[];
     /** Its automation trigger events, labelled in the reader's language. */
     readonly events?: readonly { name: string; label: string; fields: Readonly<Record<string, "string" | "number" | "boolean" | "id">> }[];
+    /** Its automation steps, labelled in the reader's language. */
+    readonly automationSteps?: readonly AppStepDefinition[];
     /** Its kinds of alert, labelled in the reader's language. */
     readonly notificationKinds?: readonly {
         id: string;
@@ -257,9 +291,29 @@ export function runtimeViews(catalog: RuntimeAppCatalog | null, known: ReadonlyS
             label: entryText(kind.label, locale),
             description: entryText(kind.description, locale)
         }));
+        const automationSteps: AppStepDefinition[] = entry.automationSteps.map((step) => ({
+            type: step.type,
+            label: entryText(step.label, locale),
+            description: entryText(step.description, locale),
+            permission: step.permission,
+            output: step.output,
+            fields: step.fields.map((field) => ({
+                key: field.key,
+                kind: field.kind,
+                label: entryText(field.label, locale),
+                ...(field.hint ? { hint: entryText(field.hint, locale) } : {}),
+                required: field.required,
+                ...(field.min !== undefined ? { min: field.min } : {}),
+                ...(field.max !== undefined ? { max: field.max } : {}),
+                ...(field.options
+                    ? { options: field.options.map((option) => ({ value: option.value, label: entryText(option.label, locale) })) }
+                    : {})
+            }))
+        }));
         views.push({
             ...view,
             ...(notificationKinds.length ? { notificationKinds } : {}),
+            ...(automationSteps.length ? { automationSteps } : {}),
             ...(entry.nav ? { nav: entry.nav } : {}),
             ...(permissionDefs.length ? { permissionDefs } : {}),
             ...(events.length ? { events } : {})

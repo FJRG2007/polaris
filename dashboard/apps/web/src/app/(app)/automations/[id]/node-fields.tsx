@@ -41,6 +41,8 @@ import { AlertInFields, AlertNotifyFields } from "./alert-fields";
 export { WebhookAddress } from "./webhook-fields";
 import { NoticeDeliveryFields } from "@/components/automations/notice-delivery-fields";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
+import { AppStepFields } from "./app-step-fields";
+import { appStepView } from "../app-step-words";
 import {
     ConditionEditor,
     FLOW_FIELD_TYPES,
@@ -194,6 +196,9 @@ export function newNode(type: string): core.GraphNode {
 export function configValid(node: core.GraphNode): boolean {
     if (core.isCoreNodeType(node.type))
         return core.CORE_NODE_CONFIGS[node.type].safeParse(node.config).success;
+    // A step an app's manifest declares is checked by its declared fields here too.
+    const step = appStepView(node.type);
+    if (step) return core.appStepConfigSchema(step).safeParse(node.config ?? {}).success;
     // An app's node is checked by the app, on save and on publish.
     return core.nodeTypeApp(node.type) !== null;
 }
@@ -217,6 +222,9 @@ function AppNodeFields({
     const t = useTranslations("automations");
     const app = core.nodeTypeApp(node.type);
     const slot = app ? detail.appNodes?.[app] : undefined;
+    const step = detail.appSteps?.find((one) => one.type === node.type);
+    if (step)
+        return <AppStepFields step={step} config={node.config} setConfig={setConfig} disabled={!detail.canEdit} />;
     if (slot?.bundle) {
         return (
             <AppSlotView

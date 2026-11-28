@@ -6,6 +6,7 @@
  */
 
 import * as core from "@polaris/core";
+import { appStepView } from "./app-step-words";
 import { Badge, Button, Skeleton } from "@polaris/ui";
 import {
     Activity,
@@ -242,6 +243,10 @@ const RUN_ERRORS = [
     "crmRunner",
     "crmForbidden",
     "crmActionFailed",
+    "appStepForbidden",
+    "appStepRefused",
+    "appStepFailed",
+    "appStepAnswer",
     "commandEmpty",
     "commandInvalid",
     "commandTooLong",
@@ -438,7 +443,7 @@ export function nodeHint(
     type: string
 ): string | null {
     const key = (NODE_KEYS as Record<string, NodeKey>)[type];
-    return key ? t(`nodeHints.${key}`) : null;
+    return key ? t(`nodeHints.${key}`) : (appStepView(type)?.description ?? null);
 }
 
 /** An output port in the reader's words: Then, Else, a Choose case (by its label), a lane, Each, Done, Error, Timed out. */
@@ -522,7 +527,7 @@ export function nodeTitle(
     const key = (NODE_KEYS as Record<string, NodeKey>)[type];
     if (key) return t(`nodes.${key}`);
     const app = (APP_NODE_KEYS as Record<string, AppNodeKey>)[type];
-    return app ? t(`appNodes.${app}`) : t("nodes.unknown");
+    return app ? t(`appNodes.${app}`) : (appStepView(type)?.label ?? t("nodes.unknown"));
 }
 
 export function Section({

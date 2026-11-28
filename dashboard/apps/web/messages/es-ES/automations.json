@@ -468,6 +468,10 @@
         "crmRunner": "La cuenta con la que se ejecuta ya no puede usar el CRM",
         "crmForbidden": "La cuenta con la que se ejecuta no puede cambiar esos registros",
         "crmActionFailed": "El CRM no lo hizo",
+        "appStepForbidden": "La cuenta con la que se ejecuta no puede hacer eso en la app",
+        "appStepRefused": "La app lo rechazó; el motivo está en el paso",
+        "appStepFailed": "La app no pudo hacerlo",
+        "appStepAnswer": "La app respondió algo que este paso no declara",
         "callLoop": "Detenida: esa automatización ya se ejecuta antes en esta cadena",
         "polarModelGone": "Ese modelo ya no está disponible para la cuenta con la que se ejecuta",
         "polarTimeout": "El paso de IA se quedó sin tiempo",
@@ -1511,5 +1515,9 @@
         "selfTrigger": "Volvería a iniciar \"{trigger}\" sin condición entre medias",
         "selfCall": "Se ejecuta a sí misma",
         "contradiction": "Sus condiciones nunca pueden cumplirse a la vez"
+    },
+    "appSteps": {
+        "choose": "Elige uno",
+        "invalid": "Esto no encaja con lo que admite el paso"
     }
 }

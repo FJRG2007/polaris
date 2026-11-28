@@ -102,15 +102,24 @@ export async function getAutomationAction(
     if (!parsed.success) return invalid();
     try {
         const who = await actor();
-        const [found, appNodes, eventApps] = await Promise.all([
+        const [found, appNodes, eventApps, appSteps] = await Promise.all([
             service.getAutomation(who, parsed.data),
             appAutomationNodeSlots().catch(() => ({})),
-            requirePermission("automations.use").then((user) => appEvents.eventApps(user))
+            requirePermission("automations.use").then((user) => appEvents.eventApps(user)),
+            requirePermission("automations.use")
+                .then(async (user) => {
+                    const [{ appStepViews }, { isAppInstalled }] = await Promise.all([
+                        import("@/lib/automations/app-steps"),
+                        import("@/lib/apps/install-presence")
+                    ]);
+                    return appStepViews(user, isAppInstalled);
+                })
+                .catch(() => [])
         ]);
         const unnamed = core.LOCALES.some(
             (locale) => translate(locale, "automations.create.untitled") === found.name
         );
-        const automation = { ...found, appNodes, eventApps, unnamed };
+        const automation = { ...found, appNodes, eventApps, appSteps, unnamed };
         const shelf = await service.shelfOf(parsed.data);
         return {
             ok: true,

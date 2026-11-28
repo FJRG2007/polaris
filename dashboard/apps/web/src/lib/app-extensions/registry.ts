@@ -94,8 +94,12 @@ export function whileInstalled(
 export async function appAutomationNodes(): Promise<AutomationServerNode[]> {
     const lists = await Promise.all(
         extensions().map(async (extension) => {
-            if (!extension.automationNodes || !(await isAppInstalled(extension.id))) return [];
-            return extension.automationNodes().catch(() => []);
+            if (!extension.automationNodes && !extension.automationSteps) return [];
+            if (!(await isAppInstalled(extension.id))) return [];
+            const own = extension.automationNodes ? await extension.automationNodes().catch(() => []) : [];
+            // The steps its manifest declares, checked and run through the host.
+            const { manifestStepNodes } = await import("@/lib/automations/app-steps");
+            return [...own, ...manifestStepNodes(extension.id, extension.automationSteps)];
         })
     );
     return lists.flat();

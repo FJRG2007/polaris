@@ -25,7 +25,9 @@ export type CatalogGroupId =
     | "logic"
     | "timing"
     | "data"
-    | "send";
+    | "send"
+    // An installed app whose manifest declares steps, by its id.
+    | (string & {});
 
 export interface CatalogItem {
     /** What the picker hands back: the node type, or `<type>#<preset>`. */
@@ -172,6 +174,8 @@ export function catalogGroups(options: {
     readonly triggers: boolean;
     readonly steps?: boolean;
     readonly apps: readonly string[];
+    /** The steps installed apps declare in their manifests, offered under each app. */
+    readonly appSteps?: readonly { readonly app: string; readonly type: string }[];
 }): CatalogGroup[] {
     const places = options.apps.includes(PLACES_APP);
     const crm = options.apps.includes(CRM_APP);
@@ -257,6 +261,8 @@ export function catalogGroups(options: {
         const steps = APP_STEPS[app];
         if (steps && options.apps.includes(app)) groups.push({ id: app, items: steps.map(plain) });
     }
+    // The steps installed apps declare in their manifests, under each app.
+    for (const step of options.appSteps ?? []) groups.push({ id: step.app, items: [plain(step.type)] });
     return mergeSame(groups);
 }
 

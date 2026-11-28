@@ -13,9 +13,11 @@ import type { RuntimeAppView } from "./runtime-catalog-schema";
 import {
     registerAppEvents,
     registerAppNotificationKinds,
+    registerAppSteps,
     registerAppPermissions,
     retainAppEvents,
     retainAppNotificationKinds,
+    retainAppSteps,
     retainAppPermissions,
     type Permission
 } from "@polaris/core";
@@ -32,10 +34,13 @@ export function registerRuntimeApps(views: readonly RuntimeAppView[]): void {
     const key = JSON.stringify(views);
     if (key === last) return;
     last = key;
-    setRuntimeApps(views.map(({ nav: _nav, permissionDefs: _permissions, events: _events, notificationKinds: _kinds, ...view }) => ({ ...view, icon: Package })));
+    setRuntimeApps(views.map(({ nav: _nav, permissionDefs: _permissions, events: _events, notificationKinds: _kinds, automationSteps: _steps, ...view }) => ({ ...view, icon: Package })));
     // Its automation triggers: a withdrawn app's go with it, and a trigger naming one is refused with the reason.
     retainAppEvents(views.filter((view) => view.events).map((view) => view.id));
     for (const view of views) if (view.events) registerAppEvents(view.id, view.events);
+    // Its automation steps, offered in the editor under the app and run through its bundle.
+    retainAppSteps(views.filter((view) => view.automationSteps).map((view) => view.id));
+    for (const view of views) if (view.automationSteps) registerAppSteps(view.id, view.name, view.automationSteps);
     // Its kinds of alert, under "apps" in Account > Notifications; a withdrawn app's are refused like any undeclared one.
     retainAppNotificationKinds(views.filter((view) => view.notificationKinds).map((view) => view.id));
     for (const view of views) if (view.notificationKinds) registerAppNotificationKinds(view.id, view.name, view.notificationKinds);
