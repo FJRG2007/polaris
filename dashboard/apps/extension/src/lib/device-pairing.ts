@@ -16,7 +16,12 @@
  */
 
 import { z } from "zod";
-import { CHROMIUM_EXTENSION_ID_PATTERN, NATIVE_HOST_NAME, PAIRING_NONCE_PATTERN, type NativePairRequest } from "@polaris/core";
+import {
+    CHROMIUM_EXTENSION_ID_PATTERN,
+    NATIVE_HOST_NAME,
+    PAIRING_NONCE_PATTERN,
+    type NativePairRequest
+} from "@polaris/core/device-pairing";
 
 /** How long a call may take before it is given up on. */
 const TIMEOUT_MS = 20_000;

@@ -9,7 +9,7 @@
  */
 
 import { storage } from "#imports";
-import type { Locale } from "@polaris/core";
+import type { Locale } from "@polaris/core/i18n/locales";
 import { pickLocale, wordsIn, type Words } from "@/lib/words";
 
 /** The connected account's language, as its server last answered. Null when no

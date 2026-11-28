@@ -36,9 +36,11 @@
  *
  * A module whose top level calls something Rollup cannot prove pure (a zod
  * schema, say) is kept, here as in the real build: no workspace package
- * declares `sideEffects`, and the barrel re-exports everything. That is why a
- * change to permissions.ts still ships with the extension - its bytes really are
- * in the bundle - while one to changelog.ts does not. Leaving packages external
+ * declares `sideEffects`, and `@polaris/core`'s barrel re-exports everything.
+ * That is why the extension and @polaris/vault-crypto import core by subpath
+ * (`@polaris/core/vault`, `@polaris/core/host-list`, ...): through the barrel,
+ * every module with such a call - permissions.ts, say - lands in the bundle and
+ * a change to it ships with the extension. Leaving packages external
  * makes their calls unknowable too, so the list errs toward a bump.
  */
 

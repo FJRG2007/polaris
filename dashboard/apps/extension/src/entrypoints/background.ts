@@ -21,14 +21,9 @@ import type { SymmetricKey } from "@polaris/vault-crypto";
 import { ACCOUNT_LOCALE, words } from "@/lib/locale-store";
 import { offerFor, type CaptureOffer } from "@/lib/capture";
 import { generatePassword } from "@polaris/core/password-generator";
-import {
-    EMAIL_FIELD,
-    hostOf,
-    mergeHostLists,
-    readHostList,
-    readUriMatch,
-    type UriMatch
-} from "@polaris/core";
+import { EMAIL_FIELD } from "@polaris/core/vault-items";
+import { hostOf, readUriMatch, type UriMatch } from "@polaris/core/vault-uris";
+import { mergeHostLists, readHostList } from "@polaris/core/host-list";
 import { z } from "zod";
 import {
     ADDRESS_FIELDS,

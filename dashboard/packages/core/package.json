@@ -100,12 +100,60 @@
         "./runner-protocol": {
             "types": "./dist/runner-protocol.d.ts",
             "import": "./dist/runner-protocol.js"
+        },
+        "./vault": {
+            "types": "./dist/vault.d.ts",
+            "import": "./dist/vault.js"
+        },
+        "./vault-items": {
+            "types": "./dist/vault-items.d.ts",
+            "import": "./dist/vault-items.js"
+        },
+        "./vault-uris": {
+            "types": "./dist/vault-uris.d.ts",
+            "import": "./dist/vault-uris.js"
+        },
+        "./host-list": {
+            "types": "./dist/host-list.d.ts",
+            "import": "./dist/host-list.js"
+        },
+        "./qr": {
+            "types": "./dist/qr.d.ts",
+            "import": "./dist/qr.js"
+        },
+        "./key-binding": {
+            "types": "./dist/key-binding.d.ts",
+            "import": "./dist/key-binding.js"
+        },
+        "./device-pairing": {
+            "types": "./dist/device-pairing.d.ts",
+            "import": "./dist/device-pairing.js"
+        },
+        "./seasons": {
+            "types": "./dist/seasons.d.ts",
+            "import": "./dist/seasons.js"
+        },
+        "./app-icon-season": {
+            "types": "./dist/app-icon-season.d.ts",
+            "import": "./dist/app-icon-season.js"
+        },
+        "./i18n/locales": {
+            "types": "./dist/i18n/locales.d.ts",
+            "import": "./dist/i18n/locales.js"
+        },
+        "./i18n/messages": {
+            "types": "./dist/i18n/messages.d.ts",
+            "import": "./dist/i18n/messages.js"
+        },
+        "./i18n/detect": {
+            "types": "./dist/i18n/detect.d.ts",
+            "import": "./dist/i18n/detect.js"
         }
     },
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "scripts": {
-        "build": "tsup src/index.ts src/tokens.ts src/launcher.ts src/key-binding.ts src/link-password.ts src/password-generator.ts src/integrity.ts src/device-plugins.ts src/integrity-guard.ts src/identity-person.ts src/faces.ts src/waf.ts src/sheets/index.ts src/catalog-search.ts src/search-text.ts src/extension-install.ts src/browser-agent.ts src/variable-groups.ts src/instance-fallback.ts src/geo.ts src/tv-compat/index.ts src/runner-relay.ts src/runner-protocol.ts src/toolchain/index.ts src/app-settings.ts --format esm --dts --clean",
+        "build": "tsup src/index.ts src/tokens.ts src/launcher.ts src/key-binding.ts src/link-password.ts src/password-generator.ts src/integrity.ts src/device-plugins.ts src/integrity-guard.ts src/identity-person.ts src/faces.ts src/waf.ts src/sheets/index.ts src/catalog-search.ts src/search-text.ts src/extension-install.ts src/browser-agent.ts src/variable-groups.ts src/instance-fallback.ts src/geo.ts src/tv-compat/index.ts src/runner-relay.ts src/runner-protocol.ts src/toolchain/index.ts src/app-settings.ts src/vault.ts src/vault-items.ts src/vault-uris.ts src/host-list.ts src/qr.ts src/device-pairing.ts src/seasons.ts src/app-icon-season.ts src/i18n/locales.ts src/i18n/messages.ts src/i18n/detect.ts --format esm --dts --clean",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
