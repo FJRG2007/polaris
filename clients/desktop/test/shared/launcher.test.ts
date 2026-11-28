@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { convert, evaluate, quickAnswer } from "@/shared/quick-answer";
-import { DEFAULT_SEARCH_ENGINE, isGameLauncher, isGamesQuery, LAUNCHER_QUERY_MAX, launcherEngineOf, launcherQuery, matchScore, rankedMatches, SEARCH_ENGINE_IDS, topMatches, useBoost, USE_BOOST_MAX, webSearchUrl } from "@/shared/launcher";
+import { DEFAULT_SEARCH_ENGINE, highlightAfter, isGameLauncher, isGamesQuery, LAUNCHER_QUERY_MAX, launcherEngineOf, launcherQuery, matchScore, rankedMatches, SEARCH_ENGINE_IDS, topMatches, useBoost, USE_BOOST_MAX, webSearchUrl } from "@/shared/launcher";
 import { conflictSentence, findLaunchers, likelyHolders } from "@/shared/launcher-conflicts";
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipboardProbe } from "@/shared/clipboard-history";
 import { bindingFromPress, DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator, type KeyPress } from "@/shared/launcher-hotkey";
@@ -292,5 +292,21 @@ describe("the games command", () => {
     it("knows the stores' own clients from the games they start", () => {
         for (const label of ["Steam", "Epic Games Launcher", "Battle.net", "EA app", "Riot Client", "GOG GALAXY"]) expect(isGameLauncher(label)).toBe(true);
         for (const label of ["Steam Deck Tools", "Fortnite", "EAsy Notes"]) expect(isGameLauncher(label)).toBe(false);
+    });
+});
+
+describe("the highlight when the list is drawn again", () => {
+    const rows = (...ids: string[]) => ids.map((id) => ({ id }));
+
+    it("stays on the row the reader had, wherever a late answer put it", () => {
+        expect(highlightAfter(rows("new", "a", "b"), "b", true, 0)).toBe(2);
+        expect(highlightAfter(rows("a", "b"), "a", true, 0)).toBe(0);
+    });
+
+    it("starts at the top for a new text or when the row is gone, clamped to the list", () => {
+        expect(highlightAfter(rows("a", "b"), "b", false, 0)).toBe(0);
+        expect(highlightAfter(rows("a", "b"), "gone", true, 0)).toBe(0);
+        expect(highlightAfter(rows("a", "b"), null, true, 5)).toBe(1);
+        expect(highlightAfter([], "a", true, 3)).toBe(0);
     });
 });

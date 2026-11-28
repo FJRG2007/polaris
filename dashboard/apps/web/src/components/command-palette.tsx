@@ -92,6 +92,7 @@ import {
     useEffect,
     useLayoutEffect,
     useMemo,
+    useLayoutEffect,
     useRef,
     useState,
     type KeyboardEvent as ReactKeyboardEvent
@@ -903,6 +904,23 @@ export function CommandPalette({
         [rows]
     );
 
+    // The highlight belongs to a row, not to a position. Results stream in and
+    // re-sort the list under the reader; the row they saw highlighted stays
+    // highlighted wherever it lands, so Enter runs what was on screen. A new
+    // query or scope starts over at the top instead.
+    const pinRef = useRef<{ id: string | null; rows: Row[]; key: string }>({ id: null, rows, key: "" });
+    useLayoutEffect(() => {
+        const pin = pinRef.current;
+        const key = `${scope?.id ?? ""}:${query}`;
+        const at = pin.rows !== rows && pin.key === key && pin.id ? rows.findIndex((row) => row.id === pin.id) : -1;
+        if (at >= 0 && at !== active) {
+            setActive(at);
+            pinRef.current = { ...pin, rows };
+            return;
+        }
+        pinRef.current = { id: rows[active]?.id ?? null, rows, key };
+    }, [rows, active, scope, query]);
+
     // A shorter result list must not leave the highlight past its end.
     useEffect(() => {
         setActive((current) => (current < rows.length ? current : 0));
@@ -1124,6 +1142,8 @@ export function CommandPalette({
             event.preventDefault();
             setActive(next);
         } else if (event.key === "Enter") {
+            // Enter that confirms an IME candidate is not a command to run.
+            if (event.nativeEvent.isComposing) return;
             event.preventDefault();
             go(rows[active]);
         } else if (event.key === "Tab" && calculation !== null && !event.shiftKey) {
