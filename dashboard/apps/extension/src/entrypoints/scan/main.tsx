@@ -10,7 +10,7 @@
 import "../popup/style.css";
 import jsQR from "jsqr";
 import { createRoot } from "react-dom/client";
-import { HOST_LIST_PREFIX } from "@polaris/core";
+import { HOST_LIST_PREFIX } from "@polaris/core/host-list";
 import { useEffect, useRef, useState } from "react";
 import { importHosts } from "../popup/host-transfer";
 import { WordsProvider, useWords } from "../popup/words";

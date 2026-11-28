@@ -3,12 +3,17 @@ name: Extension version check
 # A pull request that changes what the extension ships has to bump its version,
 # because the version reaching main is what releases it (see
 # `extension-auto-release.yml`). Without the bump the change lands and never
-# reaches a browser. Tests and docs ship nothing, so they need no bump. The
-# workspace packages the extension bundles (`@polaris/core`,
-# `@polaris/vault-crypto`) ship with it, so their source counts too.
+# reaches a browser. A bump for anything else is an update every browser is
+# offered for nothing, so "what the extension ships" is its build graph rather
+# than a list of folders: `.github/scripts/extension-closure.mjs` bundles the
+# entrypoints with Rollup (WXT's bundler) and lists the workspace modules that
+# render code into the output, the build's other inputs and the Rust crates its
+# WebAssembly binding is compiled from (docs/release-scope.md). A change to a
+# module of `@polaris/core` the bundle never renders - another app's schema, a
+# server-only helper - needs no bump. Tests and docs ship nothing either.
 #
 # No path filter: it runs on every pull request and passes at once when nothing
-# shipped changed, so `bumped` can be a required check without leaving
+# it could ship changed, so `bumped` can be a required check without leaving
 # unrelated pull requests waiting on a check that never starts.
 #
 # A green check on a pull request is measured against main as it was when the
@@ -22,6 +27,7 @@ on:
   merge_group:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -47,16 +53,54 @@ jobs:
           # Measured from where the branch left main, not from main's tip: a
           # branch a few merges behind would otherwise "change" every file main
           # gained since, and fail on work that is not its own.
+          # Run by hand, a branch is measured against main.
+          if [ -z "$BASE" ]; then BASE="$(git rev-parse origin/main)"; fi
           FORK="$(git merge-base "$BASE" "$HEAD")"
-          shipped="$(git diff --name-only "$FORK" "$HEAD" -- \
-              dashboard/apps/extension \
-              dashboard/packages/core/src \
-              dashboard/packages/core/package.json \
-              dashboard/packages/vault-crypto/src \
-              dashboard/packages/vault-crypto/package.json \
-            | grep -v -E '^dashboard/apps/extension/(test/|vitest\.config\.ts$)|\.md$' || true)"
+          changed="$RUNNER_TEMP/changed.txt"
+          git diff --name-only "$FORK" "$HEAD" > "$changed"
+          git checkout --quiet "$HEAD"
+          # The bundler at the versions the extension builds with, installed on
+          # their own beside the checkout: the workspace's own install is minutes.
+          tools() {
+            lock="dashboard/package-lock.json"
+            rollup="$(node -p "require('./$lock').packages['node_modules/rollup'].version")"
+            esbuild="$(node -p "require('./$lock').packages['node_modules/esbuild'].version")"
+            export CLOSURE_TOOLS="$RUNNER_TEMP/closure-tools"
+            mkdir -p "$CLOSURE_TOOLS"
+            echo '{"private":true}' > "$CLOSURE_TOOLS/package.json"
+            npm install --prefix "$CLOSURE_TOOLS" --no-audit --no-fund --loglevel=error "rollup@$rollup" "esbuild@$esbuild"
+          }
+          # A change to how the graph is read is tested here, against the real one.
+          if grep -qE '^\.github/scripts/(extension-closure|lock-reaches|tunnel-inputs)' "$changed"; then
+            tools
+            node --test .github/scripts/extension-closure.test.mjs
+          fi
+          # Only the extension's folder, the workspace packages and the Rust
+          # crates can reach the bundle; anything else passes without the build
+          # graph being read at all.
+          if ! grep -qE '^dashboard/(apps/extension|packages)/|^crates/|^Cargo\.lock$' "$changed"; then
+            echo "Nothing the extension could ship changed; no bump needed."
+            exit 0
+          fi
+          [ -n "${CLOSURE_TOOLS:-}" ] || tools
+          # The graph before the change as well as after it: a change can take a
+          # module out of the bundle as well as bring one in.
+          git worktree add --quiet --detach "$RUNNER_TEMP/fork" "$FORK"
+          if ! shipped="$(node .github/scripts/extension-closure.mjs shipped "$RUNNER_TEMP/fork" . < "$changed")"; then
+            # A graph that cannot be read is no reason to let a change through
+            # unversioned: count every source the bundle could come from.
+            echo "::warning::The extension's build graph could not be read; counting every workspace source it could bundle."
+            shipped="$(grep -E '^dashboard/(apps/extension|packages/(core|ui|vault-crypto|core-rs))/' "$changed" \
+              | grep -v -E '^dashboard/apps/extension/(test/|vitest\.config\.ts$)|^dashboard/packages/[^/]+/test/|\.md$' || true)"
+          fi
+          # One Cargo.lock serves every crate: it counts when it moves what the
+          # WebAssembly binding is compiled from.
+          if grep -qx 'Cargo.lock' "$changed" \
+             && [ "$(python3 .github/scripts/lock-reaches.py polaris-core-wasm "$FORK" "$HEAD" || echo true)" = true ]; then
+            shipped="$(printf '%s\nCargo.lock\n' "$shipped" | sed '/^$/d')"
+          fi
           if [ -z "$shipped" ]; then
-            echo "Nothing the extension ships changed; no bump needed."
+            echo "Nothing the extension's bundle is built from changed; no bump needed."
             exit 0
           fi
           before="$(version "$FORK")"

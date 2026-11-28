@@ -201,6 +201,17 @@ jobs:
           # the first one that did not reported every filter as "nothing changed"
           # and published no image at all.
           has() { grep -qE "$1" "$CHANGED"; }
+          # Tests and their runner's config are in the build context but in no
+          # image anybody runs: a push of nothing else published a byte-different
+          # but functionally identical dashboard, moved `latest`, and offered every
+          # deployment an update that changed nothing. The images built from
+          # workspace sources match against what is left. Only a package's or
+          # crate's own test folder counts as one - a route can be called `test`.
+          # Mirrored by NOT_SHIPPED in the dashboard's update-service.ts.
+          NOT_SHIPPED='^dashboard/(apps|packages)/[^/]+/(test|tests)/|^dashboard/scripts/test/|^crates/[^/]+/(tests|benches)/|\.test\.[cm]?[jt]sx?$|(^|/)vitest\.config\.[cm]?[jt]s$'
+          SHIPPED="$RUNNER_TEMP/shipped.txt"
+          grep -vE "$NOT_SHIPPED" "$CHANGED" > "$SHIPPED" || true
+          ships() { grep -qE "$1" "$SHIPPED"; }
           if has '^\.github/workflows/dashboard-publish\.yml$'; then all; exit 0; fi
           # The browser extension lives in this repository and in no image. The
           # Dockerfile installs `apps/web` alone and the runtime stage copies
@@ -234,8 +245,8 @@ jobs:
           # it runs. Matched by exclusion, so a new app package rebuilds the image
           # without anybody remembering to add it here.
           web=false
-          has '^dashboard/(packages|cli|patches|scripts)/|^dashboard/resources/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$|^crates/polaris-core' && web=true
-          grep -E '^dashboard/apps/' "$CHANGED" | grep -qvE '^dashboard/apps/(extension|site|companion|streamdeck)/' && web=true
+          ships '^dashboard/(packages|cli|patches|scripts)/|^dashboard/resources/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$|^crates/polaris-core' && web=true
+          grep -E '^dashboard/apps/' "$SHIPPED" | grep -qvE '^dashboard/apps/(extension|site|companion|streamdeck)/' && web=true
           out web "$web"
           has '^dashboard/mdns/' && out mdns true || out mdns false
           # Cargo.lock is shared by the whole workspace, so a bump of a crate neither
@@ -247,7 +258,7 @@ jobs:
           { has '^crates/polaris-tunnel/|^vendor/smoltcp/|^Cargo\.toml$' || lock_reaches polaris-tunnel; } && out tunnel true || out tunnel false
           has '^dashboard/docker/updater/' && out updater true || out updater false
           # The guard bundles @polaris/core, so a change there is a change to the guard.
-          has '^dashboard/services/edge-guard/|^dashboard/packages/core/|^dashboard/package(-lock)?\.json$' && out guard true || out guard false
+          ships '^dashboard/services/edge-guard/|^dashboard/packages/core/|^dashboard/package(-lock)?\.json$' && out guard true || out guard false
           has '^dashboard/services/hytale/' && out hytale true || out hytale false
           # The relay is go2rtc plus an entrypoint; nothing else feeds it.
           has '^dashboard/services/camera-relay/' && out relay true || out relay false
@@ -272,7 +283,7 @@ jobs:
           # core but each other - checked, and the reason this is safe rather
           # than merely cheaper. The barrel and the packaging go in too, since a
           # change to either changes what the bundle resolves.
-          has '^dashboard/services/vision/|^dashboard/packages/core/src/camera-|^dashboard/packages/core/(package\.json|tsconfig\.json|src/index\.ts)$|^dashboard/package(-lock)?\.json$' && out vision true || out vision false
+          ships '^dashboard/services/vision/|^dashboard/packages/core/src/camera-|^dashboard/packages/core/(package\.json|tsconfig\.json|src/index\.ts)$|^dashboard/package(-lock)?\.json$' && out vision true || out vision false
           # The recognizer is one Python file, its pins, and the weights the
           # Dockerfile bakes in.
           has '^dashboard/services/face/' && out face true || out face false

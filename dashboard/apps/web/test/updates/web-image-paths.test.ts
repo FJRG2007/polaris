@@ -11,7 +11,7 @@
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { WEB_IMAGE_PATHS } from "../../src/lib/update-service";
+import { NOT_SHIPPED, rebuildsWebImage, WEB_IMAGE_PATHS } from "../../src/lib/update-service";
 
 const WORKFLOW = join(
     __dirname,
@@ -29,7 +29,7 @@ const WORKFLOW = join(
  *  excludes, then the rest of what it names. */
 function workflowWebFilter(): string {
     const text = readFileSync(WORKFLOW, "utf8");
-    const rest = text.match(/has '([^']+)' && web=true/);
+    const rest = text.match(/ships '([^']+)' && web=true/);
     const excluded = text.match(/grep -qvE '\^dashboard\/apps\/\(([\w|-]+)\)\/' && web=true/);
     if (!rest || !excluded) throw new Error("the web filter was not found in dashboard-publish.yml");
     return `^dashboard/apps/(?!(?:${excluded[1]})/)|${rest[1]}`;
@@ -78,5 +78,36 @@ describe("WEB_IMAGE_PATHS", () => {
             expect(gate).not.toContain("Cargo\\.lock");
             expect(gate).toMatch(/lock_reaches polaris-(hostd|tunnel)/);
         }
+    });
+});
+
+describe("NOT_SHIPPED", () => {
+    it("is the workflow's own list of what ships in no image", () => {
+        const text = readFileSync(WORKFLOW, "utf8");
+        const pattern = text.match(/NOT_SHIPPED='([^']+)'/);
+        expect(pattern).not.toBeNull();
+        expect(NOT_SHIPPED.source.replace(/\\\//g, "/")).toBe(pattern![1]);
+    });
+
+    it("offers no update for a change to nothing but tests", () => {
+        for (const file of [
+            "dashboard/apps/web/test/updates/web-image-paths.test.ts",
+            "dashboard/packages/core/test/changelog.test.ts",
+            "dashboard/packages/core/src/access-grants.test.ts",
+            "dashboard/apps/web/vitest.config.ts",
+            "dashboard/scripts/test/readme-media.test.mjs",
+            "crates/polaris-core/tests/vectors.rs"
+        ])
+            expect(rebuildsWebImage(file)).toBe(false);
+    });
+
+    it("still counts the sources beside them, a route called test included", () => {
+        for (const file of [
+            "dashboard/apps/web/src/app/api/polar/connectors/[id]/test/route.ts",
+            "dashboard/packages/core/src/changelog.ts",
+            "crates/polaris-core/src/lib.rs",
+            "dashboard/apps/hospitality/src/lib/catalog.ts"
+        ])
+            expect(rebuildsWebImage(file)).toBe(true);
     });
 });
