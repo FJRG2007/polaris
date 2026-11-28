@@ -68,6 +68,7 @@ import {
 import { pageIsDark } from "@/lib/page-theme";
 import { OfficialSoftware } from "./official-software";
 import { PluginProfiles } from "./plugin-profiles";
+import { PluginActions, useDeviceActionOptions } from "./plugin-actions";
 import type { AppScreenshot } from "@/lib/apps/app-screenshots";
 import { ScreenshotGallery } from "@/app/(app)/apps/marketplace/[appId]/screenshot-gallery";
 import { DetailBack, DetailFacts, DetailHeader, DetailReleases, DetailSection, Fact } from "@/components/store-detail";
@@ -619,6 +620,7 @@ type SettingProps = { setting: PluginSetting; value: PluginSettingValue; locale:
 /** One declared setting's control: Polaris's own for its kind, never a plugin's markup. */
 function SettingControl({ setting, value, locale, onChange, width }: SettingProps & { width: string }) {
     const t = useTranslations("account");
+    const extraActions = useDeviceActionOptions();
     const label = pluginText(setting.label, locale);
     let control: ReactNode;
     switch (setting.kind) {
@@ -656,7 +658,13 @@ function SettingControl({ setting, value, locale, onChange, width }: SettingProp
                     onValueChange={(next) => onChange(next === "none" ? null : next)}
                     aria-label={label}
                     className={width}
-                    options={[{ value: "none", label: say(t, "action.none") }, ...PICKABLE_ACTIONS.map((action) => ({ value: action, label: say(t, `action.${action.slice("call.".length)}`) }))]}
+                    options={[
+                        { value: "none", label: say(t, "action.none") },
+                        ...PICKABLE_ACTIONS.map((action) => ({ value: action, label: say(t, `action.${action.slice("call.".length)}`) })),
+                        ...extraActions,
+                        // A custom action deleted since, or one this page has not heard of yet: shown, not silently swapped.
+                        ...(typeof value === "string" && value !== "call.leave" && !(PICKABLE_ACTIONS as readonly string[]).includes(value) && !extraActions.some((option) => option.value === value) ? [{ value, label: say(t, "action.missing") }] : [])
+                    ]}
                 />
             );
             break;
@@ -1079,6 +1087,7 @@ export function PluginPage({ id }: { id: string; }) {
                     <AutoUpdateRow bridge={state.bridge} snapshot={state.snapshot} id={id} />
                     {installed.manifest.view ? <PluginView bridge={state.bridge} manifest={installed.manifest} view={installed.manifest.view} /> : null}
                     {installed.profiles && state.bridge.profile ? <PluginProfiles bridge={state.bridge} id={id} profiles={installed.profiles} /> : null}
+                    {state.bridge.actions && installed.manifest?.settings.some((setting) => setting.kind === "action") ? <PluginActions bridge={state.bridge} /> : null}
                     <PluginSettings bridge={state.bridge} manifest={installed.manifest} />
                 </DetailSection>
             ) : null}

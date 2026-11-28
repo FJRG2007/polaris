@@ -2682,7 +2682,8 @@
             "camera": "Cámara",
             "share": "Compartir pantalla",
             "hangup": "Colgar",
-            "leave": "Colgar"
+            "leave": "Colgar",
+            "missing": "Acción no encontrada"
         },
         "update": {
             "title": "¿Actualizar {name} a {version}?",
@@ -2775,6 +2776,68 @@
                 "body": "Polaris cierra {app} y se queda con el {device}. Si el {device} aún tiene el driver del fabricante, Windows pide permiso una vez para poner el de Polaris.",
                 "confirm": "Cerrarlo y usar Polaris",
                 "failed": "{app} no se cerró. Ciérralo tú y vuelve a intentarlo."
+            }
+        },
+        "actions": {
+            "title": "Acciones propias",
+            "hint": "Abre, ejecuta, pulsa teclas o encadena pasos desde un botón. Elígelas en los botones de arriba.",
+            "new": "Nueva acción",
+            "empty": "Aún no hay acciones propias.",
+            "edit": "Editar",
+            "try": "Probar",
+            "save": "Guardar",
+            "cancel": "Cancelar",
+            "failed": "No se ha guardado. Inténtalo de nuevo.",
+            "ran": "Acción ejecutada.",
+            "runFailed": "Un paso de esa acción no ha funcionado.",
+            "summary": "{count, plural, one {# paso} other {# pasos}}",
+            "stateFirst": "próxima pulsación: primer estado",
+            "stateSecond": "próxima pulsación: segundo estado",
+            "unconfirmed": "pregunta la primera vez",
+            "dialog": {
+                "title": "Acción propia",
+                "hint": "Los pasos van en orden. Una acción nueva o cambiada pregunta en Polaris antes de ejecutarse."
+            },
+            "field": {
+                "name": "Nombre",
+                "kind": "Paso",
+                "path": "Archivo o carpeta",
+                "url": "Dirección web",
+                "program": "Programa",
+                "args": "Argumentos, uno por línea",
+                "key": "Tecla",
+                "ms": "Milisegundos"
+            },
+            "kind": {
+                "open": "Abrir archivo o carpeta",
+                "website": "Abrir una web",
+                "run": "Ejecutar un programa",
+                "hotkey": "Pulsar un atajo",
+                "launcher": "Lanzador de Polaris",
+                "polaris": "Llamada de Polaris",
+                "delay": "Esperar"
+            },
+            "modifier": {
+                "ctrl": "Ctrl",
+                "alt": "Alt",
+                "shift": "Mayús",
+                "meta": "Win / Cmd"
+            },
+            "pickFile": "Elegir archivo",
+            "pickFolder": "Elegir carpeta",
+            "pickProgram": "Elegir programa",
+            "hotkeysUnsupported": "Por ahora los atajos solo se pulsan en Windows.",
+            "addStep": "Añadir paso",
+            "removeStep": "Quitar paso",
+            "up": "Subir",
+            "down": "Bajar",
+            "twoStates": "Dos estados (cada pulsación hace el otro)",
+            "secondState": "Segundo estado",
+            "incomplete": "Completa cada paso: rutas completas, una web que empiece por http y un nombre.",
+            "remove": {
+                "title": "¿Borrar \"{name}\"?",
+                "hint": "Los botones que la ejecutan no harán nada.",
+                "confirm": "Borrar"
             }
         }
     }

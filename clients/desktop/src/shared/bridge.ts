@@ -289,6 +289,11 @@ export interface PolarisDesktop {
          * Absent from an app older than profiles.
          */
         profile?(id: string, request: unknown): Promise<unknown>;
+        /**
+         * The custom actions a device button can run (`deviceActionRequestSchema`):
+         * `{ ok, value }` or `{ ok: false, error }`. Absent from an app older than them.
+         */
+        actions?(request: unknown): Promise<unknown>;
     };
     /** @deprecated `plugins` by its name before the rename, the same object, for hosts that predate it. Removable once no supported desktop app or host predates the rename (desktop 0.1.124). */
     addons?: PolarisDesktop["plugins"];
@@ -880,6 +885,7 @@ export const CHANNELS = {
     pluginsOfficial: "desktop:plugins-official",
     pluginsAction: "desktop:plugins-action",
     pluginsProfile: "desktop:plugins-profile",
+    deviceActions: "desktop:device-actions",
     openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",
     appIcon: "desktop:app-icon",

@@ -390,6 +390,26 @@ export const GLANCE_SOURCE = [
     "return o.ToString();}}"
 ].join("");
 
+/**
+ * Presses a hotkey for a device button's custom action (`plugins/device-actions.ts`):
+ * every key down in order, then up in reverse, through `keybd_event` - the
+ * same input a keyboard sends, so the program in front sees a real hotkey.
+ * Arrows and the navigation block are extended keys. It takes only key
+ * codes, digits and commas, which the caller builds from a validated list.
+ */
+const KEYS_TYPE = "PolarisKeys";
+export const KEYS_SOURCE = [
+    "using System;using System.Runtime.InteropServices;",
+    `public static class ${KEYS_TYPE}{`,
+    "[DllImport(\"user32.dll\")]static extern void keybd_event(byte vk,byte scan,uint flags,UIntPtr extra);",
+    "static uint Ext(int k){return (k>=0x21&&k<=0x28)||k==0x2D||k==0x2E?1u:0u;}",
+    "public static string Send(string list){var parts=list.Split(new[]{(char)44});var keys=new int[parts.Length];",
+    "for(var i=0;i<parts.Length;i++){int k;if(!int.TryParse(parts[i],out k)||k<1||k>254)return \"bad\";keys[i]=k;}",
+    "foreach(var k in keys)keybd_event((byte)k,0,Ext(k),UIntPtr.Zero);",
+    "for(var i=keys.Length-1;i>=0;i--)keybd_event((byte)keys[i],0,Ext(keys[i])|2u,UIntPtr.Zero);",
+    "return \"sent\";}}"
+].join("");
+
 const GLANCE_COMMAND = `if ('${GLANCE_TYPE}' -as [type]) { [${GLANCE_TYPE}]::Read() }; '${LIST_END}'\n`;
 
 /** What one glance saw: the program in front and the programs using the microphone, each by its file or package name. */
@@ -468,6 +488,18 @@ export class WindowsLister {
         });
     }
 
+    /** Press `codes` (Windows virtual-key codes, 1-254) as one hotkey. Answers whether the shell sent them. */
+    async sendKeys(codes: readonly number[]): Promise<boolean> {
+        if (codes.length === 0 || codes.length > 8 || !codes.every((code) => Number.isInteger(code) && code >= 1 && code <= 254)) return false;
+        const command = `if ('${KEYS_TYPE}' -as [type]) { [${KEYS_TYPE}]::Send('${codes.join(",")}') }; '${LIST_END}'\n`;
+        try {
+            return (await this.ask(command, (text) => text.trim())) === "sent";
+        } catch {
+            this.stop();
+            return false;
+        }
+    }
+
     stop(): void {
         this.child?.kill();
         this.child = null;
@@ -486,6 +518,7 @@ export class WindowsLister {
         child.stdin.write("[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)\n");
         child.stdin.write(`try { Add-Type -TypeDefinition '${READER_SOURCE}' -ErrorAction Stop } catch { }\n`);
         child.stdin.write(`try { Add-Type -TypeDefinition '${GLANCE_SOURCE}' -ErrorAction Stop } catch { }\n`);
+        child.stdin.write(`try { Add-Type -TypeDefinition '${KEYS_SOURCE}' -ErrorAction Stop } catch { }\n`);
         this.child = child;
         this.fresh = true;
         return child;

@@ -870,3 +870,145 @@ export const pluginProfilesViewSchema = z.object({
 });
 
 export type PluginProfilesView = z.infer<typeof pluginProfilesViewSchema>;
+/*
+ * Custom device actions (docs/device-plugins.md, "Custom actions"): what the
+ * owner of a computer assigns to a lit button or a knob press beyond the
+ * call actions above, the way Stream Deck's System actions (Open, Website,
+ * Hotkey), Multi Action (steps with delays) and Multi Action Switch / Hotkey
+ * Switch (two states) work. They are kept by the desktop app on this
+ * computer only; the page edits them through the desktop, which checks every
+ * one against these schemas and asks before an action it has not run yet.
+ */
+
+/** The keys a hotkey step can press, by name; the desktop maps each to the system's key code. */
+export const DEVICE_ACTION_KEYS = [
+    ..."abcdefghijklmnopqrstuvwxyz0123456789".split(""),
+    ...Array.from({ length: 24 }, (_, index) => `f${index + 1}`),
+    "enter", "escape", "tab", "space", "backspace", "delete", "insert", "home", "end", "pageUp", "pageDown",
+    "up", "down", "left", "right", "printScreen",
+    "volumeUp", "volumeDown", "volumeMute", "mediaPlayPause", "mediaNext", "mediaPrevious", "mediaStop"
+] as unknown as [string, ...string[]];
+
+export const MAX_DEVICE_ACTIONS = 200;
+export const MAX_DEVICE_ACTION_STEPS = 50;
+/** One delay step: Stream Deck's Multi Action allows long pauses, not endless ones. */
+export const MAX_DEVICE_ACTION_DELAY_MS = 10_000;
+/** All the delays of one state together: a macro never holds the device for longer. */
+export const MAX_DEVICE_ACTION_TOTAL_DELAY_MS = 60_000;
+export const MAX_DEVICE_ACTION_ARGS = 32;
+
+/** The prefixes an `action` setting carries for a custom action and for a launcher entry. */
+export const CUSTOM_ACTION_PREFIX = "custom:";
+export const LAUNCHER_ACTION_PREFIX = "launcher:";
+
+const CONTROL = /[\u0000-\u001f\u007f]/;
+const plainText = (max: number) => z.string().max(max).refine((text) => !CONTROL.test(text), "control character");
+
+/** A full path on this computer: a drive (`C:\`), a share (`\\server\`) or a root (`/`). */
+export const absolutePathSchema = plainText(1024)
+    .transform((text) => text.trim())
+    .refine((text) => text.length >= 2 && /^(?:[a-zA-Z]:[\\/]|\\\\[^\\]|\/)/.test(text), "not a full path");
+
+const websiteSchema = plainText(2048)
+    .transform((text) => text.trim())
+    .refine((text) => {
+        try {
+            const url = new URL(text);
+            return url.protocol === "https:" || url.protocol === "http:";
+        } catch {
+            return false;
+        }
+    }, "not a web address");
+
+/** A launcher entry an action can run: a system command by id, or a Polaris page by path. */
+export const launcherEntrySchema = z
+    .string()
+    .max(55)
+    .regex(/^(?:system:[a-z-]{1,32}|page:\/[A-Za-z0-9/_-]{0,48})$/);
+
+export const deviceActionStepSchema = z.discriminatedUnion("kind", [
+    /** A file or folder, opened the way the system opens it. */
+    z.object({ kind: z.literal("open"), path: absolutePathSchema }),
+    z.object({ kind: z.literal("website"), url: websiteSchema }),
+    /** A program with its arguments, each one passed as is: never a command line a shell reads. */
+    z.object({ kind: z.literal("run"), file: absolutePathSchema, args: z.array(plainText(1000)).max(MAX_DEVICE_ACTION_ARGS).default([]) }),
+    z.object({
+        kind: z.literal("hotkey"),
+        key: z.enum(DEVICE_ACTION_KEYS),
+        ctrl: z.boolean().default(false),
+        alt: z.boolean().default(false),
+        shift: z.boolean().default(false),
+        meta: z.boolean().default(false)
+    }),
+    z.object({ kind: z.literal("polaris"), action: z.enum(PLUGIN_ACTIONS) }),
+    z.object({ kind: z.literal("launcher"), entry: launcherEntrySchema }),
+    z.object({ kind: z.literal("delay"), ms: z.number().int().min(0).max(MAX_DEVICE_ACTION_DELAY_MS) })
+]);
+
+export type DeviceActionStep = z.infer<typeof deviceActionStepSchema>;
+
+const stepsSchema = z
+    .array(deviceActionStepSchema)
+    .min(1)
+    .max(MAX_DEVICE_ACTION_STEPS)
+    .refine((steps) => steps.reduce((total, step) => total + (step.kind === "delay" ? step.ms : 0), 0) <= MAX_DEVICE_ACTION_TOTAL_DELAY_MS, "delays too long")
+    .refine((steps) => steps.some((step) => step.kind !== "delay"), "only delays");
+
+export const deviceActionIdSchema = z.string().regex(/^[a-z0-9-]{1,40}$/);
+
+/**
+ * One custom action: its steps run in order; with `off` it has two states
+ * and each press runs the other one (Stream Deck's Multi Action Switch).
+ */
+export const deviceActionSchema = z.object({
+    id: deviceActionIdSchema,
+    name: plainText(60)
+        .transform((text) => text.trim())
+        .refine((text) => text.length > 0, "empty"),
+    steps: stepsSchema,
+    off: stepsSchema.optional()
+});
+
+export type DeviceAction = z.infer<typeof deviceActionSchema>;
+
+/** What the page may ask the desktop about custom actions. */
+export const deviceActionRequestSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("list") }),
+    z.object({ kind: z.literal("save"), action: deviceActionSchema }),
+    z.object({ kind: z.literal("remove"), id: deviceActionIdSchema }),
+    /** Run it now, as a press would: the desktop still asks before a new or changed one. */
+    z.object({ kind: z.literal("run"), id: deviceActionIdSchema }),
+    /** The system's own picker, so a path is chosen rather than typed. */
+    z.object({ kind: z.literal("pick"), what: z.enum(["file", "folder", "program"]) })
+]);
+
+export type DeviceActionRequest = z.infer<typeof deviceActionRequestSchema>;
+
+/** What the desktop answers `list` with. */
+export interface DeviceActionsView {
+    readonly actions: readonly (DeviceAction & { readonly confirmed: boolean; readonly on: boolean; })[];
+    /** The launcher entries an action or a button can run. */
+    readonly launcher: readonly { readonly entry: string; readonly label: string; }[];
+    /** Null when hotkey steps can be sent on this computer, else why not. */
+    readonly hotkeys: "unsupported" | null;
+}
+
+/** What an `action` setting's value names: a call action, a custom action or a launcher entry; null when none of them. */
+export function readActionRef(value: string): { kind: "call"; action: PluginAction; } | { kind: "custom"; id: string; } | { kind: "launcher"; entry: string; } | null {
+    if ((PLUGIN_ACTIONS as readonly string[]).includes(value)) return { kind: "call", action: value as PluginAction };
+    if (value.startsWith(CUSTOM_ACTION_PREFIX)) {
+        const id = deviceActionIdSchema.safeParse(value.slice(CUSTOM_ACTION_PREFIX.length));
+        return id.success ? { kind: "custom", id: id.data } : null;
+    }
+    if (value.startsWith(LAUNCHER_ACTION_PREFIX)) {
+        const entry = launcherEntrySchema.safeParse(value.slice(LAUNCHER_ACTION_PREFIX.length));
+        return entry.success ? { kind: "launcher", entry: entry.data } : null;
+    }
+    return null;
+}
+
+/** The ids `polaris.action` takes from a plugin: a call action, or a custom or launcher one. */
+export const pluginActionRefSchema = z
+    .string()
+    .max(64)
+    .refine((value) => readActionRef(value) !== null, "unknown action");

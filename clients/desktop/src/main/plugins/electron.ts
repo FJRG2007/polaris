@@ -11,6 +11,10 @@ import { packageDir, pluginsFolder } from "./packages";
 import { judgeViewCall, readViewUrl, resolveViewFile, viewContentType, VIEW_CSP, VIEW_SCHEMES } from "./view";
 import { CHANNELS } from "@/shared/bridge";
 import type { PluginAction } from "@/shared/plugin-protocol";
+import { spawn } from "node:child_process";
+import { DeviceActions, windowsKeyCodes } from "./device-actions";
+import { openExternal } from "../open-external";
+import { launcherEntries, runLauncherEntry } from "../launcher";
 import { setTrayPlugins } from "../tray";
 import { watchUsb, type UsbWatch } from "./presence";
 import { pluginShortcuts, sameShortcuts, type PluginShortcuts } from "./ways-in";
@@ -26,8 +30,8 @@ import { newsWords } from "./updates";
 import { perfEvent } from "../perf-watch";
 import { answerInstall, pluginIdSchema, requirementKeySchema } from "./install-call";
 import { callPageAction, voiceStateNow, voiceWidgetAction } from "../voice-widget";
-import { PLUGIN_PERMISSIONS, pluginPlatform, pluginRequirements, pluginText, type PluginManifest, type UsbDevice } from "@polaris/core/device-plugins";
-import { app, ipcMain, net, Notification, protocol, utilityProcess, webContents, type IpcMainInvokeEvent } from "electron";
+import { deviceActionRequestSchema, readActionRef, PLUGIN_PERMISSIONS, pluginPlatform, pluginRequirements, pluginText, type PluginManifest, type UsbDevice } from "@polaris/core/device-plugins";
+import { app, dialog, ipcMain, net, Notification, protocol, shell, utilityProcess, webContents, type IpcMainInvokeEvent } from "electron";
 
 let manager: PluginManager | null = null;
 /** The program keys of the games this app sees running, sent as `games` in a `polaris.state` answer. */
@@ -198,6 +202,77 @@ function runPluginAction(action: PluginAction): boolean {
     }
 }
 
+/**
+ * The custom actions on this computer (`device-actions.ts`), kept beside the
+ * installed plugins. The confirmation is this app's own message box: a press
+ * on the device happens with no page in front, and the question must show
+ * even when the dashboard does not draw.
+ */
+let deviceActions: DeviceActions | null = null;
+function actionsNow(): DeviceActions {
+    if (deviceActions) return deviceActions;
+    const file = join(pluginsDir(), "device-actions.json");
+    deviceActions = new DeviceActions({
+        read: async () => JSON.parse(await readFile(file, "utf8")) as unknown,
+        write: async (store) => {
+            await mkdir(pluginsDir(), { recursive: true });
+            const temp = `${file}.${process.pid}.${Date.now()}.tmp`;
+            await writeFile(temp, JSON.stringify(store), "utf8");
+            await rename(temp, file);
+        },
+        confirm: async (action, lines) => {
+            const { response } = await dialog.showMessageBox({
+                type: "question",
+                title: "Run a custom action",
+                message: `Run "${action.name}"?`,
+                detail: `A button on your device runs this for the first time since it was set up or changed:\n\n${lines.slice(0, 20).join("\n")}${lines.length > 20 ? `\n...and ${lines.length - 20} more` : ""}\n\nPolaris asks again whenever these steps change.`,
+                buttons: ["Run it", "Cancel"],
+                defaultId: 1,
+                cancelId: 1,
+                noLink: true
+            });
+            return response === 0;
+        },
+        runner: {
+            open: async (path) => (await shell.openPath(path)) === "",
+            website: async (url) => {
+                openExternal(url);
+                return true;
+            },
+            run: (file, args) =>
+                new Promise((resolve) => {
+                    // The file and each argument as they are: no shell reads them.
+                    const child = spawn(file, [...args], { shell: false, detached: true, stdio: "ignore", windowsHide: false });
+                    child.once("error", () => resolve(false));
+                    child.once("spawn", () => {
+                        child.unref();
+                        resolve(true);
+                    });
+                }),
+            hotkey: async (step) => {
+                const codes = windowsKeyCodes(step);
+                return process.platform === "win32" && codes !== null ? sharedWindowsLister().sendKeys(codes) : false;
+            },
+            polaris: async (action) => runPluginAction(action),
+            launcher: async (entry) => runLauncherEntry(entry)
+        },
+        sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
+        launcherLabel: (entry) => launcherEntries().find((item) => item.entry === entry)?.label
+    });
+    return deviceActions;
+}
+
+/** What a plugin's `polaris.action` names: a call action, a custom action or a launcher entry. */
+async function runActionRef(value: string): Promise<boolean> {
+    const ref = readActionRef(value);
+    if (!ref) return false;
+    if (ref.kind === "call") return runPluginAction(ref.action);
+    if (ref.kind === "launcher") return runLauncherEntry(ref.entry);
+    const outcome = await actionsNow().run(ref.id);
+    if (outcome === "failed") showNotice({ title: "A custom action did not finish", body: "One of its steps did not go through. Open the device's page to check it.", tag: "device-action", silent: true });
+    return outcome === "ran";
+}
+
 function broadcast(channel: string, ...args: unknown[]): void {
     for (const contents of webContents.getAllWebContents()) if (!contents.isDestroyed()) contents.send(channel, ...args);
 }
@@ -261,8 +336,8 @@ export function startDevicePlugins(showPolaris: (path?: string) => void, games: 
             if (method === "settings.get") return manager?.settings(id) ?? null;
             if (method === "polaris.state") return { call: voiceStateNow(), games: runningGames() };
             if (method === "system.launchOfficial") return launchOfficial(id);
-            // judgeCall checked the shape: one of PLUGIN_ACTIONS.
-            return runPluginAction((params as { action: PluginAction }).action);
+            // judgeCall checked the shape: a call action, or a custom or launcher one.
+            return runActionRef((params as { action: string }).action);
         },
         devices: () => devices,
         offer: (entry, deviceName) => {
@@ -475,7 +550,8 @@ export function registerPluginIpc(
             if (verdict.method === "settings.get") return { ok: true, value: await running.settings(parsed.data) };
             if (verdict.method === "polaris.state") return { ok: true, value: { call: voiceStateNow(), games: runningGames() } };
             if (verdict.method === "system.launchOfficial") return { ok: true, value: await launchOfficial(parsed.data) };
-            return { ok: true, value: runPluginAction((verdict.params as { action: PluginAction }).action) };
+            // A view's button runs what a device button does, custom actions asking first just the same.
+            return { ok: true, value: await runActionRef((verdict.params as { action: string }).action) };
         } catch {
             return { ok: false, error: "failed" };
         }
@@ -511,6 +587,30 @@ export function registerPluginIpc(
         const parsedValue = z.boolean().nullable().safeParse(value);
         if (!allowed(event) || !parsedId.success || !parsedValue.success) return false;
         return ready().setAutoUpdate(parsedId.data, parsedValue.data);
+    });
+    // The custom actions, edited from the plugin's page; every request is checked here and a run still asks first.
+    ipcMain.handle(CHANNELS.deviceActions, async (event, request: unknown) => {
+        const parsed = deviceActionRequestSchema.safeParse(request);
+        if (!allowed(event) || !parsed.success) return { ok: false, error: "bad-request" };
+        const actions = actionsNow();
+        switch (parsed.data.kind) {
+            case "list":
+                return { ok: true, value: { actions: await actions.list(), launcher: launcherEntries(), hotkeys: process.platform === "win32" ? null : "unsupported" } };
+            case "save":
+                return (await actions.save(parsed.data.action)) ? { ok: true } : { ok: false, error: "bad-request" };
+            case "remove":
+                return { ok: await actions.remove(parsed.data.id) };
+            case "run":
+                return { ok: true, value: await actions.run(parsed.data.id) };
+            case "pick": {
+                const what = parsed.data.what;
+                const picked = await dialog.showOpenDialog({
+                    properties: [what === "folder" ? "openDirectory" : "openFile"],
+                    ...(what === "program" && process.platform === "win32" ? { filters: [{ name: "Programs", extensions: ["exe", "bat", "cmd", "lnk"] }, { name: "All files", extensions: ["*"] }] } : {})
+                });
+                return { ok: true, value: picked.canceled ? null : (picked.filePaths[0] ?? null) };
+            }
+        }
     });
     handle(CHANNELS.pluginsProfile, (event, id: unknown, request: unknown) => {
         const parsed = idSchema.safeParse(id);

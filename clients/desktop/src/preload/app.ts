@@ -48,6 +48,7 @@ const pluginsBridge: NonNullable<PolarisDesktop["plugins"]> = {
     official: (id, request) => ipcRenderer.invoke(CHANNELS.pluginsOfficial, id, request),
     runAction: (id, action) => ipcRenderer.invoke(CHANNELS.pluginsAction, id, action),
     profile: (id, request) => ipcRenderer.invoke(CHANNELS.pluginsProfile, id, request),
+    actions: (request) => ipcRenderer.invoke(CHANNELS.deviceActions, request),
     onChange: (listener) => {
         const heard = () => listener();
         ipcRenderer.on(CHANNELS.pluginsChanged, heard);

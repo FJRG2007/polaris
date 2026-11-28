@@ -2682,7 +2682,8 @@
             "camera": "Camera",
             "share": "Share your screen",
             "hangup": "Hang up",
-            "leave": "Hang up"
+            "leave": "Hang up",
+            "missing": "Action not found"
         },
         "update": {
             "title": "Update {name} to {version}?",
@@ -2775,6 +2776,68 @@
                 "body": "Polaris closes {app} and takes over the {device}. If the {device} still has its maker's driver, Windows asks once to put Polaris' driver on it.",
                 "confirm": "Close it and use Polaris",
                 "failed": "{app} did not close. Close it yourself, then try again."
+            }
+        },
+        "actions": {
+            "title": "Custom actions",
+            "hint": "Open, run, press keys or chain steps from a button. Pick them in the buttons above.",
+            "new": "New action",
+            "empty": "No custom actions yet.",
+            "edit": "Edit",
+            "try": "Try it",
+            "save": "Save",
+            "cancel": "Cancel",
+            "failed": "That did not save. Try again.",
+            "ran": "Action ran.",
+            "runFailed": "A step of that action did not go through.",
+            "summary": "{count, plural, one {# step} other {# steps}}",
+            "stateFirst": "next press: first state",
+            "stateSecond": "next press: second state",
+            "unconfirmed": "asks on its first run",
+            "dialog": {
+                "title": "Custom action",
+                "hint": "Steps run in order. A new or changed action asks in Polaris before its first run."
+            },
+            "field": {
+                "name": "Name",
+                "kind": "Step",
+                "path": "File or folder",
+                "url": "Web address",
+                "program": "Program",
+                "args": "Arguments, one per line",
+                "key": "Key",
+                "ms": "Milliseconds"
+            },
+            "kind": {
+                "open": "Open a file or folder",
+                "website": "Open a website",
+                "run": "Run a program",
+                "hotkey": "Press a hotkey",
+                "launcher": "Polaris launcher",
+                "polaris": "Polaris call",
+                "delay": "Wait"
+            },
+            "modifier": {
+                "ctrl": "Ctrl",
+                "alt": "Alt",
+                "shift": "Shift",
+                "meta": "Win / Cmd"
+            },
+            "pickFile": "Pick file",
+            "pickFolder": "Pick folder",
+            "pickProgram": "Pick program",
+            "hotkeysUnsupported": "Hotkeys can only be pressed on Windows for now.",
+            "addStep": "Add step",
+            "removeStep": "Remove step",
+            "up": "Move up",
+            "down": "Move down",
+            "twoStates": "Two states (each press runs the other)",
+            "secondState": "Second state",
+            "incomplete": "Fill in every step: full paths, a web address starting with http, and a name.",
+            "remove": {
+                "title": "Delete \"{name}\"?",
+                "hint": "Buttons that run it will do nothing.",
+                "confirm": "Delete"
             }
         }
     }

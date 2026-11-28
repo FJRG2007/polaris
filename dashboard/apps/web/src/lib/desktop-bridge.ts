@@ -323,6 +323,8 @@ export interface PolarisDesktop {
         runAction?(id: string, action: string): Promise<boolean>;
         /** Create, rename, delete, set the rules of, or pick one of a plugin's profiles. Absent from an app older than profiles. */
         profile?(id: string, request: unknown): Promise<unknown>;
+        /** List, save, remove, run or pick a path for the custom actions a device button can run. Absent from an app older than them. */
+        actions?(request: unknown): Promise<unknown>;
         onChange(listener: () => void): () => void;
         onOpen(listener: (id: string) => void): () => void;
     };

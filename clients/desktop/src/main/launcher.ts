@@ -373,6 +373,32 @@ async function runSystemCommand(command: SystemCommand): Promise<void> {
     });
 }
 
+/**
+ * The launcher entries a device button or a custom action can run, by a
+ * stable id (`system:<command>`, `page:<path>`): the system commands and the
+ * Polaris pages the launcher lists. Rows found by a search (apps, answers)
+ * are not here: their ids live only as long as that search.
+ */
+export function launcherEntries(): { entry: string; label: string; }[] {
+    const commands = systemCommands(process.platform, process.env).map((command) => ({ entry: `system:${command.id}`, label: command.label }));
+    const pages = PAGES.filter((page) => /^\/[A-Za-z0-9/_-]{0,48}$/.test(page.path)).map((page) => ({ entry: `page:${page.path}`, label: page.label }));
+    return [...commands, ...pages];
+}
+
+/** Run one of `launcherEntries` the way the launcher does (a command that ends the session still asks). False when it is not one. */
+export function runLauncherEntry(entry: string): boolean {
+    if (entry.startsWith("system:")) {
+        const command = systemCommands(process.platform, process.env).find((item) => `system:${item.id}` === entry);
+        if (!command) return false;
+        void runSystemCommand(command);
+        return true;
+    }
+    const page = PAGES.find((item) => `page:${item.path}` === entry);
+    if (!page || !host) return false;
+    host.showPolaris(page.path);
+    return true;
+}
+
 function hide(): void {
     if (!window || window.isDestroyed() || !window.isVisible()) return;
     window.hide();

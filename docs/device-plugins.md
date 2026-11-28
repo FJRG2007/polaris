@@ -209,6 +209,41 @@ for every installed plugin, a tray item while its device is plugged in
 plugins page in the app's own settings that lists them and turns them on and
 off offline.
 
+## Custom actions
+
+An `action` setting (a lit button) can name more than a call action:
+`custom:<id>` runs one of this computer's custom actions and
+`launcher:<entry>` runs a launcher entry (`system:<command>` or
+`page:/<path>`). Custom actions follow Stream Deck's System actions and Multi
+Action: steps that open a file or folder, open a website, run a program with an
+argument list, press a hotkey, run a launcher entry or a Polaris call action,
+and waits between them (10 s each, 60 s in all, 50 steps). With a second list
+(`off`) the action has two states and each press runs the other one (Multi
+Action Switch, Hotkey Switch). Schemas: `deviceActionSchema` in
+`@polaris/core/device-plugins`; host: `clients/desktop/src/main/plugins/device-actions.ts`.
+
+Trust boundary:
+
+- They are kept by the desktop app only, in `device-actions.json` beside the
+  installed plugins, and read back through the schema every time; an entry that
+  no longer fits is dropped. They are never in a plugin's settings file, and
+  they are not synced to the account.
+- A plugin only ever sends the opaque id. `polaris.action` accepts it through
+  `pluginActionRefSchema`; the host looks the action up, so a plugin cannot
+  name a program, a path or a key.
+- The page edits them through the desktop (`plugins.actions`, checked with
+  `deviceActionRequestSchema`), and paths come from the system's own file
+  picker. The page cannot make one run unseen: the first run of a new or
+  changed action shows the desktop's own message box listing every step word
+  for word, and the yes is kept against a hash of the steps, so any change asks
+  again (a rename does not). A run from the page goes through the same check.
+- A program starts from its file with its arguments as a list, `shell: false`;
+  there is no command-line text field. Websites are http(s) only and go through
+  `openExternal`.
+- Hotkeys are pressed on Windows through `keybd_event` in the game watcher's
+  already-open PowerShell (no process per press); elsewhere a hotkey step does
+  nothing and the page says so.
+
 ## Publishing a plugin
 
 `clients/device-plugins/<id>/manifest.json`, optional `listing.json` (`icon`,

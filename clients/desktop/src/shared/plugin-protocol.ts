@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { PLUGIN_ACTIONS, PLUGIN_STATUS_CODE, type PluginPermission, type PluginSettingValue, type UsbDevice } from "@polaris/core/device-plugins";
+import { pluginActionRefSchema, PLUGIN_STATUS_CODE, type PluginPermission, type PluginSettingValue, type UsbDevice } from "@polaris/core/device-plugins";
 
 /** The methods a plugin may call, and the permission each one needs (null: none). */
 export const PLUGIN_METHODS = {
@@ -54,7 +54,8 @@ export { PLUGIN_ACTIONS, type PluginAction } from "@polaris/core/device-plugins"
 
 /** The parameters of each method, checked before the app acts on them. */
 export const PLUGIN_PARAMS = {
-    "polaris.action": z.object({ action: z.enum(PLUGIN_ACTIONS) }),
+    /** A call action, or `custom:<id>` / `launcher:<entry>`: the host looks up what it does, the plugin never knows. */
+    "polaris.action": z.object({ action: pluginActionRefSchema }),
     "polaris.state": z.undefined(),
     "settings.get": z.undefined(),
     "system.launchOfficial": z.undefined()
