@@ -8,13 +8,14 @@
  * anything waits.
  *
  * A server action that gets no answer rejects; one the server refused answers
- * `{ ok: false }`. That is the line between "keep it" and "tell the waiter".
+ * `{ ok: false }`, and one the server failed on answers `{ ok: false, retry }`.
+ * `deliveryOf` draws the line between "keep it" and "tell the waiter".
  */
 
 import { payAction } from "../actions/till";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { addLinesAction, openOrderAction, sendLinesAction } from "../actions/orders";
-import { enqueue, flush, memoryStore, type Delivery, type QueuedOp, type QueueStore } from "../model/offline-queue";
+import { deliveryOf, enqueue, flush, memoryStore, type ActionAnswer, type Delivery, type QueuedOp, type QueueStore } from "../model/offline-queue";
 
 const DB = "polaris-hospitality";
 const STORE = "queue";
@@ -60,18 +61,17 @@ function store(): QueueStore {
     return shared;
 }
 
-const ACTIONS: Record<string, (payload: unknown) => Promise<{ ok: boolean; error?: string }>> = {
-    open: (p) => openOrderAction(p) as Promise<{ ok: boolean; error?: string }>,
-    add: (p) => addLinesAction(p) as Promise<{ ok: boolean; error?: string }>,
-    send: (p) => sendLinesAction(p) as Promise<{ ok: boolean; error?: string }>,
-    pay: (p) => payAction(p) as Promise<{ ok: boolean; error?: string }>
+const ACTIONS: Record<string, (payload: unknown) => Promise<ActionAnswer>> = {
+    open: (p) => openOrderAction(p),
+    add: (p) => addLinesAction(p),
+    send: (p) => sendLinesAction(p),
+    pay: (p) => payAction(p)
 };
 
 async function deliver(op: QueuedOp): Promise<Delivery> {
     const action = ACTIONS[op.kind];
     if (!action) return { status: "refused", error: "" };
-    const answer = await action(op.payload);
-    return answer.ok ? { status: "ok" } : { status: "refused", error: answer.error ?? "" };
+    return deliveryOf(await action(op.payload), op);
 }
 
 export interface OfflineQueue {

@@ -3927,18 +3927,10 @@
             "timing": {
                 "immediate": "Immediately",
                 "quiet": "At the quietest hour ({at})",
-                "quietRecommended": "At the quietest hour ({at}), recommended",
                 "daily": "Every day at",
                 "off": "Only tell me"
             },
             "riskStanding": "A critical or high fix can wait here. An administrator accepted that risk.",
-            "recommendationStanding": "Every fix installs at the quietest hour. An administrator authorized this on {date}.",
-            "recommendation": {
-                "title": "Recommended: install every fix at the quietest hour",
-                "description": "Installing restarts Polaris. At the quietest hour ({at}) it never cuts a service or a call in progress. Critical and high fixes then wait at most a day.",
-                "apply": "Apply recommendation",
-                "busy": "Available once the update in progress finishes."
-            },
             "risk": {
                 "title": "Leave known vulnerabilities open?",
                 "description": "A critical or high vulnerability that a published build already fixes would stay open on this deployment until somebody installs the update, or until the quiet hour.",

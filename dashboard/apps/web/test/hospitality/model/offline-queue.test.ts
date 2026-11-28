@@ -5,7 +5,16 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { enqueue, flush, memoryStore, type Delivery, type QueuedOp } from "@polaris-app/hospitality/src/model/offline-queue";
+import {
+    deliveryOf,
+    enqueue,
+    flush,
+    memoryStore,
+    RETRY_WINDOW_MS,
+    type ActionAnswer,
+    type Delivery,
+    type QueuedOp
+} from "@polaris-app/hospitality/src/model/offline-queue";
 
 const op = (id: string, kind: string, at: number, payload: unknown = {}): QueuedOp => ({ id, kind, payload, queuedAt: at });
 
@@ -74,5 +83,38 @@ describe("the offline queue", () => {
         await enqueue(store, op("a", "add", 1));
         await enqueue(store, op("a", "add", 5));
         expect(await store.all()).toHaveLength(1);
+    });
+
+    it("keeps an order the server failed on while the dashboard restarts, and sends it once", async () => {
+        // The dashboard restarting under an update: the new container answers
+        // before its database does, so the action fails on the server's side.
+        const store = memoryStore();
+        const lines = new Set<string>();
+        let restarting = true;
+        let now = 1_000;
+        const action = async (o: QueuedOp): Promise<ActionAnswer> => {
+            if (restarting) return { ok: false, error: "Something went wrong", retry: true };
+            for (const id of (o.payload as { lineIds: string[] }).lineIds) lines.add(id);
+            return { ok: true };
+        };
+        const send = async (o: QueuedOp) => deliveryOf(await action(o), o, now);
+        await enqueue(store, op("a", "add", now, { lineIds: ["l1"] }));
+        await enqueue(store, op("b", "send", now + 1, { lineIds: [] }));
+        now += 30_000;
+        expect(await flush(store, send)).toEqual({ sent: 0, refused: [], left: 2 });
+        restarting = false;
+        now += 30_000;
+        expect(await flush(store, send)).toEqual({ sent: 2, refused: [], left: 0 });
+        // A second flush, as the next tick would run, sends nothing again.
+        expect(await flush(store, send)).toEqual({ sent: 0, refused: [], left: 0 });
+        expect([...lines]).toEqual(["l1"]);
+    });
+
+    it("tells the waiter a refusal at once, and a server failure only once the retry window is over", () => {
+        const queued = { queuedAt: 0 };
+        expect(deliveryOf({ ok: true }, queued, 5)).toEqual({ status: "ok" });
+        expect(deliveryOf({ ok: false, error: "sold out" }, queued, 5)).toEqual({ status: "refused", error: "sold out" });
+        expect(deliveryOf({ ok: false, error: "x", retry: true }, queued, RETRY_WINDOW_MS - 1)).toEqual({ status: "offline" });
+        expect(deliveryOf({ ok: false, error: "x", retry: true }, queued, RETRY_WINDOW_MS)).toEqual({ status: "refused", error: "x" });
     });
 });

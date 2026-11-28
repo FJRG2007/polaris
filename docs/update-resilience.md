@@ -27,9 +27,10 @@ finish before the process leaves, as long as they finish within the 20 seconds.
 | 2 | Background work (automations) on the old container. | Already handled: `lib/automations/job.ts` stops claiming new steps on SIGTERM and lets the ones in flight finish. Work is held under database leases (`lib/cron/lease.ts`), so anything a killed process held is taken by the new container once the lease expires. Nothing is dropped. |
 | 3 | The update watcher and its quiet-hour install. | Already handled: its state is database rows (the first-seen and installed rows in `Setting`), not a timer's memory, so a restart reads it back on the first tick. Other in-process timers were not audited one by one. |
 | 4 | The tab's own update reload. | Already handled: `lib/reload-safety.ts` refuses to reload while a field is unsaved, a dialog is open, a file is moving, media plays, or any non-GET fetch is in flight. Server actions are POSTs through `fetch`, so they are counted by `lib/work-in-progress.ts`. A write refused or lost is marked unsaved again, so the update waits for it. |
-| 5 | An update started in the middle of a service or a call. | Fixed in the same branch: a scheduled install steps back while an order line or payment was taken in the last ten minutes or a call has somebody on it, for at most two hours (`lib/update-busy.ts`). The quietest hour itself now counts orders, payments and calls. "Immediately" and the Update button never wait. |
+| 5 | An update started in the middle of a service or a call. | Fixed in the same branch: a scheduled install steps back while an order line or payment was taken in the last ten minutes or a call has somebody on it, for at most two hours (`lib/update-busy.ts`). The quietest hour itself now counts orders, payments and calls. "Immediately" and the Update button never wait. Polaris does not recommend one install time over another: the quiet hour is an ordinary choice in Admin > Updates, and staying up through a restart is each app's own job (Hospitality: finding 8). A deployment that already moved every severity to the quiet hour keeps that schedule and its recorded acceptance. |
 | 6 | Retrying a mutation the connection dropped. | Not done, deliberately: a server action is not idempotent in general, and replaying one blind can take a payment twice. A retry needs an idempotency key per action; see "Mutations without an idempotency key" below. Everything else surfaces the failure and keeps the field unsaved (finding 4). |
 | 7 | Postgres, hostd, Traefik restarting in the same update. | Out of scope here. They are restarted in place only when their own definition changed, and the dashboard's Prisma client reconnects on the next query. |
+| 8 | A handheld taking orders through a dashboard restart. | Fixed: the queue dropped a write the server failed on. Orders, lines, sends and payments go through the device's queue (`apps/hospitality/src/model/offline-queue.ts`, kept in IndexedDB by `screens/offline.ts`), each with ids the device made, and the server stores each id once (`createMany` with `skipDuplicates` in `lib/orders.ts` and `lib/till.ts`; a replayed payment on a paid order answers what it already stored). A request with no answer (the edge's 502 while no container is up, a reset connection) rejects and stays queued. But a failure inside the action (the database restarting under the update) answered `{ ok: false }` like a refusal, and the queue dropped the order. `lib/outcome.ts` now marks those `retry`, and `deliveryOf` keeps them queued for up to ten minutes (`RETRY_WINDOW_MS`) before handing them back to the waiter. |
 
 ## Every critical surface when something fails
 
@@ -44,7 +45,7 @@ was read in the code but no test or rollover in this audit exercised it.
 | Sign-in and session | Database down | Nothing that needs an account: every session read is a database read | Prisma reconnects on the next query once Postgres is back | The page error card | Not verified here |
 | Database (Postgres) | Down or restarting | Static assets; `/api/health` answers 503, so a rollover will not swap to a new container that cannot reach it | Container `restart: unless-stopped`; Prisma reconnects | Page error cards | Not verified here |
 | Chat and calls | Dashboard restart | A call's media is LiveKit's, a separate container, so audio and video carry on; the chat stream reconnects | EventSource reconnects; call heartbeats resume | Chat shows nothing; the call keeps going | Not verified here |
-| Hospitality | Dashboard restart in service | Scheduled installs now step back while orders or payments are live (`lib/update-busy.ts`); its offline queue is owned separately | Installs at most two hours late | Nothing during the wait | `test/updates/quiet-hour-install.test.ts` |
+| Hospitality | Dashboard restart in service | Handhelds keep taking orders: each write waits in the device's queue (IndexedDB, survives a closed tab) and replays in order without duplicates once the dashboard answers. Scheduled installs also step back while orders or payments are live (`lib/update-busy.ts`) | The queue sends again on `online`, when the screen is shown, and every 15 s; a tab on the old build cannot send until it reloads, and its queue is still there after | The count of orders waiting on the device | `test/hospitality/model/offline-queue.test.ts`, `test/hospitality/lib/outcome.test.ts`, `test/updates/quiet-hour-install.test.ts` |
 | Drive | Restart during an upload or download | The tab will not reload itself while a transfer is moving (`lib/reload-safety.ts`) | The transfer has to be started again if the container went away under it | The transfer's own error | Not verified here |
 | Deploy edge (Traefik) | A malformed dynamic file | Traefik keeps its last good configuration | `writeDynamicFile` writes atomically; the health probe republishes app routes when it finds one unrouted | The app's health shows down, not up | Existing traefik-dynamic and health-probe tests |
 | hostd | Daemon not answering | Every screen that only reads the database; host actions answer `null`, "busy" or "timeout" instead of hanging (`packages/hostd-client`) | Retried on the next action | The action's own message | Not verified here |
@@ -68,6 +69,14 @@ was read in the code but no test or rollover in this audit exercised it.
    make it survive a rollover.
 4. **Rollover timing is unmeasured with streams closing early.** The 20 s stop
    is now normally a few seconds, but that has not been measured on a host.
+5. **A handheld on the old build holds its queue until it reloads.** After an
+   update the server no longer knows the old tab's action ids, so every queued
+   write is rejected as unanswered and kept. Nothing is lost or doubled, but
+   nothing reaches the kitchen either until the tab takes the new build: the
+   new-build banner offers Reload, and a page in sight is not reloaded by
+   itself (`components/new-build-banner.tsx`). Reloading the service screen
+   on its own when the queue meets a stale build, with nothing typed and no
+   dialog open, would close the gap.
 
 ## Mutations without an idempotency key
 
@@ -80,8 +89,8 @@ stored. Where that exists today:
   on-device outbox with its key and sends it again when it can.
 - **Mail**: sending goes through the draft and `/api/mail/outbox`
   (`lib/mailbox/outbox-answer`), keyed by the draft id.
-- **Hospitality orders and payments**: owned by the Hospitality offline queue,
-  outside this audit.
+- **Hospitality orders, lines and payments**: ids made on the device, stored
+  once by the server, replayed by the device's queue (finding 8).
 
 Without one, ranked by what a duplicate costs. "No key" means the action
 file has no client-supplied key, idempotency or dedupe field in its input; it is
@@ -110,6 +119,11 @@ against real containers. Verified by tests only:
 - `test/updates/quiet-hour-install.test.ts`: an install steps back while a venue
   is serving or a call is on, installs once it is quiet, installs anyway at the
   cap, and never holds back "immediately".
+- `test/hospitality/model/offline-queue.test.ts`: a write the server failed on
+  during a restart stays queued and goes out once, in order, with no line
+  added twice; a refusal is handed back at once.
+- `test/hospitality/lib/outcome.test.ts`: a failure inside an action is marked
+  for retry, a refusal is not.
 
 Not verified: the time Traefik takes to drop a dying container, the real
 drain time with streams closed, and EventSource reconnect timing in each

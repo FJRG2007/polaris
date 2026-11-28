@@ -11,9 +11,11 @@
  *
  * An operation leaves the queue when the server answers it, either way: an
  * accepted one is done, a refused one (sold out, order closed) is handed back
- * to be shown, since sending it again would be refused again. Only a request
- * that never got an answer stays, and it blocks the ones behind it so a send
- * never overtakes the lines it sends.
+ * to be shown, since sending it again would be refused again. A request that
+ * never got an answer stays, and so does one the server failed on its own side
+ * (`retry`, the database restarting under an update) for up to
+ * `RETRY_WINDOW_MS`; either blocks the ones behind it so a send never
+ * overtakes the lines it sends.
  *
  * Pure: the store and the transport are passed in, so the tests drive it
  * without a browser.
@@ -37,6 +39,26 @@ export interface QueueStore {
 export type Delivery = { readonly status: "ok" } | { readonly status: "refused"; readonly error: string } | { readonly status: "offline" };
 
 export type Transport = (op: QueuedOp) => Promise<Delivery>;
+
+/** How long a write the server failed on (not refused) is kept and sent again.
+ *  Longer than an update takes to roll the dashboard and its database over;
+ *  past it the failure is handed back, so one broken write cannot hold the
+ *  device's queue for the rest of the service. */
+export const RETRY_WINDOW_MS = 10 * 60 * 1000;
+
+/** What an action answered, as the queue reads it. */
+export interface ActionAnswer {
+    readonly ok: boolean;
+    readonly error?: string;
+    /** The server failed on its own side; the write was not judged. */
+    readonly retry?: boolean;
+}
+
+export function deliveryOf(answer: ActionAnswer, op: Pick<QueuedOp, "queuedAt">, now = Date.now()): Delivery {
+    if (answer.ok) return { status: "ok" };
+    if (answer.retry && now - op.queuedAt < RETRY_WINDOW_MS) return { status: "offline" };
+    return { status: "refused", error: answer.error ?? "" };
+}
 
 export async function enqueue(store: QueueStore, op: QueuedOp): Promise<void> {
     const ops = await store.all();

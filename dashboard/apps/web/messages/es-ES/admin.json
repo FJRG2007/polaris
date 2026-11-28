@@ -3927,18 +3927,10 @@
             "timing": {
                 "immediate": "Al momento",
                 "quiet": "En la hora más tranquila ({at})",
-                "quietRecommended": "En la hora más tranquila ({at}), recomendado",
                 "daily": "A diario a las",
                 "off": "Solo avisarme"
             },
             "riskStanding": "Aquí una corrección crítica o alta puede esperar. Un administrador aceptó ese riesgo.",
-            "recommendationStanding": "Cada corrección se instala en la hora más tranquila. Un administrador lo autorizó el {date}.",
-            "recommendation": {
-                "title": "Recomendado: instalar cada corrección en la hora más tranquila",
-                "description": "Instalar reinicia Polaris. En la hora más tranquila ({at}) nunca corta un servicio ni una llamada en curso. Las críticas y altas esperan como mucho un día.",
-                "apply": "Aplicar recomendación",
-                "busy": "Disponible cuando termine la actualización en curso."
-            },
             "risk": {
                 "title": "¿Dejar abiertas vulnerabilidades conocidas?",
                 "description": "Una vulnerabilidad crítica o alta que ya corrige una build publicada seguiría abierta en este despliegue hasta que alguien instale la actualización, o hasta la hora tranquila.",
