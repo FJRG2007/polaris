@@ -76,6 +76,18 @@ export async function startCallKeys(options: CallKeysOptions): Promise<CallKeys>
     let generation = 0;
     let keyed = false;
     let members: Set<string> | null = null;
+    /**
+     * The highest generation taken from each leader's per-call key pair
+     * (identity and public key: one who leaves and comes back counts again
+     * from 1). Setting a key makes the cryptor encrypt with it, so a key
+     * message replayed later (the media server relays every one and can send
+     * it again) would put this browser back on a generation somebody who left
+     * still holds; a leader's generations only ever go up, so anything not
+     * above its last is refused.
+     */
+    const taken = new Map<string, number>();
+    /** A key message that came before its sender's announcement, read once that arrives. */
+    const early = new Map<string, { payload: Uint8Array; from: Participant }>();
     let bind: CallBinding = await options.binding().catch(() => null);
     let busy: Promise<void> = Promise.resolve();
     options.onLock("pending");
@@ -133,6 +145,17 @@ export async function startCallKeys(options: CallKeysOptions): Promise<CallKeys>
         // From whoever leads now, or newer than anything held: two browsers that
         // briefly both think they lead settle on the later generation.
         if (from.identity !== leader && message.gen <= generation) return;
+        const sender = `${from.identity}|${message.pub}`;
+        if (message.gen <= (taken.get(sender) ?? 0)) return;
+        // Wrapped with the key pair the sender announced for this call, not one
+        // the message names for itself. Data and attributes travel apart, so a
+        // message may come before the announcement: kept until it arrives.
+        const announced = peers().get(from.identity)?.pub;
+        if (announced === undefined) {
+            early.set(from.identity, { payload, from });
+            return;
+        }
+        if (message.pub !== announced) return;
         if (message.epoch !== null && message.epoch !== bind?.epoch) {
             // The leader is at another epoch of the conversation's group: read
             // ours again and say it, and the leader wraps again for it.
@@ -146,6 +169,7 @@ export async function startCallKeys(options: CallKeysOptions): Promise<CallKeys>
             bind: message.epoch !== null && bind?.epoch === message.epoch ? bind : null
         });
         if (!key || stopped) return;
+        taken.set(sender, message.gen);
         generation = Math.max(generation, message.gen);
         await provider.put(key, e2ee.keySlot(message.gen));
         keyed = true;
@@ -157,7 +181,14 @@ export async function startCallKeys(options: CallKeysOptions): Promise<CallKeys>
     const queue = (work: () => Promise<void>) => {
         busy = busy.then(() => (stopped ? undefined : work())).catch(() => undefined);
     };
-    const onMembers = () => queue(rekey);
+    const onMembers = () => {
+        queue(rekey);
+        for (const [identity, held] of early) {
+            if (!peers().has(identity)) continue;
+            early.delete(identity);
+            queue(() => opened(held.payload, held.from, e2ee.CALL_KEY_TOPIC));
+        }
+    };
     const onData = (payload: Uint8Array, from?: Participant, _kind?: unknown, topic?: string) =>
         queue(() => opened(payload, from, topic));
 
