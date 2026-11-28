@@ -10580,6 +10580,7 @@ dependencies = [
  "persistence",
  "pin-project",
  "plist",
+ "polaris_instance",
  "polaris_relay",
  "pprof",
  "prost",
@@ -10714,6 +10715,7 @@ dependencies = [
  "base64 0.22.1",
  "ring",
  "rustls",
+ "rustls-platform-verifier",
  "serde_json",
  "url",
 ]

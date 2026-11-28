@@ -151,6 +151,19 @@ impl WebSocket {
         }
     }
 
+    /// [`Self::connect_with_headers`], verifying the server's certificate with
+    /// `config` rather than the platform's roots alone.
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn connect_with_headers_and_tls_config<'a>(
+        url: &str,
+        headers: Vec<(&'a str, String)>,
+        config: std::sync::Arc<rustls::ClientConfig>,
+    ) -> anyhow::Result<Self> {
+        let request = build_request_with_headers(url, headers)?;
+        let socket = imp::connect_with_tls_config(request, config).await?;
+        Ok(Self(socket))
+    }
+
     pub async fn into_graphql_client_builder(self) -> graphql_ws_client::ClientBuilder {
         self.0.into_graphql_client_builder().await
     }

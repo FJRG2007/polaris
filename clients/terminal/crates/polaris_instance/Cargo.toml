@@ -10,5 +10,6 @@ license.workspace = true
 base64.workspace = true
 ring = "0.17"
 rustls = { workspace = true, features = ["ring"] }
+rustls-platform-verifier = "0.7.0"
 serde_json.workspace = true
 url.workspace = true

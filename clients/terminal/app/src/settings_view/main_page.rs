@@ -398,6 +398,12 @@ impl MainSettingsPageView {
         ctx.subscribe_to_model(&PolarisSignIn::handle(ctx), |_, _, _, ctx| {
             ctx.notify();
         });
+        if ctx.has_singleton_model::<crate::local_control::PolarisRelay>() {
+            ctx.subscribe_to_model(
+                &crate::local_control::PolarisRelay::handle(ctx),
+                |_, _, _, ctx| ctx.notify(),
+            );
+        }
         input
     }
 
@@ -1424,6 +1430,33 @@ impl SettingsWidget for PolarisControlWidget {
     }
 }
 
+/// Where a signed-in terminal stands, with the address the relay is on when it
+/// is not the usual one and the addresses it would not use.
+#[cfg(feature = "local_fs")]
+fn signed_in_words(origin: &str, app: &AppContext) -> String {
+    let mut words = format!("Signed in to {origin}.");
+    if !app.has_singleton_model::<crate::local_control::PolarisRelay>() {
+        return words;
+    }
+    let address = crate::local_control::PolarisRelay::as_ref(app).address();
+    if let Some(local) = &address.local {
+        words.push_str(&format!(
+            " {} ({local}).",
+            polaris_instance::USING_LOCAL_WORDS
+        ));
+    }
+    for refused in &address.refused {
+        words.push(' ');
+        words.push_str(&polaris_instance::refused_words(refused));
+    }
+    for untrusted in &address.untrusted {
+        words.push_str(&format!(
+            " {untrusted} has a certificate this computer does not trust, so it was not used."
+        ));
+    }
+    words
+}
+
 /// The Polaris account this terminal signs in to: the address, the code to
 /// approve while a sign-in is open, and Sign out once it is signed in.
 #[cfg(feature = "local_fs")]
@@ -1501,7 +1534,7 @@ impl SettingsWidget for PolarisAccountWidget {
         let state = PolarisSignIn::as_ref(app).state();
         let (description, child) = if let Some(account) = PolarisSignIn::account(app) {
             (
-                format!("Signed in to {}.", account.origin),
+                signed_in_words(&account.origin, app),
                 self.button(
                     appearance,
                     false,

@@ -15,6 +15,7 @@
 
 mod failover;
 mod local_ca;
+mod tls;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -23,6 +24,7 @@ use ring::signature::{ED25519, UnparsedPublicKey};
 
 pub use failover::FailoverState;
 pub use local_ca::{LocalCaVerifier, sha256_hex};
+pub use tls::{is_certificate_failure, local_ca_client_config};
 
 /// Where an instance describes itself. Public, no credential.
 pub const INSTANCE_PATH: &str = "/api/instance";
@@ -58,6 +60,19 @@ pub struct InstanceRecord {
     /// over the usual, publicly trusted address, and used only on an alternate
     /// that proved it is this instance.
     pub local_ca_sha256: Vec<String>,
+}
+
+impl InstanceRecord {
+    /// The record in the shape `GET /api/instance` answers, so [`read_instance`]
+    /// reads back what the terminal stored.
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "id": self.id,
+            "publicKey": self.public_key,
+            "addresses": self.addresses,
+            "localCaSha256": self.local_ca_sha256,
+        })
+    }
 }
 
 fn is_id(value: &str) -> bool {

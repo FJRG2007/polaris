@@ -305,6 +305,7 @@ winit = { workspace = true }
 wgpu.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
+polaris_instance.workspace = true
 app-installation-detection.workspace = true
 async-io.workspace = true
 axum.workspace = true

@@ -73,6 +73,8 @@ struct Pending {
     device_code: String,
     poll: Duration,
     failures: u32,
+    /// What `GET /api/instance` said, kept with the account for the local fallback.
+    instance: Option<polaris_instance::InstanceRecord>,
 }
 
 impl PolarisSignIn {
@@ -115,7 +117,7 @@ impl PolarisSignIn {
             if me.attempt != attempt {
                 return;
             }
-            let opened = match opened {
+            let (opened, instance) = match opened {
                 Ok(opened) => opened,
                 Err(reason) => {
                     me.set_state(SignInState::Failed(reason), ctx);
@@ -147,6 +149,7 @@ impl PolarisSignIn {
                     device_code: opened.device_code,
                     poll: poll_interval(opened.poll_ms),
                     failures: 0,
+                    instance,
                 },
                 ctx,
             );
@@ -234,6 +237,7 @@ impl PolarisSignIn {
                         let account = PolarisAccount {
                             origin: pending.origin,
                             key,
+                            instance: pending.instance,
                         };
                         if let Err(error) = polaris_account::store(&account, ctx) {
                             log::warn!("Could not save the Polaris account: {error:#}");
@@ -364,11 +368,6 @@ struct Refusal {
     error: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct InstanceIdentity {
-    id: String,
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ClaimBody<'a> {
@@ -424,7 +423,9 @@ fn device_name() -> String {
     }
 }
 
-async fn open_request(origin: String) -> Result<Opened, String> {
+async fn open_request(
+    origin: String,
+) -> Result<(Opened, Option<polaris_instance::InstanceRecord>), String> {
     let client = http_client::Client::new();
     let unreachable = || {
         format!("Could not reach {origin}. Check the address and that this computer can open it.")
@@ -440,10 +441,17 @@ async fn open_request(origin: String) -> Result<Opened, String> {
     if !instance.status().is_success() {
         return Err(not_polaris());
     }
-    let identity: InstanceIdentity = instance.json().await.map_err(|_| not_polaris())?;
-    if identity.id.trim().is_empty() {
+    let identity: serde_json::Value = instance.json().await.map_err(|_| not_polaris())?;
+    let has_id = identity
+        .get("id")
+        .and_then(|id| id.as_str())
+        .is_some_and(|id| !id.trim().is_empty());
+    if !has_id {
         return Err(not_polaris());
     }
+    // An instance too old to sign challenges publishes only its id; it is
+    // reached on the address typed and nowhere else.
+    let record = polaris_instance::read_instance(&identity);
 
     let response = client
         .post(format!("{origin}/api/terminal/authorize"))
@@ -478,10 +486,11 @@ async fn open_request(origin: String) -> Result<Opened, String> {
             format!("{origin} could not open a sign-in right now. Try again in a minute.")
         }));
     }
-    response
+    let opened = response
         .json::<Opened>()
         .await
-        .map_err(|_| format!("{origin} answered the sign-in in a way this terminal does not understand. Update Polaris Terminal."))
+        .map_err(|_| format!("{origin} answered the sign-in in a way this terminal does not understand. Update Polaris Terminal."))?;
+    Ok((opened, record))
 }
 
 async fn claim(origin: &str, device_code: &str) -> Claimed {

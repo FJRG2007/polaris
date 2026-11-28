@@ -18,6 +18,7 @@ fn debug_never_prints_the_key() {
     let account = PolarisAccount {
         origin: "https://polaris.example.com".to_owned(),
         key: "plr_secret".to_owned(),
+        instance: None,
     };
     assert!(!format!("{account:?}").contains("plr_secret"));
 }

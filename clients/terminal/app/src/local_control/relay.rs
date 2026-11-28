@@ -11,6 +11,12 @@
 //! streams a pane's PTY bytes until `detach`. The socket reconnects with
 //! backoff; a handshake the instance refuses (a revoked or expired key) stops
 //! it until the next sign-in calls [`PolarisRelay::restart`].
+//!
+//! When the address the terminal signed in to stops answering, each dial tries
+//! the instance's other addresses (`crates/polaris_instance`): an alternate is
+//! sent the key only after it signs a fresh challenge with the instance's key,
+//! and its certificate may chain to the instance's own local CA. The socket
+//! goes back to the usual address the next time it reconnects after the hold.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,6 +25,7 @@ use std::time::Duration;
 use ::local_control::{ControlError, ErrorCode, ErrorResponseEnvelope, RequestEnvelope};
 use futures::{SinkExt as _, StreamExt as _};
 use instant::Instant;
+use polaris_instance::{AlternateVerdict, FailoverState, InstanceRecord};
 use polaris_relay::{Incoming, Outgoing, PaneOutput, parse_incoming};
 use pterm_core::channel::ChannelState;
 use ptermui::{Entity, ModelContext, ModelSpawner, SingletonEntity};
@@ -36,9 +43,31 @@ const LAST_RETRY: Duration = Duration::from_secs(60);
 /// A socket that stayed up this long starts the backoff over.
 const STABLE_FOR: Duration = Duration::from_secs(60);
 
+/// Which address the relay is on, for Settings > Account.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RelayAddress {
+    /// The alternate in use while the usual address does not answer.
+    pub local: Option<String>,
+    /// Alternates that answered as another Polaris and were never sent the key.
+    pub refused: Vec<String>,
+    /// Alternates whose certificate this computer does not trust.
+    pub untrusted: Vec<String>,
+}
+
+impl RelayAddress {
+    fn of(failover: &FailoverState) -> Self {
+        Self {
+            local: failover.is_local().then(|| failover.current().to_owned()),
+            refused: failover.refused().map(str::to_owned).collect(),
+            untrusted: failover.untrusted().map(str::to_owned).collect(),
+        }
+    }
+}
+
 /// Holds the relay socket's runtime; dropping it closes the socket.
 pub struct PolarisRelay {
     runtime: Option<tokio::runtime::Runtime>,
+    address: RelayAddress,
 }
 
 impl Entity for PolarisRelay {
@@ -49,9 +78,25 @@ impl SingletonEntity for PolarisRelay {}
 
 impl PolarisRelay {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        let mut relay = Self { runtime: None };
+        let mut relay = Self {
+            runtime: None,
+            address: RelayAddress::default(),
+        };
         relay.restart(ctx);
         relay
+    }
+
+    /// The address the relay is on, as last dialled.
+    pub fn address(&self) -> &RelayAddress {
+        &self.address
+    }
+
+    fn set_address(&mut self, address: RelayAddress, ctx: &mut ModelContext<Self>) {
+        if self.address != address {
+            self.address = address;
+            ctx.emit(());
+            ctx.notify();
+        }
     }
 
     /// Closes any open socket and dials again with the stored account; stays
@@ -60,14 +105,17 @@ impl PolarisRelay {
         if let Some(runtime) = self.runtime.take() {
             runtime.shutdown_background();
         }
+        self.set_address(RelayAddress::default(), ctx);
         let Some(account) = crate::polaris_account::stored(ctx) else {
             return;
         };
-        let Some(url) = crate::polaris_account::relay_url(&account.origin) else {
+        if crate::polaris_account::relay_url(&account.origin).is_none() {
             log::warn!("Polaris relay: the stored instance address is not http(s); not connecting");
             return;
-        };
+        }
+        let failover = FailoverState::new(&account.origin, account.instance.clone());
         let bridge = LocalControlBridge::handle(ctx).update(ctx, |_, ctx| ctx.spawner());
+        let me = ctx.spawner();
         let hello = Outgoing::Hello {
             name: gethostname::gethostname().into_string().ok(),
             os: Some(std::env::consts::OS.to_owned()),
@@ -85,7 +133,7 @@ impl PolarisRelay {
                 return;
             }
         };
-        runtime.spawn(run(url, account.key, hello, bridge));
+        runtime.spawn(run(failover, account.key, hello, bridge, me));
         self.runtime = Some(runtime);
     }
 }
@@ -115,11 +163,26 @@ enum SessionEnd {
     Refused(u16),
 }
 
-async fn run(url: String, key: String, hello: Outgoing, bridge: ModelSpawner<LocalControlBridge>) {
+async fn run(
+    mut failover: FailoverState,
+    key: String,
+    hello: Outgoing,
+    bridge: ModelSpawner<LocalControlBridge>,
+    me: ModelSpawner<PolarisRelay>,
+) {
     let mut retry = FIRST_RETRY;
     loop {
         let started = Instant::now();
-        match session(&url, &key, &hello, &bridge).await {
+        let dialled = dial(&mut failover, &key).await;
+        let address = RelayAddress::of(&failover);
+        let _ = me
+            .spawn(move |relay, ctx| relay.set_address(address, ctx))
+            .await;
+        let end = match dialled {
+            Ok(socket) => session(socket, &hello, &bridge).await,
+            Err(end) => end,
+        };
+        match end {
             SessionEnd::Refused(status) => {
                 log::warn!(
                     "Polaris relay: the instance refused this terminal's key ({status}); sign in again to reconnect"
@@ -138,28 +201,122 @@ async fn run(url: String, key: String, hello: Outgoing, bridge: ModelSpawner<Loc
     }
 }
 
+/// Milliseconds on a monotonic clock, for the failover's hold and verification windows.
+fn now_ms() -> u64 {
+    static START: std::sync::LazyLock<Instant> = std::sync::LazyLock::new(Instant::now);
+    u64::try_from(START.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+/// Opens the socket on the first address that answers: the one held, the usual
+/// one, then each alternate that proves it is this instance. A real answer (a
+/// refused key included) ends the walk; no answer or a gateway status moves on.
+async fn dial(failover: &mut FailoverState, key: &str) -> Result<WebSocket, SessionEnd> {
+    let mut last = anyhow::anyhow!("no address to dial");
+    for origin in failover.order(now_ms()) {
+        let Some(url) = crate::polaris_account::relay_url(&origin) else {
+            continue;
+        };
+        let tls = if origin == failover.primary() {
+            None
+        } else {
+            let Some(record) = failover.instance().cloned() else {
+                continue;
+            };
+            let config = match polaris_instance::local_ca_client_config(&record.local_ca_sha256) {
+                Ok(config) => Arc::new(config),
+                Err(error) => {
+                    log::warn!("Polaris relay: no TLS configuration for {origin}: {error}");
+                    continue;
+                }
+            };
+            if !failover.is_verified(&origin, now_ms()) {
+                let verdict = challenge(&record, &origin, &config).await;
+                failover.record_verdict(&origin, verdict, now_ms());
+                if verdict != AlternateVerdict::Same {
+                    continue;
+                }
+            }
+            Some(config)
+        };
+        let headers = vec![
+            ("Authorization", format!("Bearer {key}")),
+            ("User-Agent", user_agent()),
+        ];
+        let connected = match tls.clone() {
+            None => WebSocket::connect_with_headers(&url, std::iter::empty(), headers).await,
+            Some(config) => {
+                WebSocket::connect_with_headers_and_tls_config(&url, headers, config).await
+            }
+        };
+        let error = match connected {
+            Ok(socket) => {
+                failover.settle(&origin, now_ms());
+                return Ok(socket);
+            }
+            Err(error) => error,
+        };
+        if let Some(status) = websocket::connect_error_http_response(&error)
+            .map(|response| response.status().as_u16())
+        {
+            if matches!(status, 401 | 403) {
+                return Err(SessionEnd::Refused(status));
+            }
+            if !polaris_instance::is_gateway_failure(status) {
+                failover.settle(&origin, now_ms());
+                return Err(SessionEnd::Dropped(error));
+            }
+        } else if tls.is_some() && polaris_instance::is_certificate_failure(&*error) {
+            failover.record_verdict(
+                &origin,
+                AlternateVerdict::Unreachable { certificate: true },
+                now_ms(),
+            );
+        }
+        failover.record_failure(&origin);
+        last = error;
+    }
+    Err(SessionEnd::Dropped(last))
+}
+
+/// Asks `origin` to sign a fresh nonce (`POST /api/instance/challenge`). No
+/// credential goes with it.
+async fn challenge(
+    record: &InstanceRecord,
+    origin: &str,
+    config: &Arc<rustls::ClientConfig>,
+) -> AlternateVerdict {
+    let builder = reqwest::Client::builder()
+        .tls_backend_preconfigured(rustls::ClientConfig::clone(config))
+        .no_proxy();
+    let Ok(client) = http_client::Client::from_client_builder(builder) else {
+        return AlternateVerdict::Unreachable { certificate: false };
+    };
+    let nonce = polaris_instance::fresh_nonce();
+    let response = client
+        .post(format!("{origin}{}", polaris_instance::CHALLENGE_PATH))
+        .header("user-agent", user_agent())
+        .json(&polaris_instance::challenge_body(&nonce))
+        .timeout(Duration::from_millis(polaris_instance::DEFAULT_TIMEOUT_MS))
+        .send()
+        .await;
+    let response = match response {
+        Ok(response) => response,
+        Err(error) => {
+            return AlternateVerdict::Unreachable {
+                certificate: polaris_instance::is_certificate_failure(&error),
+            };
+        }
+    };
+    let status = response.status().as_u16();
+    let body = response.json::<serde_json::Value>().await.ok();
+    polaris_instance::judge_challenge(record, origin, &nonce, status, body.as_ref())
+}
+
 async fn session(
-    url: &str,
-    key: &str,
+    socket: WebSocket,
     hello: &Outgoing,
     bridge: &ModelSpawner<LocalControlBridge>,
 ) -> SessionEnd {
-    let headers = vec![
-        ("Authorization", format!("Bearer {key}")),
-        ("User-Agent", user_agent()),
-    ];
-    let socket = match WebSocket::connect_with_headers(url, std::iter::empty(), headers).await {
-        Ok(socket) => socket,
-        Err(error) => {
-            if let Some(response) = websocket::connect_error_http_response(&error) {
-                let status = response.status().as_u16();
-                if matches!(status, 401 | 403) {
-                    return SessionEnd::Refused(status);
-                }
-            }
-            return SessionEnd::Dropped(error);
-        }
-    };
     let (mut sink, mut stream) = socket.split().await;
     let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Outgoing>();
     let (bytes_tx, mut bytes_rx) = mpsc::unbounded_channel::<(String, Arc<Vec<u8>>)>();

@@ -10,12 +10,19 @@ use ptermui_extras::secure_storage::AppContextExt as _;
 const INSTANCE_KEY: &str = "PolarisInstanceOrigin";
 /// Secure-storage key of the terminal's API key.
 const TERMINAL_KEY: &str = "PolarisTerminalKey";
+/// Secure-storage key of what `GET /api/instance` said about the instance
+/// (id, signing key, other addresses, local CA), learned over the origin.
+const RECORD_KEY: &str = "PolarisInstanceRecord";
 
 /// A signed-in account: where the instance is and the key it issued.
 #[derive(Clone, PartialEq, Eq)]
 pub struct PolarisAccount {
     pub origin: String,
     pub key: String,
+    /// The instance's own description, which lets the terminal reach it on
+    /// another address it proves is the same Polaris. `None` for an account
+    /// signed in before the terminal kept it, or an instance that publishes none.
+    pub instance: Option<polaris_instance::InstanceRecord>,
 }
 
 impl std::fmt::Debug for PolarisAccount {
@@ -35,9 +42,15 @@ pub fn stored(ctx: &AppContext) -> Option<PolarisAccount> {
     if origin.trim().is_empty() || key.trim().is_empty() {
         return None;
     }
+    let instance = storage
+        .read_value(RECORD_KEY)
+        .ok()
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .and_then(|json| polaris_instance::read_instance(&json));
     Some(PolarisAccount {
         origin: origin.trim().trim_end_matches('/').to_owned(),
         key: key.trim().to_owned(),
+        instance,
     })
 }
 
@@ -47,13 +60,20 @@ pub fn store(account: &PolarisAccount, ctx: &AppContext) -> anyhow::Result<()> {
     let storage = ctx.secure_storage();
     storage.write_value_with_owner_only_fallback(INSTANCE_KEY, &account.origin)?;
     storage.write_value_with_owner_only_fallback(TERMINAL_KEY, &account.key)?;
+    match &account.instance {
+        Some(record) => storage
+            .write_value_with_owner_only_fallback(RECORD_KEY, &record.to_json().to_string())?,
+        None => {
+            let _ = storage.remove_value(RECORD_KEY);
+        }
+    }
     Ok(())
 }
 
 /// Forgets the account after a sign-out.
 pub fn clear(ctx: &AppContext) {
     let storage = ctx.secure_storage();
-    for key in [TERMINAL_KEY, INSTANCE_KEY] {
+    for key in [TERMINAL_KEY, INSTANCE_KEY, RECORD_KEY] {
         if let Err(error) = storage.remove_value(key) {
             log::debug!("Could not remove {key} from secure storage: {error}");
         }

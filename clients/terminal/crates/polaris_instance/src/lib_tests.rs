@@ -188,3 +188,21 @@ fn ca_pins_are_lowercase_sha256_of_the_der() {
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
 }
+
+#[test]
+fn a_stored_record_reads_back_the_same() {
+    let mut record = record_for(&key_pair());
+    record.local_ca_sha256 = vec![sha256_hex(b"ca")];
+    assert_eq!(read_instance(&record.to_json()), Some(record));
+}
+
+#[test]
+fn a_certificate_refusal_is_told_apart_from_a_dead_address() {
+    let refused = std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        rustls::Error::InvalidCertificate(rustls::CertificateError::UnknownIssuer),
+    );
+    assert!(is_certificate_failure(&refused));
+    let dead = std::io::Error::new(std::io::ErrorKind::ConnectionRefused, "refused");
+    assert!(!is_certificate_failure(&dead));
+}
