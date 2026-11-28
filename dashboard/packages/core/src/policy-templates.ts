@@ -58,6 +58,7 @@ const WRITES: readonly Permission[] = [
     "mailserver.manage",
     "automations.secrets",
     "status.manage",
+    "hospitality.manage",
     "deploy.manage",
     "games.moderate",
     "games.console",

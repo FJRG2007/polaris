@@ -1,0 +1,102 @@
+{
+    "errors": {
+        "generic": "Algo ha fallado. Prueba otra vez.",
+        "checkInput": "Revisa lo escrito y prueba otra vez.",
+        "loadFailed": "No se pudo cargar la carta",
+        "saveFailed": "No se pudo guardar"
+    },
+    "actions": {
+        "retry": "Reintentar",
+        "cancel": "Cancelar",
+        "save": "Guardar"
+    },
+    "mode": {
+        "standard": "Vista normal",
+        "basic": "Vista simple"
+    },
+    "venue": {
+        "pick": "Local"
+    },
+    "menu": {
+        "title": "Carta",
+        "all": "Todo",
+        "import": "Importar",
+        "export": "Exportar",
+        "prices": "Precios",
+        "newProduct": "Producto",
+        "newCategory": "Familia",
+        "edit": "Editar",
+        "soldOut": "Agotado",
+        "backOn": "Hay",
+        "empty": "Aún no hay nada",
+        "emptyManager": "Añade un producto o importa una hoja.",
+        "exportFile": "carta.csv",
+        "categoryNotEmpty": "Mueve o borra antes sus productos."
+    },
+    "setup": {
+        "title": "Prepara tu local",
+        "description": "Empieza con una carta de ejemplo y un salón de ocho mesas. Luego lo cambias todo.",
+        "askManager": "Un encargado debe preparar antes el local.",
+        "start": "Usar el ejemplo",
+        "sampleVenue": "Mi local",
+        "sampleRoom": "Salón",
+        "sampleCsv": "categoria,nombre,precio,iva,alergenos,estacion\nBebidas,Agua,1.80,10,,bar\nBebidas,Caña,2.50,10,gluten,bar\nBebidas,Refresco,2.20,10,,bar\nBebidas,Café,1.50,10,leche,bar\nEntrantes,Patatas bravas,5.50,10,huevos,kitchen\nEntrantes,Croquetas,7.00,10,gluten|leche|huevos,kitchen\nPrincipales,Hamburguesa,11.50,10,gluten|leche|huevos|sesamo,kitchen\nPrincipales,Pescado a la plancha,14.00,10,pescado,kitchen\nPostres,Tarta de queso,5.00,10,leche|huevos|gluten,kitchen\n"
+    },
+    "product": {
+        "new": "Nuevo producto",
+        "edit": "Editar producto",
+        "name": "Nombre",
+        "price": "Precio",
+        "tax": "IVA",
+        "category": "Familia",
+        "description": "Descripción",
+        "sku": "Código",
+        "image": "Enlace foto",
+        "allergens": "Alérgenos"
+    },
+    "category": {
+        "new": "Nueva familia",
+        "edit": "Editar familia",
+        "name": "Nombre",
+        "station": "Se hace en",
+        "color": "Color"
+    },
+    "stations": {
+        "kitchen": "Cocina",
+        "bar": "Barra"
+    },
+    "prices": {
+        "title": "Cambiar precios",
+        "apply": "Aplicar",
+        "which": "Productos",
+        "how": "Cambiar en",
+        "percent": "Porcentaje",
+        "amount": "Importe",
+        "value": "Cuánto",
+        "hint": "Usa un signo menos para bajar. El porcentaje redondea a 5 céntimos.",
+        "done": "{count, plural, one {# precio cambiado} other {# precios cambiados}}"
+    },
+    "import": {
+        "title": "Importar carta",
+        "run": "Importar",
+        "hint": "Un CSV con columnas familia, nombre, precio, iva, alérgenos, código. Lo que ya existe se actualiza.",
+        "done": "{created} nuevos, {updated} cambiados",
+        "skipped": "Filas saltadas: {rows}"
+    },
+    "allergens": {
+        "gluten": "Gluten",
+        "crustaceans": "Crustáceos",
+        "eggs": "Huevos",
+        "fish": "Pescado",
+        "peanuts": "Cacahuetes",
+        "soy": "Soja",
+        "milk": "Leche",
+        "nuts": "Frutos secos",
+        "celery": "Apio",
+        "mustard": "Mostaza",
+        "sesame": "Sésamo",
+        "sulphites": "Sulfitos",
+        "lupin": "Altramuces",
+        "molluscs": "Moluscos"
+    }
+}

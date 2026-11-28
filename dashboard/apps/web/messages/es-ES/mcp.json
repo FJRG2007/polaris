@@ -109,7 +109,9 @@
         "settings_manage": "Cambiar ajustes",
         "system_manage": "Actualizar y operar el sistema",
         "translate_use": "Traducir texto",
-        "alerts_topics": "Gestionar URL de alertas"
+        "alerts_topics": "Gestionar URL de alertas",
+        "hospitality_use": "Tomar comandas y usar la caja",
+        "hospitality_manage": "Llevar la carta y la sala"
     },
     "page": {
         "title": "Asistentes de IA",

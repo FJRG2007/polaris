@@ -1,0 +1,102 @@
+{
+    "errors": {
+        "generic": "Something went wrong. Try again.",
+        "checkInput": "Check what you typed and try again.",
+        "loadFailed": "Could not load the menu",
+        "saveFailed": "Could not save"
+    },
+    "actions": {
+        "retry": "Try again",
+        "cancel": "Cancel",
+        "save": "Save"
+    },
+    "mode": {
+        "standard": "Standard view",
+        "basic": "Simple view"
+    },
+    "venue": {
+        "pick": "Venue"
+    },
+    "menu": {
+        "title": "Menu",
+        "all": "All",
+        "import": "Import",
+        "export": "Export",
+        "prices": "Prices",
+        "newProduct": "Product",
+        "newCategory": "Category",
+        "edit": "Edit",
+        "soldOut": "Sold out",
+        "backOn": "Back on",
+        "empty": "Nothing here yet",
+        "emptyManager": "Add a product or import a spreadsheet.",
+        "exportFile": "menu.csv",
+        "categoryNotEmpty": "Move or delete its products first."
+    },
+    "setup": {
+        "title": "Set up your venue",
+        "description": "Start with a sample menu and a room of eight tables. You can change everything later.",
+        "askManager": "A manager has to set up the venue first.",
+        "start": "Start with a sample",
+        "sampleVenue": "My venue",
+        "sampleRoom": "Dining room",
+        "sampleCsv": "category,name,price,tax,allergens,station\nDrinks,Water,1.80,10,,bar\nDrinks,Beer,2.50,10,gluten,bar\nDrinks,Soft drink,2.20,10,,bar\nDrinks,Coffee,1.50,10,milk,bar\nStarters,Patatas bravas,5.50,10,eggs,kitchen\nStarters,Croquettes,7.00,10,gluten|milk|eggs,kitchen\nMains,Burger,11.50,10,gluten|milk|eggs|sesame,kitchen\nMains,Grilled fish,14.00,10,fish,kitchen\nDesserts,Cheesecake,5.00,10,milk|eggs|gluten,kitchen\n"
+    },
+    "product": {
+        "new": "New product",
+        "edit": "Edit product",
+        "name": "Name",
+        "price": "Price",
+        "tax": "Tax",
+        "category": "Category",
+        "description": "Description",
+        "sku": "Code",
+        "image": "Picture link",
+        "allergens": "Allergens"
+    },
+    "category": {
+        "new": "New category",
+        "edit": "Edit category",
+        "name": "Name",
+        "station": "Made at",
+        "color": "Colour"
+    },
+    "stations": {
+        "kitchen": "Kitchen",
+        "bar": "Bar"
+    },
+    "prices": {
+        "title": "Change prices",
+        "apply": "Apply",
+        "which": "Products",
+        "how": "Change by",
+        "percent": "Percent",
+        "amount": "Amount",
+        "value": "How much",
+        "hint": "Use a minus sign to lower prices. Percent changes round to 5 cents.",
+        "done": "{count, plural, one {# price changed} other {# prices changed}}"
+    },
+    "import": {
+        "title": "Import menu",
+        "run": "Import",
+        "hint": "A CSV with the columns category, name, price, tax, allergens, code. Products already there are updated.",
+        "done": "{created} added, {updated} updated",
+        "skipped": "Rows skipped: {rows}"
+    },
+    "allergens": {
+        "gluten": "Gluten",
+        "crustaceans": "Crustaceans",
+        "eggs": "Eggs",
+        "fish": "Fish",
+        "peanuts": "Peanuts",
+        "soy": "Soy",
+        "milk": "Milk",
+        "nuts": "Nuts",
+        "celery": "Celery",
+        "mustard": "Mustard",
+        "sesame": "Sesame",
+        "sulphites": "Sulphites",
+        "lupin": "Lupin",
+        "molluscs": "Molluscs"
+    }
+}

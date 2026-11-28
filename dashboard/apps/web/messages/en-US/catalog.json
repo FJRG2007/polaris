@@ -158,6 +158,10 @@
         "vpn": {
             "summary": "A private VPN for your people, on your own servers.",
             "description": "Connect from the Polaris app or browser extension and pick where your traffic comes out, on your own servers. No accounts with anybody else."
+        },
+        "hospitality": {
+            "summary": "Run a bar or restaurant on your own network.",
+            "description": "Keep the menu with prices, taxes and allergens, import it from a spreadsheet and change prices in bulk. Waiters take orders from a phone or tablet and the bar sees them at once, all on the venue's own network, with no internet needed. Uninstalling keeps the menu and every order."
         }
     },
     "help": {

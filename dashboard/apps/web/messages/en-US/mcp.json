@@ -109,7 +109,9 @@
         "settings_manage": "Change instance settings",
         "system_manage": "Run updates and system operations",
         "translate_use": "Translate text",
-        "alerts_topics": "Manage alert addresses"
+        "alerts_topics": "Manage alert addresses",
+        "hospitality_use": "Take orders and use the till",
+        "hospitality_manage": "Run the venue's menu and floor"
     },
     "page": {
         "title": "AI assistants",

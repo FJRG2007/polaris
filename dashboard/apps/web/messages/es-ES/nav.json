@@ -220,6 +220,9 @@
         },
         "arcade": {
             "description": "Juega solo o con otros desde una llamada"
+        },
+        "hospitality": {
+            "description": "Carta, comandas y caja de bar o restaurante"
         }
     },
     "labels": {

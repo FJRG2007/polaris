@@ -99,6 +99,7 @@ describe("app bundles", () => {
             "crm",
             "game-servers",
             "home",
+            "hospitality",
             "security-scans",
             "status-pages",
             "translate"

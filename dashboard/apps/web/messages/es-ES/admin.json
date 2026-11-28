@@ -3073,7 +3073,8 @@
             "translate": "Traductor",
             "polar": "Polar",
             "terminal": "Terminal",
-            "alerts": "Alertas"
+            "alerts": "Alertas",
+            "hospitality": "Hostelería"
         },
         "permissions": {
             "drive": {
@@ -3191,6 +3192,10 @@
             },
             "alerts": {
                 "topics": "Recibir alertas de otros sistemas"
+            },
+            "hospitality": {
+                "use": "Tomar comandas y usar la caja",
+                "manage": "Llevar carta, sala e informes"
             }
         }
     },

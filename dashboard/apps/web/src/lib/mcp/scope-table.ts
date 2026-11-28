@@ -75,6 +75,8 @@ export const PERMISSION_CATEGORIES: Readonly<Record<Permission, McpCategory>> = 
     "alerts.topics": "productivity",
     "automations.secrets": "productivity",
     "status.manage": "development",
+    "hospitality.use": "productivity",
+    "hospitality.manage": "productivity",
     "chat.use": "chat",
     "chat.spaces": "chat",
     "chat.groups": "chat",
