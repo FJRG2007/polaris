@@ -107,6 +107,18 @@ above the page and follow its theme. Values are kept per device in
 `plugins/settings/<id>.json`, checked against the declaration on every read and
 write.
 
+Desktop 0.1.138 adds `color` (`#rrggbb`, or "" for the plugin's own, with an
+optional `fallback` the page shows meanwhile) and `image` (a PNG or JPEG
+`data:` URL up to 2 MB, or ""; `width` and `height` are the size the device
+draws it at, and the page cuts and scales a picked file to exactly that). A
+plugin using either sets `minAppVersion` to 0.1.138: catalog entries list only
+the four older kinds, because an older app refuses the whole catalog over one
+it does not know, and from 0.1.138 a manifest drops a setting of an unknown
+kind instead. A device drawing shows the screen's look live when the plugin
+declares `backgroundColor`, `backgroundImage`, `textColor` or `accentColor`
+(with `backgroundFit`, `knob<n>Image`, `knobImageFit`, `labelSize`).
+Stream 100 parity: `docs/devices/hercules-stream100-parity.md`.
+
 `groups` lays them out: each is a titled section (`key`, `label`, optional
 `hint`) with a `look` - `rows` (one row per setting), `dials` or `buttons`.
 The `dials` and `buttons` groups are drawn together as the device: a `dials`
