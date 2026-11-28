@@ -24,7 +24,9 @@ import { chairsOf, lastActivity, minutesSince, planBounds, snap, tableState, typ
 import { Armchair, ChefHat, CreditCard, Hourglass, Maximize, Minus, Plus, Receipt, Save, Trash2, Users, UtensilsCrossed, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 
 const STATE_STYLE: Record<TableState, { readonly table: string; readonly chair: string; readonly icon: LucideIcon }> = {
-    free: { table: "fill-background stroke-border", chair: "fill-muted stroke-border", icon: Armchair },
+    // Light mode first (venues work in daylight): 600/700 strokes on a pale tint, and the
+    // state is always paired with its own icon, so color is never the only cue.
+    free: { table: "fill-background stroke-foreground/50", chair: "fill-muted stroke-foreground/50", icon: Armchair },
     seated: { table: "fill-sky-500/15 stroke-sky-600", chair: "fill-sky-600 stroke-sky-700", icon: Users },
     pending: { table: "fill-amber-500/25 stroke-amber-600", chair: "fill-amber-600 stroke-amber-700", icon: Hourglass },
     kitchen: { table: "fill-orange-500/20 stroke-orange-600", chair: "fill-orange-600 stroke-orange-700", icon: ChefHat },
@@ -38,9 +40,9 @@ type Box = Pick<TableView, "x" | "y" | "width" | "height" | "shape">;
 /** Shape outline of a table in grid units. */
 function TableShape({ table, className }: { table: Box; className: string }) {
     if (table.shape === "round") {
-        return <ellipse className={className} cx={table.x + table.width / 2} cy={table.y + table.height / 2} rx={table.width / 2} ry={table.height / 2} strokeWidth={0.08} />;
+        return <ellipse className={className} cx={table.x + table.width / 2} cy={table.y + table.height / 2} rx={table.width / 2} ry={table.height / 2} strokeWidth={0.1} />;
     }
-    return <rect className={className} x={table.x} y={table.y} width={table.width} height={table.height} rx={0.25} strokeWidth={0.08} />;
+    return <rect className={className} x={table.x} y={table.y} width={table.width} height={table.height} rx={0.25} strokeWidth={0.1} />;
 }
 
 /** A name cut to what fits; the whole one is in the table's label. */
@@ -93,13 +95,13 @@ const TableMark = memo(function TableMark(props: {
             <title>{label}</title>
             {chairs.map((c, i) => (
                 // Chairs with someone on them (covers) are filled, the rest outlined.
-                <circle key={i} cx={c.cx} cy={c.cy} r={0.28} strokeWidth={0.06} className={i < covers ? style.chair : "fill-background stroke-border"} />
+                <circle key={i} cx={c.cx} cy={c.cy} r={0.28} strokeWidth={0.06} className={i < covers ? style.chair : "fill-background stroke-foreground/50"} />
             ))}
             {props.selected ? (
                 <TableShape table={{ ...table, x: table.x - 0.18, y: table.y - 0.18, width: table.width + 0.36, height: table.height + 0.36 }} className="fill-none stroke-primary" />
             ) : null}
             <TableShape table={table} className={style.table} />
-            <Icon x={table.x + 0.12} y={table.y + 0.12} width={0.6} height={0.6} strokeWidth={2.4} className="text-foreground/70" aria-hidden />
+            <Icon x={table.x + 0.12} y={table.y + 0.12} width={0.6} height={0.6} strokeWidth={2.4} className="text-foreground" aria-hidden />
             <text x={cx} y={order ? middle - 0.1 : middle + 0.22} textAnchor="middle" className="fill-foreground font-semibold" fontSize={props.basic ? 0.75 : 0.6}>
                 {clip(table.name, fits)}
             </text>
@@ -110,7 +112,7 @@ const TableMark = memo(function TableMark(props: {
             ) : null}
             {minutes !== null && table.height >= 1.8 ? (
                 <text x={cx} y={middle + 0.95} textAnchor="middle" fontSize={0.36}
-                    className={cn("tabular-nums", minutes >= 20 && state !== "served" ? "fill-red-600" : "fill-muted-foreground")}
+                    className={cn("tabular-nums", minutes >= 20 && state !== "served" ? "fill-red-700 font-semibold dark:fill-red-400" : "fill-foreground")}
                 >
                     {t("floor.minutes", { count: minutes })}
                     {!props.basic && order?.waiterName ? ` - ${clip(order.waiterName, 10)}` : ""}
@@ -174,7 +176,7 @@ export function FloorPlan(props: {
             <ZoomBar zoom={zoom} setZoom={setZoom}>
                 <span className="min-w-0 truncate text-sm text-muted-foreground">{t("floor.summary", { free: counts.free, covers: counts.covers })}</span>
             </ZoomBar>
-            <div className="min-h-60 min-w-0 flex-1 overflow-auto rounded-lg border bg-muted/30">
+            <div className="min-h-60 min-w-0 flex-1 overflow-auto rounded-lg border bg-background">
                 <svg
                     viewBox={`${box.x} ${box.y} ${box.width} ${box.height}`}
                     preserveAspectRatio="xMidYMid meet"
@@ -188,7 +190,7 @@ export function FloorPlan(props: {
                     ))}
                 </svg>
             </div>
-            <ul className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground" aria-label={t("floor.legend")}>
+            <ul className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-foreground" aria-label={t("floor.legend")}>
                 {(Object.keys(STATE_STYLE) as TableState[]).map((s) => {
                     const Icon = STATE_STYLE[s].icon;
                     return (
