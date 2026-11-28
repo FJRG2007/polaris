@@ -45,6 +45,20 @@ beforeEach(() => {
 });
 
 describe("saving how security fixes install", () => {
+    it("applies the recommendation as an authorization recorded with who and when", async () => {
+        const quiet = { critical: "quiet", high: "quiet", medium: "quiet", low: "quiet" } as const;
+        // Without the authorization it is refused, like any other wait.
+        expect((await saveSecurityUpdateAction(quiet)).error).toBe("settings.security.errors.riskNotAccepted");
+        const result = await saveSecurityUpdateAction({ ...quiet, acceptRisk: true });
+        expect(result.policy).toMatchObject({ ...quiet, riskAccepted: { by: "admin-1" } });
+        expect(core.securityPolicyFollowsRecommendation(result.policy!)).toBe(true);
+        // What was stored reads back as saved, rather than as the default.
+        expect(core.parseSecurityUpdatePolicy(JSON.stringify(stored.policy))).toMatchObject(quiet);
+        // Going back to "immediately" never asks for anything.
+        const back = await saveSecurityUpdateAction({ ...quiet, critical: "immediate", high: "immediate" });
+        expect(back.policy).toMatchObject({ critical: "immediate", riskAccepted: null });
+    });
+
     it("saves medium and low freely", async () => {
         const result = await saveSecurityUpdateAction({ ...SAFE, medium: "quiet", low: "quiet" });
         expect(result.policy).toMatchObject({ medium: "quiet", low: "quiet", riskAccepted: null });

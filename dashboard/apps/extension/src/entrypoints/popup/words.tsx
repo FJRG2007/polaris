@@ -10,7 +10,7 @@
  * speaks the browser's language, which is English wherever nothing says otherwise.
  */
 
-import type { Locale } from "@polaris/core";
+import type { Locale } from "@polaris/core/i18n/locales";
 import { speakRepliesIn } from "@/lib/messages";
 import { pickLocale, wordsIn, type Words } from "@/lib/words";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";

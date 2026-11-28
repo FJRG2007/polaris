@@ -276,9 +276,11 @@ export const DEFAULT_QUIET_HOUR = 4;
 
 /**
  * The hour of the day (0-23, server time) this deployment is least used, from
- * its own record over the last two weeks: what people did (the audit log) and
- * when they signed in. Worked out once a day and kept; a deployment with too
- * little history answers `DEFAULT_QUIET_HOUR`.
+ * its own record over the last two weeks: what people did (the audit log), when
+ * they signed in, when a venue took an order line or a payment, and when
+ * somebody joined a call. A restaurant's handhelds stay signed in all day, so
+ * sign-ins alone would call its busiest hour quiet. Worked out once a day and
+ * kept; a deployment with too little history answers `DEFAULT_QUIET_HOUR`.
  */
 export async function quietHour(now = new Date()): Promise<number> {
     try {
@@ -297,7 +299,9 @@ export async function quietHour(now = new Date()): Promise<number> {
         // Unreadable: worked out again below.
     }
     const since = new Date(now.getTime() - QUIET_WINDOW_MS);
-    const [audit, sessions] = await Promise.all([
+    // Each read is bounded and picks only its timestamp, through an index on it.
+    // A table this deployment never wrote to (no venue, no calls) reads empty.
+    const [audit, sessions, lines, payments, seats] = await Promise.all([
         prisma.auditLog.findMany({
             where: { at: { gte: since } },
             select: { at: true },
@@ -309,11 +313,32 @@ export async function quietHour(now = new Date()): Promise<number> {
             select: { createdAt: true },
             orderBy: { createdAt: "desc" },
             take: QUIET_SAMPLE
+        }),
+        prisma.hospitalityOrderLine.findMany({
+            where: { createdAt: { gte: since } },
+            select: { createdAt: true },
+            orderBy: { createdAt: "desc" },
+            take: QUIET_SAMPLE
+        }),
+        prisma.hospitalityPayment.findMany({
+            where: { createdAt: { gte: since } },
+            select: { createdAt: true },
+            orderBy: { createdAt: "desc" },
+            take: QUIET_SAMPLE
+        }),
+        prisma.meetingParticipant.findMany({
+            where: { joinedAt: { gte: since } },
+            select: { joinedAt: true },
+            orderBy: { joinedAt: "desc" },
+            take: QUIET_SAMPLE
         })
     ]);
     const hour = quietestHour([
         ...audit.map((row) => row.at),
-        ...sessions.map((row) => row.createdAt)
+        ...sessions.map((row) => row.createdAt),
+        ...lines.map((row) => row.createdAt),
+        ...payments.map((row) => row.createdAt),
+        ...seats.map((row) => row.joinedAt)
     ]);
     await setSetting(QUIET_KEY, JSON.stringify({ hour, at: now.getTime() })).catch(() => undefined);
     return hour;

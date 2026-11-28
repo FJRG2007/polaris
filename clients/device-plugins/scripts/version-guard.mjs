@@ -27,8 +27,11 @@ export function packagedPath(id, path) {
         const rest = path.slice(own.length);
         return rest === "manifest.json" || (rest.includes("/") && !rest.startsWith("."));
     }
-    return (NATIVE_SOURCES[id] ?? []).some((prefix) => path.startsWith(prefix) && !path.slice(prefix.length).startsWith("tests/"));
+    return (NATIVE_SOURCES[id] ?? []).some((prefix) => path.startsWith(prefix) && !NOT_COMPILED.test(path.slice(prefix.length)));
 }
+
+/** What a crate holds that `cargo build` never compiles into the module: tests, benches, examples and docs. */
+const NOT_COMPILED = /^(tests|benches|examples)\/|\.md$/i;
 
 /**
  * The plugins that would publish changed files under a version already out:

@@ -1,4 +1,5 @@
-import { hostOf, uriMatches, URI_MATCH_NEVER, type UriMatch } from "@polaris/core";
+import { hostOf, uriMatches, type UriMatch } from "@polaris/core/vault-uris";
+import { URI_MATCH_NEVER } from "@polaris/core/vault";
 
 /**
  * Which saved logins belong to the page somebody is looking at, and which one

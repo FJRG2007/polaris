@@ -19,7 +19,8 @@
  */
 
 import { z } from "zod";
-import * as core from "@polaris/core";
+import * as iconSeason from "@polaris/core/app-icon-season";
+import * as seasons from "@polaris/core/seasons";
 import { readSmallJson } from "@/lib/server-identity";
 
 export const SEASON_PATH = "/api/polaris/season";
@@ -36,7 +37,7 @@ const TIMEOUT_MS = 5_000;
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
-export interface HostAnswer extends core.HostSeasonReport {
+export interface HostAnswer extends iconSeason.HostSeasonReport {
     /** Whether the host answered at all, whatever it said. */
     readonly reached: boolean;
 }
@@ -53,12 +54,12 @@ const ruleSchema = z.object({
  * reader, so a day its month does not have or a malformed rule is that season's
  * shipped dates rather than a calendar taken on trust.
  */
-export function readCalendar(body: unknown): core.SeasonCalendar | null | undefined {
+export function readCalendar(body: unknown): seasons.SeasonCalendar | null | undefined {
     const parsed = answerSchema.safeParse(body);
     if (!parsed.success) return undefined;
     if (parsed.data.calendar === null) return null;
     const overrides: Record<string, unknown> = {};
-    for (const season of core.SEASONS) {
+    for (const season of seasons.SEASONS) {
         const rule = ruleSchema.safeParse(parsed.data.calendar[season]);
         if (!rule.success) continue;
         overrides[season] = {
@@ -67,7 +68,7 @@ export function readCalendar(body: unknown): core.SeasonCalendar | null | undefi
             to: rule.data.window?.to
         };
     }
-    return core.resolveSeasonCalendar(core.parseSeasonOverrides(JSON.stringify(overrides)));
+    return seasons.resolveSeasonCalendar(seasons.parseSeasonOverrides(JSON.stringify(overrides)));
 }
 
 /** What one host says about its seasons. Never throws. */
@@ -92,7 +93,7 @@ export async function askHost(origin: string, fetch: FetchLike): Promise<HostAns
     return { host: origin, calendar: readCalendar(body), reached: true };
 }
 
-export function seasonIconUrl(origin: string, season: core.Season): string {
+export function seasonIconUrl(origin: string, season: seasons.Season): string {
     return `${origin}/season-icon/${season}-128.png`;
 }
 
@@ -103,7 +104,7 @@ export function seasonIconUrl(origin: string, season: core.Season): string {
  */
 export async function fetchSeasonMark(
     hosts: readonly string[],
-    season: core.Season,
+    season: seasons.Season,
     fetch: FetchLike
 ): Promise<Blob | null> {
     for (const host of hosts) {
@@ -162,7 +163,7 @@ export interface SeasonIconDeps {
 
 /** What a refresh did, for the tests and nothing else. */
 export type SeasonIconOutcome =
-    | { readonly kind: "dressed"; readonly season: core.Season }
+    | { readonly kind: "dressed"; readonly season: seasons.Season }
     | { readonly kind: "plain" }
     | { readonly kind: "kept" };
 
@@ -184,7 +185,7 @@ export function createSeasonIcon(deps: SeasonIconDeps): () => Promise<SeasonIcon
             if (answers.length > 0 && !answers.some((answer) => answer.reached)) {
                 return { details: null, outcome: { kind: "kept" } };
             }
-            const season = core.appIconSeason(answers, deps.now());
+            const season = iconSeason.appIconSeason(answers, deps.now());
             if (!season) return { details: PLAIN, outcome: { kind: "plain" } };
             const taking = answers
                 .filter((answer) => !!answer.calendar)

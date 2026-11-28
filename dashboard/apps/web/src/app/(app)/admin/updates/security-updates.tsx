@@ -9,17 +9,26 @@
  * allowed, but it is accepting a known hole, so the change is not saved until
  * the administrator ticks that they accept it - in RiskAcceptanceDialog, not a
  * native confirm - and the server refuses it without that, too.
+ *
+ * Polaris recommends the quiet hour for all four, so a fix never restarts the
+ * dashboard in the middle of a service or a call. While critical or high still
+ * install at once, a card offers that; applying it is the administrator's
+ * authorization, recorded through the same save (and acceptance) as any other.
  */
 
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { cn, DateInput, Select, settingType, Skeleton } from "@polaris/ui";
+import { useDisplayFormat } from "@/components/display-format";
+import { Button, cn, DateInput, Select, settingType, Skeleton } from "@polaris/ui";
 import { RiskAcceptanceDialog } from "@/components/risk-acceptance-dialog";
 import {
     DEFAULT_SECURITY_DAILY_AT,
+    RECOMMENDED_SECURITY_TIMING,
     SECURITY_SEVERITIES,
     SECURITY_UPDATE_TIMINGS,
+    securityPolicyCanFollowRecommendation,
+    securityPolicyFollowsRecommendation,
     securityPolicyLowers,
     type SecuritySeverity,
     type SecurityUpdatePolicy,
@@ -34,6 +43,7 @@ const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
     const t = useTranslations("admin");
+    const format = useDisplayFormat();
     const [policy, setPolicy] = useState<SecurityUpdatePolicy | null>(null);
     const [hour, setHour] = useState(4);
     const [error, setError] = useState<string | null>(null);
@@ -60,8 +70,8 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
     const choices = SECURITY_UPDATE_TIMINGS.map((value) => ({
         value,
         label:
-            value === "quiet"
-                ? t("settings.security.timing.quiet", { at })
+            value === RECOMMENDED_SECURITY_TIMING
+                ? t("settings.security.timing.quietRecommended", { at })
                 : t(`settings.security.timing.${value}`)
     }));
 
@@ -106,6 +116,15 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
         void save(next, false);
     }
 
+    /** Every severity at the quiet hour. Applying it is the authorization the
+     *  server records for critical and high, so it is sent as accepted. */
+    function applyRecommendation() {
+        if (!policy) return;
+        const next: Timings = { ...timesOf(policy) };
+        for (const severity of SECURITY_SEVERITIES) next[severity] = RECOMMENDED_SECURITY_TIMING;
+        void save(next, true);
+    }
+
     function changeTime(severity: SecuritySeverity, typed: string) {
         setDrafts((current) => ({ ...current, [severity]: typed }));
         // Only a complete time is a schedule; the half-typed states are not.
@@ -119,6 +138,23 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
                 <p className={settingType.body}>{t("settings.security.title")}</p>
                 <p className={settingType.hint}>{t("settings.security.description")}</p>
             </div>
+            {policy && securityPolicyCanFollowRecommendation(policy) ? (
+                <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border p-3">
+                    <p className={cn(settingType.body, "flex items-center gap-1.5")}>
+                        <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden />
+                        <span className="min-w-0">{t("settings.security.recommendation.title")}</span>
+                    </p>
+                    <p className={settingType.hint}>{t("settings.security.recommendation.description", { at })}</p>
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Button size="sm" onClick={applyRecommendation} disabled={disabled || saving}>
+                            {t("settings.security.recommendation.apply")}
+                        </Button>
+                        {disabled ? (
+                            <span className={settingType.small}>{t("settings.security.recommendation.busy")}</span>
+                        ) : null}
+                    </div>
+                </div>
+            ) : null}
             <div className="flex flex-col gap-2">
                 {SECURITY_SEVERITIES.map((severity) => (
                     <div key={severity} className="flex min-w-0 flex-wrap items-center gap-2">
@@ -160,7 +196,14 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
                     </div>
                 ))}
             </div>
-            {policy?.riskAccepted ? (
+            {policy?.riskAccepted && securityPolicyFollowsRecommendation(policy) ? (
+                <p className={cn(settingType.small, "flex items-center gap-1.5")}>
+                    <ShieldCheck className="size-3.5 shrink-0" aria-hidden />
+                    {t("settings.security.recommendationStanding", {
+                        date: format.date(new Date(policy.riskAccepted.at))
+                    })}
+                </p>
+            ) : policy?.riskAccepted ? (
                 <p className={cn(settingType.small, "flex items-center gap-1.5 text-warning-ink")}>
                     <ShieldAlert className="size-3.5 shrink-0" aria-hidden />
                     {t("settings.security.riskStanding")}

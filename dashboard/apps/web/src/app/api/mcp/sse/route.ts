@@ -25,6 +25,7 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { ACCESS_TOKEN_PREFIX, verifyAccessToken } from "@/lib/mcp/oauth/grants";
 import { bearerToken, deliver, openSession, ownerKey, ownsSession } from "@/lib/mcp/sse-sessions";
+import { untilShutdown } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,7 +85,7 @@ export async function GET(request: Request): Promise<Response> {
         });
     }
 
-    const opened = await openSession(owner, request.signal);
+    const opened = await openSession(owner, untilShutdown(request.signal));
     if (opened === "credential-full")
         // i18n-ignore read by a machine, not shown to a person
         return refusal(

@@ -20,7 +20,7 @@
  * browser.
  */
 
-import { baseDomain, hostOf } from "@polaris/core";
+import { baseDomain, hostOf } from "@polaris/core/vault-uris";
 
 /** Which box the step is waiting for. */
 export type StepStage = "password" | "code";

@@ -24,6 +24,7 @@ import { watchMailboxes } from "@/lib/mailbox/watch";
 import { everyAccountId } from "@/lib/mailbox/access";
 import { backgroundUser, sessionCan } from "@/lib/session";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { untilShutdown } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -180,7 +181,7 @@ export async function GET(request: Request): Promise<Response> {
                 });
             });
 
-            request.signal.addEventListener("abort", () => {
+            untilShutdown(request.signal).addEventListener("abort", () => {
                 stop();
                 try {
                     controller.close();

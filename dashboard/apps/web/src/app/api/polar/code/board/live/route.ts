@@ -15,6 +15,7 @@ import { polarAccessFor } from "@/lib/polar/access";
 import { subscribeSession } from "@/lib/agents/session-live";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { backgroundUser, sessionCan } from "@/lib/session";
+import { untilShutdown } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,7 +78,7 @@ export async function GET(request: Request): Promise<Response> {
             };
             for (const id of ids) unsubscribes.push(subscribeSession(id, change));
             heartbeat = setInterval(() => send(": keep-alive\n\n"), HEARTBEAT_MS);
-            request.signal.addEventListener("abort", stop, { once: true });
+            untilShutdown(request.signal).addEventListener("abort", stop, { once: true });
             send(`retry: 5000\nid: ${Date.now()}\n\n`);
             if (request.headers.has("last-event-id")) change();
         },

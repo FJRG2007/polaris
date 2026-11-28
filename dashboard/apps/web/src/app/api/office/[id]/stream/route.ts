@@ -25,6 +25,7 @@ import { officeReader } from "@/lib/office/reader";
 import { subscribeOfficeChanges } from "@/lib/office/live";
 import { backgroundUser, sessionCan } from "@/lib/session";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { untilShutdown } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,7 +110,7 @@ export async function GET(
             });
 
             heartbeat = setInterval(() => write(": ping\n\n"), HEARTBEAT_MS);
-            request.signal.addEventListener("abort", stop);
+            untilShutdown(request.signal).addEventListener("abort", stop);
         },
         cancel() {
             stop();

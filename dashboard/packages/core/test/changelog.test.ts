@@ -14,6 +14,8 @@ import {
     parseCommit,
     parseSecurityUpdatePolicy,
     routePluginChanges,
+    securityPolicyCanFollowRecommendation,
+    securityPolicyFollowsRecommendation,
     securityPolicyLowers,
     securityUpdateRunsAt,
     worstSeverity
@@ -168,6 +170,21 @@ describe("the security update policy", () => {
         expect(securityPolicyLowers(base, { critical: "quiet", high: "immediate" })).toBe(true);
         expect(securityPolicyLowers({ critical: "quiet", high: "off" }, { critical: "immediate", high: "off" })).toBe(false);
         expect(securityPolicyLowers({ critical: "quiet", high: "quiet" }, { critical: "quiet", high: "off" })).toBe(true);
+    });
+
+    it("recommends the quiet hour for every severity without making it the default", () => {
+        expect(DEFAULT_SECURITY_UPDATE.critical).toBe("immediate");
+        expect(securityPolicyCanFollowRecommendation(DEFAULT_SECURITY_UPDATE)).toBe(true);
+        expect(securityPolicyFollowsRecommendation(DEFAULT_SECURITY_UPDATE)).toBe(false);
+        const quiet = { ...DEFAULT_SECURITY_UPDATE, critical: "quiet", high: "quiet" } as const;
+        expect(securityPolicyCanFollowRecommendation(quiet)).toBe(false);
+        expect(securityPolicyFollowsRecommendation(quiet)).toBe(true);
+        // Applying it lowers critical and high, so it needs the authorization,
+        // and a stored copy without one is the default again.
+        expect(securityPolicyLowers(DEFAULT_SECURITY_UPDATE, quiet)).toBe(true);
+        expect(parseSecurityUpdatePolicy(JSON.stringify(quiet))).toEqual(DEFAULT_SECURITY_UPDATE);
+        const authorized = { ...quiet, riskAccepted: { by: "admin-1", at: "2026-11-28T10:00:00.000Z" } };
+        expect(parseSecurityUpdatePolicy(JSON.stringify(authorized))).toEqual(authorized);
     });
 });
 
