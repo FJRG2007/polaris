@@ -39,6 +39,7 @@ import {
     setAvailabilityAction
 } from "../actions/catalog";
 import { PictureField } from "./picture-field";
+import { hostUi } from "@polaris/app-host/client";
 import { parsePrice } from "../model/catalog-csv";
 import { csvToXlsx, xlsxToCsv } from "../model/catalog-xlsx";
 import { CATEGORY_COLORS } from "../model/schemas";
@@ -570,11 +571,15 @@ function BulkPriceDialog(props: { categories: CategoryView[]; onClose: () => voi
     );
 }
 
+const IMPORT_ACCEPT = ".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const { useChooseFiles } = hostUi.filePicker;
+
 function ImportDialog(props: { onClose: () => void; onSaved: () => void }) {
     const t = useHospitalityT();
     const toast = useToast();
     const [csv, setCsv] = useState<string | null>(null);
     const [file, setFile] = useState("");
+    const [choose, picker] = useChooseFiles();
     return (
         <FormDialog
             title={t("import.title")}
@@ -594,18 +599,22 @@ function ImportDialog(props: { onClose: () => void; onSaved: () => void }) {
             }
         >
             <p className="text-sm text-muted-foreground">{t("import.hint")}</p>
-            <Input
-                type="file"
-                accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                onChange={(e) => {
-                    const picked = e.target.files?.[0];
-                    if (!picked) return;
-                    setFile(picked.name);
-                    setCsv(null);
-                    const read = /\.xlsx$/i.test(picked.name) ? picked.arrayBuffer().then((bytes) => xlsxToCsv(bytes)) : picked.text();
-                    read.then(setCsv).catch(() => toast.show({ title: t("import.unreadable") }));
-                }}
-            />
+            <Button
+                variant="outline"
+                className="self-start"
+                onClick={() =>
+                    void choose({ accept: IMPORT_ACCEPT, title: t("import.title") }).then(([picked]) => {
+                        if (!picked) return;
+                        setFile(picked.name);
+                        setCsv(null);
+                        const read = /\.xlsx$/i.test(picked.name) ? picked.arrayBuffer().then((bytes) => xlsxToCsv(bytes)) : picked.text();
+                        read.then(setCsv).catch(() => toast.show({ title: t("import.unreadable") }));
+                    })
+                }
+            >
+                <Upload aria-hidden /> {t("import.choose")}
+            </Button>
+            {picker}
             {file ? <p className="truncate text-sm" title={file}>{file}</p> : null}
         </FormDialog>
     );

@@ -256,7 +256,7 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
     },
     // A plate with a fork and a knife.
     hospitality: {
-        palette: ["#FDBA74", "#F97316", "#C2410C"],
+        palette: ["#FCA5A5", "#B91C1C", "#7F1D1D"],
         draw: ({ base, face }) => (
             <>
                 <circle cx="16" cy="16" r="12" fill={base} />

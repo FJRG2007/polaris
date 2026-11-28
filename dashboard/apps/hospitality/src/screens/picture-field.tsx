@@ -1,27 +1,27 @@
 "use client";
 
 /**
- * A product's or category's picture: choose a file, take one with the phone's
- * camera, drop one on the box or paste one. Every picture goes through the crop
+ * A product's or category's picture: chosen through the shared picker (this
+ * computer, the phone's camera or gallery, Drive), dropped on the box or pasted. Every picture goes through the crop
  * dialog Polaris uses for every picture (square, resized, WebP, no EXIF) and is
  * stored by the app's own image route; the product keeps the address it gives.
  */
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useHospitalityT } from "./i18n";
-import { Camera, ImageUp, X } from "lucide-react";
+import { ImageUp, X } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
 import { MENU_PICTURE_CROP } from "../model/image";
 import { Button, cn, useToast } from "@polaris/ui";
 
 const { ImageCropDialog } = hostUi.imageCropper;
+const { useChooseFiles } = hostUi.filePicker;
 const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
 
 export function PictureField(props: { value: string; onChange: (url: string) => void }) {
     const t = useHospitalityT();
     const toast = useToast();
-    const pick = useRef<HTMLInputElement>(null);
-    const shoot = useRef<HTMLInputElement>(null);
+    const [choose, picker] = useChooseFiles();
     const [file, setFile] = useState<Blob | null>(null);
     const [busy, setBusy] = useState(false);
     const [over, setOver] = useState(false);
@@ -55,11 +55,8 @@ export function PictureField(props: { value: string; onChange: (url: string) => 
                 {props.value ? <img src={props.value} alt="" className="size-full object-cover" /> : <ImageUp aria-hidden className="size-6 text-muted-foreground" />}
             </div>
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => pick.current?.click()}>
+                <Button size="sm" variant="outline" onClick={() => void choose({ accept: ACCEPTED, title: t("picture.choose") }).then((files) => take(files[0]))}>
                     <ImageUp aria-hidden /> {t("picture.choose")}
-                </Button>
-                <Button size="sm" variant="outline" className="sm:hidden" onClick={() => shoot.current?.click()}>
-                    <Camera aria-hidden /> {t("picture.camera")}
                 </Button>
                 {props.value ? (
                     <Button size="sm" variant="ghost" onClick={() => props.onChange("")}>
@@ -68,8 +65,7 @@ export function PictureField(props: { value: string; onChange: (url: string) => 
                 ) : null}
                 <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">{t("picture.hint")}</span>
             </div>
-            <input ref={pick} type="file" accept={ACCEPTED} hidden onChange={(e) => { take(e.target.files?.[0]); e.target.value = ""; }} />
-            <input ref={shoot} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { take(e.target.files?.[0]); e.target.value = ""; }} />
+            {picker}
             {file ? <ImageCropDialog file={file} shape={MENU_PICTURE_CROP} busy={busy} onCancel={() => setFile(null)} onCropped={upload} /> : null}
         </div>
     );

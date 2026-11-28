@@ -84,7 +84,8 @@
         "hint": "A CSV or Excel file with the columns category, name, price, tax, allergens, code. Products already there are updated.",
         "done": "{created} added, {updated} updated",
         "skipped": "Rows skipped: {rows}",
-        "unreadable": "That file could not be read."
+        "unreadable": "That file could not be read.",
+        "choose": "Choose file"
     },
     "allergens": {
         "gluten": "Gluten",
@@ -258,7 +259,6 @@
     },
     "picture": {
         "choose": "Choose picture",
-        "camera": "Camera",
         "remove": "Remove",
         "hint": "Or drop or paste one here",
         "failed": "The picture could not be stored."
