@@ -32,7 +32,8 @@ import {
     DialogTitle,
     Input,
     Select,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 import {
     createSendAction,
@@ -109,10 +110,18 @@ export function SendsView() {
     // Password, expiry and the cap are the Send's own protocol fields; the
     // address rules are Polaris's. One section draws them all, as on every link.
     const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
+    useResetOnOpen(composing, () => {
+        setDays("7");
+        setAdvanced(EMPTY_LINK_ADVANCED);
+        setError(null);
+    });
     const [limiting, setLimiting] = useState<SendRow | null>(null);
     const [rulesDraft, setRulesDraft] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
     const [savingRules, setSavingRules] = useState(false);
     const [rulesError, setRulesError] = useState<string | null>(null);
+    useResetOnOpen(limiting !== null, () => {
+        setRulesError(null);
+    });
     const [confirm, confirmDialog] = useConfirm();
 
     async function load(withKey: SymmetricKey): Promise<void> {

@@ -33,7 +33,6 @@ const PENDING = new Set([
     "apps/web/src/app/(app)/chat/chat-sidebar.tsx#ChatSidebarList",
     "apps/web/src/app/(app)/drive/drive-explorer.tsx#DriveExplorer",
     "apps/web/src/app/(app)/drive/files-view.tsx#FilesView",
-    "apps/web/src/app/(app)/vault/sends/sends-view.tsx#SendsView",
     "apps/web/src/app/s/[token]/share-explorer.tsx#ShareExplorer",
     "apps/web/src/components/account-menu.tsx#AccountMenu"
 ]);
