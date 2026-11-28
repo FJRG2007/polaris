@@ -71,7 +71,7 @@ afterEach(() => {
 describe("a plugin's settings", () => {
     it("are sectioned in the declared order, loose ones first", () => {
         const sections = pluginSettingSections(manifest);
-        expect(sections.map((section) => section.group?.key ?? null)).toEqual([null, "knobs", "buttons", "turning", "screen"]);
+        expect(sections.map((section) => section.group?.key ?? null)).toEqual([null, "knobs", "buttons", "turning", "screen", "look"]);
         expect(sections[0]!.settings.map((setting) => setting.key)).toEqual(["enabled"]);
         expect(pluginSettingSections({ settings: manifest.settings, groups: [] })).toEqual([{ group: null, settings: manifest.settings }]);
     });
@@ -120,7 +120,7 @@ describe("a plugin's settings", () => {
     it("read as one list from an app that does not know groups", async () => {
         const { groups: _groups, ...old } = raw;
         const view = open({ ...old, settings: (old.settings as Record<string, unknown>[]).map(({ group: _group, ...setting }) => setting) });
-        await waitFor(() => expect(view.container.querySelectorAll("[role=combobox]").length).toBe(13));
+        await waitFor(() => expect(view.container.querySelectorAll("[role=combobox]").length).toBe(16));
         expect(screen.queryByRole("region", { name: "Ruedas" })).toBeNull();
     });
 

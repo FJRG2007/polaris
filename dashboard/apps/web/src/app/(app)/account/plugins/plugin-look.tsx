@@ -10,10 +10,11 @@
  * device is drawn from there with no network.
  */
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { ImagePlus, RotateCcw, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CROP_ACCEPTED, ImageCropDialog } from "@/components/image-cropper";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { Button, cn, ColorPicker, Popover, PopoverContent, PopoverTrigger, settingType, useToast } from "@polaris/ui";
 import { isPluginImageValue, PLUGIN_COLOR, type PluginManifest, type PluginSetting, type PluginSettingValue } from "@polaris/core/device-plugins";
 
@@ -87,7 +88,8 @@ async function pictureValue(blob: Blob, width: number, height: number): Promise<
 export function ImageSettingControl({ setting, value, label, onChange, width }: { setting: ImageSetting; value: PluginSettingValue; label: string; onChange: (value: string) => void; width: string }) {
     const t = useTranslations("account");
     const toast = useToast();
-    const input = useRef<HTMLInputElement>(null);
+    // The shared picker: this computer, Drive, the camera or an address, like every other screen that asks for a file.
+    const [chooseFiles, chooser] = useChooseFiles();
     const [file, setFile] = useState<File | null>(null);
     const [busy, setBusy] = useState(false);
     const current = isPluginImageValue(value) ? value : null;
@@ -98,7 +100,7 @@ export function ImageSettingControl({ setting, value, label, onChange, width }: 
                 // eslint-disable-next-line @next/next/no-img-element -- a data: URL kept on this computer, not an optimisable asset
                 <img src={current} alt="" className={cn("h-9 shrink-0 rounded-sm border border-border object-cover", ratio > 1.2 ? "w-16" : "w-9")} />
             ) : null}
-            <Button type="button" variant="outline" className="min-w-0 flex-1 gap-2" onClick={() => input.current?.click()}>
+            <Button type="button" variant="outline" className="min-w-0 flex-1 gap-2" onClick={() => void chooseFiles({ accept: CROP_ACCEPTED, title: label, onFailed: (message) => toast.show({ title: message }) }).then((files) => files[0] && setFile(files[0]))}>
                 <ImagePlus className="size-4 shrink-0" />
                 <span className="min-w-0 truncate">{say(t, current ? "replace" : "choose")}</span>
             </Button>
@@ -107,18 +109,7 @@ export function ImageSettingControl({ setting, value, label, onChange, width }: 
                     <Trash2 className="size-4 shrink-0" />
                 </Button>
             ) : null}
-            <input
-                ref={input}
-                type="file"
-                accept={CROP_ACCEPTED}
-                aria-label={label}
-                className="hidden"
-                onChange={(event) => {
-                    const picked = event.target.files?.[0] ?? null;
-                    event.target.value = "";
-                    if (picked) setFile(picked);
-                }}
-            />
+            {chooser}
             {file ? (
                 <ImageCropDialog
                     file={file}
