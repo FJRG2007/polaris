@@ -31,7 +31,6 @@ import {
     useToast
 } from "@polaris/ui";
 import {
-    PLUGIN_ACTIONS,
     PLUGIN_CATEGORIES,
     pluginReleases,
     pluginRequirements,
@@ -69,6 +68,7 @@ import { pageIsDark } from "@/lib/page-theme";
 import { OfficialSoftware } from "./official-software";
 import { PluginProfiles } from "./plugin-profiles";
 import { PluginActions, useDeviceActionOptions } from "./plugin-actions";
+import { actionOptions, actionPickValue, actionStoreValue, DeviceReplica, replicaLayout } from "./device-replica";
 import type { AppScreenshot } from "@/lib/apps/app-screenshots";
 import { ScreenshotGallery } from "@/app/(app)/apps/marketplace/[appId]/screenshot-gallery";
 import { DetailBack, DetailFacts, DetailHeader, DetailReleases, DetailSection, Fact } from "@/components/store-detail";
@@ -78,9 +78,6 @@ import { pluginViewHeight, pluginViewHello, pluginViewUrl, readPluginViewMessage
 type Words = ReturnType<typeof useTranslations<"account">>;
 type Tab = "browse" | "installed" | "updates";
 type Category = "" | (typeof PLUGIN_CATEGORIES)[number];
-
-/** The picker's list: `call.leave` reads as hang up, so it is offered once, as `call.hangup`. */
-const PICKABLE_ACTIONS = PLUGIN_ACTIONS.filter((action) => action !== "call.leave");
 
 function say(t: Words, key: string, values?: Record<string, string | number>): string {
     return (t as unknown as (key: string, values?: Record<string, string | number>) => string)(`plugins.${key}`, values);
@@ -654,17 +651,11 @@ function SettingControl({ setting, value, locale, onChange, width }: SettingProp
         case "action":
             control = (
                 <Select
-                    value={typeof value === "string" ? (value === "call.leave" ? "call.hangup" : value) : "none"}
-                    onValueChange={(next) => onChange(next === "none" ? null : next)}
+                    value={actionPickValue(value)}
+                    onValueChange={(next) => onChange(actionStoreValue(next))}
                     aria-label={label}
                     className={width}
-                    options={[
-                        { value: "none", label: say(t, "action.none") },
-                        ...PICKABLE_ACTIONS.map((action) => ({ value: action, label: say(t, `action.${action.slice("call.".length)}`) })),
-                        ...extraActions,
-                        // A custom action deleted since, or one this page has not heard of yet: shown, not silently swapped.
-                        ...(typeof value === "string" && value !== "call.leave" && !(PICKABLE_ACTIONS as readonly string[]).includes(value) && !extraActions.some((option) => option.value === value) ? [{ value, label: say(t, "action.missing") }] : [])
-                    ]}
+                    options={actionOptions(t, extraActions, value)}
                 />
             );
             break;
@@ -689,45 +680,17 @@ function SettingRow(props: SettingProps) {
     );
 }
 
-/** The device's own part above a tile: a knob with its pointer, or a button lit while it does something. */
-function TileShape({ look, lit }: { look: "dials" | "buttons"; lit: boolean }) {
-    if (look === "dials") {
-        return (
-            <span aria-hidden className="relative block size-11 shrink-0 rounded-full border-2 border-border bg-muted">
-                <span className="absolute left-1/2 top-1 h-3 w-0.5 -translate-x-1/2 rounded-full bg-primary" />
-            </span>
-        );
-    }
-    return <span aria-hidden className={`block h-8 w-11 shrink-0 rounded-md border-2 ${lit ? "border-primary bg-primary/30" : "border-border bg-muted"}`} />;
-}
-
-/** One setting as a tile of the device (a knob, a button): its shape, its name, its control. */
-function SettingTile({ look, ...props }: SettingProps & { look: "dials" | "buttons" }) {
-    const label = pluginText(props.setting.label, props.locale);
-    const lit = props.value !== null && props.value !== false && props.value !== "none";
-    return (
-        <div id={pluginSettingAnchor(props.setting.key)} className="flex min-w-0 scroll-mt-24 flex-col items-center gap-2 rounded-md border border-border p-3">
-            <TileShape look={look} lit={lit} />
-            <p className={cn(settingType.hint, "max-w-full truncate")} title={label}>
-                {label}
-            </p>
-            <SettingControl {...props} width="w-full" />
-        </div>
-    );
-}
-
-/** A titled group of settings, as rows or as the device's tiles. */
+/** A titled group of settings, as rows. */
 function SettingGroup({ group, locale, children }: { group: PluginSettingGroup | null; locale: string; children: ReactNode }) {
     if (!group) return <div className="flex min-w-0 flex-col divide-y divide-border">{children}</div>;
     const hint = group.hint ? pluginText(group.hint, locale) : null;
-    const tiles = group.look === "dials" || group.look === "buttons";
     return (
         <section id={pluginGroupAnchor(group.key)} className="flex min-w-0 scroll-mt-24 flex-col gap-2" aria-label={pluginText(group.label, locale)}>
             <div className="min-w-0">
                 <h3 className="truncate text-sm font-medium">{pluginText(group.label, locale)}</h3>
                 {hint ? <p className={settingType.hint}>{hint}</p> : null}
             </div>
-            <div className={tiles ? "grid min-w-0 grid-cols-2 gap-2 md:grid-cols-4" : "flex min-w-0 flex-col divide-y divide-border"}>{children}</div>
+            <div className="flex min-w-0 flex-col divide-y divide-border">{children}</div>
         </section>
     );
 }
@@ -752,36 +715,68 @@ function PluginSettings({ bridge, manifest }: { bridge: PluginsBridge; manifest:
     if (manifest.settings.length === 0) return <p className={cn(settingType.body, "text-muted-foreground")}>{say(t, "detail.noSettings")}</p>;
     if (!values) return <Skeleton className="h-24 w-full" />;
 
-    const change = (key: string, value: PluginSettingValue) => {
-        if (values[key] === value) return;
+    /**
+     * Several settings at once (a swap on the device is two), saved one after
+     * another; when the app refuses one, the ones it took are put back too.
+     */
+    const change = (patch: Record<string, PluginSettingValue>) => {
+        const keys = Object.keys(patch).filter((key) => values[key] !== patch[key]);
+        if (keys.length === 0) return;
         const before = values;
-        setValues({ ...values, [key]: value });
-        void bridge
-            .setSetting(manifest.id, key, value)
-            .then((after) => {
-                if (!after) throw new Error("refused");
-                keepPluginSettings(manifest.id, manifest.version, readPluginSettingValues(manifest.settings, after));
-            })
+        setValues({ ...values, ...patch });
+        const taken: string[] = [];
+        void keys
+            .reduce<Promise<unknown>>(
+                (previous, key) =>
+                    previous.then(async () => {
+                        const after = await bridge.setSetting(manifest.id, key, patch[key] ?? null);
+                        if (!after) throw new Error("refused");
+                        taken.push(key);
+                        return after;
+                    }),
+                Promise.resolve(null)
+            )
+            .then((after) => keepPluginSettings(manifest.id, manifest.version, readPluginSettingValues(manifest.settings, after)))
             .catch(() => {
+                for (const key of taken) void bridge.setSetting(manifest.id, key, before[key] ?? null).catch(() => null);
                 setValues(before);
                 toast.show({ title: say(t, "detail.saveFailed") });
             });
     };
 
+    const layout = replicaLayout(manifest);
+    const onDevice = (group: PluginSettingGroup | null) => layout !== null && group !== null && (group.look === "dials" || group.look === "buttons");
+    let replicaDrawn = false;
+
     return (
         <div className="flex min-w-0 flex-col gap-5">
-            {pluginSettingSections(manifest).map(({ group, settings }) => (
-                <SettingGroup key={group?.key ?? ""} group={group} locale={locale}>
-                    {settings.map((setting) => {
-                        const props: SettingProps = { setting, value: values[setting.key] ?? null, locale, onChange: (value) => change(setting.key, value) };
-                        return group && (group.look === "dials" || group.look === "buttons") ? <SettingTile key={setting.key} look={group.look} {...props} /> : (
+            {pluginSettingSections(manifest).map(({ group, settings }) => {
+                if (onDevice(group)) {
+                    // Every knob and button is drawn once, on the device, where the first of their groups sits.
+                    if (replicaDrawn || !layout) return null;
+                    replicaDrawn = true;
+                    return (
+                        <DeviceReplica
+                            key="device"
+                            manifest={manifest}
+                            layout={layout}
+                            values={values}
+                            locale={locale}
+                            onChange={change}
+                            control={(setting) => <SettingControl setting={setting} value={values[setting.key] ?? null} locale={locale} onChange={(value) => change({ [setting.key]: value })} width="w-full" />}
+                        />
+                    );
+                }
+                return (
+                    <SettingGroup key={group?.key ?? ""} group={group} locale={locale}>
+                        {settings.map((setting) => (
                             <div key={setting.key} id={pluginSettingAnchor(setting.key)} className="min-w-0 scroll-mt-24">
-                                <SettingRow {...props} />
+                                <SettingRow setting={setting} value={values[setting.key] ?? null} locale={locale} onChange={(value) => change({ [setting.key]: value })} />
                             </div>
-                        );
-                    })}
-                </SettingGroup>
-            ))}
+                        ))}
+                    </SettingGroup>
+                );
+            })}
         </div>
     );
 }

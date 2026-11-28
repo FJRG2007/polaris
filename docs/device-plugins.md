@@ -108,10 +108,15 @@ above the page and follow its theme. Values are kept per device in
 write.
 
 `groups` lays them out: each is a titled section (`key`, `label`, optional
-`hint`) with a `look` - `rows` (one row per setting), `dials` or `buttons` (a
-tile per setting with a knob or a lit button drawn above its control, four
-across, two on a phone). A setting joins one with `group`; those in none come
-first. An app older than groups reads the same settings as one list.
+`hint`) with a `look` - `rows` (one row per setting), `dials` or `buttons`.
+The `dials` and `buttons` groups are drawn together as the device: a `dials`
+group's `choice` settings are its knobs' turns and its `action` settings their
+presses, paired in order, and a `buttons` group's `action` settings are its lit
+buttons (`device-replica.tsx`). An action from the list beside it is dragged
+onto a control, a control onto another of its kind to swap them, or a control
+is selected and assigned from its picker or the list, so a pointer is never
+needed. A setting joins a group with `group`; those in none come first. An app
+older than groups reads the same settings as one list.
 
 A plugin may also name a `view` for what plain settings cannot draw, such as a
 preview of the device's screen.

@@ -81,14 +81,15 @@ describe("a plugin's settings", () => {
         expect(readPluginSettingValues(manifest.settings, {}).button3).toBe("call.camera");
     });
 
-    it("draw the knobs and buttons as the controller's tiles, in the reader's language, with no native control", async () => {
+    it("draw the knobs and buttons on the controller, in the reader's language, with no native control", async () => {
         const view = open(raw);
         const knobs = await screen.findByRole("region", { name: "Ruedas" });
         // Each knob turns (four) and is pressed (four more): a press runs an action of its own.
-        expect(within(knobs).getAllByRole("combobox")).toHaveLength(8);
+        expect(within(knobs).getAllByRole("button")).toHaveLength(8);
         expect(within(knobs).getByText("Rueda 1")).toBeTruthy();
-        expect(within(knobs).getByText("Pulsar rueda 1")).toBeTruthy();
-        expect(within(screen.getByRole("region", { name: "Botones iluminados" })).getAllByRole("combobox")).toHaveLength(4);
+        expect(within(screen.getByRole("region", { name: "Botones iluminados" })).getAllByRole("button")).toHaveLength(4);
+        // The selected control's picker is Polaris's own select.
+        expect(view.container.querySelectorAll("[role=combobox]").length).toBeGreaterThan(0);
         expect(screen.getByRole("region", { name: "Pantalla" })).toBeTruthy();
         expect(view.container.querySelectorAll("select, option, input[type=range], input[type=checkbox], textarea")).toHaveLength(0);
     });
@@ -107,7 +108,7 @@ describe("a plugin's settings", () => {
             const targets = pluginSettingTargets(manifest, "es-ES");
             expect(targets.some((target) => target.kind === "group")).toBe(true);
             for (const target of targets) expect(view.container.querySelector(`[id="${target.anchor}"]`), target.anchor).not.toBeNull();
-            // A knob is a tile, not a row: its own element carries the name.
+            // A knob is drawn on the device, not as a row: its own element carries the name.
             expect(view.container.querySelector("#setting-knob2")?.textContent).toContain("Rueda 2");
             await waitFor(() => expect(scrolled).toContain("setting-knob2"));
         } finally {
