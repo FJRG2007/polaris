@@ -90,6 +90,10 @@ export interface SearchHost {
     /** The device plugins the host's computer has, as the desktop app's
      *  snapshot (`@polaris/core/device-plugins`); absent from a host too old to say. */
     readonly plugins?: () => Promise<unknown>;
+    /** Put the search away and paste the text into the app that was in front
+     *  (Raycast's "Paste to active app"); false when it could not. Absent from
+     *  a host too old to do it, where an answer is copied instead. */
+    readonly paste?: (text: string) => Promise<boolean>;
 }
 
 /** A path of this instance, and nothing that leaves it. */

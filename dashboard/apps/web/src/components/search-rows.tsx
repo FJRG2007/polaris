@@ -19,7 +19,7 @@ import { Avatar } from "@/components/avatar";
 import type { LucideIcon } from "lucide-react";
 import type { ClockCommand, RecentSearch } from "@polaris/core";
 import { LAUNCHER_COMMANDS, typedUrl } from "@polaris/core";
-import { AlarmClock, AppWindow, Calculator, Clipboard, Clock, Copy, CornerDownLeft, Gamepad2, Globe, Link, Power, Timer, Watch, X } from "lucide-react";
+import { AlarmClock, AppWindow, Calculator, Clipboard, Clock, Copy, CornerDownLeft, Gamepad2, Globe, Link, Power, Sparkles, Timer, Watch, X } from "lucide-react";
 import type { HostRow, HostRowAction, HostRowKind } from "@/lib/search/search-host";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
@@ -401,6 +401,21 @@ export function HostResultRow({ row, query, ...props }: RowProps & { row: HostRo
     return (
         <Row {...props} label={label}>
             <SearchItem icon={icon} label={label} context={context} />
+        </Row>
+    );
+}
+
+/** "Ask Polar": the question answered in the panel itself (Quick AI, `quick-ai.tsx`), Tab or Enter. */
+export function AskRow({ question, ...props }: RowProps & { question: string }) {
+    const t = useTranslations("components");
+    const label = t("search.quickAi.row", { query: question.slice(0, 120) });
+    return (
+        <Row {...props} label={label} keepFocus>
+            <SearchItem
+                icon={<AppLogo appId="polar" size={18} fallback={<Sparkles className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />} />}
+                label={label}
+                context={t("search.quickAi.rowHint")}
+            />
         </Row>
     );
 }

@@ -18,7 +18,8 @@ export const LAUNCHER_CHANNELS = {
     clearClipboard: "launcher:clear-clipboard",
     open: "launcher:open",
     plugins: "launcher:plugins",
-    act: "launcher:act"
+    act: "launcher:act",
+    paste: "launcher:paste"
 } as const;
 
 export type LauncherRowKind = "url" | "answer" | "polaris" | "page" | "system" | "app" | "polar" | "web" | "clip";
@@ -69,6 +70,9 @@ export interface PolarisLauncher {
     plugins(): Promise<unknown>;
     /** @deprecated `plugins` by its name before the rename, for hosts that predate it. */
     addons(): Promise<unknown>;
+    /** Put the window away and paste the text into the program that was in front (Quick AI's answer); false when the
+     *  keys could not be pressed, the text left on the clipboard. Absent on desktops that predate it. */
+    paste?(text: string): Promise<boolean>;
 }
 
 /** Longest text the main window may hand the launcher to open with, as its own field caps it. */

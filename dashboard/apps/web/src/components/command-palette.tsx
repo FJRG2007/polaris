@@ -67,8 +67,10 @@ import {
     hostActionEntries,
     HostResultRow,
     RecentRow,
+    AskRow,
     type HostActionEntry
 } from "@/components/search-rows";
+import { QuickAiFooter, QuickAiView, useQuickAi } from "@/components/polar/quick-ai";
 import { useToast } from "@polaris/ui";
 import { groupRows, stepActive } from "@polaris/ui/search-match";
 import {
@@ -189,7 +191,8 @@ type Row =
     | { kind: "hit"; id: string; group: string; hit: SearchHit }
     | { kind: "recent"; id: string; group: string; entry: core.RecentSearch }
     | { kind: "host"; id: string; group: string; row: HostRow }
-    | { kind: "link"; id: string; group: string; link: core.TypedUrl };
+    | { kind: "link"; id: string; group: string; link: core.TypedUrl }
+    | { kind: "ask"; id: string; group: string; question: string };
 
 /** The row's id in the document, for `aria-activedescendant` to point at. */
 function rowElementId(row: Row): string {
@@ -289,6 +292,54 @@ export function CommandPalette({
         (href: string) => (host ? host.navigate(href) : router.push(href)),
         [host, router]
     );
+
+    /** Polar is one of this person's apps: Quick AI is offered (the route asks again). */
+    const polarOn = appIds.includes("polar");
+    const quick = useQuickAi(
+        useMemo(
+            () => ({
+                paste: host?.paste,
+                navigate: (href: string) => {
+                    openedRef.current = true;
+                    navigate(href);
+                    setOpen(false);
+                },
+                notify: (title: string) => toast.show({ key: "search-quick-ai", title })
+            }),
+            [host, navigate, toast]
+        )
+    );
+    const quickActive = quick.active;
+    const quickReset = quick.reset;
+    const quickEscape = quick.escape;
+    // A closed panel ends the conversation, and the answer being written with it.
+    useEffect(() => {
+        if (!open) quickReset();
+    }, [open, quickReset]);
+    // Escape inside Quick AI stops the answer, then goes back to the search,
+    // as Raycast's does; it never closes the panel. Taken before the dialog's
+    // own Escape (a capture listener on the document) can see it.
+    useEffect(() => {
+        if (!open || !quickActive) return;
+        function onKeyDown(event: KeyboardEvent) {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            event.stopPropagation();
+            quickEscape();
+            fieldRef.current?.focus();
+        }
+        window.addEventListener("keydown", onKeyDown, true);
+        return () => window.removeEventListener("keydown", onKeyDown, true);
+    }, [open, quickActive, quickEscape]);
+
+    /** Ask what was typed, here in the panel. */
+    function startQuick(question: string): void {
+        if (!question.trim()) return;
+        setHostPanel(null);
+        quick.ask(question);
+        setQuery("");
+        fieldRef.current?.focus();
+    }
 
     // The host brings the panel back up; each time is a fresh open.
     useEffect(() => {
@@ -493,6 +544,11 @@ export function CommandPalette({
 
     /** Typing, with the command taken off the front once it is complete. */
     function onFieldChange(value: string): void {
+        // A follow-up being typed is a question, never a command.
+        if (quick.active) {
+            setQuery(value);
+            return;
+        }
         if (!scope) {
             const command = detectCommand(value);
             if (command && scopeOffered(command.scope, appIds)) {
@@ -859,6 +915,8 @@ export function CommandPalette({
         // A sum is already the palette's own; the host's copy of it would say it twice.
         const hosted: Row[] = hostRows
             .filter((row) => !(row.kind === "answer" && calculation !== null))
+            // Asked here instead (Quick AI): the host's row only opened Polar.
+            .filter((row) => !(row.kind === "polar" && polarOn))
             .map((row) => ({
                 kind: "host",
                 id: `host:${row.id}`,
@@ -877,8 +935,12 @@ export function CommandPalette({
               ? [{ kind: "link", id: "link", group: hostGroup(t, "url"), link: typed }]
               : [];
         const others = hosted.filter((row) => !hostLinks.includes(row));
+        const ask: Row[] =
+            polarOn && trimmed && !scope
+                ? [{ kind: "ask", id: "ask", group: hostGroup(t, "polar"), question: trimmed }]
+                : [];
 
-        return [...links, ...sum, ...clock, ...remembered, ...commands, ...found, ...others];
+        return [...links, ...sum, ...clock, ...remembered, ...commands, ...found, ...ask, ...others];
     }, [
         host,
         hostRows,
@@ -893,7 +955,8 @@ export function CommandPalette({
         navigation,
         t,
         navLabel,
-        clockCommand
+        clockCommand,
+        polarOn
     ]);
 
     const groups = useMemo(() => groupRows(rows, (row) => row.group), [rows]);
@@ -997,6 +1060,10 @@ export function CommandPalette({
         }
         if (row.kind === "clock") {
             runClock(row.command);
+            return;
+        }
+        if (row.kind === "ask") {
+            startQuick(row.question);
             return;
         }
         if (row.kind === "host") {
@@ -1113,6 +1180,10 @@ export function CommandPalette({
     }
 
     function onFieldKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+        if (quick.active) {
+            quick.onKey(event, query, () => setQuery(""));
+            return;
+        }
         if (hostPanel) return onHostPanelKeyDown(event, hostPanel);
         if (actionable && isActionsKey(event)) {
             event.preventDefault();
@@ -1145,6 +1216,10 @@ export function CommandPalette({
             setScope(suggestions[0]!);
             setQuery("");
             setActive(0);
+        } else if (event.key === "Tab" && !event.shiftKey && polarOn && trimmed && !scope) {
+            // Tab asks Polar what was typed, as Raycast's Tab opens Quick AI.
+            event.preventDefault();
+            startQuick(trimmed);
         } else if (event.key === "Backspace" && scope && !query) {
             // Backing out of a command is backspace, where it was typed.
             event.preventDefault();
@@ -1195,13 +1270,13 @@ export function CommandPalette({
                 query={query}
                 onQueryChange={onFieldChange}
                 onFieldKeyDown={onFieldKeyDown}
-                placeholder={scope ? scopeWords(t, scope.id).placeholder : t("search.placeholder")}
-                fieldLabel={scope ? scopeWords(t, scope.id).placeholder : t("search.label")}
+                placeholder={quick.active ? t("search.quickAi.followUp") : scope ? scopeWords(t, scope.id).placeholder : t("search.placeholder")}
+                fieldLabel={quick.active ? t("search.quickAi.followUp") : scope ? scopeWords(t, scope.id).placeholder : t("search.label")}
                 fieldRef={fieldRef}
                 fieldProps={{ enterKeyHint: "go" }}
-                activeId={hostPanel ? hostEntryId(hostPanel.active) : rows[active] ? rowElementId(rows[active]!) : undefined}
+                activeId={quick.active ? undefined : hostPanel ? hostEntryId(hostPanel.active) : rows[active] ? rowElementId(rows[active]!) : undefined}
                 listId="polaris-search-results"
-                listLabel={t("search.results")}
+                listLabel={quick.active ? t("search.quickAi.label") : t("search.results")}
                 listRef={listRef}
                 lead={
                     scope && ScopeIcon ? (
@@ -1272,6 +1347,9 @@ export function CommandPalette({
                     ) : null
                 }
                 footer={
+                    quick.active ? (
+                        <QuickAiFooter quick={quick} />
+                    ) : (
                     <>
                         <span className={cn("flex min-w-0 items-center gap-3", scope && "hidden sm:flex")}>
                             <KeyHint
@@ -1318,12 +1396,16 @@ export function CommandPalette({
                                 />
                             ) : (
                                 <>
+                                    {polarOn && trimmed ? (
+                                        <KeyHint keys={[{ cap: "Tab", name: t("search.keyTab") }]} label={t("search.quickAi.hint")} />
+                                    ) : null}
                                     <KeyHint keys={[{ cap: "/", name: t("search.keySlash") }]} label={t("search.hintCommands")} />
                                     <KeyHint keys={[{ cap: "@", name: t("search.keyAt") }]} label={t("search.hintPeople")} />
                                 </>
                             )}
                         </span>
                     </>
+                    )
                 }
             >
                 {/* A column read by scanning it for one match, which is
@@ -1332,7 +1414,9 @@ export function CommandPalette({
                     their own names - somebody searching for a person
                     types the name that account is under. */}
                 <PlainNames>
-                    {hostPanel ? (
+                    {quick.active ? (
+                        <QuickAiView quick={quick} onSettings={quick.navigateTo} />
+                    ) : hostPanel ? (
                         <SearchGroup label={t("search.rowActions.of", { title: hostPanel.row.title })}>
                             {hostActionEntries(hostPanel.row).map((entry, position) => (
                                 <HostActionRow
@@ -1448,6 +1532,18 @@ export function CommandPalette({
                                                 id={rowElementId(row)}
                                                 row={{ id: row.id, kind: "url", title: row.link.host, subtitle: row.link.url }}
                                                 query={trimmed}
+                                                selected={selected}
+                                                onSelect={select}
+                                                onHover={hover}
+                                            />
+                                        );
+                                    }
+                                    if (row.kind === "ask") {
+                                        return (
+                                            <AskRow
+                                                key={row.id}
+                                                id={rowElementId(row)}
+                                                question={row.question}
                                                 selected={selected}
                                                 onSelect={select}
                                                 onHover={hover}

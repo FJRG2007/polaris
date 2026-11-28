@@ -17,6 +17,8 @@ interface DesktopLauncherBridge {
     plugins(): Promise<unknown>;
     /** `plugins` in a desktop app from before the rename (0.1.122). */
     addons(): Promise<unknown>;
+    /** Paste text into the app in front, after putting the window away (Quick AI). */
+    paste(text: string): Promise<boolean>;
 }
 
 declare global {
@@ -47,6 +49,7 @@ export function LauncherSearch({
         const plugins = bridge?.plugins ?? bridge?.addons;
         const onHidden = bridge?.onHidden;
         const act = bridge?.act;
+        const paste = bridge?.paste;
         // Feature-detected call by call: a desktop build that predates one of
         // them still gets everything else.
         return {
@@ -64,7 +67,8 @@ export function LauncherSearch({
             close: () => void bridge?.hide?.(),
             onOpened: (listener) => bridge?.onOpened?.((query) => listener(typeof query === "string" ? query : undefined)),
             onHidden: typeof onHidden === "function" ? (listener) => onHidden(listener) : undefined,
-            plugins: typeof plugins === "function" ? () => plugins() : undefined
+            plugins: typeof plugins === "function" ? () => plugins() : undefined,
+            paste: typeof paste === "function" ? (text) => paste(text).then((done) => done === true) : undefined
         };
     }, []);
     return <CommandPalette host={host} isAdmin={isAdmin} appIds={appIds} held={held} installed={installed} />;

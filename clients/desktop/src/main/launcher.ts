@@ -52,6 +52,7 @@ import { DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator } fro
 import { conflictSentence, findLaunchers, likelyHolders, type FoundLauncher } from "@/shared/launcher-conflicts";
 import { execFile } from "node:child_process";
 import { showNotice } from "./notices";
+import { FOCUS_BACK_MS, PASTE_MAX, pressPaste } from "./launcher-paste";
 import { recordLauncherUse, usageScores } from "./launcher-usage";
 import { gameKinds, setGameKind } from "./game-kinds";
 import { ACTION_KIND, kindAction, LAUNCHER_ROW_ACTIONS, treatedAsGame } from "@/shared/game-kinds";
@@ -949,6 +950,16 @@ export function startLauncher(given: LauncherHost): void {
     });
     ipcMain.handle(LAUNCHER_CHANNELS.clearClipboard, (event) => {
         if (fromLauncher(event)) clearClipboardHistory();
+    });
+    // Quick AI's answer into the program in front: the instance's palette only,
+    // since only it answers questions. The clipboard keeps the text either way.
+    ipcMain.handle(LAUNCHER_CHANNELS.paste, async (event, raw: unknown) => {
+        const text = z.string().min(1).max(PASTE_MAX).safeParse(raw);
+        if (!fromLauncher(event) || !remote || !text.success) return false;
+        clipboard.writeText(text.data);
+        hide();
+        await new Promise((done) => setTimeout(done, FOCUS_BACK_MS));
+        return pressPaste();
     });
     holdKey();
     watchClipboard();
