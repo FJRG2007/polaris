@@ -101,7 +101,7 @@ export function ImageSettingControl({ setting, value, label, onChange, width }: 
                 // eslint-disable-next-line @next/next/no-img-element -- a data: URL kept on this computer, not an optimisable asset
                 <img src={current} alt="" className={cn("h-9 shrink-0 rounded-sm border border-border object-cover", ratio > 1.2 ? "w-16" : "w-9")} />
             ) : null}
-            <Button type="button" variant="outline" className="min-w-0 flex-1 gap-2" onClick={() => void chooseFiles({ accept: CROP_ACCEPTED, title: label, onFailed: (message) => toast.show({ title: message }) }).then((files) => files[0] && setFile(files[0]))}>
+            <Button type="button" variant="outline" className="min-w-0 flex-1 gap-2" onClick={() => void chooseFiles({ accept: CROP_ACCEPTED, title: label, local: true, onFailed: (message) => toast.show({ title: message }) }).then((files) => files[0] && setFile(files[0]))}>
                 <ImagePlus className="size-4 shrink-0" />
                 <span className="min-w-0 truncate">{say(t, current ? "replace" : "choose")}</span>
             </Button>

@@ -130,7 +130,8 @@ export function FilePickerDialog({
     accept,
     multiple = true,
     title,
-    storageOnly = false
+    storageOnly = false,
+    local = false
 }: {
     onPick: (files: PickedFile[]) => void;
     onClose: () => void;
@@ -143,6 +144,9 @@ export function FilePickerDialog({
     /** Offer only files already on a storage, for a screen that points at a
      *  file where it is and so has nowhere to put an upload. */
     storageOnly?: boolean;
+    /** The file stays on this computer (a device's picture): the Upload tab
+     *  reads Select, since what is chosen there is read here and sent nowhere. */
+    local?: boolean;
 }) {
     const t = useTranslations("components");
     const heading = title ?? t("files.title");
@@ -381,9 +385,9 @@ export function FilePickerDialog({
                                     <entry.icon className="size-4 shrink-0" aria-hidden />
                                     <span
                                         className="min-w-0 truncate"
-                                        title={t(`files.tabs.${entry.id}`)}
+                                        title={t(`files.tabs.${local && entry.id === "upload" ? "select" : entry.id}`)}
                                     >
-                                        {t(`files.tabs.${entry.id}`)}
+                                        {t(`files.tabs.${local && entry.id === "upload" ? "select" : entry.id}`)}
                                     </span>
                                 </button>
                             ))}

@@ -25,7 +25,8 @@ export function ChooseFilesDialog({
     onDrive,
     accept,
     multiple = false,
-    title
+    title,
+    local = false
 }: {
     onFiles: (files: File[]) => void;
     onClose: () => void;
@@ -36,6 +37,8 @@ export function ChooseFilesDialog({
     accept?: string;
     multiple?: boolean;
     title?: string;
+    /** What is chosen is read here and kept on this computer, never uploaded. */
+    local?: boolean;
 }) {
     const t = useTranslations("components");
     const [fetching, setFetching] = useState(false);
@@ -97,6 +100,7 @@ export function ChooseFilesDialog({
             accept={accept}
             multiple={multiple}
             title={title}
+            local={local}
             onClose={() => {
                 if (!busy.current) onClose();
             }}

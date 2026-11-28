@@ -29,6 +29,9 @@ export interface ChooseFilesOptions {
      *  storage comes here as where it is, instead of being fetched into the
      *  browser, so it is not held to what a browser can be handed. */
     onDrive?: (picks: KeptPick[]) => void;
+    /** What is chosen is read in the browser and kept on this computer (a
+     *  device plugin's picture), never uploaded: the Upload tab reads Select. */
+    local?: boolean;
 }
 
 function stop(event: SyntheticEvent): void {
@@ -68,6 +71,7 @@ export function useChooseFiles(): [(options?: ChooseFilesOptions) => Promise<Fil
                 title={asked.options.title}
                 onFailed={asked.options.onFailed}
                 onDrive={asked.options.onDrive}
+                local={asked.options.local ?? false}
                 onFiles={(files) => asked.answer(files)}
                 onClose={() => {
                     asked.answer([]);
