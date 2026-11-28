@@ -27,7 +27,7 @@
     <string name="ok">OK</string>
 
     <string name="sport">Sport</string>
-    <string name="colour">Colour</string>
+    <string name="colour">Color</string>
     <string name="name">Name</string>
     <string name="link">Link</string>
     <string name="fetch_one">Fetch this calendar now</string>
@@ -42,7 +42,7 @@
     <string name="step_link">1 Link</string>
     <string name="step_name">2 Name</string>
     <string name="step_sport">3 Sport</string>
-    <string name="step_colour">4 Colour</string>
+    <string name="step_colour">4 Color</string>
     <string name="next">Next</string>
     <string name="link_hint">Links starting with webcal:// work too</string>
     <string name="link_bad">That is not a calendar link. It starts with https://, http:// or webcal://.</string>
@@ -50,7 +50,7 @@
     <string name="checking">Checking the link</string>
     <string name="checked">Checked: %1$s found. The name is only for this list.</string>
     <string name="name_bad">The name is empty or over 40 characters.</string>
-    <string name="colour_hint">Left and Right to choose, Up and Down for the shade, OK to save · a dot marks a colour another calendar uses</string>
+    <string name="colour_hint">Left and Right to choose, Up and Down for the shade, OK to save · a dot marks a color another calendar uses</string>
     <string name="on_home">On Home</string>
     <string name="no_entry">Nothing in the next 7 days</string>
     <string name="live_now">Live now</string>

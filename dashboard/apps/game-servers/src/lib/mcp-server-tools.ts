@@ -45,7 +45,7 @@ const { recordAudit } = host.auditService;
 // ---------------------------------------------------------------------------
 
 const announcement = announcementSchema.describe(
-    'What to put on the players\' screens. target: "@a" for everybody, "@ops" for the operators on, "@others" for everybody else, or one player\'s name. title and subtitle: the big text in the middle; actionbar: the line above the hotbar; chat: a chat message (up to 4 lines). At least one of them. & colour codes work. hold: "timed" (the fade timings, in seconds), "until" (with until, an ISO moment) or "manual" (stays until taken down on the screen).'
+    'What to put on the players\' screens. target: "@a" for everybody, "@ops" for the operators on, "@others" for everybody else, or one player\'s name. title and subtitle: the big text in the middle; actionbar: the line above the hotbar; chat: a chat message (up to 4 lines). At least one of them. & color codes work. hold: "timed" (the fade timings, in seconds), "until" (with until, an ISO moment) or "manual" (stays until taken down on the screen).'
 );
 
 const templatesTool = () =>

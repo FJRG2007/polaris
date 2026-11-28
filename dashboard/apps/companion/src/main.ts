@@ -503,7 +503,7 @@ export default class PolarisInstance extends InstanceBase<Schema> {
             feedbacks[id] = {
                 type: "advanced",
                 name: `${entry.area}: ${entry.label}`,
-                description: "Colours the button by what Polaris reports, and can show the value.",
+                description: "Colors the button by what Polaris reports, and can show the value.",
                 options: [
                     ...mapping.feedbackOptions(entry),
                     {
@@ -552,7 +552,7 @@ export default class PolarisInstance extends InstanceBase<Schema> {
         feedbacks.timer = {
             type: "advanced",
             name: "Timer: time left",
-            description: "Shows the time left, coloured by whether it runs, is paused or is done.",
+            description: "Shows the time left, colored by whether it runs, is paused or is done.",
             options: [
                 ...timerFields,
                 {

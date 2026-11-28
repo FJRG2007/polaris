@@ -285,7 +285,7 @@
         "call": "While I'm in a Polaris call",
         "callHint": "Ends when you leave the call.",
         "meeting": "During busy calendar events",
-        "meetingHint": "Events marked free, cancelled or declined never count. Others see only that you are in a meeting, never its title.",
+        "meetingHint": "Events marked free, canceled or declined never count. Others see only that you are in a meeting, never its title.",
         "effect": "What it does",
         "effectStatus": "Show it as my status",
         "effectBusy": "Turn on Do not disturb",

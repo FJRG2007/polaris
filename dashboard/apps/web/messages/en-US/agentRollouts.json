@@ -43,7 +43,7 @@
             "halted": "Halted",
             "done": "Finished",
             "rolled-back": "Rolled back",
-            "cancelled": "Cancelled"
+            "cancelled": "Canceled"
         },
         "summary": "{version} - wave {wave} of {waves}",
         "progress": "{done} of {total} servers updated",
@@ -57,7 +57,7 @@
         "halt": "Halt",
         "rollback": "Roll back",
         "rollbackTitle": "Roll back this rollout",
-        "rollbackBody": "No further wave runs, updates still waiting are cancelled, and every server it reached is pinned to {version}.",
+        "rollbackBody": "No further wave runs, updates still waiting are canceled, and every server it reached is pinned to {version}.",
         "wave": "Wave {wave}",
         "skippedWave": "Left out",
         "state": {
@@ -104,7 +104,7 @@
             "delivering": "Sending",
             "done": "Done",
             "failed": "Failed",
-            "cancelled": "Cancelled",
+            "cancelled": "Canceled",
             "expired": "Expired"
         },
         "cancel": "Cancel command",

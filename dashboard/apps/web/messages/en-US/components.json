@@ -350,7 +350,7 @@
                 "restart": "Restart",
                 "shutdown": "Shut down",
                 "logout": "Log out",
-                "empty-trash": "Empty the bin"
+                "empty-trash": "Empty the trash"
             }
         },
         "calculationCopied": "{value} copied to the clipboard",
@@ -815,7 +815,7 @@
         "notePlaceholder": "Cleaner, Tuesdays",
         "share": "Share",
         "nearbyLabel": "Only near the place",
-        "nearbyMeters": "Within (metres)",
+        "nearbyMeters": "Within (meters)",
         "nearbyHint": "Each press asks the browser where it is. A browser location can be faked, so treat this as a convenience, not a lock.",
         "nearbyNoPlace": "The place has no location yet. Set it on the place first, or this will refuse every press.",
         "linkHint": "Anyone with the link can use it, within the limits above. It is shown once.",

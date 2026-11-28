@@ -68,6 +68,8 @@ export function agentWord(
  * printed - passes through.
  */
 const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
+    "Canceled before it started.": "text.queueCancelled",
+    // The spelling runs finished before the catalogs moved to US English were stored with.
     "Cancelled before it started.": "text.queueCancelled",
     "The agent could not reopen this conversation, so it was given a summary of it.": "text.resumeSummary",
     "Polaris could not write the earlier conversation into this session. The agent was given a summary of it.":
@@ -86,6 +88,8 @@ const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "That task is not one of several variants.": "text.runNotVariant",
     "The session ended before it reported.": "text.runSessionEnded",
     "Rejected at its gate.": "text.runRejected",
+    "The run was canceled.": "text.runCancelled",
+    // The spelling runs finished before the catalogs moved to US English were stored with.
     "The run was cancelled.": "text.runCancelled",
     "Polaris could not start a session for it.": "text.runNoSession",
     "That run is not going any more.": "text.runOver",

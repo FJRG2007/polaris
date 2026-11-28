@@ -184,7 +184,7 @@ describe("the install dialog", () => {
         act(() =>
             listener?.({ ...BASE, phase: "allow", waiting: { step: "prompt", ...GOOGLE_TV } })
         );
-        expect(await screen.findByText(/Tick Always allow from this computer/)).toBeTruthy();
+        expect(await screen.findByText(/Check Always allow from this computer/)).toBeTruthy();
         expect(
             screen.queryByText("On the TV, choose Allow when it asks to allow USB debugging.")
         ).toBeNull();

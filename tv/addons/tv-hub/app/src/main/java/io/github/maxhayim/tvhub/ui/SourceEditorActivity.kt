@@ -58,7 +58,7 @@ class SourceEditorActivity : Activity() {
                 labelled("Name", name, "My playlist"); add(epg); add(headerEpg)
             }
             SourceType.XMLTV -> {
-                hint("An XMLTV guide (.xml or .xml.gz). Its programmes are matched to channels by tvg-id, or by name for channels without one.")
+                hint("An XMLTV guide (.xml or .xml.gz). Its programs are matched to channels by tvg-id, or by name for channels without one.")
                 labelled("Guide address", url, "http://192.168.1.10:8000/guide.xml")
                 labelled("Name", name, "My guide")
             }

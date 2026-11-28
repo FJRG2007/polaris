@@ -343,7 +343,7 @@
         "waitForCiHint": "Deploy a push only after all its GitHub checks pass. A commit with no checks deploys after a minute.",
         "ciGapApp": "The GitHub App does not ask for the Checks permission, so nothing would ever deploy. On GitHub, open the App's Permissions & events, set Checks to Read-only and save.",
         "ciGapInstall": "The GitHub App's installation on this repository has not accepted the Checks permission yet. Open it on GitHub and accept the new permissions.",
-        "ciGapEvents": "The GitHub App does not send check suite events, so checks are read once a minute instead. To hear about them at once, tick Check suite under Subscribe to events in the App's settings.",
+        "ciGapEvents": "The GitHub App does not send check suite events, so checks are read once a minute instead. To hear about them at once, check Check suite under Subscribe to events in the App's settings.",
         "ciGapAdmins": "GitHub does not let Polaris read this repository's checks yet, so nothing would deploy. Your administrators can allow it.",
         "ciGapLink": "Open on GitHub"
     },

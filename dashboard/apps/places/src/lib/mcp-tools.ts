@@ -385,7 +385,7 @@ const controlInput = z.object({
         .number()
         .finite()
         .optional()
-        .describe("For set-color-temp: the colour temperature in kelvin."),
+        .describe("For set-color-temp: the color temperature in kelvin."),
     hue: z.number().finite().optional().describe("For set-color: the hue, 0 to 360."),
     saturation: z.number().finite().optional().describe("For set-color: the saturation, 0 to 100.")
 });
@@ -397,7 +397,7 @@ const controlTool = () =>
         title: "Operate a device",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Open, unlock or lock a door, switch something on or off, dim or colour a light, or set an air conditioner or purifier. To open a door use action open, not unlock: unlock leaves it shut. Acts in the real world at once: confirm with the person before opening or unlocking a door. Answers with the state the device reports a few seconds later, or says the command was sent and not yet confirmed.",
+            "Open, unlock or lock a door, switch something on or off, dim or color a light, or set an air conditioner or purifier. To open a door use action open, not unlock: unlock leaves it shut. Acts in the real world at once: confirm with the person before opening or unlocking a door. Answers with the state the device reports a few seconds later, or says the command was sent and not yet confirmed.",
         input: controlInput,
         category: "home",
         scope: "places.control",

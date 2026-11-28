@@ -1428,7 +1428,7 @@
             },
             "ignore": {
                 "label": "Ignore this area",
-                "summary": "Nothing here is ever reported. The road, the pavement, the tree that moves all afternoon."
+                "summary": "Nothing here is ever reported. The road, the sidewalk, the tree that moves all afternoon."
             }
         },
         "title": "Areas on {name}",
@@ -2655,7 +2655,7 @@
             "triggerPosition": "Trigger {number}",
             "triggerMissing": "Missing trigger. Uncheck it to clear it.",
             "wholePlace": "Everything at this place",
-            "withLabel": "All labelled {label}",
+            "withLabel": "All labeled {label}",
             "alsoArea": "Also",
             "addArea": "Add a room, floor or label",
             "removeArea": "Remove",

@@ -110,7 +110,7 @@
         "system_manage": "Run updates and system operations",
         "translate_use": "Translate text",
         "alerts_topics": "Manage alert addresses",
-        "hospitality_use": "Take orders and use the till",
+        "hospitality_use": "Take orders and use the register",
         "hospitality_manage": "Run the venue's menu and floor"
     },
     "page": {
@@ -140,7 +140,7 @@
         "editNamed": "Change permissions for {app}",
         "disconnectNamed": "Disconnect {app}",
         "editTitle": "What {app} may do",
-        "editHint": "Changes apply on its next call. Anything it did not ask for is marked, and stays off until you tick it.",
+        "editHint": "Changes apply on its next call. Anything it did not ask for is marked, and stays off until you check it.",
         "notRequested": "Not asked for by this app",
         "save": "Save",
         "pickOne": "Choose at least one permission, or disconnect it.",

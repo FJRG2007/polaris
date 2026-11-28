@@ -450,7 +450,7 @@ const deleteTool = () =>
         title: "Delete an event",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Delete an event this account may edit - or one occurrence of a repeating one - into the Calendar's trash. People invited are told it is cancelled.",
+            "Delete an event this account may edit - or one occurrence of a repeating one - into the Calendar's trash. People invited are told it is canceled.",
         input: deleteInput,
         category: "calendar",
         scope: "calendar.manage",

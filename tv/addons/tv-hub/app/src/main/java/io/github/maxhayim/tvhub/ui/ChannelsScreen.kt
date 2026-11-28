@@ -118,7 +118,7 @@ class ChannelsScreen(host: MainActivity, private val favoritesOnly: Boolean) : S
         empty.text = when {
             shown.isNotEmpty() -> ""
             channels.isEmpty() -> "No channels yet. Add a source in Sources."
-            favoritesOnly && favs.isEmpty() -> "No favourites yet. Hold OK on a channel in Live TV or the Guide to add it."
+            favoritesOnly && favs.isEmpty() -> "No favorites yet. Hold OK on a channel in Live TV or the Guide to add it."
             query.isNotEmpty() -> "No channel matches \"$query\"."
             else -> "No channels here."
         }

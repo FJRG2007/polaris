@@ -203,7 +203,7 @@
             "success": "Done",
             "deployed": "Deployed",
             "failed": "Failed",
-            "cancelled": "Cancelled",
+            "cancelled": "Canceled",
             "rolled_back": "Rolled back",
             "removed": "Removed",
             "unknown": "Unknown"

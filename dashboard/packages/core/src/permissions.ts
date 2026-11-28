@@ -300,7 +300,7 @@ export const PERMISSION_META: Readonly<Record<Permission, PermissionMeta>> = {
     },
     // Hospitality: taking orders and using the till is staff work, given person
     // by person; the menu, the floor, prices and the reports are a manager's.
-    "hospitality.use": { area: "Hospitality", app: "hospitality", label: "Take orders and use the till" },
+    "hospitality.use": { area: "Hospitality", app: "hospitality", label: "Take orders and use the register" },
     "hospitality.manage": {
         area: "Hospitality",
         app: "hospitality",

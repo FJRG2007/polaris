@@ -186,7 +186,7 @@ const emptyTool = () =>
         title: "Empty a Minecraft player's inventory",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Remove everything a Minecraft player carries, armour and offhand included. Cannot be undone. When the player is not on, it is queued for their next join. Confirm with the person first.",
+            "Remove everything a Minecraft player carries, armor and offhand included. Cannot be undone. When the player is not on, it is queued for their next join. Confirm with the person first.",
         input: z.object({ serverId, player }),
         category: "games",
         scope: ["gameservers.moderate", "gameservers.manage"],

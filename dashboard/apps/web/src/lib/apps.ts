@@ -513,7 +513,7 @@ export const POLARIS_APPS: AppEntry[] = [
         id: "hospitality",
         category: "work",
         label: "Hospitality", // i18n-ignore
-        description: "Menu, orders and till for a bar or restaurant", // i18n-ignore
+        description: "Menu, orders and register for a bar or restaurant", // i18n-ignore
         icon: UtensilsCrossed,
         href: "/hospitality",
         permission: "hospitality.use",

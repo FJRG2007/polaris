@@ -316,7 +316,7 @@
             "running": "Running",
             "success": "Done",
             "failed": "Failed",
-            "cancelled": "Cancelled",
+            "cancelled": "Canceled",
             "rolled_back": "Rolled back",
             "stopped": "Stopped",
             "removed": "Removed",

@@ -74,7 +74,7 @@ class SourcesScreen(host: MainActivity) : Screen(host) {
                     2 -> repo.refreshAll()
                     3 -> AlertDialog.Builder(ctx, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                         .setTitle("Remove ${s.name}?")
-                        .setMessage("Its channels leave the guide. Favourites of channels no other source has are kept in case you add it back.")
+                        .setMessage("Its channels leave the guide. Favorites of channels no other source has are kept in case you add it back.")
                         .setPositiveButton("Remove") { _, _ -> repo.deleteSource(s.id) }
                         .setNegativeButton("Cancel", null).show()
                 }

@@ -301,7 +301,7 @@
             "seconds": "{seconds}s",
             "kill": "End",
             "killTitle": "End connection #{id}?",
-            "killBody": "Whatever {user} is running is cancelled and the app has to reconnect.",
+            "killBody": "Whatever {user} is running is canceled and the app has to reconnect.",
             "killConfirm": "End connection"
         },
         "tuning": {

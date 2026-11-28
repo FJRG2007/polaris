@@ -310,7 +310,7 @@
         "trackerTitle": "Tracker options",
         "apiEvent": "A custom event with properties.",
         "apiRevenue": "Revenue, in the event's currency.",
-        "apiIdentify": "Name the visitor, so return visits are recognised.",
+        "apiIdentify": "Name the visitor, so return visits are recognized.",
         "apiAttr": "An event on click, with no script of your own.",
         "apiOutbound": "On the script tag: record clicks on links to other sites.",
         "apiDomains": "On the script tag: only count visits on these hostnames.",

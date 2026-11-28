@@ -1576,7 +1576,7 @@
         "recordingsVolume": "Recordings volume",
         "everyRecordingInEveryConversation": "Every recording in every conversation, on this device.",
         "speed": "Playing at {speed} times speed. Press to change.",
-        "volumePercent": "Volume, {value} per cent"
+        "volumePercent": "Volume, {value} percent"
     },
     "scheduledBar": {
         "aScheduledMessageCouldNot": "A scheduled message could not be sent",
@@ -2643,7 +2643,7 @@
         "wantsTo": "**{action}** - waiting for your approval:",
         "approve": "Approve",
         "cancel": "Cancel",
-        "callCancelled": "Cancelled. Nothing was changed."
+        "callCancelled": "Canceled. Nothing was changed."
     },
     "gameServerCard": {
         "gameServer": "Game server",

@@ -418,7 +418,7 @@ async function requireBinned(kind: BinKind, id: string, userId: string): Promise
                         ...throughProject
                     })
                 )?.environment.project.ownerId;
-    if (!ownerId) throw new Error("That item is no longer in the recycle bin");
+    if (!ownerId) throw new Error("That item is no longer in the trash");
     return ownerId;
 }
 

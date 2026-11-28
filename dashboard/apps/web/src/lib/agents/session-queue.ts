@@ -431,7 +431,7 @@ export async function cancelQueued(sessionId: string): Promise<boolean> {
             state: "stopped",
             tokenHash: null,
             finishedAt: new Date(),
-            detail: "Cancelled before it started."
+            detail: "Canceled before it started."
         }
     });
     return moved.count === 1;

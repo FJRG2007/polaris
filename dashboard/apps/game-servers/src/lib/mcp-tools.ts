@@ -164,7 +164,7 @@ const inventoryTool = () =>
         title: "A Minecraft player's inventory",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "What one player is carrying on a Minecraft Java server - hotbar, bag, armour and offhand, each stack with its slot, item, count and its components (enchantments, damage, name). Live while they are on; when they are not, the last copy Polaris kept, with when it was taken. The same reading as the player's page. Read-only.",
+            "What one player is carrying on a Minecraft Java server - hotbar, bag, armor and offhand, each stack with its slot, item, count and its components (enchantments, damage, name). Live while they are on; when they are not, the last copy Polaris kept, with when it was taken. The same reading as the player's page. Read-only.",
         input: inventoryInput,
         category: "games",
         scope: "gameservers.read",

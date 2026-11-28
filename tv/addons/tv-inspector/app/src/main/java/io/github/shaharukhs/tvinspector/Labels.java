@@ -106,7 +106,7 @@ final class Labels {
             case AudioDeviceInfo.TYPE_HDMI_ARC: return "HDMI ARC";
             case AudioDeviceInfo.TYPE_HDMI_EARC: return "HDMI eARC";
             case AudioDeviceInfo.TYPE_LINE_DIGITAL: return "Optical (S/PDIF)";
-            case AudioDeviceInfo.TYPE_LINE_ANALOG: return "Analogue line out";
+            case AudioDeviceInfo.TYPE_LINE_ANALOG: return "Analog line out";
             case AudioDeviceInfo.TYPE_AUX_LINE: return "Aux line out";
             case AudioDeviceInfo.TYPE_WIRED_HEADPHONES:
             case AudioDeviceInfo.TYPE_WIRED_HEADSET: return "Headphone jack";

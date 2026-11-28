@@ -83,7 +83,7 @@ export async function clackUi(): Promise<Ui> {
     const p = await import("@clack/prompts");
     const answered = <Value>(value: Value): Exclude<Value, symbol> => {
         if (p.isCancel(value)) {
-            p.cancel("Cancelled. Nothing was changed.");
+            p.cancel("Canceled. Nothing was changed.");
             throw new Cancelled();
         }
         return value as Exclude<Value, symbol>;

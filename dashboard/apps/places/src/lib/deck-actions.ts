@@ -752,7 +752,7 @@ export function placesDeckActions(): readonly AppDeckAction[] {
             kind: "run",
             area: "places",
             icon: "lightbulb",
-            label: { "en-US": "Light colour", "es-ES": "Color de una luz" },
+            label: { "en-US": "Light color", "es-ES": "Color de una luz" },
             scope: "home.control",
             options: z.object({
                 deviceId: z.string().uuid(),

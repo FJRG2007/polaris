@@ -391,7 +391,7 @@
             "endOfDay": "Works through the end of the chosen day.",
             "permissions": {
                 "title": "Permissions",
-                "hint": "A key can never do more than you can, whatever is ticked here."
+                "hint": "A key can never do more than you can, whatever is checked here."
             },
             "where": {
                 "title": "Where it may be used",
@@ -1350,13 +1350,13 @@
     "companies": {
         "title": "Where you work",
         "seePage": "See your page",
-        "description": "Who sees any of this is one setting on your privacy screen. Nothing here is shown until you tick it.",
-        "organizations": "Organizations here. These carry a tick on your page: Polaris holds the roster and you are on it.",
+        "description": "Who sees any of this is one setting on your privacy screen. Nothing here is shown until you check it.",
+        "organizations": "Organizations here. These carry a check mark on your page: Polaris holds the roster and you are on it.",
         "elsewhere": "Somewhere else",
         "addAnother": "Add another",
         "company": "Company {number}",
         "remove": "Remove {name}",
-        "typedHint": "Drawn without a tick, because Polaris knows nothing about these beyond that you typed them."
+        "typedHint": "Drawn without a check mark, because Polaris knows nothing about these beyond that you typed them."
     },
     "emails": {
         "title": "Email addresses",
@@ -1598,7 +1598,7 @@
             "unreachable": "Could not reach {name}. Try again in a moment.",
             "noDeployments": "No deployments found. Type their names to add them.",
             "badPaste": "That isn't the address DigitalOcean returned to. Sign in again.",
-            "denied": "The sign-in was cancelled.",
+            "denied": "The sign-in was canceled.",
             "gone": "That sign-in has expired. Start again.",
             "invalid": "Some details are missing or not valid."
         }
@@ -1875,7 +1875,7 @@
                     "before": "Before you start, on the TV: open {about} and press OK on {press} {presses} times, then in {developer} turn on {switches}.",
                     "carriesOn": "The install carries on by itself once it is on.",
                     "pairing": "If the TV only offers Wireless debugging, turn it on and press Install: this window then asks for its code.",
-                    "prompt": "On the TV, choose Allow. Tick Always allow from this computer so it does not ask again.",
+                    "prompt": "On the TV, choose Allow. Check Always allow from this computer so it does not ask again.",
                     "list": "{items} and {last}",
                     "stop": "Stop"
                 },
@@ -2742,7 +2742,7 @@
             },
             "cancel": "Cancel",
             "failure": {
-                "uninstallerRefused": "Polaris does not recognise that uninstaller, so nothing was changed.",
+                "uninstallerRefused": "Polaris does not recognize that uninstaller, so nothing was changed.",
                 "nothingToUninstall": "The official app is not installed anymore.",
                 "stopProcess": "The official app could not be closed. Close it and try again.",
                 "removeAutostart": "It could not be taken out of start-up. Try again.",
@@ -2856,8 +2856,8 @@
             "choose": "Choose picture",
             "replace": "Replace",
             "remove": "Remove picture",
-            "defaultColor": "Default colour",
-            "useDefault": "Use the default colour",
+            "defaultColor": "Default color",
+            "useDefault": "Use the default color",
             "unreadable": "That picture could not be read",
             "preview": "Preview of the device's screen"
         }

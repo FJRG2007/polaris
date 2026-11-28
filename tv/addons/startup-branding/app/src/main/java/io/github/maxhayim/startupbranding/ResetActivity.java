@@ -40,7 +40,7 @@ public class ResetActivity extends Activity {
             Prefs.save(this, x);
             done("The welcome screen is off.", 0);
         }).setValue(l.mode == Look.Mode.OFF ? "Off" : "");
-        page.add("Restore Defaults", "Every setting back as it was installed: text, colour, time, scaling, nickname.",
+        page.add("Restore Defaults", "Every setting back as it was installed: text, color, time, scaling, nickname.",
                 () -> twice(1, () -> {
                     Prefs.clear(this);
                     done("Settings are back to their defaults.", 1);

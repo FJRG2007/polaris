@@ -121,19 +121,19 @@ public class MantleTuneScreen extends Screen {
       new MantleTuneScreen.Param("ROOT", "side", () -> TendrilFxRenderer.MANTLE_ROOT_SIDE, v -> TendrilFxRenderer.MANTLE_ROOT_SIDE = v, 0.04F),
       new MantleTuneScreen.Param("ROOT", "height", () -> TendrilFxRenderer.MANTLE_ROOT_HEIGHT, v -> TendrilFxRenderer.MANTLE_ROOT_HEIGHT = v, 0.05F),
       new MantleTuneScreen.Param(
-         "ROOT", "centre lift", () -> TendrilFxRenderer.MANTLE_ROOT_HEIGHT_CENTER, v -> TendrilFxRenderer.MANTLE_ROOT_HEIGHT_CENTER = v, 0.04F
+         "ROOT", "center lift", () -> TendrilFxRenderer.MANTLE_ROOT_HEIGHT_CENTER, v -> TendrilFxRenderer.MANTLE_ROOT_HEIGHT_CENTER = v, 0.04F
       ),
       new MantleTuneScreen.Param("ARC", "bow back", () -> TendrilFxRenderer.MANTLE_ARC_BACK, v -> TendrilFxRenderer.MANTLE_ARC_BACK = v, 0.05F),
       new MantleTuneScreen.Param("ARC", "bow spread", () -> TendrilFxRenderer.MANTLE_ARC_BACK_SPREAD, v -> TendrilFxRenderer.MANTLE_ARC_BACK_SPREAD = v, 0.04F),
       new MantleTuneScreen.Param("ARC", "bow lift", () -> TendrilFxRenderer.MANTLE_ARC_LIFT, v -> TendrilFxRenderer.MANTLE_ARC_LIFT = v, 0.05F),
-      new MantleTuneScreen.Param("ARC", "lift centre", () -> TendrilFxRenderer.MANTLE_ARC_LIFT_CENTER, v -> TendrilFxRenderer.MANTLE_ARC_LIFT_CENTER = v, 0.04F),
+      new MantleTuneScreen.Param("ARC", "lift center", () -> TendrilFxRenderer.MANTLE_ARC_LIFT_CENTER, v -> TendrilFxRenderer.MANTLE_ARC_LIFT_CENTER = v, 0.04F),
       new MantleTuneScreen.Param("ARC", "ease back", () -> TendrilFxRenderer.MANTLE_ARC2_BACK, v -> TendrilFxRenderer.MANTLE_ARC2_BACK = v, 0.04F),
       new MantleTuneScreen.Param("ARC", "ease lift", () -> TendrilFxRenderer.MANTLE_ARC2_LIFT, v -> TendrilFxRenderer.MANTLE_ARC2_LIFT = v, 0.04F),
       new MantleTuneScreen.Param("TIP", "side", () -> TendrilFxRenderer.MANTLE_SIDE, v -> TendrilFxRenderer.MANTLE_SIDE = v, 0.05F),
       new MantleTuneScreen.Param("TIP", "back", () -> TendrilFxRenderer.MANTLE_BACK, v -> TendrilFxRenderer.MANTLE_BACK = v, 0.05F),
       new MantleTuneScreen.Param("TIP", "back spread", () -> TendrilFxRenderer.MANTLE_BACK_SPREAD, v -> TendrilFxRenderer.MANTLE_BACK_SPREAD = v, 0.04F),
       new MantleTuneScreen.Param("TIP", "height", () -> TendrilFxRenderer.MANTLE_HEIGHT, v -> TendrilFxRenderer.MANTLE_HEIGHT = v, 0.06F),
-      new MantleTuneScreen.Param("TIP", "centre lift", () -> TendrilFxRenderer.MANTLE_HEIGHT_CENTER, v -> TendrilFxRenderer.MANTLE_HEIGHT_CENTER = v, 0.06F),
+      new MantleTuneScreen.Param("TIP", "center lift", () -> TendrilFxRenderer.MANTLE_HEIGHT_CENTER, v -> TendrilFxRenderer.MANTLE_HEIGHT_CENTER = v, 0.06F),
       new MantleTuneScreen.Param("MOTION", "sway", () -> TendrilFxRenderer.MANTLE_SWAY, v -> TendrilFxRenderer.MANTLE_SWAY = Math.max(0.0F, v), 0.2F),
       new MantleTuneScreen.Param("MOTION", "bounce", () -> TendrilFxRenderer.MANTLE_BOUNCE, v -> TendrilFxRenderer.MANTLE_BOUNCE = Math.max(0.0F, v), 0.2F),
       new MantleTuneScreen.Param(

@@ -364,8 +364,8 @@
         "trash": {
             "titleOne": "Move item to Trash",
             "titleMany": "Move {count} items to Trash",
-            "bodyOne": "{name} will be moved to the recycle bin. You can restore it from Trash.",
-            "bodyMany": "The selected items will be moved to the recycle bin. You can restore them from Trash.",
+            "bodyOne": "{name} will be moved to the trash. You can restore it from Trash.",
+            "bodyMany": "The selected items will be moved to the trash. You can restore them from Trash.",
             "confirm": "Move to Trash",
             "dontAskAgain": "Don't ask again",
             "dontAskAgainHint": "Turn it back on in Drive > Settings."
@@ -374,7 +374,7 @@
             "titlePermanent": "Empty folder permanently",
             "titleTrash": "Empty folder to Trash",
             "bodyPermanent": "Everything inside {name} will be permanently deleted. The folder itself is kept. This cannot be undone.",
-            "bodyTrash": "Everything inside {name} will be moved to the recycle bin. The folder itself is kept. You can restore items from Trash.",
+            "bodyTrash": "Everything inside {name} will be moved to the trash. The folder itself is kept. You can restore items from Trash.",
             "confirmPermanent": "Empty permanently",
             "confirmTrash": "Empty to Trash"
         },
@@ -397,7 +397,7 @@
             "bodyOne": "{name} will be deleted at the time you choose.",
             "bodyMany": "{count} items will be deleted at the time you choose.",
             "deleteOn": "Delete on",
-            "permanent": "Delete permanently (skip the recycle bin)",
+            "permanent": "Delete permanently (skip the trash)",
             "hint": "Runs the next time this connection is browsed after that moment, or exactly on time if the deletion cron is configured.",
             "scheduling": "Scheduling...",
             "submit": "Schedule"
@@ -1195,10 +1195,10 @@
     },
     "settings": {
         "confirmTrash": "Ask before moving to Trash",
-        "confirmTrashHint": "Show a confirmation before anything goes to the recycle bin. Deleting permanently always asks.",
+        "confirmTrashHint": "Show a confirmation before anything goes to the trash. Deleting permanently always asks.",
         "saveFailed": "Could not save that. Try again.",
-        "trashKeep": "Empty the bin",
-        "trashKeepHint": "Items in the bin are deleted for good once they are this old.",
+        "trashKeep": "Empty the trash",
+        "trashKeepHint": "Items in the trash are deleted for good once they are this old.",
         "trashKeepChoice": "{days, plural, =0 {Until I empty it} =1 {After a day} other {After # days}}"
     },
     "disposable": {
@@ -1281,7 +1281,7 @@
         "rename": "Rename {from} to {to}",
         "move": "Move {name} to {folder}",
         "moveTop": "Move {name} to the top folder",
-        "trash": "Move {name} to the bin",
+        "trash": "Move {name} to the trash",
         "mkdir": "New folder {name}",
         "waiting": "Made when Polaris is back",
         "notMade": "Not made",

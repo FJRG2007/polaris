@@ -84,7 +84,7 @@ export const SKILL_CATALOG: readonly CatalogSkill[] = [
             "1. **Correctness**: logic errors, unhandled cases (empty, null, very large, concurrent), off-by-one, broken error handling.",
             "2. **Security**: unvalidated input, injection, secrets in code, missing authorization checks, unsafe deserialization.",
             "3. **Data safety**: migrations that are not reversible, writes that can lose data, missing transactions.",
-            "4. **Behaviour changes** the description does not mention.",
+            "4. **Behavior changes** the description does not mention.",
             "5. **Clarity**: naming, dead code, duplication of something that already exists.",
             "",
             "For each finding give the file and line, what is wrong, why it matters, and a concrete fix. Mark each as blocking or optional.",
@@ -100,7 +100,7 @@ export const SKILL_CATALOG: readonly CatalogSkill[] = [
         instructions: [
             "# Planning a trip",
             "",
-            "Before planning, make sure you know: where, the dates or number of days, who is travelling, the rough budget, and the pace they like. Ask for whichever of these is missing in one short question; do not ask about anything else up front.",
+            "Before planning, make sure you know: where, the dates or number of days, who is traveling, the rough budget, and the pace they like. Ask for whichever of these is missing in one short question; do not ask about anything else up front.",
             "",
             "Then answer with:",
             "- A day-by-day plan. Each day has a morning, afternoon and evening, grouped by area so the person is not crossing the city twice.",

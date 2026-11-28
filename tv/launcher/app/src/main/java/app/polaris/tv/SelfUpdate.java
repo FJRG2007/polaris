@@ -189,7 +189,7 @@ final class SelfUpdate {
         NOT_POLARIS_TV("The download is not a Polaris TV build."),
         NOT_NEWER("That build is not newer than the one on this TV."),
         NOT_STARTED("This TV could not start the install."),
-        CANCELLED("The update was cancelled on the TV."),
+        CANCELLED("The update was canceled on the TV."),
         BLOCKED("This TV blocks installs from Polaris TV."),
         CONFLICT("This TV refused the update: it is signed differently or older."),
         STORAGE("This TV does not have enough free space for the update."),

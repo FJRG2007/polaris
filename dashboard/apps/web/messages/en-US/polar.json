@@ -642,7 +642,7 @@
             "title": "Extras",
             "intro": "Small jobs around your chats, on a model of their own.",
             "suggestions": "Suggest a next message",
-            "suggestionsHint": "After each answer, press Tab to use the greyed suggestion.",
+            "suggestionsHint": "After each answer, press Tab to use the grayed suggestion.",
             "model": "Model for titles and suggestions",
             "modelHint": "Automatic uses the fastest model you have.",
             "unavailable": "That model is not available now, so Automatic is used.",

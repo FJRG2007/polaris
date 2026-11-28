@@ -340,7 +340,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "calendar.invitation",
         group: "calendar",
         label: "Invitation",
-        description: "Somebody invited you to an event, or changed or cancelled one you are in.",
+        description: "Somebody invited you to an event, or changed or canceled one you are in.",
         level: "info",
         target: "/calendar/e/[id]",
         defaults: { inapp: true, email: true }
@@ -367,7 +367,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "calendar.booking",
         group: "calendar",
         label: "New booking",
-        description: "Somebody booked, moved or cancelled time on one of your booking pages.",
+        description: "Somebody booked, moved or canceled time on one of your booking pages.",
         level: "info",
         target: "/calendar/booking/[id]",
         defaults: { inapp: true, email: true }

@@ -30,7 +30,7 @@ public class MainActivity extends Activity {
         page.rows.removeAllViews();
         Look l = Prefs.load(this);
 
-        page.add("Welcome Screen", "Custom: your picture, colour and text. Black: a plain black screen. Off: nothing.",
+        page.add("Welcome Screen", "Custom: your picture, color and text. Black: a plain black screen. Off: nothing.",
                 () -> change(x -> x.mode = Look.next(Look.Mode.values(), x.mode)))
                 .setValue(cap(l.mode.name()));
         page.add("Preview", "Full screen, as it will look. Back or OK closes it.",

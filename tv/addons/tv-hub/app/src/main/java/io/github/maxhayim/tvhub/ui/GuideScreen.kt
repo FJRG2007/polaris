@@ -100,8 +100,8 @@ class GuideScreen(host: MainActivity) : Screen(host) {
         grid.setData(shown, repo.prefs.guideDays)
         empty.text = when {
             shown.isNotEmpty() -> ""
-            channels.isEmpty() -> "No channels yet. Add a playlist, Dispatcharr or a tuner in Sources, and an XMLTV guide for programme listings."
-            category == "Favorites" -> "No favourites yet. Hold OK on a channel to add it."
+            channels.isEmpty() -> "No channels yet. Add a playlist, Dispatcharr or a tuner in Sources, and an XMLTV guide for program listings."
+            category == "Favorites" -> "No favorites yet. Hold OK on a channel to add it."
             else -> "No channels in $category."
         }
         empty.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE

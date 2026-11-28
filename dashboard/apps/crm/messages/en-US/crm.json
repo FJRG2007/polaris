@@ -650,7 +650,7 @@
             "done": "Done",
             "stopped": "Stopped by a filter",
             "failed": "Failed",
-            "cancelled": "Cancelled"
+            "cancelled": "Canceled"
         },
         "chatChannel": "Channel",
         "chatBody": "Message",

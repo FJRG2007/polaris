@@ -35,7 +35,7 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "automations.secrets": "Store automation secrets",
     "alerts.topics": "Manage alert addresses",
     "status.manage": "Run status pages and their checks",
-    "hospitality.use": "Take orders and use the till",
+    "hospitality.use": "Take orders and use the register",
     "hospitality.manage": "Run the venue's menu and floor",
     "mailserver.manage": "Run mail servers",
     "chat.use": "Use chat",
@@ -100,7 +100,7 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     "automations.secrets": "Store secrets for automations. A stored secret is never read back.",
     "alerts.topics": "Create the addresses other systems post alerts to, in Automations.",
     "status.manage": "Create status pages, run their checks, and post incidents and maintenance.",
-    "hospitality.use": "Read the menu, take orders and payments, and use the till.",
+    "hospitality.use": "Read the menu, take orders and payments, and use the register.",
     "hospitality.manage": "Change the menu, prices, venues and floor plans, and read the reports.",
     "mailserver.manage":
         "Set up the mail servers the owner runs, and manage their domains, mailboxes and records.",

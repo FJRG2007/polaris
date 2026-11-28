@@ -46,7 +46,7 @@ final class Compat {
     static List<Item> items(Facts f) {
         List<Item> out = new ArrayList<>();
         out.add(new Item("Welcome screen and preview", Status.WORKS,
-                "Your picture, colour and text, full screen, closed with Back or OK. No root, no permissions."));
+                "Your picture, color and text, full screen, closed with Back or OK. No root, no permissions."));
         out.add(new Item("Pictures from a computer", Status.WORKS,
                 "push-image.sh copies them into this module's own folder over ADB."));
         out.add(new Item("Pictures from the TV's file picker", f.picker ? Status.WORKS : Status.DEPENDS,

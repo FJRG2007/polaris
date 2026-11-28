@@ -46,7 +46,7 @@ export function defaultTitleBarColors(dark: boolean): TitleBarColors {
  * sit in is filled and drags the window, since that page has no header of ours.
  */
 export function foreignPageCss(background: string): string {
-    if (!HEX.test(background)) throw new Error("not a hex colour");
+    if (!HEX.test(background)) throw new Error("not a hex color");
     return [
         "html { padding-top: env(titlebar-area-height, 0px) !important; }",
         "html::before { content: \"\"; position: fixed; inset: 0 0 auto 0; z-index: 2147483647;",

@@ -105,10 +105,10 @@ describe("recycle bin through organization access", () => {
 
     it("refuses an item the user cannot manage", async () => {
         await expect(recycleBin.restoreFromBin("project", PROJECT, USER, USER)).rejects.toThrow(
-            "no longer in the recycle bin"
+            "no longer in the trash"
         );
         await expect(recycleBin.deleteForever("application", PROJECT, USER)).rejects.toThrow(
-            "no longer in the recycle bin"
+            "no longer in the trash"
         );
         expect(deleteProject).not.toHaveBeenCalled();
     });

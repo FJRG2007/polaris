@@ -122,7 +122,7 @@ export class ChatHost {
                 abortController: turn.abort,
                 canUseTool: (name: string, input: Record<string, unknown>, context?: { toolUseID?: string; }): Promise<PermissionResult> =>
                     new Promise((resolve) => {
-                        if (turn.cancelled) return resolve({ behavior: "deny", message: "The turn was cancelled." });
+                        if (turn.cancelled) return resolve({ behavior: "deny", message: "The turn was canceled." });
                         const approvalId = randomUUID();
                         turn.approvals.set(approvalId, (allow) =>
                             resolve(allow ? { behavior: "allow", updatedInput: input } : { behavior: "deny", message: "The person declined this tool call." })

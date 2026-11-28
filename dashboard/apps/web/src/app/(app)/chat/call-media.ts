@@ -210,7 +210,7 @@ export async function openScreen(video: MediaTrackConstraints): Promise<MediaStr
         canPickDesktopShare()
     ) {
         const pick = await pickDesktopShare(desktop);
-        if (!pick) throw new DOMException("The share was cancelled.", "AbortError");
+        if (!pick) throw new DOMException("The share was canceled.", "AbortError");
         if (pick.kind === "device") return openCaptureDevice(pick, video);
         if (pick.kind === "source") await desktop.chooseShare({ id: pick.id, sound: pick.sound });
     }

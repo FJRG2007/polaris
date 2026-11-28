@@ -42,7 +42,7 @@ public class CalendarStoreTest {
 
     @Test public void badLinksAndColoursAreRefusedWithTheirLine() {
         assertBad("# x\nHockey | Wild | ftp://h.example/a.ics", 2, "link");
-        assertBad("Hockey | Wild | https://h.example/a.ics | Chartreuse", 1, "colour");
+        assertBad("Hockey | Wild | https://h.example/a.ics | Chartreuse", 1, "color");
         assertBad("Hockey | https://h.example/a.ics", 1, "sport | name | link");
         assertBad("Hockey |  | https://h.example/a.ics", 1, "name");
         assertBad("Hockey | " + "W".repeat(41) + " | https://h.example/a.ics", 1, "40");

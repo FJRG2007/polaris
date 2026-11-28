@@ -83,7 +83,7 @@ export async function moveManyToTrash(
 ): Promise<{ moved: string[]; failures: { path: string; reason: string }[] }> {
     if (!trackable(connectionId)) {
         throw new TrashUnavailableError(
-            "This source has no recycle bin. Use Delete permanently instead."
+            "This source has no trash. Use Delete permanently instead."
         );
     }
 
@@ -169,7 +169,7 @@ export async function moveToTrash(
     if (!source || source === POLARIS_DIR || source.startsWith(`${POLARIS_DIR}/`)) return;
     if (!trackable(connectionId)) {
         throw new TrashUnavailableError(
-            "This source has no recycle bin. Use Delete permanently instead."
+            "This source has no trash. Use Delete permanently instead."
         );
     }
     const driver = await getDriver(connectionId, ownerId);
@@ -202,7 +202,7 @@ export async function trashWithDriver(
     if (!source || source === POLARIS_DIR || source.startsWith(`${POLARIS_DIR}/`)) return;
     if (!trackable(connectionId)) {
         throw new TrashUnavailableError(
-            "This source has no recycle bin. Use Delete permanently instead."
+            "This source has no trash. Use Delete permanently instead."
         );
     }
     // Something that is not there any more is already in the state the caller

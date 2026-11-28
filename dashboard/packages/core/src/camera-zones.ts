@@ -51,7 +51,7 @@ export const ZONE_KIND_META: Readonly<Record<ZoneKind, ZoneKindMeta>> = {
         id: "ignore",
         label: "Ignore this area",
         summary:
-            "Nothing here is ever reported. The road, the pavement, the tree that moves all afternoon."
+            "Nothing here is ever reported. The road, the sidewalk, the tree that moves all afternoon."
     }
 };
 

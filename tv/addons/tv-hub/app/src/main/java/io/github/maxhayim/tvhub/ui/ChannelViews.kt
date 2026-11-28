@@ -55,7 +55,7 @@ class ChannelRow(c: Context) : LinearLayout(c) {
             progress.visibility = View.VISIBLE
             progress.progress = (((nowMs - cur.start) * 1000) / (cur.stop - cur.start).coerceAtLeast(1)).toInt()
         } else {
-            now.text = if (ch.epgIds.isEmpty()) "No guide information" else "No programme listed now"
+            now.text = if (ch.epgIds.isEmpty()) "No guide information" else "No program listed now"
             progress.visibility = View.GONE
         }
         next.text = nx?.let { "Next  ${Ui.time(context, it.start)}  ${it.title}" } ?: ""

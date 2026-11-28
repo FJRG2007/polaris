@@ -645,7 +645,7 @@ export async function cancelRun(runId: string): Promise<void> {
     }
     await prisma.agentOrchestrationTask.updateMany({
         where: { runId, status: { in: ["pending", "ready", "blocked", "dispatched"] } },
-        data: { status: "failed", outcome: "failed", result: "The run was cancelled.", finishedAt: new Date() }
+        data: { status: "failed", outcome: "failed", result: "The run was canceled.", finishedAt: new Date() }
     });
 }
 

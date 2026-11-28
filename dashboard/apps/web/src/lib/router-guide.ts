@@ -821,7 +821,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
     {
         id: "nokia",
         // i18n-ignore a brand's name
-        label: "Nokia (fibre ONT)",
+        label: "Nokia (fiber ONT)",
         // The G-240W family providers ship: Application > Port Forwarding, from a
         // provider's full manual for the G-240W-C (INEA, source), matching
         // portforward.com/nokia/g-240w-b/.

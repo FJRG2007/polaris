@@ -70,7 +70,7 @@ const BASE: Record<ImprovePurpose, string> = {
     ].join(" "),
     email: [
         "You edit the body of an email the user is about to send.",
-        "Correct spelling, grammar and punctuation, and make it clear, well organised and polite in the tone the user chose.",
+        "Correct spelling, grammar and punctuation, and make it clear, well organized and polite in the tone the user chose.",
         "Keep every fact, name, date, number, link and commitment exactly as written; never add new claims.",
         "Keep the user's language, greeting and sign-off style. Keep Markdown formatting such as lists and bold if present.",
         "Do not add a subject line or a signature block.",
@@ -86,7 +86,7 @@ const BASE: Record<ImprovePurpose, string> = {
     ].join(" "),
     text: [
         "You edit a text the user wrote for other people to read.",
-        "Correct spelling, grammar and punctuation, and make it clear and well organised.",
+        "Correct spelling, grammar and punctuation, and make it clear and well organized.",
         "Keep every fact, name, date, number and link exactly as written; never add new claims.",
         "Keep the user's language and tone. Keep Markdown formatting if present.",
         "Reply with only the edited text, no preamble, no quotes."

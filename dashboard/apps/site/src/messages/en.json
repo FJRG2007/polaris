@@ -56,7 +56,7 @@
     },
     "market": {
         "title": "Marketplace",
-        "intro": "Every app in the catalogue, as the dashboard lists it. Built-in apps come with every install; the rest install with one press. Device plugins, which the desktop app installs on your own computer, are listed apart.",
+        "intro": "Every app in the catalog, as the dashboard lists it. Built-in apps come with every install; the rest install with one press. Device plugins, which the desktop app installs on your own computer, are listed apart.",
         "installPolaris": "Install Polaris",
         "installHint": "Apps are installed from your own Polaris, in one click.",
         "plugin": {

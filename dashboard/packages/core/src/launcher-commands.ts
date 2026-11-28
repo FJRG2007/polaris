@@ -31,7 +31,7 @@ export const LAUNCHER_COMMANDS: readonly LauncherCommand[] = [
     { id: "restart", surfaces: ["desktop"], label: "Restart", words: ["restart", "reboot"], confirm: true },
     { id: "shutdown", surfaces: ["desktop"], label: "Shut down", words: ["shut down", "shutdown", "power off", "turn off"], confirm: true },
     { id: "logout", surfaces: ["desktop"], label: "Log out", words: ["log out", "logout", "sign out", "log off"], confirm: true },
-    { id: "empty-trash", surfaces: ["desktop"], label: "Empty bin", words: ["empty trash", "empty bin", "recycle bin", "trash"], confirm: true }
+    { id: "empty-trash", surfaces: ["desktop"], label: "Empty trash", words: ["empty trash", "empty bin", "recycle bin", "trash"], confirm: true }
 ];
 
 /** The commands `surface` lists. */

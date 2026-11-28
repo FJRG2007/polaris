@@ -39,7 +39,7 @@ final class CalendarStore {
             String line = lines[n - 1].trim();
             if (line.isEmpty() || line.startsWith("#")) continue;
             String[] f = line.split("\\|", -1);
-            if (f.length < 3 || f.length > 4) throw new BadLine(n, "expected sport | name | link, optionally | colour");
+            if (f.length < 3 || f.length > 4) throw new BadLine(n, "expected sport | name | link, optionally | color");
             Sport sport = Sport.byLabel(f[0]);
             if (sport == null) {
                 // The column is named, never quoted: in a line written in the wrong order it can be the link.
@@ -53,7 +53,7 @@ final class CalendarStore {
             int colour;
             if (f.length == 4 && !f[3].trim().isEmpty()) {
                 colour = Palette.byName(f[3]);
-                if (colour < 0) throw new BadLine(n, "the fourth column is not one of the 36 colours, for example \"Green, dark\"");
+                if (colour < 0) throw new BadLine(n, "the fourth column is not one of the 36 colors, for example \"Green, dark\"");
             } else {
                 colour = Palette.firstUnused(colours);
             }
