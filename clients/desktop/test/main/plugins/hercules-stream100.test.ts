@@ -338,7 +338,8 @@ describe("Hercules Stream 100 plugin", () => {
         });
         it("lays its settings out as the controller: knobs as dials, buttons as buttons", () => {
             const looks = Object.fromEntries(manifest.groups.map((group) => [group.key, group.look]));
-            for (const setting of manifest.settings) {
+            // The look's pictures and fits name a knob too, but they are the screen's, drawn as rows.
+            for (const setting of manifest.settings.filter((item) => item.group !== "look")) {
                 if (setting.key.startsWith("knob")) expect(looks[setting.group!], setting.key).toBe("dials");
                 if (setting.key.startsWith("button")) expect(looks[setting.group!], setting.key).toBe("buttons");
             }
