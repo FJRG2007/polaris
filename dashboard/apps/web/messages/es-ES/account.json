@@ -2851,6 +2851,15 @@
             "press": "Pulsar",
             "swap": "Cambiar con",
             "holds": "{name}: {value}"
+        },
+        "look": {
+            "choose": "Elegir imagen",
+            "replace": "Cambiar",
+            "remove": "Quitar imagen",
+            "defaultColor": "Por defecto",
+            "useDefault": "Usar el color por defecto",
+            "unreadable": "No se pudo leer esa imagen",
+            "preview": "Vista previa de la pantalla"
         }
     }
 }

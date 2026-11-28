@@ -135,6 +135,7 @@ pub fn plugin_groups() -> Value {
         { "key": "buttons", "label": label("Lit buttons", "Botones iluminados"), "hint": label("What each button does in a Polaris call.", "Lo que hace cada botón en una llamada de Polaris."), "look": "buttons" },
         { "key": "turning", "label": label("How the knobs turn", "Cómo giran las ruedas"), "look": "rows" },
         { "key": "screen", "label": label("Screen", "Pantalla"), "hint": label("What the controller's screen shows with Polaris' driver.", "Lo que muestra la pantalla del controlador con el driver de Polaris."), "look": "rows" },
+        { "key": "look", "label": label("Look", "Aspecto"), "hint": label("Colours and pictures on the screen, like Stream Control's graphic settings.", "Colores e imágenes de la pantalla, como los ajustes gráficos de Stream Control."), "look": "rows" },
     ])
 }
 
@@ -202,7 +203,37 @@ pub fn plugin_settings() -> Value {
         { "value": "medium", "label": label("Medium", "Mediano") },
         { "value": "large", "label": label("Large", "Grande") }
     ], "default": "medium" }));
+    list.extend(look_settings());
     Value::Array(list)
+}
+
+/// Today's colours as `#rrggbb`, shown by the page while nothing is picked.
+fn default_color(role: usize) -> String {
+    let (red, green, blue) = crate::theme::DEFAULT_COLORS[role];
+    format!("#{red:02x}{green:02x}{blue:02x}")
+}
+
+/// The screen's look (`look_from_plugin`): every value empty or today's by default.
+fn look_settings() -> Vec<Value> {
+    use crate::theme::{BACKGROUND, FILL, KNOB_IMAGE_SIDE, TEXT};
+    let fit = |key: &str, en: &str, es: &str, default: &str| {
+        json!({ "kind": "choice", "key": key, "group": "look", "label": label(en, es), "options": [
+            { "value": "cover", "label": label("Fill the space", "Llenar el espacio") },
+            { "value": "contain", "label": label("Show it whole", "Mostrarla entera") }
+        ], "default": default })
+    };
+    let mut list = vec![
+        json!({ "kind": "color", "key": "backgroundColor", "group": "look", "label": label("Background colour", "Color de fondo"), "fallback": default_color(BACKGROUND), "default": "" }),
+        json!({ "kind": "color", "key": "textColor", "group": "look", "label": label("Text colour", "Color del texto"), "fallback": default_color(TEXT), "default": "" }),
+        json!({ "kind": "color", "key": "accentColor", "group": "look", "label": label("Volume bar colour", "Color de la barra de volumen"), "fallback": default_color(FILL), "default": "" }),
+        json!({ "kind": "image", "key": "backgroundImage", "group": "look", "label": label("Background picture", "Imagen de fondo"), "hint": label("Drawn behind everything at 480 x 272, like Stream Control's background.", "Se dibuja detrás de todo a 480 x 272, como el fondo de Stream Control."), "width": crate::display::WIDTH, "height": crate::display::HEIGHT, "default": "" }),
+        fit("backgroundFit", "Background picture fit", "Ajuste de la imagen de fondo", "cover"),
+    ];
+    for knob in 1..=4 {
+        list.push(json!({ "kind": "image", "key": format!("knob{knob}Image"), "group": "look", "label": label(&format!("Knob {knob} icon"), &format!("Icono de la rueda {knob}")), "width": KNOB_IMAGE_SIDE, "height": KNOB_IMAGE_SIDE, "default": "" }));
+    }
+    list.push(fit("knobImageFit", "Knob icon fit", "Ajuste de los iconos", "contain"));
+    list
 }
 
 fn number(values: &Map<String, Value>, key: &str) -> Option<u8> {

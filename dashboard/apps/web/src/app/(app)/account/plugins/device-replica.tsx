@@ -12,6 +12,7 @@
  */
 
 import { useDeviceActionOptions } from "./plugin-actions";
+import { declaresLook, ScreenPreview } from "./plugin-look";
 import { cn, Input, Select, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useMemo, useState, type DragEvent, type ReactNode } from "react";
@@ -270,7 +271,11 @@ export function DeviceReplica({ manifest, layout, values, locale, onChange, cont
             <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
                 <div className="flex min-w-0 flex-col gap-4">
                     <div className="mx-auto flex w-full min-w-0 max-w-xl flex-col items-center gap-4 rounded-3xl border-2 border-border bg-muted p-4 sm:p-6">
-                        <div aria-hidden className="aspect-[480/272] w-3/5 max-w-64 rounded-md border-2 border-border bg-foreground/85" />
+                        {declaresLook(manifest) ? (
+                            <ScreenPreview manifest={manifest} values={values} names={layout.knobs.map((knob) => (knob.turn ? valueLabel(knob.turn) : ""))} />
+                        ) : (
+                            <div aria-hidden className="aspect-[480/272] w-3/5 max-w-64 rounded-md border-2 border-border bg-foreground/85" />
+                        )}
                         {layout.knobs.length > 0 && layout.dials ? (
                             <div id={pluginGroupAnchor(layout.dials.key)} role="region" aria-label={pluginText(layout.dials.label, locale)} className="grid w-full min-w-0 scroll-mt-24 grid-cols-4 gap-2 sm:gap-4">
                                 {layout.knobs.map((knob, index) => (

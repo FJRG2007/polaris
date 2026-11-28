@@ -2851,6 +2851,15 @@
             "press": "Press",
             "swap": "Swap with",
             "holds": "{name}: {value}"
+        },
+        "look": {
+            "choose": "Choose picture",
+            "replace": "Replace",
+            "remove": "Remove picture",
+            "defaultColor": "Default",
+            "useDefault": "Use the default colour",
+            "unreadable": "That picture could not be read",
+            "preview": "Preview of the device's screen"
         }
     }
 }

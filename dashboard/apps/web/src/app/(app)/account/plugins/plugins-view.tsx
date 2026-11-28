@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { formatBytes, initialsInk, tintFor } from "@polaris/core";
 import { Loader2, Package, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
+import { ColorSettingControl, ImageSettingControl } from "./plugin-look";
 import { StoreCard, StatusBadge, StorePreview } from "@polaris/ui/store-card";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -658,6 +659,12 @@ function SettingControl({ setting, value, locale, onChange, width }: SettingProp
                     options={actionOptions(t, extraActions, value)}
                 />
             );
+            break;
+        case "color":
+            control = <ColorSettingControl setting={setting} value={value} label={label} onChange={onChange} width={width} />;
+            break;
+        case "image":
+            control = <ImageSettingControl setting={setting} value={value} label={label} onChange={onChange} width={width} />;
             break;
     }
     return control;

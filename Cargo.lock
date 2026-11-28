@@ -2910,7 +2910,7 @@ dependencies = [
 
 [[package]]
 name = "polaris-stream100"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "ab_glyph",
  "base64",

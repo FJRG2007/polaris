@@ -59,10 +59,22 @@
                 "es-ES": "Pantalla"
             },
             "look": "rows"
+        },
+        {
+            "hint": {
+                "en-US": "Colours and pictures on the screen, like Stream Control's graphic settings.",
+                "es-ES": "Colores e imágenes de la pantalla, como los ajustes gráficos de Stream Control."
+            },
+            "key": "look",
+            "label": {
+                "en-US": "Look",
+                "es-ES": "Aspecto"
+            },
+            "look": "rows"
         }
     ],
     "id": "hercules-stream100",
-    "minAppVersion": "0.1.75",
+    "minAppVersion": "0.1.138",
     "name": "Hercules Stream 100",
     "permissions": [
         "usb",
@@ -723,6 +735,155 @@
                     "value": "large"
                 }
             ]
+        },
+        {
+            "default": "",
+            "fallback": "#101216",
+            "group": "look",
+            "key": "backgroundColor",
+            "kind": "color",
+            "label": {
+                "en-US": "Background colour",
+                "es-ES": "Color de fondo"
+            }
+        },
+        {
+            "default": "",
+            "fallback": "#f0f2f5",
+            "group": "look",
+            "key": "textColor",
+            "kind": "color",
+            "label": {
+                "en-US": "Text colour",
+                "es-ES": "Color del texto"
+            }
+        },
+        {
+            "default": "",
+            "fallback": "#4096ff",
+            "group": "look",
+            "key": "accentColor",
+            "kind": "color",
+            "label": {
+                "en-US": "Volume bar colour",
+                "es-ES": "Color de la barra de volumen"
+            }
+        },
+        {
+            "default": "",
+            "group": "look",
+            "height": 272,
+            "hint": {
+                "en-US": "Drawn behind everything at 480 x 272, like Stream Control's background.",
+                "es-ES": "Se dibuja detrás de todo a 480 x 272, como el fondo de Stream Control."
+            },
+            "key": "backgroundImage",
+            "kind": "image",
+            "label": {
+                "en-US": "Background picture",
+                "es-ES": "Imagen de fondo"
+            },
+            "width": 480
+        },
+        {
+            "default": "cover",
+            "group": "look",
+            "key": "backgroundFit",
+            "kind": "choice",
+            "label": {
+                "en-US": "Background picture fit",
+                "es-ES": "Ajuste de la imagen de fondo"
+            },
+            "options": [
+                {
+                    "label": {
+                        "en-US": "Fill the space",
+                        "es-ES": "Llenar el espacio"
+                    },
+                    "value": "cover"
+                },
+                {
+                    "label": {
+                        "en-US": "Show it whole",
+                        "es-ES": "Mostrarla entera"
+                    },
+                    "value": "contain"
+                }
+            ]
+        },
+        {
+            "default": "",
+            "group": "look",
+            "height": 40,
+            "key": "knob1Image",
+            "kind": "image",
+            "label": {
+                "en-US": "Knob 1 icon",
+                "es-ES": "Icono de la rueda 1"
+            },
+            "width": 40
+        },
+        {
+            "default": "",
+            "group": "look",
+            "height": 40,
+            "key": "knob2Image",
+            "kind": "image",
+            "label": {
+                "en-US": "Knob 2 icon",
+                "es-ES": "Icono de la rueda 2"
+            },
+            "width": 40
+        },
+        {
+            "default": "",
+            "group": "look",
+            "height": 40,
+            "key": "knob3Image",
+            "kind": "image",
+            "label": {
+                "en-US": "Knob 3 icon",
+                "es-ES": "Icono de la rueda 3"
+            },
+            "width": 40
+        },
+        {
+            "default": "",
+            "group": "look",
+            "height": 40,
+            "key": "knob4Image",
+            "kind": "image",
+            "label": {
+                "en-US": "Knob 4 icon",
+                "es-ES": "Icono de la rueda 4"
+            },
+            "width": 40
+        },
+        {
+            "default": "contain",
+            "group": "look",
+            "key": "knobImageFit",
+            "kind": "choice",
+            "label": {
+                "en-US": "Knob icon fit",
+                "es-ES": "Ajuste de los iconos"
+            },
+            "options": [
+                {
+                    "label": {
+                        "en-US": "Fill the space",
+                        "es-ES": "Llenar el espacio"
+                    },
+                    "value": "cover"
+                },
+                {
+                    "label": {
+                        "en-US": "Show it whole",
+                        "es-ES": "Mostrarla entera"
+                    },
+                    "value": "contain"
+                }
+            ]
         }
     ],
     "statusTexts": {
@@ -744,6 +905,6 @@
         }
     },
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.24",
+    "version": "0.1.25",
     "view": "view/index.html"
 }
