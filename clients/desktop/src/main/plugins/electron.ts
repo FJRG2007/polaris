@@ -18,6 +18,7 @@ import type { PluginChild, WantedPlugin } from "./supervisor";
 import { createPluginManager, type PluginManager } from "./manager";
 import { createRequirements, type EnsureReason, type Requirements } from "./requirements";
 import { sharedWindowsLister } from "../game-detect";
+import { watchProfileSignals } from "./profile-signals";
 import { createCollisionWatch, takeOverAction, TAKE_OVER_ACTION, type CollisionWatch } from "./collision";
 import { answerOfficial, DRIVER_REQUIREMENT, driverRunnerFor, lookDriver, officialRequestSchema, officialRunnerFor, requirementRunnerFor, udevRunnerFor } from "./official";
 import { showNotice } from "../notices";
@@ -294,9 +295,26 @@ export function startDevicePlugins(showPolaris: (path?: string) => void, games: 
         },
         log: (id, level, text) => console[level === "info" ? "log" : level](`[plugin ${id}] ${text}`),
         // Kept on disk (`logs/perf.log`): the console above is gone once the app closes.
-        record: perfEvent
+        record: perfEvent,
+        // The microphone and the app in front are read through the game watcher's shell, which only Windows has.
+        profileReads: { meeting: process.platform === "win32", front: process.platform === "win32" }
     });
     manager = created;
+    watchProfileSignals(
+        {
+            inCall: () => voiceStateNow() !== null,
+            games: () => runningGames(),
+            glance: process.platform === "win32" ? () => sharedWindowsLister().glance() : null,
+            needs: () => created.profileNeeds(),
+            ownPath: process.execPath,
+            push: (signals) => void created.profileSignals(signals).catch(() => undefined)
+        },
+        (tick, ms) => {
+            const timer = setInterval(tick, ms);
+            timer.unref();
+            return () => clearInterval(timer);
+        }
+    );
     const keptAt = join(pluginsDir(), "requirements.json");
     requirements = createRequirements({
         platform: pluginPlatform(process.platform, process.arch),
@@ -493,6 +511,10 @@ export function registerPluginIpc(
         const parsedValue = z.boolean().nullable().safeParse(value);
         if (!allowed(event) || !parsedId.success || !parsedValue.success) return false;
         return ready().setAutoUpdate(parsedId.data, parsedValue.data);
+    });
+    handle(CHANNELS.pluginsProfile, (event, id: unknown, request: unknown) => {
+        const parsed = idSchema.safeParse(id);
+        return allowed(event) && parsed.success ? ready().profile(parsed.data, request) : { ok: false, error: "bad-request" };
     });
     handle(CHANNELS.pluginsSetSetting, (event, id: unknown, key: unknown, value: unknown) => {
         const parsed = idSchema.safeParse(id);

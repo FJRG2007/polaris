@@ -3,6 +3,10 @@
     "pictureSource": "https://www.hercules.com/en/product/stream-100",
     "releases": [
         {
+            "version": "0.1.22",
+            "notes": "profiles, like Stream Deck's: keep several sets of knobs, lit buttons and screen, and switch between them on the plugin's page or let them switch by themselves in a Polaris call, in a meeting in another app, while a game runs or when an app is in front. Your settings so far are the Default profile. Switching by itself needs Polaris for desktop 0.1.136 or later; meetings and apps in front are seen on Windows."
+        },
+        {
             "version": "0.1.21",
             "notes": "the screen and the volume follow a knob without the delay: the screen redraws only what changed, a fast turn moves all the way at once, and a volume change lands at once. A knob set to Games follows the games Polaris for desktop sees running (Polaris for desktop 0.1.134 or later)."
         },

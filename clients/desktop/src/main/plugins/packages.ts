@@ -23,6 +23,8 @@ import {
     comparePluginVersions,
     readPluginManifest,
     readPluginSettingValues,
+    readPluginProfiles,
+    type PluginProfiles,
     type PluginEntry,
     type PluginManifest,
     type PluginPermission,
@@ -290,6 +292,7 @@ export async function uninstallPlugin(dir: string, id: string): Promise<void> {
     await saveInstalled(dir, installed);
     await rm(join(dir, "packages", id), { recursive: true, force: true });
     await rm(join(dir, "settings", `${id}.json`), { force: true });
+    await rm(join(dir, "settings", `${id}.profiles.json`), { force: true });
 }
 
 export async function setPluginEnabled(dir: string, id: string, enabled: boolean): Promise<boolean> {
@@ -326,4 +329,24 @@ export async function readPluginSettings(dir: string, manifest: PluginManifest):
 export async function writePluginSettings(dir: string, id: string, values: Record<string, PluginSettingValue>): Promise<void> {
     await mkdir(join(dir, "settings"), { recursive: true });
     await writeWhole(join(dir, "settings", `${id}.json`), JSON.stringify(values));
+}
+
+/**
+ * Its profiles besides Default, kept beside the settings file rather than in
+ * it: the settings file stays exactly what an app older than profiles reads
+ * and writes, so going back to one loses nothing and Default is what it had.
+ */
+export async function readPluginProfilesFile(dir: string, manifest: PluginManifest): Promise<PluginProfiles> {
+    let stored: unknown = {};
+    try {
+        stored = JSON.parse(await readFile(join(dir, "settings", `${manifest.id}.profiles.json`), "utf8"));
+    } catch {
+        stored = {};
+    }
+    return readPluginProfiles(manifest.settings, stored);
+}
+
+export async function writePluginProfilesFile(dir: string, id: string, profiles: PluginProfiles): Promise<void> {
+    await mkdir(join(dir, "settings"), { recursive: true });
+    await writeWhole(join(dir, "settings", `${id}.profiles.json`), JSON.stringify(profiles));
 }

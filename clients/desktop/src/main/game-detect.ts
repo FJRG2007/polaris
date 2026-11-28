@@ -361,6 +361,59 @@ export const READER_SOURCE = [
 const LIST_COMMAND = `if ('${READER_TYPE}' -as [type]) { [${READER_TYPE}]::Read() } else { (Get-Process).ProcessName }; '${LIST_END}'\n`;
 
 /**
+ * The quick look device plugin profiles ask for every few seconds, compiled
+ * once in the same shell: the file of the program whose window is in front
+ * (`f<TAB>path`), and every program Windows says is using the microphone now
+ * (`m<TAB>name`). The microphone comes from the privacy settings' own record
+ * (`CapabilityAccessManager\ConsentStore\microphone`, the list behind the
+ * "is using your microphone" icon): an app is using it while its
+ * `LastUsedTimeStop` is 0 after a start. Desktop programs sit under
+ * `NonPackaged` with their path's backslashes written as `#`; store apps by
+ * their package name. Reading a few registry keys, no process list: ~1 ms.
+ */
+const GLANCE_TYPE = "PolarisGlance";
+export const GLANCE_SOURCE = [
+    "using System;using System.Text;using System.Runtime.InteropServices;using Microsoft.Win32;",
+    `public static class ${GLANCE_TYPE}{`,
+    "[DllImport(\"kernel32.dll\")]static extern IntPtr OpenProcess(uint access,bool inherit,uint id);",
+    "[DllImport(\"kernel32.dll\",CharSet=CharSet.Unicode)]static extern bool QueryFullProcessImageName(IntPtr handle,uint flags,StringBuilder name,ref uint size);",
+    "[DllImport(\"kernel32.dll\")]static extern bool CloseHandle(IntPtr handle);",
+    "[DllImport(\"user32.dll\")]static extern IntPtr GetForegroundWindow();",
+    "[DllImport(\"user32.dll\")]static extern uint GetWindowThreadProcessId(IntPtr window,out uint id);",
+    "static void Mic(RegistryKey k,StringBuilder o){if(k==null)return;foreach(var n in k.GetSubKeyNames()){using(var c=k.OpenSubKey(n)){if(c==null)continue;",
+    "if(n==\"NonPackaged\"){Mic(c,o);continue;}var a=c.GetValue(\"LastUsedTimeStart\");var b=c.GetValue(\"LastUsedTimeStop\");",
+    "if(a is long&&(long)a!=0&&b is long&&(long)b==0)o.Append(\"m\\t\").Append(n).Append(\"\\n\");}}}",
+    "public static string Read(){var o=new StringBuilder();",
+    "try{var w=GetForegroundWindow();uint id=0;if(w!=IntPtr.Zero&&GetWindowThreadProcessId(w,out id)!=0&&id!=0){var h=OpenProcess(0x1000,false,id);",
+    "if(h!=IntPtr.Zero){var s=new StringBuilder(1024);uint n=1024;if(QueryFullProcessImageName(h,0,s,ref n))o.Append(\"f\\t\").Append(s.ToString()).Append(\"\\n\");CloseHandle(h);}}}catch{}",
+    "try{using(var k=Registry.CurrentUser.OpenSubKey(\"Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\CapabilityAccessManager\\\\ConsentStore\\\\microphone\")){Mic(k,o);}}catch{}",
+    "return o.ToString();}}"
+].join("");
+
+const GLANCE_COMMAND = `if ('${GLANCE_TYPE}' -as [type]) { [${GLANCE_TYPE}]::Read() }; '${LIST_END}'\n`;
+
+/** What one glance saw: the program in front and the programs using the microphone, each by its file or package name. */
+export interface Glance {
+    readonly front: string | null;
+    readonly microphone: readonly string[];
+}
+
+/** A glance's lines, read: a desktop program's `#`-written path back to its file, a store app's package name to its name. */
+export function parseGlance(text: string): Glance {
+    let front: string | null = null;
+    const microphone: string[] = [];
+    for (const line of text.split(/\r?\n/)) {
+        const tab = line.indexOf("\t");
+        if (tab !== 1) continue;
+        const value = line.slice(2).trim();
+        if (!value) continue;
+        if (line[0] === "f") front = value;
+        else if (line[0] === "m") microphone.push(value.includes("#") ? value.replaceAll("#", "\\") : (value.split("_")[0] ?? value));
+    }
+    return { front, microphone: microphone.slice(0, 64) };
+}
+
+/**
  * The running programs on Windows, read every `CHECK_MS` by one PowerShell that
  * stays open. `tasklist` was measured at 1.2-1.5 s of processor per run on a
  * machine with ~500 processes, every 15 s for as long as the app ran; the open
@@ -373,6 +426,8 @@ const LIST_COMMAND = `if ('${READER_TYPE}' -as [type]) { [${READER_TYPE}]::Read(
 export class WindowsLister {
     private child: ChildProcessWithoutNullStreams | null = null;
     private pending: Promise<RunningProcess[]> | null = null;
+    /** The shell answers one question at a time: each waits for the one before it. */
+    private turn: Promise<unknown> = Promise.resolve();
     private fresh = false;
 
     constructor(
@@ -388,7 +443,7 @@ export class WindowsLister {
      */
     list(fallback = true): Promise<RunningProcess[]> {
         if (this.pending) return this.pending;
-        const asked: Promise<RunningProcess[]> = this.ask()
+        const asked: Promise<RunningProcess[]> = this.ask(LIST_COMMAND, parseProcessList)
             .catch(async (error: unknown) => {
                 this.stop();
                 if (!fallback) throw error;
@@ -399,6 +454,18 @@ export class WindowsLister {
             });
         this.pending = asked;
         return asked;
+    }
+
+    /**
+     * The program in front and who has the microphone (`GLANCE_SOURCE`), for a
+     * look every few seconds. A shell that does not answer is a rejection and
+     * is started again on the next ask; there is no fallback that spawns.
+     */
+    glance(): Promise<Glance> {
+        return this.ask(GLANCE_COMMAND, parseGlance).catch((error: unknown) => {
+            this.stop();
+            throw error;
+        });
     }
 
     stop(): void {
@@ -418,12 +485,19 @@ export class WindowsLister {
         // Names outside the console's code page arrive as themselves.
         child.stdin.write("[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)\n");
         child.stdin.write(`try { Add-Type -TypeDefinition '${READER_SOURCE}' -ErrorAction Stop } catch { }\n`);
+        child.stdin.write(`try { Add-Type -TypeDefinition '${GLANCE_SOURCE}' -ErrorAction Stop } catch { }\n`);
         this.child = child;
         this.fresh = true;
         return child;
     }
 
-    private ask(): Promise<RunningProcess[]> {
+    private ask<T>(command: string, parse: (text: string) => T): Promise<T> {
+        const asked = this.turn.then(() => this.askNow(command, parse));
+        this.turn = asked.catch(() => undefined);
+        return asked;
+    }
+
+    private askNow<T>(command: string, parse: (text: string) => T): Promise<T> {
         const child = this.shell();
         const timeout = this.fresh ? FIRST_LIST_TIMEOUT_MS : LIST_TIMEOUT_MS;
         this.fresh = false;
@@ -437,7 +511,7 @@ export class WindowsLister {
                 child.stdout.off("data", heard);
                 child.off("exit", gone);
                 if (error) reject(error);
-                else resolve(parseProcessList(list));
+                else resolve(parse(list));
             };
             const heard = (data: string | Buffer) => {
                 const chunk = String(data);
@@ -456,7 +530,7 @@ export class WindowsLister {
             const timer = setTimeout(() => done(new Error("The process list did not answer.")), timeout);
             child.stdout.on("data", heard);
             child.once("exit", gone);
-            child.stdin.write(LIST_COMMAND, (error) => {
+            child.stdin.write(command, (error) => {
                 if (error) done(error);
             });
         });

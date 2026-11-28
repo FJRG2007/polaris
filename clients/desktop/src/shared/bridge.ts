@@ -283,6 +283,12 @@ export interface PolarisDesktop {
         official(id: string, request: unknown): Promise<unknown>;
         /** Run one of an installed plugin's `actions` (the snapshot lists them). False when it is not offered or did not go through. */
         runAction(id: string, action: string): Promise<boolean>;
+        /**
+         * Create, rename, delete, set the rules of, or pick one of a plugin's
+         * profiles (`pluginProfileRequestSchema`): `{ ok, id }` or `{ ok: false, error }`.
+         * Absent from an app older than profiles.
+         */
+        profile?(id: string, request: unknown): Promise<unknown>;
     };
     /** @deprecated `plugins` by its name before the rename, the same object, for hosts that predate it. Removable once no supported desktop app or host predates the rename (desktop 0.1.124). */
     addons?: PolarisDesktop["plugins"];
@@ -873,6 +879,7 @@ export const CHANNELS = {
     pluginsOpen: "desktop:plugins-open",
     pluginsOfficial: "desktop:plugins-official",
     pluginsAction: "desktop:plugins-action",
+    pluginsProfile: "desktop:plugins-profile",
     openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",
     appIcon: "desktop:app-icon",

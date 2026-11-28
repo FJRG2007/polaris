@@ -123,6 +123,15 @@ nothing around it, and the frame clips its list - so a view holds none:
 control role in a repository plugin's view folder, and on a text missing a
 language.
 
+## Profiles
+
+A manifest with `"profiles": true` gets profiles, the way Stream Deck and Hercules' own software keep them: several sets of the plugin's **grouped** settings (a setting with no `group` stays one for all profiles). The host does all of it; the plugin only ever receives the values of the profile in use through `start`/`settings`, so a plugin needs no code for it.
+
+- **Storage.** Default is the settings file every install already has (`settings/<id>.json`), unchanged, so an install from before profiles keeps everything as Default and an older app reads and writes exactly what it did. The other profiles, their rules and a hand pick live beside it in `settings/<id>.profiles.json` (read through `readPluginProfiles`, which drops broken entries and refits values that no longer fit). Uninstalling removes both.
+- **Editing.** The page's picker offers Automatic, Default and every profile. Picking one uses it by hand; the settings drawn below always change the profile in use, as Stream Deck's editor changes the profile it shows. New (the plugin's defaults), Duplicate (a copy of the profile in use), Rename and Delete use the page's own dialogs; Default cannot be renamed or deleted. Up to 16 profiles besides Default.
+- **Switching.** A hand pick wins; otherwise the first rule that matches, in this order: a Polaris call, a meeting in another app (another program has the microphone), a game running (the game watcher), one of the profile's apps in front; otherwise Default. A new automatic choice must hold for 2 s before the device switches (`holdPluginProfile`), so a moment's change does not flap; a hand pick, and going back to Automatic, switch at once. The page says the profile in use and why.
+- **Signals.** The call and the games are already in memory. The microphone and the app in front are one glance at the game watcher's open PowerShell (`WindowsLister.glance`, a compiled reader: the foreground window's program and the privacy settings' `CapabilityAccessManager\ConsentStore\microphone` record, where a program with `LastUsedTimeStop` 0 is using it), every 2 s and only while some profile has such a rule; no process is started per look. Only Windows can tell those two for now: elsewhere the page shows those rules switched off with the reason.
+
 ## Status
 
 A running plugin reports how its device is (`state`), with an English sentence

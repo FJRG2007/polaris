@@ -21,6 +21,18 @@ import {
     pluginsClaiming,
     comparePluginVersions,
     readPluginSettingChange,
+    applyPluginProfileRequest,
+    choosePluginProfile,
+    holdPluginProfile,
+    pluginProfileRequestSchema,
+    pluginProfileValues,
+    DEFAULT_PLUGIN_PROFILE,
+    NO_PLUGIN_PROFILE_HOLD,
+    type PluginProfileError,
+    type PluginProfileHold,
+    type PluginProfiles,
+    type PluginProfileSignals,
+    type PluginProfilesView,
     type PluginCatalog,
     type PluginEntry,
     type PluginManifest,
@@ -34,12 +46,14 @@ import {
     installedManifest,
     packageDir,
     readPluginSettings,
+    readPluginProfilesFile,
     readInstalled,
     rollbackPlugin,
     setPluginEnabled,
     updateInstalled,
     uninstallPlugin,
     writePluginSettings,
+    writePluginProfilesFile,
     type InstallFailure
 } from "./packages";
 
@@ -93,7 +107,17 @@ export interface ManagerOptions {
     readonly catalogUrl?: string;
     readonly keys?: readonly TrustedKey[];
     readonly now?: () => number;
+    /** What this computer can tell for profile rules (a meeting in another app, the app in front); neither when left out. */
+    readonly profileReads?: PluginProfilesView["reads"];
+    /** A created profile's id. */
+    readonly profileId?: () => string;
 }
+
+/** What a profile request answers: done (and the profile it was about), or why not. */
+export type ProfileResult = { readonly ok: true; readonly id: string | null } | { readonly ok: false; readonly error: PluginProfileError | "bad-request" | "unknown" };
+
+/** What no app has told yet: nothing is running and no call is on. */
+export const NO_PROFILE_SIGNALS: PluginProfileSignals = { call: false, meeting: null, games: [], front: null };
 
 export interface InstalledView {
     readonly id: string;
@@ -109,6 +133,8 @@ export interface InstalledView {
     readonly consent: readonly PluginPermission[];
     /** A version that failed here and was rolled back from. */
     readonly failed: string | null;
+    /** Its profiles and the one in use, for a plugin whose manifest has `profiles`; null otherwise. */
+    readonly profiles: PluginProfilesView | null;
     /** Running, or why not: "disabled", "sleeping" (its device is unplugged) or "missing" (its files are gone). */
     readonly run: PluginRun | { readonly state: "disabled" | "sleeping" | "missing"; };
 }
@@ -352,6 +378,48 @@ export function createPluginManager(options: ManagerOptions) {
     }
 
     /** Start what is installed, enabled and has its device; stop the rest. */
+    /** Each profiled plugin's stored profiles (read once, then kept: only this manager writes them) and its hold. */
+    const kept = new Map<string, { version: string; profiles: PluginProfiles; hold: PluginProfileHold }>();
+    let signals: PluginProfileSignals = NO_PROFILE_SIGNALS;
+    const profileId = options.profileId ?? (() => Math.random().toString(36).slice(2, 12));
+
+    async function profileState(manifest: PluginManifest): Promise<{ version: string; profiles: PluginProfiles; hold: PluginProfileHold }> {
+        let state = kept.get(manifest.id);
+        // Read again for a new version: its settings, and so what fits them, may have changed.
+        if (!state || state.version !== manifest.version) {
+            state = { version: manifest.version, profiles: await readPluginProfilesFile(options.dir, manifest), hold: state?.hold ?? NO_PLUGIN_PROFILE_HOLD };
+            kept.set(manifest.id, state);
+        }
+        // The first look, and the one after a request, takes the choice at once.
+        if (!state.hold.active) state.hold = holdPluginProfile(NO_PLUGIN_PROFILE_HOLD, choosePluginProfile(state.profiles, signals), now());
+        return state;
+    }
+
+    /** The id of the profile in use, Default for a plugin without profiles. */
+    async function activeProfile(manifest: PluginManifest): Promise<string> {
+        if (!manifest.profiles) return DEFAULT_PLUGIN_PROFILE;
+        return (await profileState(manifest)).hold.active?.id ?? DEFAULT_PLUGIN_PROFILE;
+    }
+
+    /** What the plugin runs with: the settings file, under the profile in use. */
+    async function runningSettings(manifest: PluginManifest): Promise<Record<string, PluginSettingValue>> {
+        const flat = await readPluginSettings(options.dir, manifest);
+        if (!manifest.profiles) return flat;
+        const state = await profileState(manifest);
+        return pluginProfileValues(flat, state.profiles, state.hold.active?.id ?? DEFAULT_PLUGIN_PROFILE);
+    }
+
+    async function profilesView(manifest: PluginManifest): Promise<PluginProfilesView | null> {
+        if (!manifest.profiles) return null;
+        const { profiles, hold } = await profileState(manifest);
+        return {
+            list: profiles.list.map(({ id, name, rules }) => ({ id, name, rules })),
+            manual: profiles.manual,
+            active: hold.active ?? { id: DEFAULT_PLUGIN_PROFILE, reason: "default", subject: null },
+            reads: options.profileReads ?? { meeting: false, front: false }
+        };
+    }
+
     async function reconcile(): Promise<void> {
         const installed = await readInstalled(options.dir);
         const devices = options.devices();
@@ -368,7 +436,7 @@ export function createPluginManager(options: ManagerOptions) {
                 manifest,
                 granted: plugin.granted,
                 entryPath: join(packageDir(options.dir, id, plugin.version), ...entry.split("/")),
-                settings: await readPluginSettings(options.dir, manifest)
+                settings: await runningSettings(manifest)
             });
         }
         changed();
@@ -429,6 +497,7 @@ export function createPluginManager(options: ManagerOptions) {
                     autoUpdate: plugin.autoUpdate ?? null,
                     consent,
                     failed: plugin.failed ?? null,
+                    profiles: manifest ? await profilesView(manifest) : null,
                     run
                 });
             }
@@ -539,6 +608,7 @@ export function createPluginManager(options: ManagerOptions) {
             return serial(async () => {
                 supervisor.drop(id);
                 await uninstallPlugin(options.dir, id);
+                kept.delete(id);
                 for (const key of [...manifests.keys()]) if (key.startsWith(`${id}@`)) manifests.delete(key);
                 await reconcile();
             });
@@ -555,7 +625,7 @@ export function createPluginManager(options: ManagerOptions) {
         async settings(id: string): Promise<Record<string, PluginSettingValue> | null> {
             const plugin = (await readInstalled(options.dir)).plugins[id];
             const manifest = plugin ? await manifestOf(id, plugin.version) : null;
-            return manifest ? readPluginSettings(options.dir, manifest) : null;
+            return manifest ? runningSettings(manifest) : null;
         },
 
         /** Change one setting; answers every value after it, or null when the key or value does not fit. */
@@ -566,12 +636,80 @@ export function createPluginManager(options: ManagerOptions) {
                 if (!manifest) return null;
                 const change = readPluginSettingChange(manifest.settings, key, value);
                 if (!change) return null;
-                const values = { ...(await readPluginSettings(options.dir, manifest)), [change.key]: change.value };
-                await writePluginSettings(options.dir, id, values);
+                // A grouped setting changes the profile in use; one in no group, and any under Default, the settings file.
+                const active = await activeProfile(manifest);
+                const grouped = manifest.settings.find((setting) => setting.key === change.key)?.group !== undefined;
+                const state = kept.get(id);
+                if (active !== DEFAULT_PLUGIN_PROFILE && grouped && state) {
+                    const list = state.profiles.list.map((item) => (item.id === active ? { ...item, values: { ...item.values, [change.key]: change.value } } : item));
+                    await writePluginProfilesFile(options.dir, id, { ...state.profiles, list });
+                    state.profiles = { ...state.profiles, list };
+                } else {
+                    await writePluginSettings(options.dir, id, { ...(await readPluginSettings(options.dir, manifest)), [change.key]: change.value });
+                }
+                const values = await runningSettings(manifest);
                 supervisor.settings(id, values);
                 changed();
                 return values;
             });
+        },
+
+        /** Create, rename, delete, set the rules of, or pick one of a plugin's profiles (`pluginProfileRequestSchema`). */
+        profile(id: string, raw: unknown): Promise<ProfileResult> {
+            const parsed = pluginProfileRequestSchema.safeParse(raw);
+            if (!parsed.success) return Promise.resolve({ ok: false, error: "bad-request" });
+            return serial(async (): Promise<ProfileResult> => {
+                const plugin = (await readInstalled(options.dir)).plugins[id];
+                const manifest = plugin ? await manifestOf(id, plugin.version) : null;
+                if (!manifest?.profiles) return { ok: false, error: "unknown" };
+                const state = await profileState(manifest);
+                const outcome = applyPluginProfileRequest(manifest.settings, await readPluginSettings(options.dir, manifest), state.profiles, parsed.data, profileId);
+                if (!outcome.ok) return outcome;
+                await writePluginProfilesFile(options.dir, id, outcome.profiles);
+                state.profiles = outcome.profiles;
+                // What is in use is chosen again now, with no hold: the person just changed it.
+                state.hold = NO_PLUGIN_PROFILE_HOLD;
+                supervisor.settings(id, await runningSettings(manifest));
+                changed();
+                return { ok: true, id: outcome.id };
+            });
+        },
+
+        /** Whether any plugin has a rule on a meeting or on the app in front, so the app looks only when something asks. */
+        profileNeeds(): { readonly meeting: boolean; readonly front: boolean } {
+            let meeting = false;
+            let front = false;
+            for (const { profiles } of kept.values()) {
+                for (const { rules } of profiles.list) {
+                    meeting ||= rules.meeting;
+                    front ||= rules.apps.length > 0;
+                }
+            }
+            return { meeting, front };
+        },
+
+        /**
+         * What the app sees now (a call, the microphone, games, the app in
+         * front): each running plugin with profiles switches once its new
+         * choice has held for PLUGIN_PROFILE_HOLD_MS.
+         */
+        async profileSignals(next: PluginProfileSignals): Promise<void> {
+            // Called every second: nothing is read from disk, and nothing done while nothing changed or waits out a hold.
+            const same = JSON.stringify(next) === JSON.stringify(signals);
+            signals = next;
+            if (same && [...kept.values()].every((state) => state.hold.pending === null)) return;
+            let moved = false;
+            for (const [id, state] of kept) {
+                const manifest = await manifestOf(id, state.version);
+                if (!manifest?.profiles) continue;
+                const before = state.hold.active;
+                state.hold = holdPluginProfile(state.hold, choosePluginProfile(state.profiles, signals), now());
+                const after = state.hold.active;
+                if (before?.id === after?.id && before?.reason === after?.reason && before?.subject === after?.subject) continue;
+                moved = true;
+                if (before?.id !== after?.id) supervisor.settings(id, await runningSettings(manifest));
+            }
+            if (moved) changed();
         },
 
         /**

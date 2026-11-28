@@ -208,7 +208,14 @@ export const pluginManifestSchema = z.object({
     statusTexts: z
         .record(PLUGIN_STATUS_CODE, pluginSentenceSchema)
         .refine((texts) => Object.keys(texts).length <= 32, "too many status texts")
-        .optional()
+        .optional(),
+    /**
+     * Its grouped settings can be kept as several profiles that switch by
+     * themselves (in a call, in a meeting, playing a game, an app in front) or
+     * by hand, like Stream Deck's. Settings that name no group stay one for all
+     * profiles. An app older than profiles ignores it and keeps one set.
+     */
+    profiles: z.boolean().optional()
 });
 
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;
@@ -519,6 +526,14 @@ const installedPluginSchema = z.object({
     failed: versionSchema.nullable().default(null),
     /** What the client offers to do for it (`pluginHostActionSchema`). Absent from an older app. */
     actions: z.array(pluginHostActionSchema).max(8).default([]),
+    /** Its profiles and the one in use, for a plugin with `profiles` (`pluginProfilesViewSchema`). Absent from an older app. */
+    profiles: z
+        .unknown()
+        .optional()
+        .transform((value) => {
+            const parsed = pluginProfilesViewSchema.safeParse(value);
+            return parsed.success ? parsed.data : null;
+        }),
     run: pluginRunSchema
 });
 
@@ -606,3 +621,252 @@ export function pluginSettingTargets(manifest: Pick<PluginManifest, "settings" |
     }
     return targets;
 }
+/*
+ * Profiles (manifest `profiles`): several sets of a plugin's grouped settings,
+ * one of them in use at a time, the way Stream Deck and Hercules' own software
+ * keep them. "Default" is the settings file every install already has, so an
+ * install from before profiles keeps all it had as its Default profile; the
+ * others live beside it. Which one is in use is chosen by hand, or else by the
+ * first rule that matches, in this order: a Polaris call, a meeting in another
+ * app (the microphone in use by it), a game running, an app in front. A new
+ * automatic choice must hold for PLUGIN_PROFILE_HOLD_MS before the device
+ * switches, so a moment's change does not flip it back and forth.
+ */
+
+/** The profile every plugin with profiles has: its settings as they were stored before profiles. */
+export const DEFAULT_PLUGIN_PROFILE = "default";
+/** The most profiles one plugin keeps besides Default. */
+export const MAX_PLUGIN_PROFILES = 16;
+/** How long a new automatic choice holds before the device switches to it. */
+export const PLUGIN_PROFILE_HOLD_MS = 2_000;
+/** Why a profile is the one in use, in the order the choice looks. */
+export const PLUGIN_PROFILE_REASONS = ["manual", "call", "meeting", "game", "app", "default"] as const;
+export type PluginProfileReason = (typeof PLUGIN_PROFILE_REASONS)[number];
+
+const profileIdSchema = z.string().regex(/^[a-z0-9]{1,24}$/);
+const profileNameSchema = z.string().trim().min(1).max(40);
+
+/** A program the way a rule names it: its file name, lowercase, without ".exe" or a folder. */
+export function pluginProgramKey(name: string): string {
+    const base = name.trim().split(/[\\/]/).pop() ?? "";
+    return base.toLowerCase().replace(/\.exe$/, "").trim();
+}
+
+const programSchema = z.string().trim().min(1).max(260).transform(pluginProgramKey).refine((key) => key.length > 0, "no program");
+
+export const pluginProfileRulesSchema = z.object({
+    /** In a Polaris call. */
+    call: z.boolean().default(false),
+    /** In a meeting in another app: something other than Polaris has the microphone. */
+    meeting: z.boolean().default(false),
+    /** A game is running. */
+    game: z.boolean().default(false),
+    /** One of these programs is in front (`pluginProgramKey`). */
+    apps: z
+        .array(programSchema)
+        .max(16)
+        .default([])
+        .transform((list) => [...new Set(list)])
+});
+
+export type PluginProfileRules = z.infer<typeof pluginProfileRulesSchema>;
+
+export const NO_PLUGIN_PROFILE_RULES: PluginProfileRules = { call: false, meeting: false, game: false, apps: [] };
+
+export interface PluginProfile {
+    readonly id: string;
+    readonly name: string;
+    readonly rules: PluginProfileRules;
+    /** Its value for every grouped setting. */
+    readonly values: Record<string, PluginSettingValue>;
+}
+
+/** What is stored beside the settings file: the profiles besides Default, and the one picked by hand. */
+export interface PluginProfiles {
+    /** A profile picked by hand (Default included), or null to choose by the rules. */
+    readonly manual: string | null;
+    readonly list: readonly PluginProfile[];
+}
+
+export const NO_PLUGIN_PROFILES: PluginProfiles = { manual: null, list: [] };
+
+/** The settings a profile holds: every one in a group. The rest are one for all profiles. */
+export function profiledPluginSettings(settings: readonly PluginSetting[]): PluginSetting[] {
+    return settings.filter((setting) => setting.group !== undefined);
+}
+
+const storedProfileSchema = z.object({
+    id: profileIdSchema.refine((id) => id !== DEFAULT_PLUGIN_PROFILE),
+    name: profileNameSchema,
+    rules: pluginProfileRulesSchema.catch(NO_PLUGIN_PROFILE_RULES),
+    values: z.record(z.string(), z.unknown()).catch({})
+});
+
+/**
+ * The stored profiles, every one whole: an entry of the wrong shape is
+ * dropped, a value that no longer fits its setting falls back to its default
+ * (the way `readPluginSettingValues` reads the settings file), and a hand pick
+ * of a profile that is gone reads as none.
+ */
+export function readPluginProfiles(settings: readonly PluginSetting[], stored: unknown): PluginProfiles {
+    const source = stored && typeof stored === "object" ? (stored as { manual?: unknown; list?: unknown; }) : {};
+    const profiled = profiledPluginSettings(settings);
+    const list: PluginProfile[] = [];
+    const ids = new Set<string>();
+    for (const item of Array.isArray(source.list) ? source.list : []) {
+        const parsed = storedProfileSchema.safeParse(item);
+        if (!parsed.success || ids.has(parsed.data.id) || list.length >= MAX_PLUGIN_PROFILES) continue;
+        ids.add(parsed.data.id);
+        list.push({ id: parsed.data.id, name: parsed.data.name, rules: parsed.data.rules, values: readPluginSettingValues(profiled, parsed.data.values) });
+    }
+    const manual = typeof source.manual === "string" && (source.manual === DEFAULT_PLUGIN_PROFILE || ids.has(source.manual)) ? source.manual : null;
+    return { manual, list };
+}
+
+/** The values a plugin runs with under one profile: the settings file, with that profile's grouped values over it. */
+export function pluginProfileValues(flat: Record<string, PluginSettingValue>, profiles: PluginProfiles, id: string): Record<string, PluginSettingValue> {
+    const profile = profiles.list.find((item) => item.id === id);
+    return profile ? { ...flat, ...profile.values } : flat;
+}
+
+/** What the app can tell right now, for the rules. */
+export interface PluginProfileSignals {
+    /** In a Polaris call. */
+    readonly call: boolean;
+    /** The program using the microphone when it is not Polaris, else null. */
+    readonly meeting: string | null;
+    /** The games running, by program. */
+    readonly games: readonly string[];
+    /** The program in front, or null when it cannot be told. */
+    readonly front: string | null;
+}
+
+export interface PluginProfileChoice {
+    readonly id: string;
+    readonly reason: PluginProfileReason;
+    /** What made the rule match (the program in a meeting, the game, the app in front), when there is one to name. */
+    readonly subject: string | null;
+}
+
+/** The profile that should be in use: the hand pick, else the first rule that matches in PLUGIN_PROFILE_REASONS order, else Default. */
+export function choosePluginProfile(profiles: PluginProfiles, signals: PluginProfileSignals): PluginProfileChoice {
+    if (profiles.manual) return { id: profiles.manual, reason: "manual", subject: null };
+    const first = (match: (rules: PluginProfileRules) => boolean) => profiles.list.find((profile) => match(profile.rules));
+    if (signals.call) {
+        const found = first((rules) => rules.call);
+        if (found) return { id: found.id, reason: "call", subject: null };
+    }
+    if (signals.meeting) {
+        const found = first((rules) => rules.meeting);
+        if (found) return { id: found.id, reason: "meeting", subject: signals.meeting };
+    }
+    if (signals.games.length > 0) {
+        const found = first((rules) => rules.game);
+        if (found) return { id: found.id, reason: "game", subject: signals.games[0] ?? null };
+    }
+    const front = signals.front ? pluginProgramKey(signals.front) : "";
+    if (front) {
+        const found = first((rules) => rules.apps.includes(front));
+        if (found) return { id: found.id, reason: "app", subject: signals.front };
+    }
+    return { id: DEFAULT_PLUGIN_PROFILE, reason: "default", subject: null };
+}
+
+/** The profile in use, and a choice waiting out its hold. */
+export interface PluginProfileHold {
+    readonly active: PluginProfileChoice | null;
+    readonly pending: PluginProfileChoice | null;
+    readonly since: number;
+}
+
+export const NO_PLUGIN_PROFILE_HOLD: PluginProfileHold = { active: null, pending: null, since: 0 };
+
+/**
+ * The profile in use after `wanted` was chosen at `now`. A hand pick, and
+ * leaving one, switch at once (the person asked); an automatic change to
+ * another profile switches only once it has been wanted for `holdMs` in a row.
+ */
+export function holdPluginProfile(hold: PluginProfileHold, wanted: PluginProfileChoice, now: number, holdMs = PLUGIN_PROFILE_HOLD_MS): PluginProfileHold {
+    const { active } = hold;
+    if (!active || active.id === wanted.id || wanted.reason === "manual" || active.reason === "manual") return { active: wanted, pending: null, since: now };
+    if (hold.pending && hold.pending.id === wanted.id) {
+        return now - hold.since >= holdMs ? { active: wanted, pending: null, since: now } : { active, pending: wanted, since: hold.since };
+    }
+    return { active, pending: wanted, since: now };
+}
+
+/** What a page may ask of a plugin's profiles. */
+export const pluginProfileRequestSchema = z.discriminatedUnion("op", [
+    /** A new profile: a copy of `from` (Default included), or the plugin's defaults without one. */
+    z.object({ op: z.literal("create"), name: profileNameSchema, from: profileIdSchema.optional() }),
+    z.object({ op: z.literal("rename"), profile: profileIdSchema, name: profileNameSchema }),
+    z.object({ op: z.literal("delete"), profile: profileIdSchema }),
+    z.object({ op: z.literal("rules"), profile: profileIdSchema, rules: pluginProfileRulesSchema }),
+    /** Use one by hand (Default included), or null to go back to the rules. */
+    z.object({ op: z.literal("pick"), profile: profileIdSchema.nullable() })
+]);
+
+export type PluginProfileRequest = z.infer<typeof pluginProfileRequestSchema>;
+export type PluginProfileError = "not-found" | "name-taken" | "full" | "default";
+export type PluginProfileOutcome = { readonly ok: true; readonly profiles: PluginProfiles; readonly id: string | null; } | { readonly ok: false; readonly error: PluginProfileError; };
+
+/**
+ * One request carried out on the stored profiles (pure: the caller stores the
+ * answer). `flat` is the settings file, which a copy of Default starts from;
+ * `newId` names a created profile.
+ */
+export function applyPluginProfileRequest(
+    settings: readonly PluginSetting[],
+    flat: Record<string, PluginSettingValue>,
+    profiles: PluginProfiles,
+    request: PluginProfileRequest,
+    newId: () => string
+): PluginProfileOutcome {
+    const profiled = profiledPluginSettings(settings);
+    const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+    const taken = (name: string, except: string | null) => same(name, DEFAULT_PLUGIN_PROFILE) || profiles.list.some((item) => item.id !== except && same(item.name, name));
+    const known = (id: string) => profiles.list.some((item) => item.id === id);
+    switch (request.op) {
+        case "create": {
+            if (profiles.list.length >= MAX_PLUGIN_PROFILES) return { ok: false, error: "full" };
+            if (taken(request.name, null)) return { ok: false, error: "name-taken" };
+            if (request.from !== undefined && request.from !== DEFAULT_PLUGIN_PROFILE && !known(request.from)) return { ok: false, error: "not-found" };
+            const base = request.from === undefined ? {} : pluginProfileValues(flat, profiles, request.from);
+            let id = newId();
+            while (id === DEFAULT_PLUGIN_PROFILE || known(id) || !profileIdSchema.safeParse(id).success) id = newId();
+            const profile: PluginProfile = { id, name: request.name, rules: NO_PLUGIN_PROFILE_RULES, values: readPluginSettingValues(profiled, base) };
+            return { ok: true, profiles: { ...profiles, list: [...profiles.list, profile] }, id };
+        }
+        case "rename":
+        case "rules":
+        case "delete": {
+            if (request.profile === DEFAULT_PLUGIN_PROFILE) return { ok: false, error: "default" };
+            if (!known(request.profile)) return { ok: false, error: "not-found" };
+            if (request.op === "delete") {
+                const list = profiles.list.filter((item) => item.id !== request.profile);
+                return { ok: true, profiles: { manual: profiles.manual === request.profile ? null : profiles.manual, list }, id: null };
+            }
+            if (request.op === "rename" && taken(request.name, request.profile)) return { ok: false, error: "name-taken" };
+            const list = profiles.list.map((item) => {
+                if (item.id !== request.profile) return item;
+                return request.op === "rename" ? { ...item, name: request.name } : { ...item, rules: request.rules };
+            });
+            return { ok: true, profiles: { ...profiles, list }, id: request.profile };
+        }
+        case "pick": {
+            if (request.profile !== null && request.profile !== DEFAULT_PLUGIN_PROFILE && !known(request.profile)) return { ok: false, error: "not-found" };
+            return { ok: true, profiles: { ...profiles, manual: request.profile }, id: request.profile };
+        }
+    }
+}
+
+/** A plugin's profiles as its page draws them (`InstalledPlugin.profiles`). */
+export const pluginProfilesViewSchema = z.object({
+    list: z.array(z.object({ id: profileIdSchema, name: profileNameSchema, rules: pluginProfileRulesSchema })).max(MAX_PLUGIN_PROFILES),
+    manual: profileIdSchema.nullable(),
+    active: z.object({ id: profileIdSchema, reason: z.enum(PLUGIN_PROFILE_REASONS), subject: z.string().max(260).nullable() }),
+    /** What this computer can tell; a rule on what it cannot tell never matches. */
+    reads: z.object({ meeting: z.boolean(), front: z.boolean() })
+});
+
+export type PluginProfilesView = z.infer<typeof pluginProfilesViewSchema>;

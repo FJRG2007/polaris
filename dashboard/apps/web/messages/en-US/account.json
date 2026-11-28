@@ -2624,6 +2624,57 @@
             "releasesAll": "Show all {count}",
             "releasesFewer": "Show fewer"
         },
+        "profiles": {
+            "title": "Profiles",
+            "pick": "Profile",
+            "automatic": "Automatic",
+            "default": "Default",
+            "inUse": "In use: {name}.",
+            "why": {
+                "manual": "You picked it.",
+                "call": "You are in a Polaris call.",
+                "meeting": "{subject} is using the microphone.",
+                "game": "{subject} is running.",
+                "app": "{subject} is in front.",
+                "default": "No other profile's rule matches now."
+            },
+            "editsInUse": "The settings below change {name}.",
+            "new": "New",
+            "duplicate": "Duplicate",
+            "rename": "Rename",
+            "delete": "Delete",
+            "create": "Create",
+            "newTitle": "New profile",
+            "duplicateTitle": "Duplicate profile",
+            "renameTitle": "Rename profile",
+            "copyOf": "{name} copy",
+            "deleteTitle": "Delete {name}?",
+            "deleteBody": "Its settings and rules are removed. Default and the other profiles stay as they are.",
+            "defaultFixed": "Default cannot be renamed or deleted.",
+            "defaultRules": "Default is used whenever no other profile's rule matches.",
+            "full": "A plugin can have up to 16 profiles besides Default.",
+            "failed": "That change was not saved.",
+            "name": {
+                "label": "Name",
+                "hint": "Like Gaming, Meetings or Streaming.",
+                "long": "Use 40 characters or fewer.",
+                "taken": "Another profile already has this name."
+            },
+            "rules": {
+                "title": "Switch to {name} automatically when",
+                "order": "If several profiles match, the first rule wins in this order: call, meeting, game, app in front.",
+                "call": "In a Polaris call",
+                "meeting": "In a meeting in another app",
+                "meetingHint": "Another app is using the microphone.",
+                "game": "A game is running",
+                "apps": "One of these apps is in front",
+                "appsHint": "Its program name, like obs64 or spotify.",
+                "appsPlaceholder": "Program name",
+                "add": "Add",
+                "remove": "Remove {app}",
+                "windowsOnly": "Only Polaris for desktop on Windows can tell this for now."
+            }
+        },
         "action": {
             "none": "Nothing",
             "mic": "Mute mic",

@@ -69,6 +69,7 @@
         "audio-sessions",
         "polaris-actions"
     ],
+    "profiles": true,
     "publisher": "Polaris",
     "requires": {
         "darwin-arm64": [
@@ -637,6 +638,6 @@
         }
     },
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.21",
+    "version": "0.1.22",
     "view": "view/index.html"
 }

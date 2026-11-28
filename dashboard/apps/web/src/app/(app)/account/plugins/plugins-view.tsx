@@ -67,6 +67,7 @@ import {
 } from "@/lib/device-plugins-client";
 import { pageIsDark } from "@/lib/page-theme";
 import { OfficialSoftware } from "./official-software";
+import { PluginProfiles } from "./plugin-profiles";
 import type { AppScreenshot } from "@/lib/apps/app-screenshots";
 import { ScreenshotGallery } from "@/app/(app)/apps/marketplace/[appId]/screenshot-gallery";
 import { DetailBack, DetailFacts, DetailHeader, DetailReleases, DetailSection, Fact } from "@/components/store-detail";
@@ -1077,6 +1078,7 @@ export function PluginPage({ id }: { id: string; }) {
                 <DetailSection id="settings" title={say(t, "detail.settings")}>
                     <AutoUpdateRow bridge={state.bridge} snapshot={state.snapshot} id={id} />
                     {installed.manifest.view ? <PluginView bridge={state.bridge} manifest={installed.manifest} view={installed.manifest.view} /> : null}
+                    {installed.profiles && state.bridge.profile ? <PluginProfiles bridge={state.bridge} id={id} profiles={installed.profiles} /> : null}
                     <PluginSettings bridge={state.bridge} manifest={installed.manifest} />
                 </DetailSection>
             ) : null}

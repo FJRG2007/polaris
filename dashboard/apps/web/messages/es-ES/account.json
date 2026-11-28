@@ -2624,6 +2624,57 @@
             "releasesAll": "Ver las {count}",
             "releasesFewer": "Ver menos"
         },
+        "profiles": {
+            "title": "Perfiles",
+            "pick": "Perfil",
+            "automatic": "Automático",
+            "default": "Predeterminado",
+            "inUse": "En uso: {name}.",
+            "why": {
+                "manual": "Lo elegiste tú.",
+                "call": "Estás en una llamada de Polaris.",
+                "meeting": "{subject} está usando el micrófono.",
+                "game": "{subject} está en marcha.",
+                "app": "{subject} está en primer plano.",
+                "default": "Ahora no coincide la regla de otro perfil."
+            },
+            "editsInUse": "Los ajustes de abajo cambian {name}.",
+            "new": "Nuevo",
+            "duplicate": "Duplicar",
+            "rename": "Renombrar",
+            "delete": "Eliminar",
+            "create": "Crear",
+            "newTitle": "Nuevo perfil",
+            "duplicateTitle": "Duplicar perfil",
+            "renameTitle": "Renombrar perfil",
+            "copyOf": "{name} copia",
+            "deleteTitle": "¿Eliminar {name}?",
+            "deleteBody": "Se borran sus ajustes y reglas. Predeterminado y los demás perfiles no cambian.",
+            "defaultFixed": "Predeterminado no se puede renombrar ni eliminar.",
+            "defaultRules": "Predeterminado se usa cuando no coincide la regla de otro perfil.",
+            "full": "Un plugin puede tener hasta 16 perfiles además de Predeterminado.",
+            "failed": "No se guardó el cambio.",
+            "name": {
+                "label": "Nombre",
+                "hint": "Como Juegos, Reuniones o Directo.",
+                "long": "Usa 40 caracteres o menos.",
+                "taken": "Otro perfil ya tiene este nombre."
+            },
+            "rules": {
+                "title": "Cambiar a {name} solo cuando",
+                "order": "Si coinciden varios perfiles, gana la primera regla en este orden: llamada, reunión, juego, app delante.",
+                "call": "En una llamada de Polaris",
+                "meeting": "En una reunión en otra app",
+                "meetingHint": "Otra app está usando el micrófono.",
+                "game": "Hay un juego en marcha",
+                "apps": "Una de estas apps está delante",
+                "appsHint": "Su nombre de programa, como obs64 o spotify.",
+                "appsPlaceholder": "Nombre del programa",
+                "add": "Añadir",
+                "remove": "Quitar {app}",
+                "windowsOnly": "Por ahora solo Polaris para escritorio en Windows lo sabe."
+            }
+        },
         "action": {
             "none": "Nada",
             "mic": "Silenciar",

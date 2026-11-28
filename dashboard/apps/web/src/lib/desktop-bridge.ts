@@ -321,6 +321,8 @@ export interface PolarisDesktop {
         official?(id: string, request: unknown): Promise<unknown>;
         /** Run one of an installed plugin's `actions` from the snapshot. Absent from an app older than them. */
         runAction?(id: string, action: string): Promise<boolean>;
+        /** Create, rename, delete, set the rules of, or pick one of a plugin's profiles. Absent from an app older than profiles. */
+        profile?(id: string, request: unknown): Promise<unknown>;
         onChange(listener: () => void): () => void;
         onOpen(listener: (id: string) => void): () => void;
     };

@@ -311,7 +311,10 @@ describe("listing programs on Windows", () => {
         const lister = new WindowsLister(() => shell.child, async () => []);
         expect(await lister.list()).toEqual([{ name: "celeste.exe", path: "C:\\Games\\Celeste\\Celeste.exe" }]);
         await lister.list();
-        expect(shell.asked.filter((line) => line.includes("Add-Type"))).toHaveLength(1);
+        // Each reader once: the process list, and the profiles' glance (microphone and app in front).
+        expect(shell.asked.filter((line) => line.includes("Add-Type"))).toHaveLength(2);
+        expect(shell.asked.filter((line) => line.includes("Add-Type") && line.includes("class PolarisProcessList"))).toHaveLength(1);
+        expect(shell.asked.filter((line) => line.includes("Add-Type") && line.includes("class PolarisGlance"))).toHaveLength(1);
         expect(shell.asked.filter((line) => line.includes("PolarisProcessList]::Read()"))).toHaveLength(2);
     });
 
