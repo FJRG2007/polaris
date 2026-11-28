@@ -124,8 +124,6 @@
         "roomName": "Nombre sala",
         "addTable": "Mesa",
         "tableName": "Nombre mesa",
-        "fewerSeats": "Menos sillas",
-        "moreSeats": "Más sillas",
         "removeTable": "Quitar mesa",
         "seats": "{count, plural, one {# silla} other {# sillas}}",
         "state": {

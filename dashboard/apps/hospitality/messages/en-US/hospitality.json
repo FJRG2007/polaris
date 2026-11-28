@@ -124,8 +124,6 @@
         "roomName": "Room name",
         "addTable": "Table",
         "tableName": "Table name",
-        "fewerSeats": "Fewer seats",
-        "moreSeats": "More seats",
         "removeTable": "Remove table",
         "seats": "{count, plural, one {# seat} other {# seats}}",
         "state": {
