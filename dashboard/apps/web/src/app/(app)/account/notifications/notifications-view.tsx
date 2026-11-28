@@ -26,7 +26,7 @@ import { eventLabel } from "./event-names";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { loadNotificationHistoryAction } from "./actions";
 import type { NotificationView } from "@/lib/notification-service";
-import { NOTIFICATION_EVENTS } from "@polaris/core";
+import { notificationEvents } from "@polaris/core";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { NotificationFace } from "@/components/notifications/notification-face";
 import { describeAudience } from "@/components/notifications/notification-visuals";
@@ -156,7 +156,7 @@ export function NotificationsView() {
 
     const eventOptions = [
         { value: ALL_EVENTS, label: t("history.allEvents") },
-        ...NOTIFICATION_EVENTS.map((entry) => ({
+        ...notificationEvents().map((entry) => ({
             value: entry.id,
             label: eventLabel(t, entry.id) ?? entry.label,
             icon: <NotificationGroupMark group={entry.group} />

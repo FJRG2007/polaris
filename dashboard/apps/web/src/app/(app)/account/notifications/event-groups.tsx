@@ -127,7 +127,7 @@ export function EventGroups({
     // A group with no rule handed in is one the account cannot open: the page
     // leaves out the rules of apps it has no access to.
     const groups = core.NOTIFICATION_GROUPS.filter((group) =>
-        core.NOTIFICATION_EVENTS.some((entry) => entry.group === group && state.has(entry.id))
+        core.notificationEvents().some((entry) => entry.group === group && state.has(entry.id))
     );
 
     function toggle(group: string) {
@@ -205,7 +205,7 @@ export function EventGroup({
     hold: HoldControls;
 }) {
     const t = useTranslations("accountNotifications");
-    const events = core.NOTIFICATION_EVENTS.filter((entry) => entry.group === group);
+    const events = core.notificationEvents().filter((entry) => entry.group === group);
     const { on, total } = groupSummary(events, state);
     const target: core.HoldTarget = { kind: "group", id: group };
     const label = groupLabel(t, group);

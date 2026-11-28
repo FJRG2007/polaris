@@ -94,6 +94,22 @@ export const runtimeAppEntrySchema = z.object({
         )
         .max(32)
         .default([]),
+    /** The kinds of alert it raises, each `<id>.<kind>`, opening one of its own pages. */
+    notificationKinds: z
+        .array(
+            z.object({
+                id: z.string().regex(/^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,63}$/),
+                label: localized(80),
+                description: localized(200),
+                level: z.enum(["info", "success", "warning", "danger"]).default("info"),
+                target: z.string().regex(/^\/[a-z0-9/[\]_-]{1,200}$/),
+                defaults: z.object({ inapp: z.boolean(), email: z.boolean() }).optional()
+            })
+        )
+        .max(32)
+        .default([]),
+    /** Its settings page among its own screens (`/x/<id>/...`), drawn at Admin > Apps > <app> > Settings. */
+    settingsAt: z.string().regex(/^\/x\/[a-z][a-z0-9-]{1,47}(\/[a-z0-9-]{1,40}){0,4}$/).optional(),
     /** The bundle, pinned by digest: fetched from the dashboard's own registry and refused unless it hashes to this. */
     bundle: z.object({
         file: z.string().regex(/^[a-z0-9][a-z0-9.-]{0,95}\.zip$/),
@@ -193,6 +209,8 @@ export function runtimeManifest(entry: RuntimeAppEntry, fit: RuntimeAppFit, loca
         instanceWide: true,
         opensAt: `${RUNTIME_APP_BASE}/${entry.id}`,
         ...(entry.logo ? { logo: entry.logo } : {}),
+        // Only a page among its own screens: an entry cannot point Settings at another app's.
+        ...(entry.settingsAt?.startsWith(`${RUNTIME_APP_BASE}/${entry.id}/`) ? { settingsAt: entry.settingsAt } : {}),
         ...(fit.ok ? {} : { needsPolaris: entry.minPolaris ?? NEWER_POLARIS }),
         runtime: { version: entry.version }
     };
@@ -205,6 +223,15 @@ export type RuntimeAppView = Omit<AppManifest, "icon"> & {
     readonly permissionDefs?: readonly { key: string; label: string; implies: readonly string[]; writes: boolean }[];
     /** Its automation trigger events, labelled in the reader's language. */
     readonly events?: readonly { name: string; label: string; fields: Readonly<Record<string, "string" | "number" | "boolean" | "id">> }[];
+    /** Its kinds of alert, labelled in the reader's language. */
+    readonly notificationKinds?: readonly {
+        id: string;
+        label: string;
+        description: string;
+        level: "info" | "success" | "warning" | "danger";
+        target: string;
+        defaults?: { inapp: boolean; email: boolean };
+    }[];
 };
 
 /** The entries a dashboard lists, with the ones written for a host API it has moved past left out. */
@@ -225,8 +252,14 @@ export function runtimeViews(catalog: RuntimeAppCatalog | null, known: ReadonlyS
             writes: definition.writes
         }));
         const events = entry.events.map((event) => ({ name: event.name, label: entryText(event.label, locale), fields: event.fields }));
+        const notificationKinds = entry.notificationKinds.map((kind) => ({
+            ...kind,
+            label: entryText(kind.label, locale),
+            description: entryText(kind.description, locale)
+        }));
         views.push({
             ...view,
+            ...(notificationKinds.length ? { notificationKinds } : {}),
             ...(entry.nav ? { nav: entry.nav } : {}),
             ...(permissionDefs.length ? { permissionDefs } : {}),
             ...(events.length ? { events } : {})

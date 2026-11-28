@@ -21,7 +21,9 @@ export const NON_APP_GROUPS = {
     system: "polaris",
     // Sign-ins, sessions, keys, a domain's security, a vulnerable image: about
     // the account and the instance, raised by several apps at once.
-    security: "security"
+    security: "security",
+    // Kinds installed apps declared in their manifests, each named with its app.
+    apps: "polaris"
 } as const satisfies Partial<Record<NotificationGroup, string>>;
 
 export type NonAppGroup = keyof typeof NON_APP_GROUPS;

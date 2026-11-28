@@ -52,7 +52,7 @@ describe("which groups an account sees", () => {
 
     it("always shows Polaris, security and alerts, which reach people outside any app", () => {
         const visible = visibleNotificationGroups(new Set());
-        expect(visible).toEqual(["security", "alerts", "system"]);
+        expect(visible).toEqual(["security", "alerts", "apps", "system"]);
         expect(notificationGroupGate("alerts")).toBeNull();
     });
 

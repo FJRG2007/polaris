@@ -71,9 +71,12 @@ export default async function NotificationsPage() {
         // check the switcher draws its apps by.
         reachableApps(accessFor(user))
     ]);
-    const groups = new Set(visibleNotificationGroups(new Set(apps.map((app) => app.id))));
+    const reachable = new Set(apps.map((app) => app.id));
+    const groups = new Set(visibleNotificationGroups(reachable));
     const shownRules = rules.filter((entry) => {
         const group = notificationEvent(entry.event)?.group;
+        // An installed app's own kinds (`<app>.<kind>`) only to who can open that app.
+        if (group === "apps") return reachable.has(entry.event.split(".")[0] ?? "");
         return group !== undefined && groups.has(group);
     });
 

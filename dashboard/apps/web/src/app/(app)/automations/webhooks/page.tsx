@@ -8,7 +8,7 @@
 import { accessFor, requirePermission } from "@/lib/session";
 import { reachableApps } from "@/lib/app-access";
 import { visibleNotificationGroups } from "@/lib/notifications/group-apps";
-import { NOTIFICATION_EVENTS } from "@polaris/core";
+import { notificationEvents } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
 import { WebhooksView, type EventOption } from "./webhooks-view";
@@ -26,7 +26,7 @@ export default async function WebhooksPage() {
     ]);
     // Only the events of apps this account can open, as Account > Notifications.
     const groups = new Set(visibleNotificationGroups(new Set(apps.map((app) => app.id))));
-    const events: EventOption[] = NOTIFICATION_EVENTS.filter((event) => groups.has(event.group)).map(
+    const events: EventOption[] = notificationEvents().filter((event) => groups.has(event.group)).map(
         (event) => ({
             id: event.id,
             label: eventLabel(t, event.id) ?? event.label,

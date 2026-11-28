@@ -15,7 +15,7 @@ import { prisma } from "@polaris/db";
 import {
     parseQuietHours,
     pruneHolds,
-    NOTIFICATION_EVENTS,
+    notificationEvents,
     parseNotificationHolds,
     type NotificationHolds,
     type QuietHours,
@@ -47,7 +47,7 @@ export async function describeNotificationRules(
     userId: string
 ): Promise<Array<{ event: string; rule: NotificationRule }>> {
     const preferences = await getNotificationPreferences(userId);
-    return NOTIFICATION_EVENTS.map((event) => ({
+    return notificationEvents().map((event) => ({
         event: event.id,
         rule: resolveRule(preferences, event.id)
     }));

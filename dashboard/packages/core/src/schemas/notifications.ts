@@ -104,6 +104,8 @@ export const NOTIFICATION_GROUPS = [
     "agents",
     "polar",
     "alerts",
+    // Kinds an installed app declared in its manifest (`registerAppNotificationKinds`).
+    "apps",
     "system"
 ] as const;
 
@@ -123,6 +125,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     agents: "Agents",
     polar: "Polar",
     alerts: "Alerts",
+    apps: "Apps",
     system: "Polaris"
 };
 
@@ -1411,9 +1414,72 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
 
+/**
+ * Kinds of alert an installed app declares in its manifest, registered when the
+ * manifest is read (docs/addons-delivery.md): an app never edits the list
+ * above, which stays the built-in default. Each is `<app id>.<kind>`, filed
+ * under the "apps" group with the app's name, and goes when the app does - an
+ * alert of a withdrawn kind is refused like any undeclared one.
+ */
+export interface AppNotificationKindDefinition {
+    /** `<app id>.<kind>`. */
+    readonly id: string;
+    readonly label: string;
+    readonly description: string;
+    readonly level: NotificationLevel;
+    /** The page it opens; must be one of the app's own (`/x/<id>` or `/<id>`). */
+    readonly target: string;
+    readonly defaults?: { readonly inapp: boolean; readonly email: boolean };
+}
+
+type RegisteredKind = NotificationEventInfo & { readonly app: string };
+
+const kindRegistry = ((globalThis as Record<symbol, unknown>)[Symbol.for("polaris.notifications.app-kinds")] ??=
+    new Map()) as Map<string, RegisteredKind>;
+
+const KIND_ID = /^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,63}$/;
+const LEVELS: readonly NotificationLevel[] = ["info", "success", "warning", "danger"];
+
+/** Register (or replace) the kinds an app declares; one outside its id, a built-in id or a page not its own is left out. */
+export function registerAppNotificationKinds(
+    app: string,
+    appName: string,
+    definitions: readonly AppNotificationKindDefinition[]
+): void {
+    for (const [id, kind] of kindRegistry) if (kind.app === app) kindRegistry.delete(id);
+    for (const definition of definitions.slice(0, 32)) {
+        if (!KIND_ID.test(definition.id) || !definition.id.startsWith(`${app}.`)) continue;
+        if (EVENT_BY_ID.has(definition.id) || !LEVELS.includes(definition.level)) continue;
+        const target = definition.target;
+        if (!(target === `/x/${app}` || target.startsWith(`/x/${app}/`) || target === `/${app}` || target.startsWith(`/${app}/`))) continue;
+        kindRegistry.set(definition.id, {
+            id: definition.id,
+            app,
+            group: "apps",
+            label: `${appName}: ${definition.label}`.slice(0, 160),
+            description: definition.description.slice(0, 300),
+            level: definition.level,
+            target,
+            // Never critical: only Polaris's own alerts break through do not disturb.
+            defaults: definition.defaults ?? { inapp: true, email: false }
+        });
+    }
+}
+
+/** Forget every app's registered kinds except those of `keep`. */
+export function retainAppNotificationKinds(keep: Iterable<string>): void {
+    const kept = new Set(keep);
+    for (const [id, kind] of kindRegistry) if (!kept.has(kind.app)) kindRegistry.delete(id);
+}
+
+/** Every kind an alert can be now: the built-in ones, then those installed apps registered. */
+export function notificationEvents(): readonly NotificationEventInfo[] {
+    return kindRegistry.size === 0 ? NOTIFICATION_EVENTS : [...NOTIFICATION_EVENTS, ...kindRegistry.values()];
+}
+
 /** The catalogue entry for an event id, or null when nothing declares it. */
 export function notificationEvent(id: string): NotificationEventInfo | null {
-    return EVENT_BY_ID.get(id) ?? null;
+    return EVENT_BY_ID.get(id) ?? kindRegistry.get(id) ?? null;
 }
 
 /**
@@ -1442,7 +1508,7 @@ export function eventFallbackHref(event: Pick<NotificationEventInfo, "target">):
  * device. Everything else still lands in the bell, without a sound or a notice.
  */
 export function breaksDoNotDisturb(type: string): boolean {
-    return EVENT_BY_ID.get(type)?.critical === true;
+    return notificationEvent(type)?.critical === true;
 }
 
 /**
@@ -1454,7 +1520,7 @@ export function arrivalsMayAlert(quiet: boolean, arrivals: readonly { type: stri
 }
 
 export function isNotificationEvent(id: string): boolean {
-    return EVENT_BY_ID.has(id);
+    return EVENT_BY_ID.has(id) || kindRegistry.has(id);
 }
 
 /** Where one event goes. Destination ids point at the account's own rows. */
@@ -1489,7 +1555,7 @@ export function resolveRule(
     preferences: NotificationPreferences,
     eventId: string
 ): NotificationRule {
-    const event = EVENT_BY_ID.get(eventId);
+    const event = notificationEvent(eventId);
     if (!event) return { inapp: true, email: false, destinations: [] };
     const saved = preferences[eventId];
     const rule = saved ? { ...saved, destinations: [...saved.destinations] } : defaultRule(event);
@@ -1577,9 +1643,9 @@ export const outboundWebhookInputSchema = z.object({
     events: z
         .array(z.string().trim().min(1).max(80))
         .min(1, "Pick at least one event")
-        .max(NOTIFICATION_EVENTS.length)
+        .max(NOTIFICATION_EVENTS.length + 2_048)
         .refine(
-            (ids) => ids.every((id) => EVENT_BY_ID.has(id)),
+            (ids) => ids.every((id) => isNotificationEvent(id)),
             "One of those events does not exist"
         )
         .transform((ids) => [...new Set(ids)])

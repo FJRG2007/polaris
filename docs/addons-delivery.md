@@ -219,8 +219,8 @@ Inventory of today's per-app registries:
 | Own tables | bundle migrations (`app_<id>` schema) | runtime |
 | Emitting an app's events from its bundle | `host.automations.emitOwnAppEvent({ app, name, payload, key, permission })` (host API 1.3) | runtime: only an event the app's manifest declared, payload checked against it, received only by runners holding the app's own `permission` while the app is installed |
 | Home / overview widgets | built-in cards: `app/(app)/home/widgets/*`; an app's: bundle `AppExtension.overviewWidgets` (`kind`, `defaultSize`, `describe` in the reader's language, `targets`/`read`/`act` through the host, optional `permission` under the app's id) | runtime: offered once installed, a card whose reader lost the permission reads "no longer have access" without asking the app, and an uninstalled app's card reads "not available" |
-| Notification kinds | core notification groups | not done: static list |
-| Settings sections | `settingsAt` in the image catalog | not done for catalogue apps |
+| Notification kinds | manifest `notificationKinds` (`<id>.<kind>`, label, description, level, a target among the app's own pages, defaults) -> `registerAppNotificationKinds` | runtime: listed under "From your apps" in Account > Notifications (only to who can open the app), accepted by `notify`, never critical, refused again once the app is withdrawn |
+| Settings sections | manifest `settingsAt` (`/x/<id>/...`), drawn at Admin > Apps > <app> > Settings | runtime: an address outside the app's own screens is dropped |
 | Cross-app actions ("create task from order") | none generic yet | not done |
 | Outgoing webhooks for an app's events | automation `http` node on an app trigger | works once the events are emitted |
 
