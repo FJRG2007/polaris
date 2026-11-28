@@ -108,7 +108,8 @@
         "service": "Service",
         "menu": "Menu",
         "kitchen": "Kitchen",
-        "till": "Till"
+        "till": "Till",
+        "devices": "Devices"
     },
     "service": {
         "noFloor": "No dining room yet",
@@ -179,7 +180,7 @@
         "changed": "Another device changed this table just now. It is up to date: check it and try again.",
         "undoExpired": "That can no longer be undone.",
         "removed": "{name} removed",
-        "undo": "Undo",
+        "undo": "Put back",
         "lastChange": "Last change: {name}"
     },
     "kitchen": {
@@ -272,6 +273,23 @@
         "failed": "The picture could not be stored."
     },
     "devices": {
-        "badCode": "That code is wrong or has expired. Ask the device for a new one."
+        "badCode": "That code is wrong or has expired. Ask the device for a new one.",
+        "linkTitle": "Link a device",
+        "linkHint": "Open Hospitality on the handheld, till or kitchen screen and type the code it shows.",
+        "code": "Code",
+        "name": "Name",
+        "namePlaceholder": "Terrace PDA",
+        "link": "Link device",
+        "linked": "{name} is linked",
+        "none": "No linked devices",
+        "noneHint": "A linked device takes orders and payments for this venue without anyone signing in.",
+        "lastSeen": "Last seen: {when}",
+        "neverSeen": "never",
+        "rename": "Rename",
+        "save": "Save",
+        "unlink": "Unlink device",
+        "unlinkTitle": "Unlink {name}?",
+        "unlinkHint": "It stops working at once and needs a new code to be linked again.",
+        "cancel": "Cancel"
     }
 }

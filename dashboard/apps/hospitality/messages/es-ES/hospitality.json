@@ -108,7 +108,8 @@
         "service": "Servicio",
         "menu": "Carta",
         "kitchen": "Cocina",
-        "till": "Caja"
+        "till": "Caja",
+        "devices": "Equipos"
     },
     "service": {
         "noFloor": "Aún no hay salón",
@@ -272,6 +273,23 @@
         "failed": "No se pudo guardar la foto."
     },
     "devices": {
-        "badCode": "Ese código no vale o ha caducado. Pide uno nuevo en el aparato."
+        "badCode": "Ese código no vale o ha caducado. Pide uno nuevo en el aparato.",
+        "linkTitle": "Vincular equipo",
+        "linkHint": "Abre Hosteleria en la PDA, la caja o la pantalla de cocina y escribe el codigo que muestra.",
+        "code": "Codigo",
+        "name": "Nombre",
+        "namePlaceholder": "PDA terraza",
+        "link": "Vincular",
+        "linked": "{name} vinculado",
+        "none": "Sin dispositivos",
+        "noneHint": "Un dispositivo vinculado toma comandas y cobros de este local sin que nadie inicie sesion.",
+        "lastSeen": "Visto por ultima vez: {when}",
+        "neverSeen": "nunca",
+        "rename": "Renombrar",
+        "save": "Guardar",
+        "unlink": "Desvincular",
+        "unlinkTitle": "Desvincular {name}?",
+        "unlinkHint": "Deja de funcionar al momento y necesitara un codigo nuevo para volver a vincularse.",
+        "cancel": "Cancelar"
     }
 }
