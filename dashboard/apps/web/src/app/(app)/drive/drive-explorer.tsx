@@ -103,7 +103,8 @@ import {
     Skeleton,
     cn,
     Checkbox,
-    DateInput
+    DateInput,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as polls from "./drive-reads";
 import { canKeepForLater } from "@/lib/offline/try-now";
@@ -211,8 +212,14 @@ export function DriveExplorer({
     const [accessTarget, setAccessTarget] = useState<AccessTarget | null>(null);
     const [newFolderOpen, setNewFolderOpen] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
+    useResetOnOpen(newFolderOpen, () => {
+        setNewFolderName("");
+    });
     const [newFileOpen, setNewFileOpen] = useState(false);
     const [newFileName, setNewFileName] = useState("Untitled.txt");
+    useResetOnOpen(newFileOpen, () => {
+        setNewFileName("Untitled.txt");
+    });
     const [deleteTargets, setDeleteTargets] = useState<DriveEntry[] | null>(null);
     const [confirmTrash, setConfirmTrash] = useState(askBeforeTrash);
     const [stopAsking, setStopAsking] = useState(false);

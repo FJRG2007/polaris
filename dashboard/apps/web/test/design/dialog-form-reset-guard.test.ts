@@ -29,9 +29,7 @@ const PENDING = new Set([
     "apps/web/src/app/(app)/apps/deploy/import-site.tsx#ImportSiteButton",
     "apps/game-servers/src/screens/installed/game-console.tsx#GameConsole",
     "apps/web/src/app/(app)/chat/chat-sidebar.tsx#ChatSidebarList",
-    "apps/web/src/app/(app)/drive/drive-explorer.tsx#DriveExplorer",
-    "apps/web/src/app/(app)/drive/files-view.tsx#FilesView",
-    "apps/web/src/app/s/[token]/share-explorer.tsx#ShareExplorer"
+    "apps/web/src/app/(app)/drive/files-view.tsx#FilesView"
 ]);
 
 /**

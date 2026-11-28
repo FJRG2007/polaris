@@ -100,7 +100,8 @@ import {
     ShortcutHint,
     cn,
     shortcutPressed,
-    DateInput
+    DateInput,
+    useResetOnOpen
 } from "@polaris/ui";
 
 type SortKey = "name" | "created" | "modified" | "size";
@@ -280,6 +281,9 @@ export function ShareExplorer({
     const fileInput = useRef<HTMLInputElement>(null);
     const [newFolderOpen, setNewFolderOpen] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
+    useResetOnOpen(newFolderOpen, () => {
+        setNewFolderName("");
+    });
     const [renameTarget, setRenameTarget] = useState<DriveEntry | null>(null);
     const [renameValue, setRenameValue] = useState("");
     const [deleteTargets, setDeleteTargets] = useState<DriveEntry[] | null>(null);
