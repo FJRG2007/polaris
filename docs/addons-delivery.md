@@ -36,8 +36,11 @@ key in the repository. The app catalogue says `"kind": "apps"` and has no
            "description": { "en-US": "Orders, ovens and the till." },
            "category": "Productivity",
            "keywords": ["bread"],
-           "nav": { "category": "work", "permission": "deploy.read" },
-           "permissions": ["deploy.read"],
+           "nav": { "category": "work", "permission": "bakery.use" },
+           "permissions": ["bakery.use"],
+           "permissionDefs": [
+               { "key": "bakery.use", "label": { "en-US": "Take orders" } }
+           ],
            "coreTables": false
        }
    }
@@ -74,7 +77,8 @@ key in the repository. The app catalogue says `"kind": "apps"` and has no
   hashes to it. Screens are served under `/x/<id>`, one route in every image.
 - **Compatibility.** An entry is runnable when its host API is satisfied
   (`@polaris/app-host/version`, the caret rule), every permission it uses is one
-  this dashboard knows, and it keeps no tables in the core schema. Otherwise it is
+  this dashboard knows or one it declares itself, and it keeps no tables in the
+  core schema. Otherwise it is
   listed as "Needs Polaris X - Update", linking to Settings > Updates. An entry
   written for a host API this dashboard has moved past is not listed. An entry
   this dashboard cannot read is dropped on its own; the rest of the catalogue
@@ -83,11 +87,42 @@ key in the repository. The app catalogue says `"kind": "apps"` and has no
 The device plugin catalog follows the same per-entry rule: a plugin from a newer
 catalog no longer hides every other plugin from an older host or desktop app.
 
+## The rule: an app never edits core
+
+Adding an app touches only the app's own folder. It never adds a line to
+`dashboard/packages/core` (permissions, minors, policy templates, own paths) or
+to a per-app list in `apps/web` (nav, catalog, logos, marketplace), because a
+core change forces an extension bump and a host update for something that is
+only the app's, and does not scale to hundreds of apps.
+
+What an app needs from those registries it declares in its manifest, and the
+host registers it at runtime:
+
+| Registry | Built-in defaults (unchanged) | An app's own entries |
+| --- | --- | --- |
+| Permissions, roles editor, role schema, API keys, view-as | `PERMISSIONS` / `PERMISSION_META` in `core/src/permissions.ts` | `permissionDefs` -> `registerAppPermissions`, read through `knownPermissions()` / `permissionMeta()` / `isKnownPermission()` / `permissionSchema` |
+| Minors | `MINOR_FLOOR` and the stage table in `core/src/minors.ts` | denied to a minor until a guardian allows them (`deniedPermissions` covers every known permission) |
+| Own paths (firewall) | `POLARIS_ROUTE_ROOTS` | none needed: every catalogue app is served under the one root `/x` |
+| Nav, catalog, logo, names | `POLARIS_APPS`, `POLARIS_APP_CATALOG`, `catalog` messages | `nav`, `name`/`summary`/`description` per locale, `logo` |
+
+An app may only declare permissions under its own id (`<id>.<action>`); a key
+outside it, or one a built-in permission already has, is ignored, so an app can
+never take over or widen a permission it does not own. The hard-coded entries
+stay as the built-in defaults, so every existing install and every stored role
+that names one (`hospitality.use` included) resolves exactly as before.
+
+Still static, and to be moved to the same registry before an app needs them:
+policy templates (`core/src/policy-templates.ts`), MCP scopes
+(`lib/mcp/scope-table.ts`), API key scope labels (`lib/api-key-scopes.ts`), and
+the `z.enum(PERMISSIONS)` checks in `core/src/schemas/account-security.ts` and
+`apps/installed/[id]/access-actions.ts`. An app's permissions are therefore not
+yet offered as MCP or API key scopes.
+
 ## Limits
 
 - An app whose tables live in the core Prisma schema (`coreTables: true`) still
   needs the dashboard release that carries their migration.
-- An app that needs a permission this dashboard does not know needs a newer
-  dashboard; permissions are not delivered by the catalogue.
+- An app that uses a permission it does not declare itself, and this dashboard
+  does not know, needs a newer dashboard.
 - No app opts in yet: until one adds `polaris.catalog`, the published catalogue is
   empty and every app still arrives with the image, as before.

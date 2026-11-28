@@ -4,7 +4,7 @@
  * capabilities).
  */
 
-import { PERMISSION_META, type Permission } from "@polaris/core";
+import { permissionMeta, type Permission } from "@polaris/core";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 type Translate = NamespaceTranslator<"admin">;
@@ -21,7 +21,7 @@ export function areaLabel(t: Translate, area: string): string {
  *  English for one the catalog does not know yet. */
 export function permissionLabel(t: Translate, permission: Permission): string {
     const key = `roles.permissions.${permission}`;
-    return t.has(key) ? t(key) : PERMISSION_META[permission].label;
+    return t.has(key) ? t(key) : permissionMeta(permission).label;
 }
 
 /**

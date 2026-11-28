@@ -61,6 +61,21 @@ export const runtimeAppEntrySchema = z.object({
         })
         .optional(),
     permissions: z.array(z.string().regex(PERMISSION)).max(32).default([]),
+    /**
+     * The permissions the app brings, under its own id (`<id>.<action>`). They
+     * join the roles editor and the server's checks when the app is registered
+     * (`registerAppPermissions` in `@polaris/core`): an app never edits core.
+     */
+    permissionDefs: z
+        .array(
+            z.object({
+                key: z.string().regex(PERMISSION),
+                label: localized(80),
+                implies: z.array(z.string().regex(PERMISSION)).max(8).default([])
+            })
+        )
+        .max(16)
+        .default([]),
     /** The bundle, pinned by digest: fetched from the dashboard's own registry and refused unless it hashes to this. */
     bundle: z.object({
         file: z.string().regex(/^[a-z0-9][a-z0-9.-]{0,95}\.zip$/),
@@ -124,7 +139,11 @@ export function appEntryFit(
     const newer = { ok: false, needs: "polaris", version: entry.minPolaris } as const;
     if (!verdict.ok || entry.coreTables) return newer;
     const uses = entry.nav ? [...entry.permissions, entry.nav.permission] : entry.permissions;
-    if (uses.some((permission) => !known.has(permission))) return newer;
+    // Its own permissions it brings with it; any other must be one this dashboard has.
+    const own = new Set(
+        entry.permissionDefs.map((definition) => definition.key).filter((key) => key.startsWith(`${entry.id}.`) && !known.has(key))
+    );
+    if (uses.some((permission) => !known.has(permission) && !own.has(permission))) return newer;
     if (entry.nav && !entry.permissions.includes(entry.nav.permission)) return newer;
     return { ok: true };
 }
@@ -159,7 +178,11 @@ export function runtimeManifest(entry: RuntimeAppEntry, fit: RuntimeAppFit, loca
 }
 
 /** What the browser is handed to register: plain data, the icon added back on its side. */
-export type RuntimeAppView = Omit<AppManifest, "icon"> & { readonly nav?: RuntimeAppEntry["nav"] };
+export type RuntimeAppView = Omit<AppManifest, "icon"> & {
+    readonly nav?: RuntimeAppEntry["nav"];
+    /** Its own permissions, labelled in the reader's language, for a runnable entry. */
+    readonly permissionDefs?: readonly { key: string; label: string; implies: readonly string[] }[];
+};
 
 /** The entries a dashboard lists, with the ones written for a host API it has moved past left out. */
 export function runtimeViews(catalog: RuntimeAppCatalog | null, known: ReadonlySet<string>, locale: string): RuntimeAppView[] {
@@ -168,7 +191,16 @@ export function runtimeViews(catalog: RuntimeAppCatalog | null, known: ReadonlyS
         const fit = appEntryFit(entry, known);
         if (!fit.ok && fit.needs === "app") continue;
         const { icon: _icon, ...view } = runtimeManifest(entry, fit, locale);
-        views.push(entry.nav && fit.ok ? { ...view, nav: entry.nav } : view);
+        if (!fit.ok) {
+            views.push(view);
+            continue;
+        }
+        const permissionDefs = entry.permissionDefs.map((definition) => ({
+            key: definition.key,
+            label: entryText(definition.label, locale),
+            implies: definition.implies
+        }));
+        views.push({ ...view, ...(entry.nav ? { nav: entry.nav } : {}), ...(permissionDefs.length ? { permissionDefs } : {}) });
     }
     return views;
 }

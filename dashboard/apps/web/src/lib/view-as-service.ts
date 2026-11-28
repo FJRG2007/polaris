@@ -22,7 +22,7 @@
 
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
-import { ALL_PERMISSIONS, expandPermissions, PERMISSIONS, type Permission } from "@polaris/core";
+import { ALL_PERMISSIONS, expandPermissions, knownPermissions, type Permission } from "@polaris/core";
 import { readerWords } from "@/lib/i18n/reader-words";
 
 /**
@@ -142,7 +142,7 @@ function roleGrants(raw: string): Permission[] {
     }
     if (!Array.isArray(parsed)) return [];
     const keys = parsed.filter((value): value is string => typeof value === "string");
-    if (keys.includes(ALL_PERMISSIONS)) return [...PERMISSIONS];
+    if (keys.includes(ALL_PERMISSIONS)) return knownPermissions();
     return expandPermissions(keys as Permission[]);
 }
 

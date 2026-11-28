@@ -158,8 +158,8 @@ export async function explainUserAccess(userId: string): Promise<AccessExplanati
     const isAdmin = account?.isAdmin === true;
     const flattened = sourced.flatMap((entry) => entry.statements);
 
-    const global: PermissionVerdict[] = core.PERMISSIONS.map((permission) => {
-        const meta = core.PERMISSION_META[permission];
+    const global: PermissionVerdict[] = core.knownPermissions().map((permission) => {
+        const meta = core.permissionMeta(permission);
         const reasons = sourced.flatMap((entry) => {
             const decision = core.evaluateStatements(entry.statements, permission, "*");
             if (decision === "implicit-deny") return [];

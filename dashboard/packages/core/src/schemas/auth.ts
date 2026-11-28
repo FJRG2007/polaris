@@ -10,8 +10,14 @@ import { normalizePersonName } from "../names.js";
 import { nameRefusal } from "../text-safety.js";
 import { pendingGrantSchema } from "./sharing.js";
 import { accessRulesSchema } from "./account-security.js";
-import { MAX_ROLE_NAME_LENGTH, PERMISSIONS } from "../permissions.js";
+import { isKnownPermission, MAX_ROLE_NAME_LENGTH, PERMISSIONS, type Permission } from "../permissions.js";
 import { IDENTITY_PASSWORD_MESSAGE, passwordMatchesIdentity } from "../password-safety.js";
+
+/** One permission this Polaris knows, built in or an app's own, checked when parsed. */
+export const permissionSchema = z
+    .string()
+    .max(100)
+    .refine((value): value is Permission => isKnownPermission(value), "unknown permission");
 
 export const emailField = z.string().trim().min(1, "Email is required").email("Enter a valid email");
 
@@ -202,7 +208,8 @@ export const createInviteSchema = accessRulesSchema.extend({
 /** A role's grants, as the roles editor saves them. The wildcard is not offered:
  *  it belongs to the one role that is not editable. */
 export const roleGrantsSchema = z.object({
-    permissions: z.array(z.enum(PERMISSIONS)).max(PERMISSIONS.length)
+    // Built-in or registered by an installed app's manifest (`registerAppPermissions`).
+    permissions: z.array(permissionSchema).max(PERMISSIONS.length + 512)
 });
 
 export const createRoleSchema = roleGrantsSchema.extend({ name: roleNameField });

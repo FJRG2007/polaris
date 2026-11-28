@@ -13,7 +13,7 @@
  * does not change with the server's clock zone.
  */
 
-import { impliedBy, PERMISSIONS, type Permission } from "./permissions.js";
+import { impliedBy, knownPermissions, PERMISSIONS, type Permission } from "./permissions.js";
 
 /** The stages in order, youngest first. An adult has no stage: no row. */
 export const MINOR_STAGES = ["baby", "child", "preteen", "teen", "olderTeen"] as const;
@@ -421,7 +421,7 @@ export function minorCeiling(input: {
     while (changed) {
         changed = false;
         for (const key of [...allowed]) {
-            if (!(PERMISSIONS as readonly string[]).includes(key)) continue;
+            if (!(knownPermissions() as readonly string[]).includes(key)) continue;
             if (impliedBy(key as Permission).every((implied) => allowed.has(implied))) continue;
             allowed.delete(key);
             contactsOnly.delete(key);
@@ -436,7 +436,9 @@ export function minorCeiling(input: {
 /** The permissions the ceiling denies, in catalogue order: what the server adds
  *  as deny statements over whatever the account's roles grant. */
 export function deniedPermissions(ceiling: MinorCeiling): Permission[] {
-    return PERMISSIONS.filter((permission) => !ceiling.allowed.has(permission));
+    // Every known permission, an app's own included: one the ceiling does not
+    // name is denied, so an app's permissions stay off a minor until allowed.
+    return knownPermissions().filter((permission) => !ceiling.allowed.has(permission));
 }
 
 /** What a guardian may see about a minor's account. Never message contents. */

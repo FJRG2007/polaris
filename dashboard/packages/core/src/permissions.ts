@@ -401,6 +401,81 @@ export const PERMISSION_META: Readonly<Record<Permission, PermissionMeta>> = {
     "system.manage": { area: "Management", label: "Updates, backups and maintenance" }
 };
 
+/**
+ * Permissions an app declares in its own manifest, registered when its manifest
+ * is read (the published app catalogue, `docs/addons-delivery.md`). An app never
+ * edits this file: the lists above are the built-in defaults every install and
+ * stored role already relies on, and an app's own permissions join them here at
+ * runtime. Kept on the process (and the window) so every bundle layer and every
+ * copy of this module sees the same registry.
+ */
+export interface AppPermissionDefinition {
+    /** `<app id>.<action>`: an app may only declare permissions under its own id. */
+    readonly key: string;
+    readonly label: string;
+    /** Other permissions of the same app this one carries with it. */
+    readonly implies?: readonly string[];
+}
+
+type AppPermissionRegistry = Map<string, { app: string; area: string; definitions: readonly AppPermissionDefinition[] }>;
+
+const appRegistry = ((globalThis as Record<symbol, unknown>)[Symbol.for("polaris.permissions.apps")] ??=
+    new Map()) as AppPermissionRegistry;
+
+const BUILT_IN: ReadonlySet<string> = new Set(PERMISSIONS);
+const APP_KEY = /^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,47}$/;
+
+/**
+ * Register (or replace) the permissions an app declares. A key outside the app's
+ * own id, or one a built-in permission already has, is ignored: an app can add
+ * permissions, never take over or widen one it does not own.
+ */
+export function registerAppPermissions(app: string, area: string, definitions: readonly AppPermissionDefinition[]): void {
+    const own = definitions.filter(
+        (definition) => APP_KEY.test(definition.key) && definition.key.startsWith(`${app}.`) && !BUILT_IN.has(definition.key)
+    );
+    const keys = new Set(own.map((definition) => definition.key));
+    const kept = own.map((definition) => ({
+        ...definition,
+        implies: (definition.implies ?? []).filter((implied) => keys.has(implied) && implied !== definition.key)
+    }));
+    if (kept.length === 0) appRegistry.delete(app);
+    else appRegistry.set(app, { app, area, definitions: kept });
+}
+
+/** Forget every app's registered permissions except those of `keep`. */
+export function retainAppPermissions(keep: Iterable<string>): void {
+    const kept = new Set(keep);
+    for (const app of [...appRegistry.keys()]) if (!kept.has(app)) appRegistry.delete(app);
+}
+
+function appDefinition(permission: string): { app: string; area: string; definition: AppPermissionDefinition } | null {
+    for (const entry of appRegistry.values()) {
+        const definition = entry.definitions.find((candidate) => candidate.key === permission);
+        if (definition) return { app: entry.app, area: entry.area, definition };
+    }
+    return null;
+}
+
+/** Every permission this Polaris knows: the built-in ones, then those apps registered. */
+export function knownPermissions(): Permission[] {
+    const registered = [...appRegistry.values()].flatMap((entry) => entry.definitions.map((definition) => definition.key));
+    return registered.length === 0 ? [...PERMISSIONS] : [...PERMISSIONS, ...(registered as Permission[])];
+}
+
+/** Whether `permission` is one this Polaris knows, built in or registered by an app. */
+export function isKnownPermission(permission: string): permission is Permission {
+    return BUILT_IN.has(permission) || appDefinition(permission) !== null;
+}
+
+/** What a permission is called and where it is filed, built in or registered. */
+export function permissionMeta(permission: Permission): PermissionMeta {
+    const builtIn = (PERMISSION_META as Readonly<Record<string, PermissionMeta>>)[permission];
+    if (builtIn) return builtIn;
+    const found = appDefinition(permission);
+    return found ? { area: found.area, app: found.app, label: found.definition.label } : { area: "Other", label: permission };
+}
+
 /** Every app some permission arrives with, each once. */
 export const PERMISSION_APPS: readonly string[] = [
     ...new Set(Object.values(PERMISSION_META).flatMap((meta) => (meta.app ? [meta.app] : [])))
@@ -414,8 +489,8 @@ export const PERMISSION_APPS: readonly string[] = [
  */
 export function listedPermissions(installed: Iterable<string>): Permission[] {
     const present = new Set(installed);
-    return PERMISSIONS.filter((permission) => {
-        const app = PERMISSION_META[permission].app;
+    return knownPermissions().filter((permission) => {
+        const app = permissionMeta(permission).app;
         return !app || present.has(app);
     });
 }
@@ -463,7 +538,7 @@ export const IMPLIED_PERMISSIONS: Readonly<Partial<Record<Permission, readonly P
 
 /** The permissions one grant carries with it, itself excluded. */
 export function impliedBy(permission: Permission): readonly Permission[] {
-    return IMPLIED_PERMISSIONS[permission] ?? [];
+    return IMPLIED_PERMISSIONS[permission] ?? ((appDefinition(permission)?.definition.implies ?? []) as readonly Permission[]);
 }
 
 /**
@@ -477,7 +552,7 @@ export function expandPermissions(granted: Iterable<Permission>): Permission[] {
         expanded.add(permission);
         for (const implied of impliedBy(permission)) expanded.add(implied);
     }
-    return PERMISSIONS.filter((permission) => expanded.has(permission));
+    return knownPermissions().filter((permission) => expanded.has(permission));
 }
 
 /**

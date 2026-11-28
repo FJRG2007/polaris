@@ -21,7 +21,7 @@ import { recordAudit } from "@/lib/audit-service";
 import {
     ALL_PERMISSIONS,
     expandPermissions,
-    PERMISSIONS,
+    knownPermissions,
     SYSTEM_ROLES,
     UNEDITABLE_ROLE,
     type CreateRoleInput,
@@ -87,7 +87,7 @@ export async function listRoleOptions(): Promise<RoleOption[]> {
     const rows = await prisma.role.findMany({ orderBy: { name: "asc" }, select: { name: true, permissions: true } });
     return rows.map((row) => {
         const { wildcard, permissions } = readGrants(row.permissions);
-        return { name: row.name, grants: wildcard ? PERMISSIONS.length : permissions.length };
+        return { name: row.name, grants: wildcard ? knownPermissions().length : permissions.length };
     });
 }
 

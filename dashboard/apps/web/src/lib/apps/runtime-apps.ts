@@ -10,7 +10,7 @@ import { Package } from "lucide-react";
 import { setRuntimeApps } from "./catalog";
 import { APP_CATEGORIES, POLARIS_APPS, type AppEntry } from "@/lib/apps";
 import type { RuntimeAppView } from "./runtime-catalog-schema";
-import type { Permission } from "@polaris/core";
+import { registerAppPermissions, retainAppPermissions, type Permission } from "@polaris/core";
 
 const RAIL_CATEGORIES: ReadonlySet<string> = new Set(APP_CATEGORIES.map((category) => category.id));
 
@@ -24,7 +24,10 @@ export function registerRuntimeApps(views: readonly RuntimeAppView[]): void {
     const key = JSON.stringify(views);
     if (key === last) return;
     last = key;
-    setRuntimeApps(views.map(({ nav: _nav, ...view }) => ({ ...view, icon: Package })));
+    setRuntimeApps(views.map(({ nav: _nav, permissionDefs: _permissions, ...view }) => ({ ...view, icon: Package })));
+    // Each app's own permissions, filed under its name; a withdrawn app's go with it.
+    retainAppPermissions(views.filter((view) => view.permissionDefs).map((view) => view.id));
+    for (const view of views) if (view.permissionDefs) registerAppPermissions(view.id, view.name, view.permissionDefs);
     for (let index = POLARIS_APPS.length - 1; index >= 0; index--) {
         if (railed.has(POLARIS_APPS[index]?.id ?? "")) POLARIS_APPS.splice(index, 1);
     }

@@ -82,7 +82,7 @@ function parseActions(raw: string): core.Permission[] {
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) return [];
         const known = new Set(parsed.filter((value): value is string => typeof value === "string"));
-        return core.PERMISSIONS.filter((permission) => known.has(permission));
+        return core.knownPermissions().filter((permission) => known.has(permission));
     } catch {
         return [];
     }

@@ -17,7 +17,7 @@ import { generateToken, hashToken, tokenMatchesHash } from "@polaris/core/tokens
 import {
     ALL_PERMISSIONS,
     API_KEY_PREFIX,
-    PERMISSIONS,
+    knownPermissions,
     hasPermission,
     parseStringList,
     stringifyList,
@@ -425,10 +425,10 @@ export async function verifyApiKey(presented: string): Promise<VerifiedApiKey | 
  * pass every permission gate, so their keys may carry any scope.
  */
 export async function scopesAvailableTo(userId: string, isAdmin = false): Promise<Permission[]> {
-    if (isAdmin) return [...PERMISSIONS];
+    if (isAdmin) return knownPermissions();
     const granted = await getUserPermissions(userId);
-    if (granted.has(ALL_PERMISSIONS)) return [...PERMISSIONS];
-    return PERMISSIONS.filter((permission) => granted.has(permission));
+    if (granted.has(ALL_PERMISSIONS)) return knownPermissions();
+    return knownPermissions().filter((permission) => granted.has(permission));
 }
 
 /**

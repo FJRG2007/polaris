@@ -16,8 +16,8 @@ import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import {
-    PERMISSIONS,
-    PERMISSION_META,
+    permissionMeta,
+    permissionSchema,
     isAllowed,
     listedPermissions,
     parseResource,
@@ -173,8 +173,8 @@ export async function userCapabilitiesAction(
         // uninstalled one stays stored and shows again when the app is back.
         capabilities: listedPermissions(installed).map((permission) => ({
             permission,
-            area: PERMISSION_META[permission].area,
-            label: PERMISSION_META[permission].label,
+            area: permissionMeta(permission).area,
+            label: permissionMeta(permission).label,
             inherited: inheritedOf(permission),
             override: set.get(permission) === "deny" ? "deny" : set.has(permission) ? "allow" : null
         }))
@@ -198,7 +198,7 @@ export async function setUserPermissionAction(
     const parsed = z
         .object({
             userId: idSchema,
-            permission: z.enum(PERMISSIONS),
+            permission: permissionSchema,
             state: z.enum(["inherit", "allow", "deny"])
         })
         .safeParse({ userId, permission, state });

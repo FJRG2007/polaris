@@ -29,8 +29,8 @@ import { areaLabel, permissionLabel } from "@/lib/permission-labels";
 import { createRoleAction, deleteRoleAction, setRolePermissionsAction } from "./actions";
 import {
     impliedBy,
-    PERMISSION_META,
-    PERMISSIONS,
+    knownPermissions,
+    permissionMeta,
     UNEDITABLE_ROLE,
     type Permission
 } from "@polaris/core";
@@ -51,19 +51,21 @@ import {
     settingType
 } from "@polaris/ui";
 
-/** The permissions of each area, in the order the areas were declared. */
-const AREAS: { area: string; permissions: Permission[] }[] = groupByArea(
-    PERMISSIONS,
-    (permission) => PERMISSION_META[permission].area
-).map(([area, permissions]) => ({ area, permissions }));
+/** The permissions of each area, in the order the areas were declared, an
+ *  installed app's own permissions included (registered from its manifest). */
+function areas(): { area: string; permissions: Permission[] }[] {
+    return groupByArea(knownPermissions(), (permission) => permissionMeta(permission).area).map(
+        ([area, permissions]) => ({ area, permissions })
+    );
+}
 
 /** The permissions this Polaris lists: those of installed apps and of every
  *  Polaris. Resolved on the server; a grant outside it is kept, only not drawn. */
-const Listed = createContext<ReadonlySet<Permission>>(new Set(PERMISSIONS));
+const Listed = createContext<ReadonlySet<Permission>>(new Set(knownPermissions()));
 
 /** Everything that cannot be held without `permission`. */
 function dependents(permission: Permission): Permission[] {
-    return PERMISSIONS.filter((candidate) => impliedBy(candidate).includes(permission));
+    return knownPermissions().filter((candidate) => impliedBy(candidate).includes(permission));
 }
 
 /** Apply one click, carrying implied grants in and dependent grants out. */
@@ -251,7 +253,7 @@ function PermissionGrid({
     const listed = useContext(Listed);
     const sections = useMemo(
         () =>
-            AREAS.map(({ area, permissions }) => ({
+            areas().map(({ area, permissions }) => ({
                 id: area,
                 label: areaLabel(t, area),
                 items: permissions
