@@ -28,6 +28,7 @@ a regression. Entries are sorted open/regressed first, then by severity.
 | VULN-0040 | A seat kept after losing access to a conversation goes on minting tickets for its call | High | Fixed | dashboard/apps/web/src/lib/chat/meetings.ts | CWE-863 | 2026-11-12 |
 | VULN-0041 | Vault access token and client key keep working after the extension is disconnected | High | Fixed | dashboard/apps/web/src/lib/vault/auth.ts | CWE-613 | 2026-11-12 |
 | VULN-0052 | An agent's live preview opened in its own desktop window gets the dashboard's desktop bridge | High | Fixed | clients/desktop/src/main/ipc.ts | CWE-346 | 2026-11-26 |
+| VULN-0053 | A call key message played again puts a browser back on a key somebody who left still holds | Medium | Fixed | dashboard/apps/web/src/app/(app)/chat/call-e2ee-session.ts | CWE-294 | 2026-11-28 |
 | VULN-0020 | Bind volumes of different accounts collide on the shared volume root (same project slug or typed path) | Medium | Fixed | dashboard/apps/web/src/lib/deploy-volume-service.ts | CWE-639 | 2026-09-28 |
 | VULN-0021 | Office link pass works forever and survives revoking the link | Medium | Fixed | dashboard/apps/web/src/lib/office/links.ts:295 | CWE-613 | 2026-09-28 |
 | VULN-0022 | SSRF through notification webhook destinations | Medium | Fixed | dashboard/apps/web/src/lib/notifications/webhook-sender.ts:127 | CWE-918 | 2026-09-28 |
