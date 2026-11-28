@@ -327,6 +327,10 @@ export interface PolarisDesktop {
         actions?(request: unknown): Promise<unknown>;
         onChange(listener: () => void): () => void;
         onOpen(listener: (id: string) => void): () => void;
+        /** A running plugin's newest live values (`{ knobs }`), or null. Absent from an app older than them. */
+        live?(id: string): Promise<unknown>;
+        /** Called with a plugin's id and its live values each time they change. Absent from an app older than them. */
+        onLive?(listener: (id: string, live: unknown) => void): () => void;
     };
     /** @deprecated `plugins` by its name in desktop apps from before the rename. Removable once no supported desktop app or host predates the rename (desktop 0.1.124). */
     addons?: PolarisDesktop["plugins"];

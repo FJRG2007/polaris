@@ -45,6 +45,8 @@ export const pluginMessageSchema = z.discriminatedUnion("type", [
     z.object({ type: z.literal("log"), level: z.enum(["info", "warn", "error"]), text: z.string().max(2_000) }),
     /** What it wants the plugin's Settings page header to say about its device. */
     z.object({ type: z.literal("status"), state: z.enum(["connected", "sleeping", "busy", "error"]), detail: z.string().max(200).optional(), code: PLUGIN_STATUS_CODE.optional() }),
+    /** What its device shows now, for the plugin's page to follow live: each knob's name, volume and mute. */
+    z.object({ type: z.literal("state"), knobs: z.array(z.object({ label: z.string().max(80), volume: z.number().int().min(0).max(100).nullable(), muted: z.boolean() })).max(8) }),
     callSchema
 ]);
 
@@ -82,3 +84,6 @@ export function judgeCall(granted: readonly PluginPermission[], method: string, 
     const parsed = PLUGIN_PARAMS[known].safeParse(params);
     return parsed.success ? { ok: true, method: known, params: parsed.data } : { ok: false, error: "bad-params" };
 }
+
+/** A plugin's live values, as its newest `state` message carried them. */
+export type PluginLive = { readonly knobs: Extract<z.infer<typeof pluginMessageSchema>, { type: "state" }>["knobs"] };

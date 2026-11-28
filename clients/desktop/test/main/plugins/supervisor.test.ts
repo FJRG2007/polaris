@@ -35,8 +35,10 @@ function harness(granted: WantedPlugin["granted"] = ["usb", "polaris-actions"], 
     const timers: { run: () => void; ms: number; }[] = [];
     const children: FakeChild[] = [];
     const calls: string[] = [];
+    const live: { id: string; live: unknown }[] = [];
     const supervisor = createSupervisor({
         ...(locale ? { locale } : {}),
+        onLive: (id, values) => live.push({ id, live: values }),
         fork: () => {
             const child = new FakeChild();
             children.push(child);
@@ -53,6 +55,7 @@ function harness(granted: WantedPlugin["granted"] = ["usb", "polaris-actions"], 
     const wanted: WantedPlugin = { manifest: readPluginManifest(manifest)!, granted, entryPath: "/x/main.js", settings: { lights: true } };
     return {
         supervisor,
+        live,
         wanted,
         children,
         timers,
@@ -80,6 +83,19 @@ describe("plugin supervisor", () => {
         expect(supervisor.snapshot()["fixture-mixer"]?.state).toBe("starting");
         children[0]!.say({ type: "ready" });
         expect(supervisor.snapshot()["fixture-mixer"]?.state).toBe("running");
+    });
+
+    it("passes on what the device shows now, live, and says at start that it follows it", () => {
+        const { supervisor, wanted, children, live } = harness();
+        supervisor.want(wanted);
+        expect(children[0]?.sent[0]).toMatchObject({ type: "start", live: true });
+        children[0]!.say({ type: "ready" });
+        const knobs = [{ label: "Calls", volume: 64, muted: false }, { label: "Music", volume: null, muted: true }];
+        children[0]!.say({ type: "state", knobs });
+        expect(live).toEqual([{ id: "fixture-mixer", live: { knobs } }]);
+        // A volume out of range is the wrong shape and goes nowhere.
+        children[0]!.say({ type: "state", knobs: [{ label: "Calls", volume: 400, muted: false }] });
+        expect(live).toHaveLength(1);
     });
 
     it("restarts a crashed plugin with a growing delay and gives up after five in a row", () => {

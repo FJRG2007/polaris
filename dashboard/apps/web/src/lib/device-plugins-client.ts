@@ -429,3 +429,47 @@ export async function lookOfficial(bridge: PluginsBridge | null, id: string): Pr
     const answer = officialLookSchema.safeParse(await bridge.official(id, { kind: "look" }).catch(() => null));
     return answer.success ? answer.data : null;
 }
+
+const pluginLiveSchema = z.object({
+    knobs: z.array(z.object({ label: z.string().max(80), volume: z.number().int().min(0).max(100).nullable(), muted: z.boolean() })).max(8)
+});
+
+/** What a running plugin's device shows now: each knob's name, volume and mute. */
+export type PluginLive = z.infer<typeof pluginLiveSchema>;
+
+/** A live value from the desktop app, checked, or null for anything else. */
+export function readPluginLive(value: unknown): PluginLive | null {
+    const parsed = pluginLiveSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
+}
+
+/**
+ * The device's live values while the page is open: the newest the app holds
+ * at once, then every change it pushes. Null from an app older than them, or
+ * before the device has shown anything.
+ */
+export function usePluginLive(bridge: Pick<PluginsBridge, "live" | "onLive"> | null, id: string): PluginLive | null {
+    const [live, setLive] = useState<PluginLive | null>(null);
+    useEffect(() => {
+        if (!bridge?.onLive) return;
+        let current = true;
+        const stop = bridge.onLive((from, value) => {
+            if (from !== id) return;
+            const read = readPluginLive(value);
+            if (read) setLive(read);
+        });
+        void bridge
+            .live?.(id)
+            .catch(() => null)
+            .then((value) => {
+                const read = readPluginLive(value);
+                // A push that landed first is newer than this read.
+                if (current && read) setLive((held) => held ?? read);
+            });
+        return () => {
+            current = false;
+            stop();
+        };
+    }, [bridge, id]);
+    return live;
+}

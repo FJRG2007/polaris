@@ -29,6 +29,8 @@
 const RENAMED = { "call.hangup": "call.leave" };
 
 const WAIT_MS = 500;
+/** How often the page's live values are looked at; only a change is sent. */
+const LIVE_MS = 200;
 const RETRY_MS = 3_000;
 const OWNERSHIP_EVERY_MS = 15_000;
 const CALL_TIMEOUT_MS = 10_000;
@@ -479,6 +481,27 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
             }, WATCH_MS);
             watcher?.unref?.();
             void watch();
+            // A host that follows live values says so; an older one would only log each as the wrong shape.
+            if (message.live === true && typeof native.latestScreenJson === "function") {
+                let lastLive = "";
+                const follower = every(() => {
+                    if (!running) return stopEvery(follower);
+                    let read = "null";
+                    try {
+                        read = native.latestScreenJson();
+                    } catch {
+                        return;
+                    }
+                    if (read === lastLive || read === "null") return;
+                    lastLive = read;
+                    try {
+                        send({ type: "state", ...JSON.parse(read) });
+                    } catch {
+                        // A page that does not parse is skipped; the next one goes.
+                    }
+                }, LIVE_MS);
+                follower?.unref?.();
+            }
         } else if (message.type === "settings") {
             values = message.settings ?? {};
             controller?.setSettings(settingsJson());

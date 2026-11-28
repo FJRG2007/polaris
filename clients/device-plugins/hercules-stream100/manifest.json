@@ -905,6 +905,6 @@
         }
     },
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.25",
+    "version": "0.1.26",
     "view": "view/index.html"
 }

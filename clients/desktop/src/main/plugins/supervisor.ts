@@ -13,7 +13,7 @@
  * without Electron.
  */
 
-import { pluginMessageSchema, judgeCall, type PluginMethod, type AppMessage } from "@/shared/plugin-protocol";
+import { pluginMessageSchema, judgeCall, type PluginMethod, type AppMessage, type PluginLive } from "@/shared/plugin-protocol";
 import type { PluginManifest, PluginPermission, PluginSettingValue, UsbDevice } from "@polaris/core/device-plugins";
 
 export interface PluginChild {
@@ -43,6 +43,8 @@ export interface SupervisorOptions {
     readonly fork: (wanted: WantedPlugin) => PluginChild;
     readonly call: (id: string, method: PluginMethod, params: unknown) => Promise<unknown>;
     readonly onChange?: () => void;
+    /** A running plugin's live values (`state` messages), passed on as they come. */
+    readonly onLive?: (id: string, live: PluginLive) => void;
     readonly log?: (id: string, level: "info" | "warn" | "error", text: string) => void;
     readonly now?: () => number;
     readonly setTimer?: (run: () => void, ms: number) => unknown;
@@ -104,6 +106,7 @@ export function createSupervisor(options: SupervisorOptions) {
                 slot.state = "running";
                 changed();
             } else if (message.type === "log") options.log?.(manifest.id, message.level, message.text);
+            else if (message.type === "state") options.onLive?.(manifest.id, { knobs: message.knobs });
             else if (message.type === "status") {
                 slot.status = { state: message.state, ...(message.detail === undefined ? {} : { detail: message.detail }), ...(message.code === undefined ? {} : { code: message.code }) };
                 changed();
@@ -120,7 +123,7 @@ export function createSupervisor(options: SupervisorOptions) {
             }
         });
         child.onExit(() => crashed(slot, generation));
-        child.postMessage({ type: "start", id: manifest.id, version: manifest.version, permissions: slot.wanted.granted, devices, settings: slot.wanted.settings, ...(options.locale ? { locale: options.locale() } : {}) });
+        child.postMessage({ type: "start", id: manifest.id, version: manifest.version, permissions: slot.wanted.granted, devices, settings: slot.wanted.settings, live: true, ...(options.locale ? { locale: options.locale() } : {}) });
         changed();
     }
 

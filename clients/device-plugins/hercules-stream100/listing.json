@@ -3,6 +3,10 @@
     "pictureSource": "https://www.hercules.com/en/product/stream-100",
     "releases": [
         {
+            "version": "0.1.26",
+            "notes": "a screen that stays sharp while it changes: turning a knob no longer keeps the whole screen in blocks, and the lines between the knobs are gone. The drawing of the device on Polaris' page shows each knob's real volume and mute as they change. Live values need Polaris for desktop 0.1.139 or later."
+        },
+        {
             "version": "0.1.25",
             "notes": "the screen's look, like Stream Control's graphic settings: pick a background colour or picture, the text and volume bar colours, and an icon above each knob, with a live preview on the drawing of the device. Needs Polaris for desktop 0.1.138 or later."
         },

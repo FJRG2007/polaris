@@ -63,7 +63,8 @@ import {
     type PluginListing,
     type PluginOffer,
     type PluginsBridge,
-    type PluginsState
+    type PluginsState,
+    usePluginLive
 } from "@/lib/device-plugins-client";
 import { pageIsDark } from "@/lib/page-theme";
 import { OfficialSoftware } from "./official-software";
@@ -709,6 +710,7 @@ function PluginSettings({ bridge, manifest }: { bridge: PluginsBridge; manifest:
     const toast = useToast();
     // What was kept from the last visit draws at once; the app's answer replaces it only when it differs.
     const values = usePluginSettings(bridge, manifest);
+    const live = usePluginLive(bridge, manifest.id);
     const setValues = (next: Record<string, PluginSettingValue>) => changePluginSettings(manifest.id, manifest.version, next);
 
     // A search result names one setting or group (`#setting-<key>`, `#group-<key>`); they are drawn only once the values arrive.
@@ -769,6 +771,7 @@ function PluginSettings({ bridge, manifest }: { bridge: PluginsBridge; manifest:
                             manifest={manifest}
                             layout={layout}
                             values={values}
+                            live={live}
                             locale={locale}
                             onChange={change}
                             control={(setting) => <SettingControl setting={setting} value={values[setting.key] ?? null} locale={locale} onChange={(value) => change({ [setting.key]: value })} width="w-full" />}

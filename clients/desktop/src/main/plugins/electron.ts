@@ -10,7 +10,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { packageDir, pluginsFolder } from "./packages";
 import { judgeViewCall, readViewUrl, resolveViewFile, viewContentType, VIEW_CSP, VIEW_SCHEMES } from "./view";
 import { CHANNELS } from "@/shared/bridge";
-import type { PluginAction } from "@/shared/plugin-protocol";
+import type { PluginAction, PluginLive } from "@/shared/plugin-protocol";
 import { DeviceActions, windowsKeyCodes } from "./device-actions";
 import { openExternal } from "../open-external";
 import { launcherEntries, runLauncherEntry } from "../launcher";
@@ -265,6 +265,9 @@ async function runActionRef(value: string): Promise<boolean> {
     return outcome === "ran";
 }
 
+/** Each running plugin's newest live values, for a page that opens after they came. */
+const liveValues = new Map<string, PluginLive>();
+
 function broadcast(channel: string, ...args: unknown[]): void {
     for (const contents of webContents.getAllWebContents()) if (!contents.isDestroyed()) contents.send(channel, ...args);
 }
@@ -324,6 +327,10 @@ export function startDevicePlugins(showPolaris: (path?: string) => void, games: 
         fetcher: (url, init) => net.fetch(url, init),
         locale: () => app.getLocale(),
         fork,
+        onLive: (id, live) => {
+            liveValues.set(id, live);
+            broadcast(CHANNELS.pluginsLive, id, live);
+        },
         call: async (id, method, params) => {
             if (method === "settings.get") return manager?.settings(id) ?? null;
             if (method === "polaris.state") return { call: voiceStateNow(), games: runningGames() };
@@ -466,6 +473,7 @@ export function registerPluginIpc(
         void ensureRequirements("install", id);
     };
     handle(CHANNELS.pluginsGet, (event) => (allowed(event) ? snapshotWithActions(ready()) : null));
+    handle(CHANNELS.pluginsLiveGet, (event, id: unknown) => (allowed(event) && typeof id === "string" ? (liveValues.get(id) ?? null) : null));
     handle(CHANNELS.pluginsRefresh, async (event) => (allowed(event) ? ready().refresh() : null));
     // Every path answers (install-call.ts): a stuck or failed update comes back to the page as a reason it can say.
     handle(CHANNELS.pluginsInstall, (event, id: unknown, accepted: unknown, requires: unknown) =>

@@ -190,7 +190,6 @@ const DIM: u8 = theme::DIM as u8;
 const TRACK: u8 = theme::TRACK as u8;
 const FILL: u8 = theme::FILL as u8;
 const MUTED: u8 = theme::MUTED as u8;
-const DIVIDER: u8 = theme::DIVIDER as u8;
 
 /// The page's letters: Roboto Medium (SIL Open Font License 1.1,
 /// `assets/Roboto-LICENSE.txt`), drawn from its outlines at the size each
@@ -421,9 +420,6 @@ fn mixer_page(canvas: &mut Canvas<'_>, knobs: &[Knob; 4]) {
     for (index, knob) in knobs.iter().enumerate() {
         let left = index * COLUMN;
         let center = left + COLUMN / 2;
-        if index > 0 {
-            canvas.rect(left, 12, 1, HEIGHT - 24, DIVIDER);
-        }
         // A knob's picture takes the top of its column; its name then moves
         // under the value, into the room above the bar.
         let theme = canvas.theme;
@@ -507,7 +503,6 @@ fn call_page(canvas: &mut Canvas<'_>, call: &Call, locale: Locale) {
     };
     canvas.text(mic, WIDTH / 4, 60, 2, 17, mic_color);
     canvas.text(sound, WIDTH * 3 / 4, 60, 2, 17, sound_color);
-    canvas.rect(MARGIN, 88, WIDTH - 2 * MARGIN, 1, DIVIDER);
     let shown = if count > CALL_ROWS {
         CALL_ROWS - 1
     } else {
@@ -613,8 +608,15 @@ const UNKNOWN: u16 = 256;
 /// It keeps a model of the panel and sends only the tiles whose pixels
 /// differ from the newest page, coarse to fine, one per [`TILE_EVERY`]. A
 /// page that comes in mid-draw replaces the one being drawn at once: the
-/// tiles still owed to the older page are never sent, and the next tile is
-/// the first one the newer page needs.
+/// tiles still owed to the older page are never sent, and every tile from
+/// then on is the newer page's.
+///
+/// A pass, once begun, runs on to the finest tiles before a coarse one goes
+/// out again. Every coarse tile fills a block around each of its samples
+/// across the whole screen (the official SDK's table, [`display::TILE_BLOCKS`]),
+/// so going back to tile 0 for each new volume of a turn kept the entire
+/// panel in 8x4 blocks for as long as anything kept changing; finishing the
+/// pass first leaves it sharp at least once every 32 tiles.
 ///
 /// The panel is modelled twice, because how the firmware treats a tile sent
 /// again after the whole picture is not documented: once as if it fills each
@@ -652,6 +654,8 @@ pub struct Painter {
     last_keepalive: Option<Instant>,
     last_tile: Option<Instant>,
     last_sent: Option<Instant>,
+    /// The tile the pass in flight goes on from; 0 when none is.
+    cursor: usize,
 }
 
 impl Default for Painter {
@@ -673,6 +677,7 @@ impl Default for Painter {
             last_keepalive: None,
             last_tile: None,
             last_sent: None,
+            cursor: 0,
         }
     }
 }
@@ -729,15 +734,28 @@ impl Painter {
             self.set_up = true;
             self.setup_due = true;
             self.brightness_due = false;
-        } else if previous.is_some_and(|previous| previous.brightness != screen.brightness) {
+        } else if previous
+            .as_ref()
+            .is_some_and(|previous| previous.brightness != screen.brightness)
+        {
             self.brightness_due = true;
         }
         if !self.setup_due && self.palette != Some(frame.palette) {
             // Another look: every index on the panel means another colour
             // now, so the new palette goes first and the page is drawn whole.
             self.palette_due = true;
+            self.cursor = 0;
             self.filled.fill(UNKNOWN);
             self.sampled.fill(UNKNOWN);
+        }
+        let other_page = previous
+            .as_ref()
+            .is_none_or(|previous| kind(previous) != kind(screen));
+        if other_page || !self.is_drawing() {
+            // Nothing in flight, or another page altogether (most of the
+            // screen changes, so the tiles still owed would be painted over):
+            // a new pass starts from the coarsest tile.
+            self.cursor = 0;
         }
         self.target = Some(frame);
     }
@@ -762,6 +780,7 @@ impl Painter {
         self.palette = None;
         self.pending = None;
         self.target = None;
+        self.cursor = 0;
         self.filled.fill(UNKNOWN);
         self.sampled.fill(UNKNOWN);
     }
@@ -771,16 +790,20 @@ impl Painter {
         self.ack = true;
     }
 
-    /// The first tile, coarse to fine, whose samples the panel does not
-    /// show yet under either model.
+    /// The next tile whose samples the panel does not show yet under either
+    /// model: the rest of the pass in flight first, then a new pass from the
+    /// coarsest.
     fn next_tile(&self) -> Option<usize> {
         let target = self.target.as_ref()?;
-        (0..CHUNK_COUNT).find(|tile| {
+        let owed = |tile: &usize| {
             samples(*tile).any(|at| {
                 let want = u16::from(target.pixels[at]);
                 self.filled[at] != want || self.sampled[at] != want
             })
-        })
+        };
+        (self.cursor..CHUNK_COUNT)
+            .find(owed)
+            .or_else(|| (0..self.cursor).find(owed))
     }
 
     /// The panel after `tile` of the newest page went out.
@@ -788,6 +811,7 @@ impl Painter {
         let Some(target) = self.target.as_ref() else {
             return;
         };
+        self.cursor = (tile + 1) % CHUNK_COUNT;
         let (width, height) = display::TILE_BLOCKS[tile];
         for at in samples(tile) {
             let value = u16::from(target.pixels[at]);
@@ -904,6 +928,16 @@ impl Painter {
             || self.palette_due
             || self.next_tile().is_some()
     }
+}
+
+/// Which page a screen shows: the same one with new figures keeps the pass going.
+fn kind(screen: &Screen) -> (bool, DisplayMode, bool, bool) {
+    (
+        screen.idle.is_some(),
+        screen.mode,
+        screen.call.is_some(),
+        screen.playing.is_some(),
+    )
 }
 
 fn due(last: Option<Instant>, now: Instant, every: Duration) -> bool {

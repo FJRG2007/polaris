@@ -421,10 +421,11 @@ fn a_page_that_comes_in_mid_draw_supersedes_the_one_being_drawn() {
     painter.show(&page(50));
     painter.show(&page(60));
     let rest = run(&mut painter, start + TILE_EVERY * 4, TILE_EVERY * 80);
-    // Not the rest of the first page and then the newest whole: only what
-    // the newest still needs, and never a tile of the page in between.
+    // Not the rest of the first page and then the newest whole: the pass
+    // goes on with the newest page, one more pass at most fixes what the
+    // first tiles held, and never a tile of the page in between.
     let tiles = draws(&rest);
-    assert!(tiles.len() <= CHUNK_COUNT, "{} tiles", tiles.len());
+    assert!(tiles.len() <= 2 * CHUNK_COUNT, "{} tiles", tiles.len());
     for panel in [&mut filled, &mut sampled] {
         panel.apply(&begun);
         panel.apply(&rest);
@@ -458,6 +459,74 @@ fn a_turn_is_followed_live_and_the_panel_settles_on_the_last_volume() {
     filled.apply(&sent);
     sampled.apply(&sent);
     assert!(filled.shows(&page(59)) && sampled.shows(&page(59)));
+}
+
+/// BUG-0076: every new volume of a turn sent tile 0 again, and tile 0 fills
+/// an 8x4 block around each of its samples across the whole screen, so the
+/// panel stayed in blocks for as long as the turn lasted. A pass now runs on
+/// to the finest tiles before a coarse one goes out again.
+#[test]
+fn a_long_turn_never_keeps_the_whole_screen_in_coarse_blocks() {
+    let mut painter = Painter::default();
+    let start = Instant::now();
+    painter.show(&page(10));
+    let first = run(&mut painter, start, TILE_EVERY * 40);
+    let mut panel = Panel::new(true);
+    panel.apply(&first);
+    // Three seconds of turning: a new volume every 20 ms.
+    let mut at = start + TILE_EVERY * 41;
+    let mut during = Vec::new();
+    for step in 0..150u8 {
+        painter.show(&page(10 + step % 90));
+        during.extend(run(&mut painter, at, Duration::from_millis(19)));
+        at += Duration::from_millis(20);
+    }
+    let tiles: Vec<usize> = tiles_in(&during)
+        .into_iter()
+        .map(|(tile, _)| tile)
+        .collect();
+    // Before: 75 coarse tiles in a row, the finest never reached.
+    let coarse = tiles.iter().filter(|tile| **tile == 0).count();
+    assert!(coarse <= 3, "tile 0 sent {coarse} times in 3 s");
+    // Within a pass tiles only go finer, and every pass reaches the finest ones.
+    let passes: Vec<&[usize]> = tiles
+        .split_inclusive(|tile| *tile == CHUNK_COUNT - 1)
+        .collect();
+    assert!(passes.len() >= 2, "{tiles:?}");
+    for pass in &passes[..passes.len() - 1] {
+        assert!(
+            pass.windows(2)
+                .all(|pair| pair[0] < pair[1] || pair[1] == 0),
+            "{pass:?}"
+        );
+    }
+    // And it settles on the last volume under both firmware models.
+    let rest = run(&mut painter, at, TILE_EVERY * 80);
+    let mut sampled = Panel::new(false);
+    sampled.apply(&first);
+    for model in [&mut panel, &mut sampled] {
+        model.apply(&during);
+        model.apply(&rest);
+    }
+    let last = page(10 + 149 % 90);
+    assert!(panel.shows(&last) && sampled.shows(&last));
+    assert!(!painter.is_drawing());
+}
+
+/// The mixer page draws no frames of its own: no lines between the knobs.
+#[test]
+fn the_mixer_page_has_no_lines_between_the_knobs() {
+    let frame = render(&page(40)).unwrap();
+    let background = pixel(&frame, 2, 2);
+    for column in 1..4 {
+        let x = column * WIDTH / 4;
+        for y in 12..HEIGHT - 12 {
+            if (104..252).contains(&y) {
+                continue;
+            }
+            assert_eq!(pixel(&frame, x, y), background, "line at ({x}, {y})");
+        }
+    }
 }
 
 #[test]

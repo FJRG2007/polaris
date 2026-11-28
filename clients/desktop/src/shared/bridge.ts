@@ -273,6 +273,10 @@ export interface PolarisDesktop {
         onChange(listener: () => void): () => void;
         /** Hear the app asking to show a plugin (its "found" notice was clicked). Answers the way to stop. */
         onOpen(listener: (id: string) => void): () => void;
+        /** A running plugin's newest live values (`{ knobs }`), or null. Absent from an app older than them. */
+        live?(id: string): Promise<unknown>;
+        /** Called with a plugin's id and its live values each time they change. Absent from an app older than them. */
+        onLive?(listener: (id: string, live: unknown) => void): () => void;
         /**
          * The device's official software on this computer, for the install
          * dialog and the plugin's page: `{ kind: "look" }`, `{ kind: "choose",
@@ -882,6 +886,8 @@ export const CHANNELS = {
     pluginsViewCall: "desktop:plugins-view-call",
     pluginsChanged: "desktop:plugins-changed",
     pluginsOpen: "desktop:plugins-open",
+    pluginsLive: "desktop:plugins-live",
+    pluginsLiveGet: "desktop:plugins-live-get",
     pluginsOfficial: "desktop:plugins-official",
     pluginsAction: "desktop:plugins-action",
     pluginsProfile: "desktop:plugins-profile",

@@ -13,6 +13,7 @@
 import { useState } from "react";
 import { ImagePlus, RotateCcw, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { PluginLive } from "@/lib/device-plugins-client";
 import { CROP_ACCEPTED, ImageCropDialog } from "@/components/image-cropper";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { Button, cn, ColorPicker, Popover, PopoverContent, PopoverTrigger, settingType, useToast } from "@polaris/ui";
@@ -133,6 +134,9 @@ export function ImageSettingControl({ setting, value, label, onChange, width }: 
     );
 }
 
+/** The device's colour for a muted knob (its theme's `MUTED`). */
+const MUTED = "#eb5050";
+
 /** The well-known keys a screen preview reads; a plugin that declares none of them keeps the plain screen. */
 const LOOK_KEYS = ["backgroundColor", "backgroundImage", "textColor", "accentColor"] as const;
 
@@ -143,9 +147,10 @@ export function declaresLook(manifest: Pick<PluginManifest, "settings">): boolea
 /**
  * The device's screen as its look draws it: the background colour or picture,
  * and under each knob its icon, its name and a volume bar in the accent
- * colour. The names are what each knob follows; the volumes are a sample.
+ * colour. The names are what each knob follows; the volumes are the
+ * device's own, live, while it runs (a sample before it shows anything).
  */
-export function ScreenPreview({ manifest, values, names }: { manifest: Pick<PluginManifest, "settings">; values: Values; names: readonly string[] }) {
+export function ScreenPreview({ manifest, values, names, live = null }: { manifest: Pick<PluginManifest, "settings">; values: Values; names: readonly string[]; live?: PluginLive | null }) {
     const t = useTranslations("account");
     const color = (key: string) => lookColor(manifest.settings.find((setting): setting is ColorSetting => setting.key === key && setting.kind === "color"), values[key] ?? "");
     const background = color("backgroundColor") ?? "#101216";
@@ -169,8 +174,11 @@ export function ScreenPreview({ manifest, values, names }: { manifest: Pick<Plug
             ) : null}
             {names.slice(0, 4).map((name, index) => {
                 const icon = values[`knob${index + 1}Image`];
+                const knob = live?.knobs[index];
+                const volume = knob ? knob.volume : sample[index]!;
+                const muted = knob?.muted === true;
                 return (
-                    <div key={index} className={cn("relative flex min-w-0 flex-col items-center gap-0.5 px-1 py-1.5", index > 0 && "border-s")} style={{ borderColor: `${text}22` }}>
+                    <div key={index} className="relative flex min-w-0 flex-col items-center gap-0.5 px-1 py-1.5">
                         {isPluginImageValue(icon) ? (
                             // eslint-disable-next-line @next/next/no-img-element -- a data: URL kept on this computer
                             <img src={icon} alt="" className={cn("size-[15%] min-h-3 min-w-3 shrink-0", fit("knobImageFit", "contain") === "contain" ? "object-contain" : "object-cover")} />
@@ -178,11 +186,11 @@ export function ScreenPreview({ manifest, values, names }: { manifest: Pick<Plug
                         <span className="w-full truncate text-center font-medium leading-tight" style={{ fontSize: nameSize }} title={name}>
                             {name}
                         </span>
-                        <span className="font-semibold leading-tight" style={{ fontSize: "0.625rem" }}>
-                            {sample[index]}%
+                        <span className="font-semibold leading-tight tabular-nums" style={{ fontSize: "0.625rem", color: muted ? MUTED : undefined }}>
+                            {volume === null ? "-" : `${volume}%`}
                         </span>
                         <span className="relative mt-auto h-1/2 w-1/4 min-w-2 rounded-[1px]" style={{ backgroundColor: `${text}26` }}>
-                            <span className="absolute inset-x-0 bottom-0 rounded-[1px]" style={{ height: `${sample[index]}%`, backgroundColor: accent }} />
+                            <span className="absolute inset-x-0 bottom-0 rounded-[1px]" style={{ height: `${volume ?? 0}%`, backgroundColor: muted ? MUTED : accent }} />
                         </span>
                     </div>
                 );

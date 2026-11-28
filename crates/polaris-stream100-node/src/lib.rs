@@ -254,6 +254,21 @@ impl Controller {
     }
 }
 
+/// What each knob shows on the screen now (`{"knobs":[{"label","volume","muted"}]}`),
+/// for the plugin's page to follow live; `null` before the first page.
+#[napi(catch_unwind)]
+pub fn latest_screen_json() -> String {
+    let Some(latest) = screen::latest() else {
+        return "null".to_owned();
+    };
+    let knobs: Vec<serde_json::Value> = latest
+        .knobs
+        .iter()
+        .map(|knob| serde_json::json!({ "label": knob.label, "volume": knob.volume, "muted": knob.muted }))
+        .collect();
+    serde_json::json!({ "knobs": knobs }).to_string()
+}
+
 /// One read of the system's media session, on a worker thread: the
 /// Windows one waits on its own asynchronous calls.
 pub struct ReadNowPlaying;

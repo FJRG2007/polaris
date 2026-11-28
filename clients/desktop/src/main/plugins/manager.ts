@@ -10,7 +10,7 @@
 
 import { join } from "node:path";
 import type { Fetcher } from "./catalog";
-import type { PluginMethod } from "@/shared/plugin-protocol";
+import type { PluginLive, PluginMethod } from "@/shared/plugin-protocol";
 import type { TrustedKey } from "./signature";
 import { cachedCatalog, refreshCatalog, CATALOG_URL, LEGACY_CATALOG_URL, type Refresh } from "./catalog";
 import { addedPermissions, announced, autoUpdates, busyHoldsUpdate, decideUpdate, FIRST_CHECK_MS, nextCheckDelay, type UpdateNews } from "./updates";
@@ -91,6 +91,8 @@ export interface ManagerOptions {
     /** A device a catalog plugin supports was plugged in and the plugin is not installed. */
     readonly offer?: (entry: PluginEntry, deviceName: string) => void;
     readonly onChange?: () => void;
+    /** A running plugin's live values, as they come. */
+    readonly onLive?: (id: string, live: PluginLive) => void;
     /** Tell the person about an update: put in, waiting for them, or rolled back. Once per version. */
     readonly notify?: (id: string, news: UpdateNews) => void;
     /** Run `work` after `ms`; answers how to cancel it. A real timer by default. */
@@ -169,6 +171,7 @@ export function createPluginManager(options: ManagerOptions) {
         fork: options.fork,
         call: options.call,
         onChange: runChanged,
+        ...(options.onLive ? { onLive: options.onLive } : {}),
         log: options.log,
         ...(options.locale ? { locale: options.locale } : {}),
         ...(options.restartTimer ? { setTimer: options.restartTimer } : {})
