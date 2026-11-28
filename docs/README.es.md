@@ -351,6 +351,10 @@ Para actualizar, usa el botón Actualizar de Ajustes.
 
 ## Dónde funciona
 
+Necesita al menos 4 GB de RAM, 2 núcleos y 20 GB de disco libre; se recomiendan
+8 GB y 4 núcleos, más para sesiones de agente y servidores de juego. Las cifras
+medidas, parte por parte, están en [requisitos de hardware](requirements.es.md).
+
 La interfaz está en español e inglés, y cada cuenta elige la suya.
 
 | Cliente                                                                                 | Estado                                                                                                                                                       |

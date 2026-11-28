@@ -95,15 +95,14 @@ describe("an open plugin view", () => {
     it("is told the settings on ready, and again only when they changed elsewhere", async () => {
         const { view, post } = await openView();
         const settings = () => post.mock.calls.map((call) => call[0]).filter((message) => message?.type === "settings");
-        await settle();
-        expect(settings()).toEqual([{ type: "settings", values: { knob1: "music" } }]);
+        await vi.waitFor(() => expect(settings()).toEqual([{ type: "settings", values: { knob1: "music" } }]));
         view.rerender(<PluginView bridge={bridge} manifest={{ ...manifest }} view="view/index.html" />);
         await settle();
         expect(settings().length).toBe(1);
         // The app says something changed: the values are read again behind what is drawn.
         stored.values = { knob1: "games" };
         for (const listener of changes.listeners) listener();
-        await settle();
-        expect(settings().at(-1)).toEqual({ type: "settings", values: { knob1: "games" } });
+        // The re-read is a few awaits deep; a loaded runner needs more than one tick.
+        await vi.waitFor(() => expect(settings().at(-1)).toEqual({ type: "settings", values: { knob1: "games" } }));
     });
 });
