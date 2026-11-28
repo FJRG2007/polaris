@@ -43,6 +43,7 @@ export const SCOPE = [
     "apps/calendar/src",
     "apps/crm/src",
     "apps/status-pages/src",
+    "apps/hospitality/src",
     "apps/translate/src",
     "apps/security-scans/src",
     "apps/cloud-servers/src"

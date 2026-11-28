@@ -1,0 +1,266 @@
+{
+    "errors": {
+        "generic": "Algo ha fallado. Prueba otra vez.",
+        "checkInput": "Revisa lo escrito y prueba otra vez.",
+        "loadFailed": "No se pudo cargar la carta",
+        "saveFailed": "No se pudo guardar"
+    },
+    "actions": {
+        "retry": "Reintentar",
+        "cancel": "Cancelar",
+        "save": "Guardar"
+    },
+    "mode": {
+        "standard": "Vista normal",
+        "basic": "Vista simple"
+    },
+    "venue": {
+        "pick": "Local"
+    },
+    "menu": {
+        "title": "Carta",
+        "all": "Todo",
+        "import": "Importar",
+        "export": "Exportar",
+        "prices": "Precios",
+        "newProduct": "Producto",
+        "newCategory": "Familia",
+        "edit": "Editar",
+        "soldOut": "Agotado",
+        "backOn": "Hay",
+        "empty": "Aún no hay nada",
+        "emptyManager": "Añade un producto o importa una hoja.",
+        "exportFile": "carta.csv",
+        "categoryNotEmpty": "Mueve o borra antes sus productos.",
+        "exportXlsx": "carta.xlsx",
+        "exportCsv": "CSV"
+    },
+    "setup": {
+        "title": "Prepara tu local",
+        "description": "Empieza con una carta de ejemplo y un salón de ocho mesas. Luego lo cambias todo.",
+        "askManager": "Un encargado debe preparar antes el local.",
+        "start": "Usar el ejemplo",
+        "sampleVenue": "Mi local",
+        "sampleRoom": "Salón",
+        "sampleCsv": "categoria,nombre,precio,iva,alergenos,estacion\nBebidas,Agua,1.80,10,,bar\nBebidas,Caña,2.50,10,gluten,bar\nBebidas,Refresco,2.20,10,,bar\nBebidas,Café,1.50,10,leche,bar\nEntrantes,Patatas bravas,5.50,10,huevos,kitchen\nEntrantes,Croquetas,7.00,10,gluten|leche|huevos,kitchen\nPrincipales,Hamburguesa,11.50,10,gluten|leche|huevos|sesamo,kitchen\nPrincipales,Pescado a la plancha,14.00,10,pescado,kitchen\nPostres,Tarta de queso,5.00,10,leche|huevos|gluten,kitchen\n"
+    },
+    "product": {
+        "new": "Nuevo producto",
+        "edit": "Editar producto",
+        "name": "Nombre",
+        "price": "Precio",
+        "tax": "IVA",
+        "category": "Familia",
+        "description": "Descripción",
+        "sku": "Código",
+        "image": "Enlace foto",
+        "allergens": "Alérgenos"
+    },
+    "category": {
+        "new": "Nueva familia",
+        "edit": "Editar familia",
+        "name": "Nombre",
+        "station": "Se hace en",
+        "color": "Color"
+    },
+    "stations": {
+        "kitchen": "Cocina",
+        "bar": "Barra"
+    },
+    "prices": {
+        "title": "Cambiar precios",
+        "apply": "Aplicar",
+        "which": "Productos",
+        "how": "Cambiar en",
+        "percent": "Porcentaje",
+        "amount": "Importe",
+        "value": "Cuánto",
+        "hint": "Usa un signo menos para bajar. El porcentaje redondea a 5 céntimos.",
+        "done": "{count, plural, one {# precio cambiado} other {# precios cambiados}}"
+    },
+    "import": {
+        "title": "Importar carta",
+        "run": "Importar",
+        "hint": "Un CSV o Excel con columnas familia, nombre, precio, iva, alérgenos, código. Lo que ya existe se actualiza.",
+        "done": "{created} nuevos, {updated} cambiados",
+        "skipped": "Filas saltadas: {rows}",
+        "unreadable": "No se pudo leer ese archivo.",
+        "choose": "Elegir archivo"
+    },
+    "allergens": {
+        "gluten": "Gluten",
+        "crustaceans": "Crustáceos",
+        "eggs": "Huevos",
+        "fish": "Pescado",
+        "peanuts": "Cacahuetes",
+        "soy": "Soja",
+        "milk": "Leche",
+        "nuts": "Frutos secos",
+        "celery": "Apio",
+        "mustard": "Mostaza",
+        "sesame": "Sésamo",
+        "sulphites": "Sulfitos",
+        "lupin": "Altramuz",
+        "molluscs": "Moluscos"
+    },
+    "tabs": {
+        "label": "Hostelería",
+        "service": "Servicio",
+        "menu": "Carta",
+        "kitchen": "Cocina",
+        "till": "Caja"
+    },
+    "service": {
+        "noFloor": "Aún no hay salón",
+        "noFloorHint": "Prepara antes el local en Carta."
+    },
+    "floor": {
+        "edit": "Editar sala",
+        "done": "Listo",
+        "table": "Mesa",
+        "roomName": "Nombre sala",
+        "addTable": "Mesa",
+        "tableName": "Nombre mesa",
+        "fewerSeats": "Menos sillas",
+        "moreSeats": "Más sillas",
+        "removeTable": "Quitar mesa",
+        "seats": "{count, plural, one {# silla} other {# sillas}}",
+        "state": {
+            "free": "libre",
+            "open": "abierta",
+            "pending": "sin marchar",
+            "billed": "pide cuenta"
+        },
+        "shape": {
+            "square": "Cuadrada",
+            "round": "Redonda",
+            "long": "Larga"
+        }
+    },
+    "order": {
+        "back": "Volver a sala",
+        "course": "Pase",
+        "courses": {
+            "0": "Ya",
+            "1": "1º",
+            "2": "2º",
+            "3": "Postre"
+        },
+        "send": "Marchar",
+        "sent": "Enviado a cocina y barra",
+        "remove": "Quitar",
+        "less": "Uno menos",
+        "status": {
+            "pending": "por marchar",
+            "sent": "marchado",
+            "ready": "listo",
+            "served": "servido",
+            "void": "anulado"
+        },
+        "bill": "Cuenta",
+        "pay": "Cobrar",
+        "pick": "Elige {count}",
+        "upTo": "Hasta {count}",
+        "note": "Nota para cocina",
+        "add": "Poner",
+        "more": "Uno más",
+        "change": "Cambiar {name}",
+        "move": "Mover"
+    },
+    "orders": {
+        "tableGone": "Esa mesa ya no está en la sala.",
+        "gone": "Ese pedido ya no existe.",
+        "closed": "Ese pedido ya está cerrado.",
+        "soldOut": "Hay algo agotado en él.",
+        "modifiers": "Elige las opciones que necesita.",
+        "tableBusy": "Una mesa que quitaste tiene una cuenta abierta."
+    },
+    "kitchen": {
+        "station": "Puesto",
+        "all": "Todos",
+        "undo": "Deshacer",
+        "empty": "Nada pendiente",
+        "minutes": "{count} min",
+        "allReady": "Todo listo"
+    },
+    "till": {
+        "openTitle": "Abrir la caja",
+        "float": "Cambio",
+        "open": "Abrir caja",
+        "openSince": "Caja abierta por {name}",
+        "moveTitle": "Entrada o salida",
+        "in": "Entrada",
+        "out": "Salida",
+        "amount": "Importe",
+        "reason": "Motivo",
+        "record": "Anotar",
+        "closeTitle": "Cerrar la caja",
+        "closeHint": "Cuenta el cajón y escribe lo que hay.",
+        "counted": "Contado",
+        "close": "Cerrar e imprimir Z",
+        "zTitle": "Informe Z {number}",
+        "expected": "Esperado",
+        "short": "Falta",
+        "over": "Sobra",
+        "next": "Listo",
+        "orders": "Pedidos",
+        "sales": "Ventas",
+        "discounts": "Descuentos",
+        "tips": "Propinas",
+        "tax": "IVA {rate} %",
+        "noShift": "Abre antes la caja.",
+        "shiftOpen": "La caja ya está abierta.",
+        "overpaid": "Es más de lo que queda."
+    },
+    "pay": {
+        "title": "Cobrar {amount}",
+        "handed": "Entregado",
+        "change": "Cambio: {amount}",
+        "partial": "Quedan {amount}",
+        "card": "Tarjeta {amount}",
+        "done": "Cobrado. Ticket {ticket}",
+        "methods": {
+            "cash": "Efectivo",
+            "card": "Tarjeta",
+            "other": "Otro"
+        },
+        "modes": {
+            "whole": "Todo",
+            "items": "Por plato",
+            "even": "A partes"
+        },
+        "tip": "Bote",
+        "noTip": "Nada",
+        "fewer": "Menos gente",
+        "more": "Más gente",
+        "parts": "{count} personas, {amount} cada una",
+        "short": "Faltan {amount} para el total",
+        "pickItems": "Toca lo que paga esta persona."
+    },
+    "discount": {
+        "title": "Descuento",
+        "reason": "Motivo",
+        "remove": "Quitar",
+        "apply": "Aplicar",
+        "line": "Descuento en {name}"
+    },
+    "offline": {
+        "queued": "Sin red: guardado aquí, se enviará",
+        "waiting": "{count} en espera",
+        "waitingHint": "Guardado en este aparato; sale en cuanto vuelva la red"
+    },
+    "move": {
+        "title": "Pasar a otra mesa",
+        "whole": "Toda",
+        "some": "Algunos",
+        "joins": "{table} está abierta: se suman a su cuenta.",
+        "confirm": "Mover",
+        "done": "Pasado a {table}"
+    },
+    "picture": {
+        "choose": "Elegir foto",
+        "remove": "Quitar",
+        "hint": "O suéltala o pégala aquí",
+        "failed": "No se pudo guardar la foto."
+    }
+}

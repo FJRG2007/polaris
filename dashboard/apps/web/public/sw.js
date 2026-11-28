@@ -39,7 +39,7 @@ const MEDIA = "polaris-chat-media";
 const KEPT_SECTIONS = [
     "account", "admin", "analytics", "announcements", "apps", "automations", "calendar", "chat", "crm",
     "drive", "game-servers", "games", "home", "mail", "mail-server", "network-filter", "notes", "office",
-    "places", "polar", "router", "status-pages", "tasks", "telemetry", "tools", "translate", "vpn", "watch"
+    "places", "polar", "router", "status-pages", "hospitality", "tasks", "telemetry", "tools", "translate", "vpn", "watch"
 ];
 /* How many pages are kept at most; the least recently loaded go first. */
 const PAGES_KEPT = 80;

@@ -254,6 +254,18 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
+    // A plate with a fork and a knife.
+    hospitality: {
+        palette: ["#FCA5A5", "#B91C1C", "#7F1D1D"],
+        draw: ({ base, face }) => (
+            <>
+                <circle cx="16" cy="16" r="12" fill={base} />
+                <circle cx="16" cy="16" r="7.5" fill={face} />
+                <rect x="6.2" y="8" width="2" height="16" rx="1" fill={WHITE} />
+                <rect x="23.8" y="8" width="2" height="16" rx="1" fill={WHITE} />
+            </>
+        )
+    },
     // A status page: a header and a row of uptime bars.
     "status-pages": {
         palette: ["#6EE7B7", "#10B981", "#047857"],

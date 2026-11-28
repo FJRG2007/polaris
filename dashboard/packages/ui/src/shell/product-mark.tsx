@@ -15,6 +15,7 @@ export type PolarisProduct =
     | "polar"
     | "notes"
     | "crm"
+    | "hospitality"
     | "automations"
     | "translate";
 

@@ -1,0 +1,25 @@
+{
+    "name": "@polaris-app/hospitality",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Hospitality: run a bar or restaurant - the menu, the floor, orders, the kitchen and the till - on the local network. An installable Polaris app.",
+    "polaris": {
+        "id": "hospitality",
+        "extension": "src/lib/hospitality-extension.ts#hospitalityExtension"
+    },
+    "dependencies": {
+        "@polaris/app-host": "0.1.0",
+        "@polaris/core": "0.1.0",
+        "@polaris/db": "0.1.0",
+        "@polaris/ui": "0.1.0",
+        "lucide-react": "0.469.0",
+        "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+        "zod": "3.25.76"
+    },
+    "peerDependencies": {
+        "next": "*",
+        "react": "^19",
+        "react-dom": "^19"
+    }
+}

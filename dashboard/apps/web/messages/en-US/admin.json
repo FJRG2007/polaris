@@ -3073,7 +3073,8 @@
             "translate": "Translate",
             "polar": "Polar",
             "terminal": "Terminal",
-            "alerts": "Alerts"
+            "alerts": "Alerts",
+            "hospitality": "Hospitality"
         },
         "permissions": {
             "drive": {
@@ -3191,6 +3192,10 @@
             },
             "alerts": {
                 "topics": "Receive alerts from other systems"
+            },
+            "hospitality": {
+                "use": "Take orders and use the till",
+                "manage": "Run the menu, the floor and the reports"
             }
         }
     },
