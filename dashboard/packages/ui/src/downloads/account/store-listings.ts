@@ -12,7 +12,16 @@
  * answer that worked and is asked again in five minutes; with none ever read,
  * the store is left off - the APK is always offered, so nobody is left without
  * a way to install it.
+ *
+ * Past the six hours the held answer is still what the page draws: the store is
+ * asked again behind the read (`@polaris/core/stale-while-revalidate`). The
+ * Android card used to wait up to five seconds on Google Play every time the
+ * hold ran out, and every five minutes while Play refused a server's request.
+ * Only a deployment that has never had an answer waits, and not past the
+ * timeout.
  */
+
+import { staleWhileRevalidate } from "@polaris/core/stale-while-revalidate";
 
 /** The application id in `mobile/android/app/build.gradle`. */
 export const ANDROID_PACKAGE = "app.polaris.mobile";
@@ -38,14 +47,20 @@ export function listingState(status: number): boolean | null {
     return null;
 }
 
+/** What a store last said, and whether the look that said it failed (then it is
+ *  the answer before, kept, and asked again in `RETRY_MS`). */
 interface Held {
     readonly listed: boolean | null;
-    readonly at: number;
-    readonly hold: number;
+    readonly failed: boolean;
 }
 
-const held = new Map<string, Held>();
-const pending = new Map<string, Promise<boolean | null>>();
+const listings = staleWhileRevalidate<Held>({
+    freshMs: HOLD_MS,
+    retryMs: RETRY_MS,
+    freshFor: (held) => (held.failed ? RETRY_MS : HOLD_MS),
+    waitMs: TIMEOUT_MS,
+    maxKeys: 8
+});
 
 async function ask(url: string): Promise<boolean | null> {
     try {
@@ -64,17 +79,13 @@ async function ask(url: string): Promise<boolean | null> {
 }
 
 async function listed(url: string): Promise<boolean> {
-    const last = held.get(url);
-    if (last && Date.now() - last.at < last.hold) return last.listed ?? false;
-    let running = pending.get(url);
-    if (!running) {
-        running = ask(url).finally(() => pending.delete(url));
-        pending.set(url, running);
-    }
-    const answer = await running;
-    const known = answer ?? last?.listed ?? null;
-    held.set(url, { listed: known, at: Date.now(), hold: answer === null ? RETRY_MS : HOLD_MS });
-    return known ?? false;
+    const held = await listings.get(url, async (previous) => {
+        const answer = await ask(url);
+        return answer === null
+            ? { listed: previous?.listed ?? null, failed: true }
+            : { listed: answer, failed: false };
+    });
+    return held?.listed ?? false;
 }
 
 /** The stores that carry Polaris for Android, asked of the stores themselves. */

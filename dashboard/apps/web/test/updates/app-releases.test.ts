@@ -39,6 +39,12 @@ const release = (over: Partial<ReleaseListing> = {}): ReleaseListing => ({
     ...over
 });
 
+/** Let a refresh started in the background finish: past its freshness a held
+ *  list is served at once and replaced behind the read, never waited for. */
+async function settle(): Promise<void> {
+    for (let turn = 0; turn < 50; turn++) await Promise.resolve();
+}
+
 describe("pickRelease", () => {
     it("offers nothing when there are no releases at all", () => {
         expect(pickRelease([], DESKTOP_TAG_PREFIX)).toBeNull();
@@ -396,6 +402,9 @@ describe("appDownload", () => {
             try {
                 expect(await extensionDownload("example/cut-short")).toBeNull();
                 vi.advanceTimersByTime(121_000);
+                // Served at once from what was held, refreshed behind the read.
+                expect(await extensionDownload("example/cut-short")).toBeNull();
+                await settle();
                 expect((await extensionDownload("example/cut-short"))?.version).toBe("0.1.10");
                 const [, init] = fetching.mock.calls[2] as [string, RequestInit];
                 expect((init.headers as Record<string, string>)["if-none-match"]).toBeUndefined();
@@ -415,6 +424,10 @@ describe("appDownload", () => {
             try {
                 await extensionDownload("example/published");
                 vi.advanceTimersByTime(121_000);
+                // The reader past the two minutes is not kept waiting: the list
+                // held answers, and the one after sees the new release.
+                expect((await extensionDownload("example/published"))?.version).toBe("0.1.10");
+                await settle();
                 expect((await extensionDownload("example/published"))?.version).toBe("0.1.12");
             } finally {
                 vi.unstubAllGlobals();
@@ -480,6 +493,7 @@ describe("a release every member is offered", () => {
             expect(later.download?.version).toBe("0.1.19");
             expect(pickFile(later.download?.files ?? [], [".exe"])?.name).toBe("Polaris-Setup.exe");
             // Tried again soon, not two minutes later.
+            await settle();
             vi.advanceTimersByTime(31_000);
             await desktopDownload("example/members");
             expect(fetching).toHaveBeenCalledTimes(3);

@@ -4,7 +4,7 @@ import { DEFAULT_IOS_BUNDLE } from "@/lib/mobile/voip-push";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { getGithubStatus } from "@/lib/github-service";
-import { getRunnerAccess } from "@/lib/github-runners";
+import { runnerAccessForScreen } from "@/lib/github-runners";
 import { connectionProven } from "@/lib/connections/proven";
 import { listIntegrationStates } from "@/lib/integration-service";
 import { readConnectionFailure } from "@/lib/connections/attention";
@@ -249,7 +249,8 @@ export async function loadIntegrationsAction() {
 export async function loadRunnerAccessAction() {
     await requireAdmin();
     try {
-        const access = await getRunnerAccess();
+        const access = await runnerAccessForScreen();
+        if (!access) return null;
         return { ready: access.ready, advice: access.advice };
     } catch (error) {
         console.error("[integrations] runner access check failed", error);

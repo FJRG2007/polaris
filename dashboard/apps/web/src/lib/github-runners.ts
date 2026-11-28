@@ -20,6 +20,7 @@
 
 import { getGithubStatus, githubApiToken, listGithubInstallations } from "@/lib/github-service";
 import { evaluateRunnerAccess, normalizeRunnerLabels, type RunnerTargetKind } from "@polaris/core";
+import { staleWhileRevalidate } from "@polaris/core/stale-while-revalidate";
 
 const API = "https://api.github.com";
 
@@ -315,12 +316,29 @@ export async function getRunnerAccess() {
     return evaluateRunnerAccess({ method: null });
 }
 
+type RunnerAccess = Awaited<ReturnType<typeof getRunnerAccess>>;
+
+/** The same answer for a screen: held per connection method, served at once and
+ *  re-read from GitHub behind the render. The Runners page and the GitHub card
+ *  on Integrations used to ask GitHub on every visit, with no timeout. Adding a
+ *  runner still asks `getRunnerAccess` fresh, because that is a decision. */
+const screenAccess = staleWhileRevalidate<RunnerAccess>({ freshMs: 60_000, waitMs: 4000, maxKeys: 4 });
+
+export async function runnerAccessForScreen(): Promise<RunnerAccess | null> {
+    const status = await getGithubStatus();
+    return (await screenAccess.get(status.method ?? "none", () => getRunnerAccess())) ?? null;
+}
+
 /** Scopes of the stored classic token, or null when GitHub reported none (which
  *  is what a fine-grained token looks like). */
 async function readPatScopes(): Promise<string[] | null> {
     const token = await githubApiToken();
     if (!token) return null;
-    const res = await fetch(`${API}/user`, { headers: apiHeaders(token), cache: "no-store" });
+    const res = await fetch(`${API}/user`, {
+        headers: apiHeaders(token),
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000)
+    });
     const header = res.headers.get("x-oauth-scopes");
     if (header === null) return null;
     return header

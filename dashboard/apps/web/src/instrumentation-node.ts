@@ -60,6 +60,14 @@ export async function registerNode(): Promise<void> {
     // cannot be read leaves the seed table in place.
     const { ensureProviderCatalog } = await import("./lib/integrations/provider-catalog");
     void ensureProviderCatalog();
+    // The release list and store listings Downloads draws from, read once now so
+    // the first visit after a restart - which an update is - paints from memory
+    // instead of waiting on GitHub. Never throws.
+    const { warmAppReleases } = await import("./lib/app-releases");
+    const { androidStores } = await import("@polaris/ui/account-downloads/store-listings");
+    const { loadEnv: envForWarmup } = await import("@polaris/config");
+    void warmAppReleases(envForWarmup().POLARIS_REPO).catch(() => undefined);
+    void androidStores().catch(() => undefined);
 
     const { afterPredecessor, whenAlone } = await import("./lib/deploy/dashboard-peers");
     const { startMetricsCollector } = await import("./lib/metrics-collector-service");

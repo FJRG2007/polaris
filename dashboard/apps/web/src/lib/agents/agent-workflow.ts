@@ -18,6 +18,7 @@
  * `server` execution installs nothing: it needs no workflow at all.
  */
 
+import { coalescer } from "@/lib/coalesce";
 import { Buffer } from "node:buffer";
 import { prisma } from "@polaris/db";
 import { AGENT_EXECUTIONS, AGENT_WORKFLOW_PATH, needsWorkflowFile, type AgentExecution } from "@polaris/core";
@@ -306,6 +307,18 @@ export async function reconcileRepoWorkflows(ownerId: string): Promise<number> {
         )
     );
     return results.filter((result) => !result.error).length;
+}
+
+const reconciling = coalescer<number>();
+
+/**
+ * `reconcileRepoWorkflows` for a screen: started, never waited for. The list of
+ * repositories used to sit behind up to five GitHub writes on every visit while
+ * a write kept failing; it now draws at once and the next visit shows the
+ * result. One run per owner at a time, however many tabs open the page.
+ */
+export function reconcileRepoWorkflowsInBackground(ownerId: string): void {
+    void reconciling.run(ownerId, () => reconcileRepoWorkflows(ownerId)).catch(() => undefined);
 }
 
 /**

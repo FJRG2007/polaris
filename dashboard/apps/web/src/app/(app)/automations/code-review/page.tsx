@@ -5,21 +5,23 @@ import { ReposView } from "./repos-view";
 import { requirePermission } from "@/lib/session";
 import { providersFor } from "@/lib/agents/model-keys";
 import { listAgentRepos } from "@/lib/agents/agent-repo-service";
-import { reconcileRepoWorkflows } from "@/lib/agents/agent-workflow";
+import { reconcileRepoWorkflowsInBackground } from "@/lib/agents/agent-workflow";
 import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgentReposPage() {
-    // Anything whose workflow file never made it into GitHub is put right before
-    // the list is read, so a repository that looks configured here is configured
-    // there too. A healthy instance matches nothing and pays one query.
     const user = await requirePermission("agents.read");
-    const t = await getTranslations("agents");
+    // Anything whose workflow file never made it into GitHub is put right behind
+    // the render, so a repository that looks configured here is configured there
+    // too by the next visit. A healthy instance matches nothing and pays one query.
+    reconcileRepoWorkflowsInBackground(user.id);
 
-    await reconcileRepoWorkflows(user.id).catch(() => undefined);
-
-    const [repos, providers] = await Promise.all([listAgentRepos(user.id), providersFor(user.id)]);
+    const [t, repos, providers] = await Promise.all([
+        getTranslations("agents"),
+        listAgentRepos(user.id),
+        providersFor(user.id)
+    ]);
 
     return (
         <>

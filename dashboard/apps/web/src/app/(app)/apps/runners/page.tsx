@@ -5,7 +5,7 @@ import { PageHeader } from "@polaris/ui";
 import { RunnersView } from "./runners-view";
 import { LOCAL_SERVER_ID } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
-import { getRunnerAccess } from "@/lib/github-runners";
+import { runnerAccessForScreen } from "@/lib/github-runners";
 import { listRunnerPools } from "@/lib/runners/runner-service";
 import { localMachineIdentity } from "@/lib/local-machine";
 import { findLocalHost, hasOtherServer } from "@/lib/server-options";
@@ -64,7 +64,7 @@ export default async function RunnersPage() {
  *  before they fill anything in, and this is the same evaluation the GitHub card
  *  on Integrations shows. */
 async function GithubAccess() {
-    const access = await getRunnerAccess().catch(() => null);
+    const access = await runnerAccessForScreen().catch(() => null);
     if (access?.ready) return null;
     const t = await getTranslations("runners");
     return (

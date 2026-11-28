@@ -37,6 +37,10 @@
             "types": "./dist/app-settings.d.ts",
             "import": "./dist/app-settings.js"
         },
+        "./stale-while-revalidate": {
+            "types": "./dist/stale-while-revalidate.d.ts",
+            "import": "./dist/stale-while-revalidate.js"
+        },
         "./device-plugins": {
             "types": "./dist/device-plugins.d.ts",
             "import": "./dist/device-plugins.js"

@@ -19,6 +19,13 @@
  * to be ten, and ten is how long somebody looking for a release that had just been
  * published was shown the one before it - by a screen that has no refresh of its own.
  *
+ * The two minutes decide when the list is looked at again, never how long a screen
+ * waits: the list held is served at once, fresh or not, and the look happens in
+ * the background, shared by every viewer that lands meanwhile
+ * (`@polaris/core/stale-while-revalidate`). It used to block on expiry, so
+ * whoever opened Downloads after the two minutes - and after every restart -
+ * waited on up to three pages of GitHub before a single file drew.
+ *
  * Past the two minutes the first page is asked for again with the `etag` it last
  * came with. An unchanged list answers `304` with no body, and the answer already
  * held is kept without walking the pages again; GitHub only promises that a `304`
@@ -177,6 +184,8 @@ export function pickRelease(
     };
 }
 
+import { staleWhileRevalidate } from "@polaris/core/stale-while-revalidate";
+
 /** Every prefix a screen asks about. One walk of the list answers all of them, so
  *  it stops once each has been seen rather than once the first one has. */
 const KNOWN_PREFIXES = [
@@ -195,7 +204,9 @@ const RETRY_MS = 30 * 1000;
 interface Held {
     /** The releases the last walk that finished saw, or null when none has. */
     readonly releases: readonly ReleaseListing[] | null;
-    readonly at: number;
+    /** True when the last look failed or was cut short, so the next one is due
+     *  in `RETRY_MS` rather than the usual two minutes. */
+    readonly retry: boolean;
     /** The first page's `etag` when this list was read, if it had one. */
     readonly etag: string | null;
     /** False when the walk was cut short, so a prefix missing from `releases` may
@@ -211,8 +222,15 @@ export interface AppLookup {
     readonly reached: boolean;
 }
 
-const cache = new Map<string, Held>();
-const pending = new Map<string, Promise<Held>>();
+/** The list per repository: served at once, refreshed behind the read, one walk
+ *  at a time however many screens ask. A screen with nothing held waits at most
+ *  the walk's own deadline. */
+const lists = staleWhileRevalidate<Held>({
+    freshMs: CACHE_TTL_MS,
+    freshFor: (held) => (held.retry ? RETRY_MS : CACHE_TTL_MS),
+    waitMs: LOOKUP_TIMEOUT_MS,
+    maxKeys: 32
+});
 
 /** What a walk came back with: the releases seen, the first page's `etag`, and
  *  whether it read as far as it meant to. A `304` on that page is `unchanged`,
@@ -297,8 +315,8 @@ function merged(
 export async function appLookup(repo: string, prefix: string): Promise<AppLookup> {
     const trimmed = repo.trim();
     if (!REPO.test(trimmed)) return { download: null, reached: true };
-    const held = await heldList(trimmed);
-    if (!held.releases) return { download: null, reached: false };
+    const held = await lists.get(trimmed, (previous) => refresh(trimmed, previous));
+    if (!held?.releases) return { download: null, reached: false };
     const download = pickRelease(held.releases, prefix);
     return { download, reached: download !== null || held.complete };
 }
@@ -308,46 +326,41 @@ export async function appDownload(repo: string, prefix: string): Promise<AppDown
     return (await appLookup(repo, prefix)).download;
 }
 
-async function heldList(repo: string): Promise<Held> {
-    const held = cache.get(repo);
-    if (held && Date.now() - held.at < CACHE_TTL_MS) return held;
-
-    const running = pending.get(repo);
-    if (running) return running;
-    const lookup = refresh(repo, held).finally(() => pending.delete(repo));
-    pending.set(repo, lookup);
-    return lookup;
-}
-
 async function refresh(repo: string, held: Held | undefined): Promise<Held> {
     const asked = await ask(repo, held?.releases ? held.etag : null);
-    const now = Date.now();
-    let next: Held;
-    if ("unchanged" in asked && held?.releases) {
-        next = { ...held, at: now };
-    } else if ("releases" in asked && asked.complete) {
-        next = { releases: asked.releases, etag: asked.etag, complete: true, at: now };
-    } else if ("releases" in asked) {
+    if ("unchanged" in asked && held?.releases) return { ...held, retry: false };
+    if ("releases" in asked && asked.complete) {
+        return { releases: asked.releases, etag: asked.etag, complete: true, retry: false };
+    }
+    if ("releases" in asked) {
         // Cut short: keep what was read, fill the rest from the last list, and
         // look again soon. No `etag`, so the next look reads every page again.
-        next = {
+        return {
             releases: held?.releases ? merged(asked.releases, held.releases) : asked.releases,
             etag: null,
             complete: held?.complete ?? false,
-            at: now - CACHE_TTL_MS + RETRY_MS
-        };
-    } else {
-        // Failed, or a 304 with no list held to keep: keep whatever list was last
-        // read, and look again sooner than the usual two minutes.
-        next = {
-            releases: held?.releases ?? null,
-            etag: held?.releases ? held.etag : null,
-            complete: held?.complete ?? false,
-            at: now - CACHE_TTL_MS + RETRY_MS
+            retry: true
         };
     }
-    cache.set(repo, next);
-    return next;
+        // Failed, or a 304 with no list held to keep: keep whatever list was last
+        // read, and look again sooner than the usual two minutes.
+    return {
+        releases: held?.releases ?? null,
+        etag: held?.releases ? held.etag : null,
+        complete: held?.complete ?? false,
+        retry: true
+    };
+}
+
+/** Read the list into memory ahead of the first screen that needs it - what the
+ *  server does at boot, so the visit after a restart does not wait on GitHub. */
+export async function warmAppReleases(repo: string): Promise<void> {
+    await appLookup(repo, DESKTOP_TAG_PREFIX);
+}
+
+/** Forget every list held, for a test that needs a cold start. */
+export function forgetAppReleases(): void {
+    lists.forget();
 }
 
 /** The desktop app for Windows, macOS and Linux. */
