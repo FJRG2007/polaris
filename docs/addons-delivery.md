@@ -146,3 +146,56 @@ grants nothing for it, not even to the wildcard, until the app is back.
   in the core schema, so a host without it is told to update rather than offered
   an install; every current image carries it anyway, and an id the image carries
   stays the image's.
+
+## App-owned data
+
+An app that keeps data needs no dashboard release for its tables. It ships SQL
+migrations in its bundle and the host applies them into a Postgres schema of
+its own, `app_<id>` (dashes become underscores), never into the core Prisma
+schema. This is the technique Odoo modules (per-module migrations run on module
+upgrade), Directus extensions and Strapi plugins (each plugin's migrations
+tracked in its own table) and PocketBase (ordered, forward-only migration files)
+converged on. Code: `apps/web/src/lib/app-bundles/migrations.ts`.
+
+- **Shipping.** `polaris.assets.migrations` points at the app's `migrations/`
+  folder; each file is `NNNN_name.sql` and they apply in name order.
+- **When.** Before any of the app's code is loaded: on install, on every boot,
+  and when its bundle changes (`migrate()` in `lifecycle.ts`).
+- **Tracking.** `app_<id>._polaris_migrations` (name, sha256, applied_at). An
+  applied migration never runs again; one whose text changed after it was
+  applied stops the app instead of being skipped.
+- **Rules, checked before anything runs.** Additive only: no DROP, TRUNCATE,
+  RENAME, or DELETE without WHERE. Its own schema only: a statement naming any
+  other schema, or touching the search path, roles or grants, is refused.
+- **Safety.** One transaction per run, under `pg_advisory_xact_lock` keyed to
+  the app, with `SET LOCAL search_path` to the app's schema. A failure keeps
+  nothing of the run and leaves the app off with a sentence naming the
+  migration, shown where any app failure is (`appFailure`); two servers
+  installing at once apply each migration exactly once.
+- **Reading and writing.** `appDatabase(id)` gives the app a client scoped to
+  its schema (parameters bound, never string-built). Users and permissions stay
+  behind the host APIs; an app never reads core tables.
+
+Not yet done: `appDatabase` is a host-side function and is not yet handed to
+bundles as a host API service (that is a host API minor bump, see below).
+Hospitality's tables stay in the core schema for now, with `coreTables: true`.
+Moving them later: ship `0001_*.sql` creating the same tables in
+`app_hospitality`, copy the rows across in a one-off host step run once under
+the same advisory lock, switch the app to `appDatabase`, keep the core tables
+read-only for one release as the rollback path, then drop them from the Prisma
+schema in a later release.
+
+## The host API version is the gate
+
+`HOST_API` in `dashboard/packages/app-host/src/version.ts` (kept equal to
+`hostApi` in that package's `package.json`) is the host contract version,
+`MAJOR.MINOR`, and the only thing that decides whether a dashboard runs an app.
+It only ever goes up: a new host service or shared library raises the minor,
+taking one away or changing what one takes or returns raises the major. Every
+change to the contract bumps it in the same commit. An app runs on a dashboard
+with the same major and at least its minor (`hostApiVerdict`).
+
+`minPolaris` is optional and only shown ("Needs Polaris X - Update"); without
+it the card says "Needs a newer Polaris - Update". The dashboard's package
+version (`apps/web/package.json`) has not moved since 2026-07-21 and gates
+nothing.

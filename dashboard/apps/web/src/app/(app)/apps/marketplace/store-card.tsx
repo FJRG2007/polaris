@@ -23,6 +23,7 @@ import { PREVIEW_HEIGHT, StatusBadge, StoreCardFrame, StorePreview } from "@pola
 export { PREVIEW_HEIGHT, StatusBadge, StoreCardFrame };
 export { OverflowMenu, type OverflowEntry } from "@polaris/ui/store-layout";
 import type { PrimaryAction } from "@/lib/apps/marketplace-store";
+import { NEWER_POLARIS } from "@/lib/apps/runtime-catalog-schema";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { AppLogo, Badge, Button } from "@polaris/ui";
@@ -194,7 +195,11 @@ export function PrimaryActionButton({
         case "needsPolaris":
             return (
                 <Button asChild size={size} variant="outline" title={t("card.needsPolarisHint")}>
-                    <Link href="/admin/updates">{t("card.needsPolaris", { version: action.version })}</Link>
+                    <Link href="/admin/updates">
+                        {action.version === NEWER_POLARIS
+                            ? t("card.needsNewerPolaris")
+                            : t("card.needsPolaris", { version: action.version })}
+                    </Link>
                 </Button>
             );
         case "unavailable":

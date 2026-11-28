@@ -92,6 +92,7 @@
         "locked": "Needs permission",
         "lockedHint": "Installing apps needs permission to manage apps. Ask an admin.",
         "needsPolaris": "Needs Polaris {version} - Update",
+        "needsNewerPolaris": "Needs a newer Polaris - Update",
         "needsPolarisHint": "This app needs a newer Polaris. Update it from Settings, then install the app.",
         "preview": "{name} preview",
         "kindApp": "App",

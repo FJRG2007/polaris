@@ -17,7 +17,7 @@
 import { primeAppCatalog } from "@/lib/apps/runtime-catalog";
 import { knownApps } from "./code";
 import { findApp } from "@/lib/apps/catalog";
-import { BundleIncompatible, BundleUnavailable, removeBundle } from "./store";
+import { BundleIncompatible, BundleUnavailable, ensureBundle, removeBundle } from "./store";
 import { loadBundle, loadedBundle, unloadBundle } from "./loader";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import { afterPredecessor, predecessorRetired } from "@/lib/deploy/dashboard-peers";
@@ -69,9 +69,21 @@ function failureOf(error: unknown): AppFailure {
         : { reason: reasonOf(error) };
 }
 
+/**
+ * An app's own tables, from the migrations its bundle ships, before any of its
+ * code runs. A failure throws, so the app stays off with the reason instead of
+ * running on tables older than its code.
+ */
+async function migrate(id: string): Promise<void> {
+    const { applyAppMigrations, bundleMigrations, hostMigrationDb } = await import("./migrations");
+    const migrations = await bundleMigrations(await ensureBundle(id));
+    if (migrations.length > 0) await applyAppMigrations(await hostMigrationDb(), id, migrations);
+}
+
 /** Load an app's bundle, and start what it runs from boot. */
 async function bring(id: string): Promise<void> {
     const already = loadedBundle(id);
+    await migrate(id);
     const bundle = await loadBundle(id);
     state.failures.delete(id);
     // What an app starts with the server acts on its own - recovering a copy it
@@ -113,6 +125,7 @@ export async function prepareAppBundles(): Promise<void> {
     const loads = knownApps().map(async (id) => {
         if (!(await isAppInstalled(id))) return;
         try {
+            await migrate(id);
             await loadBundle(id);
             state.failures.delete(id);
         } catch (error) {

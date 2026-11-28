@@ -30,7 +30,8 @@ test("takes the app's own host API over the default", () => {
 
 test("stops the publish on an app it could not list correctly", () => {
     assert.throws(() => catalogEntry(pkg(), undefined, "1.2", ISSUED), /bundle index/);
-    assert.throws(() => catalogEntry(pkg({ ...about, minPolaris: undefined }), bundle, "1.2", ISSUED), /minPolaris/);
+    assert.throws(() => catalogEntry(pkg({ ...about, minPolaris: "soon" }), bundle, "1.2", ISSUED), /minPolaris/);
+    assert.equal(catalogEntry(pkg({ ...about, minPolaris: undefined }), bundle, "1.2", ISSUED).minPolaris, undefined);
     assert.throws(() => catalogEntry(pkg({ ...about, name: {} }), bundle, "1.2", ISSUED), /name/);
 });
 

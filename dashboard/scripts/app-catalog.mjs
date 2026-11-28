@@ -64,7 +64,8 @@ export function catalogEntry(pkg, bundle, hostApi, published) {
     if (!VERSION.test(pkg.version ?? "")) fail(`needs a MAJOR.MINOR.PATCH version, not "${pkg.version}"`);
     const api = app.hostApi ?? hostApi;
     if (!HOST_API.test(api ?? "")) fail(`host API "${api}" is not MAJOR.MINOR`);
-    if (!VERSION.test(about.minPolaris ?? "")) fail("needs minPolaris, the first Polaris release that runs it");
+    // Optional and shown only; the host API decides (docs/addons-delivery.md).
+    if (about.minPolaris !== undefined && !VERSION.test(about.minPolaris)) fail(`minPolaris "${about.minPolaris}" is not MAJOR.MINOR.PATCH`);
     for (const field of ["name", "summary", "description"]) {
         if (typeof about[field]?.["en-US"] !== "string") fail(`needs ${field}["en-US"]`);
     }
@@ -72,7 +73,7 @@ export function catalogEntry(pkg, bundle, hostApi, published) {
         id: app.id,
         version: pkg.version,
         hostApi: api,
-        minPolaris: about.minPolaris,
+        ...(about.minPolaris ? { minPolaris: about.minPolaris } : {}),
         name: about.name,
         summary: about.summary,
         description: about.description,

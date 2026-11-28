@@ -45,7 +45,12 @@ export const runtimeAppEntrySchema = z.object({
     /** The host API the bundle needs (`@polaris/app-host/version`): the real gate. */
     hostApi: z.string().regex(/^\d{1,4}\.\d{1,4}$/),
     /** The first Polaris release that provides it, for the "needs Polaris X" sentence. */
-    minPolaris: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,6}$/),
+    /**
+     * Shown only: "Needs Polaris X". What decides is `hostApi`, the host contract
+     * version that moves whenever the contract does; the dashboard's package
+     * version does not move with releases, so it never gates anything.
+     */
+    minPolaris: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,6}$/).optional(),
     name: localized(60),
     summary: localized(140),
     description: localized(1_000),
@@ -95,6 +100,9 @@ export const runtimeAppEntrySchema = z.object({
 
 export type RuntimeAppEntry = z.infer<typeof runtimeAppEntrySchema>;
 
+/** `needsPolaris` for an entry that names no release: the card says "a newer Polaris". */
+export const NEWER_POLARIS = "newer";
+
 const envelopeSchema = z.object({
     schema: z.literal(1),
     kind: z.literal("apps"),
@@ -138,7 +146,7 @@ export function appEntryFit(
 ): RuntimeAppFit {
     const verdict = hostApiVerdict(entry.hostApi, hostApi);
     if (!verdict.ok && verdict.update === "app") return { ok: false, needs: "app" };
-    const newer = { ok: false, needs: "polaris", version: entry.minPolaris } as const;
+    const newer = { ok: false, needs: "polaris", version: entry.minPolaris ?? NEWER_POLARIS } as const;
     if (!verdict.ok || entry.coreTables) return newer;
     const uses = entry.nav ? [...entry.permissions, entry.nav.permission] : entry.permissions;
     // Its own permissions it brings with it; any other must be one this dashboard has.
@@ -174,7 +182,7 @@ export function runtimeManifest(entry: RuntimeAppEntry, fit: RuntimeAppFit, loca
         instanceWide: true,
         opensAt: `${RUNTIME_APP_BASE}/${entry.id}`,
         ...(entry.logo ? { logo: entry.logo } : {}),
-        ...(fit.ok ? {} : { needsPolaris: entry.minPolaris }),
+        ...(fit.ok ? {} : { needsPolaris: entry.minPolaris ?? NEWER_POLARIS }),
         runtime: { version: entry.version }
     };
 }
