@@ -270,10 +270,26 @@ export const pluginCatalogSchema = z.preprocess(
         schema: z.literal(1),
         /** When it was signed: a client never trades the catalog it has for an older one. */
         issued: z.string().datetime(),
+        /**
+         * Read one entry at a time: an entry this build cannot read (a category,
+         * permission or setting kind from a newer catalog) is left out on its own,
+         * so a new plugin never hides every other one from a client that predates
+         * it. The first of a repeated id is kept.
+         */
         plugins: z
-            .array(pluginEntrySchema)
+            .array(z.unknown())
             .max(500)
-            .refine((list) => new Set(list.map((entry) => entry.id)).size === list.length, "repeated id")
+            .transform((list) => {
+                const seen = new Set<string>();
+                const entries: z.infer<typeof pluginEntrySchema>[] = [];
+                for (const raw of list) {
+                    const entry = pluginEntrySchema.safeParse(raw);
+                    if (!entry.success || seen.has(entry.data.id)) continue;
+                    seen.add(entry.data.id);
+                    entries.push(entry.data);
+                }
+                return entries;
+            })
     })
 );
 

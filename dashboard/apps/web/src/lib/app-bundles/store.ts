@@ -361,8 +361,24 @@ export function ensureBundle(id: string): Promise<string> {
     const running = inflight.get(id);
     if (running) return running;
     const work = (async () => {
-        const index = bundleIndex();
-        const ref = index?.apps[id];
+        let index = bundleIndex();
+        let ref = index?.apps[id];
+        if (!ref) {
+            // An app published after this image was built: its bundle as the signed
+            // catalogue pins it, from this image's own registry (the catalogue never
+            // names where to fetch from), refused unless it hashes to that digest.
+            const { runnableEntry } = await import("@/lib/apps/runtime-catalog");
+            const entry = runnableEntry(id);
+            if (entry) {
+                ref = entry.bundle;
+                index = {
+                    format: BUNDLE_FORMAT,
+                    build: "catalog",
+                    ...(index?.registry ? { registry: index.registry } : {}),
+                    apps: { [id]: entry.bundle }
+                };
+            }
+        }
         if (!index || !ref)
             throw new BundleUnavailable("This version of Polaris was built without it.");
         // An app updated on its own stays on that update for as long as the

@@ -10,15 +10,16 @@
  */
 
 import { bundleIndex } from "./store";
+import { runnableIds } from "@/lib/apps/runtime-catalog";
 import { matchRoute, type RouteParams } from "./route-match";
 import { loadedBundle, loadedBundles, type LoadedBundle } from "./loader";
 import type { AppExtension, AppSlot } from "@/lib/app-extensions/types";
 
 type RouteModule = Record<string, unknown>;
 
-/** The apps this build carries a bundle for. */
+/** The apps this build carries a bundle for, and the ones the published catalogue adds that it can run. */
 export function knownApps(): string[] {
-    return Object.keys(bundleIndex()?.apps ?? {});
+    return [...new Set([...Object.keys(bundleIndex()?.apps ?? {}), ...runnableIds()])];
 }
 
 /** Each loaded app's extension. */

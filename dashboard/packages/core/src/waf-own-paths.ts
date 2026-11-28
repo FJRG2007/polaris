@@ -104,7 +104,9 @@ export const POLARIS_ROUTE_ROOTS: readonly string[] = [
     "vpn",
     "vs",
     "wall",
-    "watch"
+    "watch",
+    // Apps published after the image was built (`/x/<id>`), one root for all of them.
+    "x"
 ];
 
 const ROOTS = new Set(POLARIS_ROUTE_ROOTS);

@@ -14,6 +14,7 @@
  * Server-only.
  */
 
+import { primeAppCatalog } from "@/lib/apps/runtime-catalog";
 import { knownApps } from "./code";
 import { findApp } from "@/lib/apps/catalog";
 import { BundleIncompatible, BundleUnavailable, removeBundle } from "./store";
@@ -106,6 +107,9 @@ function retryLater(id: string): void {
  * starting by a minute at most, and the app is tried again in the background.
  */
 export async function prepareAppBundles(): Promise<void> {
+    // The apps published after this image, from the copy kept on disk; the
+    // network is asked behind it and never holds the boot.
+    await primeAppCatalog();
     const loads = knownApps().map(async (id) => {
         if (!(await isAppInstalled(id))) return;
         try {

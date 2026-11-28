@@ -16,14 +16,19 @@ import { SessionKeeper } from "@/components/session-keeper";
 import { AccountWatcher } from "@/components/account-watcher";
 import { OfflineWrites } from "@/components/offline-writes";
 import { PageTiming } from "@/components/telemetry/page-timing";
+import { getLocale } from "@/lib/i18n/request";
+import { heldRuntimeAppViews } from "@/lib/apps/runtime-catalog";
+import { RuntimeAppsRegistrar } from "@/components/app-bundles/runtime-apps-registrar";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-    const user = await requireUser();
+    const [user, locale] = await Promise.all([requireUser(), getLocale()]);
     return (
         <AppChrome user={user}>
             {/* Before the screens, so an installable app's components find the
                 dashboard's pieces when they render. */}
             <ProvideAppHostUi />
+            {/* Apps published after this image: what the held catalogue lists, never waiting on it. */}
+            <RuntimeAppsRegistrar apps={heldRuntimeAppViews(locale)} />
             <SessionKeeper />
             {/* How long this screen took to load, into Polaris' own Telemetry. */}
             <PageTiming />

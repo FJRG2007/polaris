@@ -191,6 +191,12 @@ export function PrimaryActionButton({
             );
         case "comingSoon":
             return <Badge className="text-muted-foreground">{t("card.comingSoon")}</Badge>;
+        case "needsPolaris":
+            return (
+                <Button asChild size={size} variant="outline" title={t("card.needsPolarisHint")}>
+                    <Link href="/admin/updates">{t("card.needsPolaris", { version: action.version })}</Link>
+                </Button>
+            );
         case "unavailable":
             return <Badge className="text-muted-foreground">{t("card.unavailable")}</Badge>;
     }

@@ -165,6 +165,7 @@ export type PrimaryAction =
     | { readonly kind: "install"; readonly configurable: boolean }
     | { readonly kind: "locked" }
     | { readonly kind: "comingSoon" }
+    | { readonly kind: "needsPolaris"; readonly version: string }
     | { readonly kind: "unavailable" };
 
 export function primaryAction(
@@ -178,6 +179,7 @@ export function primaryAction(
         return { kind: "open", href: app.opensAt ?? `/apps/installed/${first.id}` };
     }
     if (app.comingSoon) return { kind: "comingSoon" };
+    if (app.needsPolaris) return { kind: "needsPolaris", version: app.needsPolaris };
     if (!isInstallable(app)) return { kind: "unavailable" };
     if (!state.canInstall) return { kind: "locked" };
     // A template is a service in a project, not an install: Deploy's flow makes it.

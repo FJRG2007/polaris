@@ -259,6 +259,13 @@ export interface AppManifest {
      * is migrated to its successor the next time its owner opens the app.
      */
     legacy?: boolean;
+    /**
+     * The Polaris release an app from the published catalogue needs, when this
+     * dashboard is older: listed, not installable, with "needs Polaris X - Update".
+     */
+    needsPolaris?: string;
+    /** Came from the published catalogue (`runtime-catalog-schema.ts`), not this image. */
+    runtime?: { readonly version: string };
 }
 
 // i18n-ignore (marked per line below): manifest words are data; screens draw them through `app-words.ts` and the `catalog` namespace.
@@ -1653,14 +1660,34 @@ export function installedAppHref(
     return tab ? `${base}/${install.id}/${tab}` : `${base}/${install.id}`;
 }
 
+let runtimeApps: readonly AppManifest[] = [];
+let allApps: readonly AppManifest[] = POLARIS_APP_CATALOG;
+
+/**
+ * Apps from the published catalogue, beside the ones this image carries. An id
+ * this image already has stays the image's, so an app baked in keeps working
+ * exactly as it did. Called on the server when the catalogue is read and in the
+ * browser by `RuntimeAppsRegistrar`.
+ */
+export function setRuntimeApps(apps: readonly AppManifest[]): void {
+    const baked = new Set(POLARIS_APP_CATALOG.map((app) => app.id));
+    runtimeApps = apps.filter((app) => !baked.has(app.id));
+    allApps = runtimeApps.length ? [...POLARIS_APP_CATALOG, ...runtimeApps] : POLARIS_APP_CATALOG;
+}
+
+/** The apps registered from the published catalogue. */
+export function catalogRuntimeApps(): readonly AppManifest[] {
+    return runtimeApps;
+}
+
 /** Every app manifest, offered or not. */
 export function catalogApps(): readonly AppManifest[] {
-    return POLARIS_APP_CATALOG;
+    return allApps;
 }
 
 /** Look up an app manifest by id. */
 export function findApp(id: string): AppManifest | undefined {
-    return POLARIS_APP_CATALOG.find((app) => app.id === id);
+    return allApps.find((app) => app.id === id);
 }
 
 /** Whether an app is one the marketplace still offers at all. Everything else
@@ -1672,7 +1699,7 @@ export function isOffered(app: AppManifest): boolean {
 
 /** Apps that are installable now (declared, not coming soon). */
 export function installableApps(): readonly AppManifest[] {
-    return POLARIS_APP_CATALOG.filter((app) => !app.comingSoon && isOffered(app));
+    return allApps.filter((app) => !app.comingSoon && isOffered(app));
 }
 
 /** Whether an app provides a given capability. */
@@ -1684,7 +1711,7 @@ export function appHasCapability(app: AppManifest, capability: AppCapability): b
  *  image (build-only apps need their image published first) and not coming soon.
  *  Pure and client-safe, so the marketplace UI and the install service agree. */
 export function isInstallable(app: AppManifest): boolean {
-    if (app.comingSoon || app.legacy) return false;
+    if (app.comingSoon || app.legacy || app.needsPolaris) return false;
     // Part of every Polaris: there is nothing to install.
     if (isNativeApp(app.id)) return false;
     // A builtin app has nothing to run: installing it records that this Polaris
@@ -1767,6 +1794,6 @@ const CATEGORY_ORDER: readonly AppCategory[] = [
 export function appsByCategory(): ReadonlyArray<{ category: AppCategory; apps: AppManifest[] }> {
     return CATEGORY_ORDER.map((category) => ({
         category,
-        apps: POLARIS_APP_CATALOG.filter((app) => app.category === category && isOffered(app))
+        apps: allApps.filter((app) => app.category === category && isOffered(app))
     })).filter((group) => group.apps.length > 0);
 }
