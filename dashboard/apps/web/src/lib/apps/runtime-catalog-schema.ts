@@ -83,6 +83,17 @@ export const runtimeAppEntrySchema = z.object({
         )
         .max(16)
         .default([]),
+    /** The automation trigger events it emits, each `<id>.<event>` with typed payload fields. */
+    events: z
+        .array(
+            z.object({
+                name: z.string().regex(/^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,63}$/),
+                label: localized(80),
+                fields: z.record(z.enum(["string", "number", "boolean", "id"])).default({})
+            })
+        )
+        .max(32)
+        .default([]),
     /** The bundle, pinned by digest: fetched from the dashboard's own registry and refused unless it hashes to this. */
     bundle: z.object({
         file: z.string().regex(/^[a-z0-9][a-z0-9.-]{0,95}\.zip$/),
@@ -192,6 +203,8 @@ export type RuntimeAppView = Omit<AppManifest, "icon"> & {
     readonly nav?: RuntimeAppEntry["nav"];
     /** Its own permissions, labelled in the reader's language, for a runnable entry. */
     readonly permissionDefs?: readonly { key: string; label: string; implies: readonly string[]; writes: boolean }[];
+    /** Its automation trigger events, labelled in the reader's language. */
+    readonly events?: readonly { name: string; label: string; fields: Readonly<Record<string, "string" | "number" | "boolean" | "id">> }[];
 };
 
 /** The entries a dashboard lists, with the ones written for a host API it has moved past left out. */
@@ -211,7 +224,13 @@ export function runtimeViews(catalog: RuntimeAppCatalog | null, known: ReadonlyS
             implies: definition.implies,
             writes: definition.writes
         }));
-        views.push({ ...view, ...(entry.nav ? { nav: entry.nav } : {}), ...(permissionDefs.length ? { permissionDefs } : {}) });
+        const events = entry.events.map((event) => ({ name: event.name, label: entryText(event.label, locale), fields: event.fields }));
+        views.push({
+            ...view,
+            ...(entry.nav ? { nav: entry.nav } : {}),
+            ...(permissionDefs.length ? { permissionDefs } : {}),
+            ...(events.length ? { events } : {})
+        });
     }
     return views;
 }

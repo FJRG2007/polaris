@@ -83,6 +83,7 @@ export function catalogEntry(pkg, bundle, hostApi, published) {
         ...(about.nav ? { nav: about.nav } : {}),
         permissions: about.permissions ?? [],
         permissionDefs: about.permissionDefs ?? [],
+        events: about.events ?? [],
         bundle: { file: bundle.file, digest: bundle.digest, size: bundle.size },
         coreTables: Boolean(about.coreTables),
         published

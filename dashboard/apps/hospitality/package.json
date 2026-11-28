@@ -48,7 +48,60 @@
                     "writes": true
                 }
             ],
-            "coreTables": true
+            "coreTables": true,
+            "events": [
+                {
+                    "name": "hospitality.order-sent",
+                    "label": {
+                        "en-US": "Order sent to the kitchen",
+                        "es-ES": "Comanda enviada a cocina"
+                    },
+                    "fields": {
+                        "orderId": "id",
+                        "venueId": "id",
+                        "lines": "number"
+                    }
+                },
+                {
+                    "name": "hospitality.bill-paid",
+                    "label": {
+                        "en-US": "Bill paid",
+                        "es-ES": "Cuenta cobrada"
+                    },
+                    "fields": {
+                        "orderId": "id",
+                        "venueId": "id",
+                        "due": "number",
+                        "closed": "boolean"
+                    }
+                },
+                {
+                    "name": "hospitality.shift-closed",
+                    "label": {
+                        "en-US": "Z report closed",
+                        "es-ES": "Cierre Z hecho"
+                    },
+                    "fields": {
+                        "venueId": "id",
+                        "zNumber": "number",
+                        "counted": "number",
+                        "expected": "number",
+                        "difference": "number"
+                    }
+                },
+                {
+                    "name": "hospitality.product-availability",
+                    "label": {
+                        "en-US": "Product marked available or unavailable",
+                        "es-ES": "Producto marcado disponible o agotado"
+                    },
+                    "fields": {
+                        "productId": "id",
+                        "venueId": "string",
+                        "available": "boolean"
+                    }
+                }
+            ]
         }
     },
     "dependencies": {

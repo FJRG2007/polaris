@@ -159,13 +159,84 @@ export type AppEventPayload<Name extends AppEventName> = z.infer<
 
 export const APP_EVENT_NAMES = Object.keys(APP_EVENTS) as AppEventName[];
 
+/**
+ * Events an app declares in its own manifest, registered when the manifest is
+ * read (docs/addons-delivery.md): an app never edits this file. `APP_EVENTS`
+ * above is the built-in default; an app's events join it here at runtime, each
+ * named under the app's id, with a payload of plain typed fields.
+ */
+export const APP_EVENT_FIELD_KINDS = ["string", "number", "boolean", "id"] as const;
+export type AppEventFieldKind = (typeof APP_EVENT_FIELD_KINDS)[number];
+
+export interface AppEventDefinition {
+    /** `<app id>.<event>`. */
+    readonly name: string;
+    readonly label: string;
+    readonly fields: Readonly<Record<string, AppEventFieldKind>>;
+}
+
+type RegisteredEvent = { app: string; label: string; payload: z.ZodObject<z.ZodRawShape> };
+
+const eventRegistry = ((globalThis as Record<symbol, unknown>)[Symbol.for("polaris.automation.app-events")] ??=
+    new Map()) as Map<string, RegisteredEvent>;
+
+const EVENT_NAME = /^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,63}$/;
+const FIELD_NAME = /^[a-z][a-zA-Z0-9]{0,39}$/;
+
+function fieldSchema(kind: AppEventFieldKind): z.ZodTypeAny {
+    if (kind === "number") return z.number().finite();
+    if (kind === "boolean") return z.boolean();
+    if (kind === "id") return id;
+    return z.string().max(2_000);
+}
+
+/**
+ * Register (or replace) the events an app declares. An event outside the app's
+ * own id, one a built-in event already has, or one with an unreadable field is
+ * left out: an app adds events, it never redefines one it does not own.
+ */
+export function registerAppEvents(app: string, definitions: readonly AppEventDefinition[]): void {
+    for (const [name, event] of eventRegistry) if (event.app === app) eventRegistry.delete(name);
+    for (const definition of definitions) {
+        if (!EVENT_NAME.test(definition.name) || !definition.name.startsWith(`${app}.`)) continue;
+        if (Object.hasOwn(APP_EVENTS, definition.name)) continue;
+        const entries = Object.entries(definition.fields);
+        if (entries.length > 32 || entries.some(([field, kind]) => !FIELD_NAME.test(field) || !APP_EVENT_FIELD_KINDS.includes(kind))) continue;
+        const shape = Object.fromEntries(entries.map(([field, kind]) => [field, fieldSchema(kind)]));
+        eventRegistry.set(definition.name, { app, label: definition.label, payload: z.object(shape).strict() });
+    }
+}
+
+/** Forget every app's registered events except those of `keep`. */
+export function retainAppEvents(keep: Iterable<string>): void {
+    const kept = new Set(keep);
+    for (const [name, event] of eventRegistry) if (!kept.has(event.app)) eventRegistry.delete(name);
+}
+
+/** Every event a trigger can listen to now: the built-in ones, then those apps registered. */
+export function appEventNames(): string[] {
+    return [...APP_EVENT_NAMES, ...eventRegistry.keys()];
+}
+
+/** The app an event belongs to, built in or registered, or null for a name nobody knows. */
+export function appEventOwner(name: string): string | null {
+    if (Object.hasOwn(APP_EVENTS, name)) return APP_EVENTS[name as AppEventName].app;
+    return eventRegistry.get(name)?.app ?? null;
+}
+
+/** What an app's own event is called, for the trigger menu; null for a built-in or unknown one. */
+export function registeredAppEventLabel(name: string): string | null {
+    return eventRegistry.get(name)?.label ?? null;
+}
+
 export function isAppEventName(name: string): name is AppEventName {
-    return Object.hasOwn(APP_EVENTS, name);
+    return Object.hasOwn(APP_EVENTS, name) || eventRegistry.has(name);
 }
 
 /** The payload fields an app event carries, for the reference menu; empty for any other name. */
 export function appEventFields(name: string): string[] {
-    return isAppEventName(name) ? Object.keys(APP_EVENTS[name].payload.shape) : [];
+    if (Object.hasOwn(APP_EVENTS, name)) return Object.keys(APP_EVENTS[name as AppEventName].payload.shape);
+    return Object.keys(eventRegistry.get(name)?.payload.shape ?? {});
 }
 
 /** An app event's payload checked against its shape: the data, or null when it does not match. */
@@ -173,6 +244,8 @@ export function parseAppEventPayload(
     name: AppEventName,
     payload: unknown
 ): Record<string, unknown> | null {
-    const parsed = APP_EVENTS[name].payload.safeParse(payload);
+    const schema = Object.hasOwn(APP_EVENTS, name) ? APP_EVENTS[name].payload : eventRegistry.get(name)?.payload;
+    if (!schema) return null;
+    const parsed = schema.safeParse(payload);
     return parsed.success ? (parsed.data as Record<string, unknown>) : null;
 }

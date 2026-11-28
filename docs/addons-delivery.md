@@ -199,3 +199,37 @@ with the same major and at least its minor (`hostApiVerdict`).
 it the card says "Needs a newer Polaris - Update". The dashboard's package
 version (`apps/web/package.json`) has not moved since 2026-07-21 and gates
 nothing.
+
+## Extension points: where each comes from
+
+Every contribution an app makes has to arrive with the app (its bundle's
+`AppExtension`, or its manifest), never from an edit to core or `apps/web`.
+Inventory of today's per-app registries:
+
+| Extension point | Comes from | Status |
+| --- | --- | --- |
+| Permissions, roles, scopes, minors, policy templates | manifest `permissionDefs` -> `registerAppPermissions` | runtime |
+| Nav entry, name, logo, marketplace listing | manifest (`nav`, `name`, `logo`) | runtime |
+| Automation trigger events | manifest `events` -> `registerAppEvents` (`core/src/automation-app-events.ts`); built-in `APP_EVENTS` stay as defaults | runtime; a withdrawn app's events stop being events, so its triggers are reported as problems instead of firing |
+| Automation actions (nodes), typed input and output | bundle `AppExtension.automationNodes`, schema-checked (`lib/automations/node-registry.ts`) | runtime already; a run reaching an uninstalled app's node is refused with `appMissing` |
+| Scheduled jobs | bundle `AppExtension.jobs` | runtime already |
+| Search / launcher records, favorites | bundle `searchRecords`, `favorites` | runtime already |
+| MCP tools | bundle `mcpTools`, `mcpToolLabels` | runtime already |
+| Calendar events, presence, backups, game server cards | bundle `upcomingEvents`, `presence*`, `backupSources`, `gameServer*` | runtime already |
+| Page slots inside core screens | bundle `AppSlot` (`withBundleSlot`) | runtime already |
+| Own tables | bundle migrations (`app_<id>` schema) | runtime |
+| Emitting an app's events from its bundle | needs a host API service (`HOST_API` 1.3) | not done |
+| Home / overview widgets | `app/(app)/home/widgets/*` in `apps/web` | not done: static list |
+| Notification kinds | core notification groups | not done: static list |
+| Settings sections | `settingsAt` in the image catalog | not done for catalogue apps |
+| Cross-app actions ("create task from order") | none generic yet | not done |
+| Outgoing webhooks for an app's events | automation `http` node on an app trigger | works once the events are emitted |
+
+Hospitality's manifest declares its first trigger events, each matching code
+that exists in the app today: `hospitality.order-sent` (`sendLines`),
+`hospitality.bill-paid` (`pay`), `hospitality.shift-closed` (`closeShift`,
+with `counted`, `expected` and `difference`, so "till difference over X" is a
+condition on `difference`), and `hospitality.product-availability`
+(`setAvailability`). "Table waiting longer than X" has no event in the code
+yet and is left out. The hospitality code does not emit them yet: that needs the
+emit service above and a change in the hospitality app itself.

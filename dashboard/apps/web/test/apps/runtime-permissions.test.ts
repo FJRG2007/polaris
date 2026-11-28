@@ -12,7 +12,13 @@ vi.mock("@/lib/app-bundles/store", () => ({ bundleRoot: () => "/nonexistent-pola
 
 import { HOST_API } from "@polaris/app-host/version";
 import {
+    appEventFields,
+    appEventNames,
+    appEventOwner,
     deniedPermissions,
+    isAppEventName,
+    parseAppEventPayload,
+    registeredAppEventLabel,
     createApiKeySchema,
     expandPermissions,
     hasPermission,
@@ -152,5 +158,36 @@ describe("an app's own permissions, from its manifest", () => {
         expect(knownPermissions()).toEqual(expect.arrayContaining(["hospitality.use", "hospitality.manage", "deploy.read"]));
         expect(roleGrantsSchema.safeParse({ permissions: ["hospitality.use"] }).success).toBe(true);
         expect(hasPermission(["hospitality.use"], "hospitality.use")).toBe(true);
+    });
+});
+
+describe("an app's own automation triggers, from its manifest", () => {
+    const withEvents = {
+        ...bakery,
+        events: [
+            { name: "bakery.oven-ready", label: { "en-US": "Oven ready" }, fields: { ovenId: "id", minutes: "number" } },
+            // Not its own: left out, so an app never redefines another's event.
+            { name: "deploy.succeeded", label: { "en-US": "Hijack" }, fields: {} }
+        ]
+    };
+
+    it("offers them as triggers, with their fields, and validates what is emitted", () => {
+        deliver([withEvents]);
+        expect(appEventNames()).toContain("bakery.oven-ready");
+        expect(appEventOwner("bakery.oven-ready")).toBe("bakery");
+        expect(registeredAppEventLabel("bakery.oven-ready")).toBe("Oven ready");
+        expect(appEventFields("bakery.oven-ready")).toEqual(["ovenId", "minutes"]);
+        expect(parseAppEventPayload("bakery.oven-ready" as never, { ovenId: "o1", minutes: 12 })).toEqual({ ovenId: "o1", minutes: 12 });
+        expect(parseAppEventPayload("bakery.oven-ready" as never, { ovenId: "o1", minutes: "12" })).toBeNull();
+        expect(parseAppEventPayload("bakery.oven-ready" as never, { ovenId: "o1", minutes: 1, extra: true })).toBeNull();
+        expect(appEventOwner("deploy.succeeded")).toBe("deploy");
+    });
+
+    it("withdraws them with the app, so a trigger naming one is no longer an event, while built-in ones stay", () => {
+        deliver([withEvents]);
+        deliver([]);
+        expect(isAppEventName("bakery.oven-ready")).toBe(false);
+        expect(appEventOwner("bakery.oven-ready")).toBeNull();
+        expect(isAppEventName("game-server.started")).toBe(true);
     });
 });
