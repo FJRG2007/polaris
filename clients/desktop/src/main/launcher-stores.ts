@@ -693,6 +693,27 @@ export async function originFolders(programData: string): Promise<GameFolder[]> 
 }
 
 /**
+ * The EA app's installed games: a folder per title in
+ * `%ProgramData%\EA Desktop\InstallData`, whose game is in `EA Games\<title>`
+ * under a library folder (its default is `Program Files\EA Games`). Only a
+ * title whose folder is found on a drive is listed.
+ */
+export async function eaAppFolders(programData: string, drives = "CDEFGHIJKLMNOPQRSTUVWXYZ"): Promise<GameFolder[]> {
+    const out: GameFolder[] = [];
+    const titles = (await readdir(join(programData, "EA Desktop", "InstallData")).catch(() => [] as string[])).filter((title) => title && !/^(base-|\.)/i.test(title)).slice(0, MAX_PER_STORE);
+    for (const title of titles) {
+        for (const letter of drives) {
+            const dir = (await Promise.all([`${letter}:\Program Files\EA Games\${title}`, `${letter}:\EA Games\${title}`].map(async (path) => ((await exists(path)) ? path : null)))).find((path) => path !== null);
+            if (dir) {
+                out.push({ name: title, folder: dir, store: storeId("ea", title) });
+                break;
+            }
+        }
+    }
+    return out;
+}
+
+/**
  * The folders of games these stores keep, read once per listing, each store
  * failing on its own. Windows only; every read is bounded and read-only.
  */
@@ -703,6 +724,7 @@ export async function gameFolders(env: NodeJS.ProcessEnv = process.env): Promise
         registry([`${wow}\\Rockstar Games`, "/s"]).then(rockstarFolders),
         registry([`${wow}\\EA Games`, "/s"]).then(eaFolders),
         originFolders(env.ProgramData ?? "C:\\ProgramData"),
+        eaAppFolders(env.ProgramData ?? "C:\\ProgramData"),
         Promise.all(UNINSTALL_HIVES.map((hive) => registry([hive, "/s", "/f", "Blizzard Entertainment", "/d", "/e"]))).then((hives) => battleNetFolders(hives.flat())),
         xboxFolders(),
         registry(["HKCU\\System\\GameConfigStore\\Children", "/s"]).then((keys) => gameConfigFolders(keys, windowsDir))

@@ -101,6 +101,12 @@ HKEY_CURRENT_USER\\System\\GameConfigStore\\Children\\b2
         expect(await stores.xboxFolders("CD")).toEqual([{ name: "Forza Horizon 5", folder: "D:\\XboxGames\\Forza Horizon 5\\Content", store: "xbox:forza-horizon-5" }]);
     });
 
+    it("EA app: an InstallData title whose game folder is on a drive", async () => {
+        dirs.set("C:\ProgramData\EA Desktop\InstallData", ["Fixture Game", "base-Origin.SFT.50.0000000", "Gone Game"]);
+        dirs.set("D:\EA Games\Fixture Game", []);
+        expect(await stores.eaAppFolders("C:\ProgramData", "CD")).toEqual([{ name: "Fixture Game", folder: "D:\EA Games\Fixture Game", store: "ea:fixture-game" }]);
+    });
+
     it("Origin: the LocalContent manifest of an installed game", async () => {
         dirs.set("C:\\ProgramData\\Origin\\LocalContent", ["FIFA 23"]);
         dirs.set("C:\\ProgramData\\Origin\\LocalContent\\FIFA 23", ["FIFA 23.mfst"]);

@@ -21,11 +21,25 @@ thread, kept in the listing cache (`launcher-index.json`, `INDEX_VERSION`):
 | Xbox / Microsoft Store | `<drive>:\XboxGames\<title>\Content\MicrosoftGame.config`; a package folder holding `MicrosoftGame.config` | `xboxFolders`, `packagedApps` |
 | Windows | `HKCU\System\GameConfigStore\Children\*` `MatchedExeFullPath` (Game Bar's match) | `gameConfigFolders` |
 
+## Verification status per source
+
+Checked read-only on the owner's gaming PC (names and value names only; fixtures
+in the repo are synthetic), 2026-11-28. No web lookup was possible in this
+session, so nothing below is "sourced doc" yet.
+
+| Source | Status |
+|---|---|
+| Steam `libraryfolders.vdf` | file present on the PC; format as Playnite reads it; not parsed against the real file in this pass |
+| Epic `Manifests\*.item` | verified: folder exists with `.item` files (and a `Pending` folder) |
+| Rockstar `WOW6432Node\Rockstar Games\<title>` | verified: `InstallFolder` and `Version` values; the title key is a short id (`GTAV Enhanced`), its folder is `Program Files\Rockstar Games\<name>`; `Launcher` and `Rockstar Games Social Club` keys sit beside it (both skipped) |
+| EA app | corrected: no `EA Games` registry key exists on this PC. Installed titles are folders in `%ProgramData%\EA Desktop\InstallData` and the game is in `<library>\EA Games\<title>`, found by `eaAppFolders`. The registry `EA Games` and Origin `.mfst` readers are kept for older installs and are unverified |
+| Battle.net uninstall entries (Blizzard) | unverified: none installed on this PC (`ProgramData\Battle.net` is empty) |
+| Xbox `XboxGames\<title>\Content\MicrosoftGame.config` | partly verified: `C:\XboxGames` exists with title folders (Minecraft); the `MicrosoftGame.config` file was not looked for |
+| Windows Game Bar `GameConfigStore\Children` | not confirmed: the children here hold `Type`, `Revision`, `Flags`, `Parent`, `GameDVR_GameGUID`, `TitleId` and no `MatchedExeFullPath`, so that reader finds nothing on this PC; it stays as an extra hint only |
+| GOG, Ubisoft | unverified: not installed here |
+
 Steam, Epic, GOG and Ubisoft follow the Playnite library plugins
-(github.com/JosefNemec/PlayniteExtensions). The Rockstar, EA, Battle.net, Xbox
-and Game Bar locations are the ones those launchers and Windows document or are
-known to write; they were written from that knowledge and checked against
-fixtures only, not against a live install of each launcher.
+(github.com/JosefNemec/PlayniteExtensions).
 
 Stores without a vetted launch link (Rockstar, EA, Battle.net, Game Bar) are read
 for folders only: the Start menu shortcut or uninstall entry that already opens
