@@ -52,6 +52,7 @@
             "events": [
                 {
                     "name": "hospitality.order-sent",
+                    "permission": "hospitality.use",
                     "label": {
                         "en-US": "Order sent to the kitchen",
                         "es-ES": "Comanda enviada a cocina"
@@ -64,6 +65,7 @@
                 },
                 {
                     "name": "hospitality.bill-paid",
+                    "permission": "hospitality.use",
                     "label": {
                         "en-US": "Bill paid",
                         "es-ES": "Cuenta cobrada"
@@ -77,6 +79,7 @@
                 },
                 {
                     "name": "hospitality.shift-closed",
+                    "permission": "hospitality.use",
                     "label": {
                         "en-US": "Z report closed",
                         "es-ES": "Cierre Z hecho"
@@ -91,6 +94,7 @@
                 },
                 {
                     "name": "hospitality.product-availability",
+                    "permission": "hospitality.use",
                     "label": {
                         "en-US": "Product marked available or unavailable",
                         "es-ES": "Producto marcado disponible o agotado"
@@ -103,6 +107,7 @@
                 },
                 {
                     "name": "hospitality.table-waiting",
+                    "permission": "hospitality.use",
                     "label": {
                         "en-US": "Table waiting to be served",
                         "es-ES": "Mesa esperando a ser servida"

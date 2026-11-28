@@ -37,7 +37,7 @@ export function registerRuntimeApps(views: readonly RuntimeAppView[]): void {
     setRuntimeApps(views.map(({ nav: _nav, permissionDefs: _permissions, events: _events, notificationKinds: _kinds, automationSteps: _steps, ...view }) => ({ ...view, icon: Package })));
     // Its automation triggers: a withdrawn app's go with it, and a trigger naming one is refused with the reason.
     retainAppEvents(views.filter((view) => view.events).map((view) => view.id));
-    for (const view of views) if (view.events) registerAppEvents(view.id, view.events);
+    for (const view of views) if (view.events) registerAppEvents(view.id, view.events, view.name);
     // Its automation steps, offered in the editor under the app and run through its bundle.
     retainAppSteps(views.filter((view) => view.automationSteps).map((view) => view.id));
     for (const view of views) if (view.automationSteps) registerAppSteps(view.id, view.name, view.automationSteps);

@@ -90,7 +90,9 @@ export const runtimeAppEntrySchema = z.object({
             z.object({
                 name: z.string().regex(/^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,63}$/),
                 label: localized(80),
-                fields: z.record(z.enum(["string", "number", "boolean", "id"])).default({})
+                fields: z.record(z.enum(["string", "number", "boolean", "id"])).default({}),
+                /** What a person needs to pick it as a trigger: one of the app's own permissions. */
+                permission: z.string().regex(PERMISSION).optional()
             })
         )
         .max(32)
@@ -254,7 +256,12 @@ export type RuntimeAppView = Omit<AppManifest, "icon"> & {
     /** Its own permissions, labelled in the reader's language, for a runnable entry. */
     readonly permissionDefs?: readonly { key: string; label: string; implies: readonly string[]; writes: boolean }[];
     /** Its automation trigger events, labelled in the reader's language. */
-    readonly events?: readonly { name: string; label: string; fields: Readonly<Record<string, "string" | "number" | "boolean" | "id">> }[];
+    readonly events?: readonly {
+        name: string;
+        label: string;
+        fields: Readonly<Record<string, "string" | "number" | "boolean" | "id">>;
+        permission?: string;
+    }[];
     /** Its automation steps, labelled in the reader's language. */
     readonly automationSteps?: readonly AppStepDefinition[];
     /** Its kinds of alert, labelled in the reader's language. */
@@ -285,7 +292,16 @@ export function runtimeViews(catalog: RuntimeAppCatalog | null, known: ReadonlyS
             implies: definition.implies,
             writes: definition.writes
         }));
-        const events = entry.events.map((event) => ({ name: event.name, label: entryText(event.label, locale), fields: event.fields }));
+        // An event without a permission of its own is gated like the app's place on the rail.
+        const events = entry.events.map((event) => {
+            const permission = event.permission ?? entry.nav?.permission;
+            return {
+                name: event.name,
+                label: entryText(event.label, locale),
+                fields: event.fields,
+                ...(permission ? { permission } : {})
+            };
+        });
         const notificationKinds = entry.notificationKinds.map((kind) => ({
             ...kind,
             label: entryText(kind.label, locale),

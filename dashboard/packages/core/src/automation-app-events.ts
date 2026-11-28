@@ -173,15 +173,39 @@ export interface AppEventDefinition {
     readonly name: string;
     readonly label: string;
     readonly fields: Readonly<Record<string, AppEventFieldKind>>;
+    /**
+     * What a person needs to build an automation on it: one of the app's own
+     * permissions, the one its emitter asks of the runner. Without one the
+     * event still fires, but the editor offers it to nobody.
+     */
+    readonly permission?: string;
 }
 
-type RegisteredEvent = { app: string; label: string; payload: z.ZodObject<z.ZodRawShape> };
+type RegisteredEvent = {
+    app: string;
+    appName: string;
+    label: string;
+    permission: string | null;
+    payload: z.ZodObject<z.ZodRawShape>;
+};
+
+/** One event an app registered, as the trigger menu lists it. */
+export interface RegisteredAppEvent {
+    readonly name: string;
+    readonly app: string;
+    readonly appName: string;
+    readonly label: string;
+    /** Null when the manifest named none of the app's own permissions. */
+    readonly permission: string | null;
+    readonly fields: readonly string[];
+}
 
 const eventRegistry = ((globalThis as Record<symbol, unknown>)[Symbol.for("polaris.automation.app-events")] ??=
     new Map()) as Map<string, RegisteredEvent>;
 
 const EVENT_NAME = /^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,63}$/;
 const FIELD_NAME = /^[a-z][a-zA-Z0-9]{0,39}$/;
+const PERMISSION_NAME = /^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,63}$/;
 
 function fieldSchema(kind: AppEventFieldKind): z.ZodTypeAny {
     if (kind === "number") return z.number().finite();
@@ -195,7 +219,7 @@ function fieldSchema(kind: AppEventFieldKind): z.ZodTypeAny {
  * own id, one a built-in event already has, or one with an unreadable field is
  * left out: an app adds events, it never redefines one it does not own.
  */
-export function registerAppEvents(app: string, definitions: readonly AppEventDefinition[]): void {
+export function registerAppEvents(app: string, definitions: readonly AppEventDefinition[], appName: string = app): void {
     for (const [name, event] of eventRegistry) if (event.app === app) eventRegistry.delete(name);
     for (const definition of definitions) {
         if (!EVENT_NAME.test(definition.name) || !definition.name.startsWith(`${app}.`)) continue;
@@ -203,7 +227,12 @@ export function registerAppEvents(app: string, definitions: readonly AppEventDef
         const entries = Object.entries(definition.fields);
         if (entries.length > 32 || entries.some(([field, kind]) => !FIELD_NAME.test(field) || !APP_EVENT_FIELD_KINDS.includes(kind))) continue;
         const shape = Object.fromEntries(entries.map(([field, kind]) => [field, fieldSchema(kind)]));
-        eventRegistry.set(definition.name, { app, label: definition.label, payload: z.object(shape).strict() });
+        // Only one of the app's own permissions gates it; anything else leaves it offered to nobody.
+        const permission =
+            definition.permission && PERMISSION_NAME.test(definition.permission) && definition.permission.startsWith(`${app}.`)
+                ? definition.permission
+                : null;
+        eventRegistry.set(definition.name, { app, appName, label: definition.label, permission, payload: z.object(shape).strict() });
     }
 }
 
@@ -216,6 +245,18 @@ export function retainAppEvents(keep: Iterable<string>): void {
 /** Every event a trigger can listen to now: the built-in ones, then those apps registered. */
 export function appEventNames(): string[] {
     return [...APP_EVENT_NAMES, ...eventRegistry.keys()];
+}
+
+/** Every event apps registered, in the order they were declared. */
+export function registeredAppEvents(): RegisteredAppEvent[] {
+    return [...eventRegistry].map(([name, event]) => ({
+        name,
+        app: event.app,
+        appName: event.appName,
+        label: event.label,
+        permission: event.permission,
+        fields: Object.keys(event.payload.shape)
+    }));
 }
 
 /** The app an event belongs to, built in or registered, or null for a name nobody knows. */
