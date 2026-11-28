@@ -126,3 +126,30 @@ Status: **done** (on branch `hospitality-app`), **partial**, **planned (Mn)**,
 | Reservations, waiting list | Sq To Ls Rv TB | planned (M6) |
 | Stock, recipes (escandallos), low-stock alerts, suppliers, purchase orders | Ls Rv Ag Lo Od Gl uC | planned (M8) |
 | Clock-in, customer accounts, loyalty, delivery/takeaway, menu of the day | various | planned (M7/M8) |
+
+## Numier ecosystem (target customer's current system)
+
+The owner's first customer runs Numier (Sevilla) and finds it hard to set up,
+unreliable on the handhelds, slow to add products to, and impossible to use
+without a training course. Everything below has to exist here and be doable
+with no training: guided first steps, working defaults, undo. Features only, as
+Numier describes them publicly; nothing of its code or wording is used.
+
+| Numier module | What a venue uses it for | Polaris |
+| --- | --- | --- |
+| TPV | The main till: tables, orders, payments, cash | done (M1-M4: menu, floor, orders, kitchen, payments, till X/Z, offline queue) |
+| PDA | An Android order taker with payment on it | partial: order screen works on a phone today; installable PWA + device linked by code (M5, data layer done) planned; card payment on the handheld depends on the terminal integration below |
+| COCINA | Kitchen monitor: touch, pass control, pending dishes | partial: kitchen display done (bump/recall per line); station display on a TV as a linked device, timers, colour by age, sound (A1) planned |
+| ONLINE | Managing every venue from anywhere | planned: the venue's own Polaris reached through Polaris's remote access, relay and domains, with no router configuration by the owner; cross-venue reports in A5 |
+| KIOSCO | Self-service kiosk paying by card | planned (M6, with the QR/kiosk work); card payment needs the terminal integration |
+| CARTA DIGITAL | QR menu for customers with live availability | planned (M6): menu, allergens, translations, 86 live |
+| PEDIDOS | Order and pay at the table from the customer's phone; delivery and take away | planned (M6 order at table, M7 take away/delivery); online payment needs a payment provider |
+| INVENTARIO | Phone as an inventory scanner: barcode by camera, counts | planned (M8 stock), scanning through the camera |
+| FACTURA QR | QR on the ticket so the customer issues their own full invoice | planned (with A2 printing: QR in the ticket document; a public invoice-request page) |
+| CONTROL HORARIO | Staff time clock, NFC with a PIN fallback; Spain's registro de jornada | planned (M8 clock-in): staff profiles (M5) + PIN; NFC where the device reads it (Web NFC on Android Chrome) |
+| CASH | Cash machines (CashGuard, Cashlogy) | planned, needs hardware: their integration protocols to be researched before any claim |
+| API | Integrations with other systems | planned: Polaris's existing API keys and scopes (`hospitality.*`) |
+| Verifactu | Signed, chained invoice records sent to the tax agency; required to sell in Spain from 2027 | no, pending the owner's decision. Nothing here signs invoices or claims to |
+| Card terminals: Redsys, Dojo | Card payment sent to the terminal, result back on the order | planned, needs each provider's integration and a terminal to test against |
+| CoverManager | Reservations | planned (M6 reservations; CoverManager sync after) |
+| Gstock | Stock and purchasing | planned (A4 suppliers / M8 stock; Gstock sync after) |
