@@ -223,6 +223,9 @@ export function UpdateChangelog({
         () => (changelog?.entries ?? []).filter(shipsElsewhere).length,
         [changelog]
     );
+    // A device plugin's changes ship in its own update; a range remembered
+    // from before the count existed has none.
+    const plugins = changelog?.plugins ?? 0;
 
     const installed = kind === "installed";
     const from = read?.from ?? base;
@@ -387,8 +390,9 @@ export function UpdateChangelog({
                 })}
             </div>
 
-            {changelog.more > 0 || changelog.hidden + elsewhere > 0 ? (
+            {changelog.more > 0 || changelog.hidden + elsewhere + plugins > 0 ? (
                 <p className={settingType.hint}>
+                    {plugins > 0 ? `${t("settings.changelog.plugins", { count: plugins })} ` : null}
                     {t.rich("settings.changelog.rest", {
                         more: changelog.more,
                         hidden: changelog.hidden + elsewhere,

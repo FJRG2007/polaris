@@ -3960,6 +3960,7 @@
             "showAll": "Ver los {count}",
             "showLess": "Ver menos",
             "openCommit": "Abrir este commit en GitHub",
+            "plugins": "{count, plural, one {# cambio llega con la actualización de un plugin.} other {# cambios llegan con actualizaciones de plugins.}}",
             "rest": "{more, plural, =0 {} one {# cambio más, } other {# cambios más, }}{hidden, plural, =0 {} one {# commit interno sin listar. } other {# commits internos sin listar. }}<link>Ver todo en GitHub</link>",
             "unavailable": "No se pudo contactar con GitHub para leer qué ha cambiado. La actualización se puede instalar igualmente.",
             "nothingVisible": "Solo cambios internos: tests, CI y herramientas."

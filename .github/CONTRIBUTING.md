@@ -70,11 +70,12 @@ Contributions to Polaris are welcome. Here is how you can contribute:
 
    The changelog an operator sees before updating is read from these commits.
    `feat`, `fix`, `perf` and the rest appear; `test`, `ci`, `chore`, `docs`,
-   `style` and `build` do not. Two trailers in the commit body change that:
+   `style` and `build` do not. Trailers in the commit body change that:
 
    ```text
    Security: high VULN-0041
    Changelog: skip
+   Plugin: hercules-stream100
    ```
 
    `Security: <critical|high|medium|low> [VULN-NNNN ...]` marks a vulnerability
@@ -82,6 +83,15 @@ Contributions to Polaris are welcome. Here is how you can contribute:
    update installs itself (by default critical and high install at once). A
    write-up in `docs/vulnerabilities/` with `status: fixed` counts the same way.
    `Changelog: skip` leaves a commit out.
+
+   `Plugin: <id>` (or the scope `plugins/<id>`, as in
+   `✨ feat(plugins/hercules-stream100): ...`) marks a change to one device
+   plugin. It ships in that plugin's own update, with the notes in its
+   `listing.json`, so Polaris's list counts it instead of listing it. Use it on
+   every commit about one plugin; a change to the plugin system itself (the
+   plugins page, the store, the host API) keeps the plain `plugins` scope. An
+   older `plugins` commit whose subject names a catalogued plugin ("Stream 100")
+   is counted the same way.
 
 ## Working with a coding agent
 

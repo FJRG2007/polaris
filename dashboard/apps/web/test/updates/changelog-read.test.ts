@@ -18,6 +18,10 @@ vi.mock("@/lib/setting-store", () => ({
 const auditLog = vi.hoisted(() => ({ findMany: vi.fn(async () => [] as { at: Date }[]) }));
 const session = vi.hoisted(() => ({ findMany: vi.fn(async () => [] as { createdAt: Date }[]) }));
 vi.mock("@polaris/db", () => ({ prisma: { auditLog, session } }));
+const catalog = vi.hoisted(() => ({
+    plugins: [{ id: "hercules-stream100", name: "Hercules Stream 100", claims: [{ name: "Hercules Stream 100" }] }]
+}));
+vi.mock("@/lib/device-plugins-catalog", () => ({ publishedPluginCatalog: async () => catalog }));
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -46,7 +50,7 @@ describe("what an update carries", () => {
         const first = await updateChangelog("s1", "s2", "installed");
         expect(first?.entries.map((entry) => entry.title)).toEqual(["stored"]);
         const row = JSON.parse(settings.get("updates.changelog.installed")!);
-        expect(row.key).toBe("s1...s2");
+        expect(row.key).toBe("2:s1...s2");
 
         // A fresh process: nothing in memory, the row is all there is.
         vi.resetModules();
@@ -57,12 +61,39 @@ describe("what an update carries", () => {
         expect(second?.entries.map((entry) => entry.title)).toEqual(["stored"]);
     });
 
+    it("leaves a device plugin's changes to its own update, counted, and reads again a row an older build stored", async () => {
+        const plugin = "✨ feat(plugins): profiles for the Stream 100 that switch by themselves in a call, a meeting, a game or an app";
+        settings.set(
+            "updates.changelog.available",
+            JSON.stringify({
+                key: "p1...p2",
+                changelog: { base: "p1", head: "p2", entries: [], fixes: [], more: 0, hidden: 0, security: null, url: "u" }
+            })
+        );
+        github.mockResolvedValueOnce({
+            total_commits: 3,
+            html_url: "u",
+            commits: [
+                commit("5555555", plugin),
+                commit("6666666", "🐛 fix(plugins): custom action editor follows the settings rules\n\nPlugin: hercules-stream100"),
+                commit("7777777", "🐛 fix(plugins): the cards get the apps' menu and width")
+            ],
+            files: []
+        });
+        const log = await updateChangelog("p1", "p2");
+        expect(github).toHaveBeenCalledTimes(1);
+        expect(log?.entries.map((entry) => entry.sha)).toEqual(["7777777"]);
+        expect(log?.plugins).toBe(2);
+        // What is stored keeps every entry, so a plugin catalogued later is still sorted out.
+        expect(JSON.parse(settings.get("updates.changelog.available")!).changelog.entries).toHaveLength(3);
+    });
+
     it("replaces a slot's row when its range moves on, so storage never grows", async () => {
         settings.set("updates.changelog.available", JSON.stringify({ key: "old...older", changelog: { nonsense: true } }));
         github.mockResolvedValueOnce({ total_commits: 0, html_url: "u", commits: [], files: [] });
         await updateChangelog("n1", "n2");
         expect(github).toHaveBeenCalledTimes(1);
-        expect(JSON.parse(settings.get("updates.changelog.available")!).key).toBe("n1...n2");
+        expect(JSON.parse(settings.get("updates.changelog.available")!).key).toBe("2:n1...n2");
         expect([...settings.keys()].filter((key) => key.startsWith("updates.changelog."))).toHaveLength(1);
     });
 

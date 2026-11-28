@@ -20,6 +20,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { github } from "@/lib/update-service";
+import { publishedPluginCatalog } from "@/lib/device-plugins-catalog";
 import { getSetting, setSetting } from "@/lib/setting-store";
 
 /** 100 commits a page; five is a fortnight of a busy main. */
@@ -37,6 +38,8 @@ export interface UpdateChangelog {
     readonly more: number;
     /** Commits left out because nobody running Polaris would notice them. */
     readonly hidden: number;
+    /** Changes left out because they ship in a device plugin's own update. */
+    readonly plugins: number;
     readonly security: core.SecuritySeverity | null;
     /** The vulnerability write-ups this range marks fixed, by id. */
     readonly fixes: readonly { readonly id: string; readonly severity: core.SecuritySeverity }[];
@@ -126,6 +129,7 @@ async function read(repo: string, base: string, head: string): Promise<UpdateCha
         entries: changelog.entries.slice(0, MAX_LISTED),
         more: Math.max(0, changelog.entries.length - MAX_LISTED) + unread,
         hidden: changelog.hidden,
+        plugins: 0,
         security,
         fixes,
         url
@@ -150,6 +154,37 @@ const SLOT_KEY: Record<ChangelogSlot, string> = {
     available: "updates.changelog.available",
     installed: "updates.changelog.installed"
 };
+
+/**
+ * Bumped when what a stored range holds changes, so a row kept by an older
+ * build is read again rather than shown: 2 added each entry's `plugin`.
+ */
+const STORED_VERSION = 2;
+
+/** How long the plugin catalog may hold up a changelog before it is shown without it. */
+const CATALOG_WAIT_MS = 5000;
+
+/** The device plugins the published catalog lists, by the names a commit may call them. */
+async function knownPlugins(): Promise<core.ChangelogPlugin[]> {
+    const catalog = await Promise.race([
+        publishedPluginCatalog().catch(() => null),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), CATALOG_WAIT_MS))
+    ]);
+    return (catalog?.plugins ?? []).map((plugin) => ({
+        id: plugin.id,
+        names: [plugin.name, ...plugin.claims.map((claim) => claim.name)]
+    }));
+}
+
+/**
+ * The range without what ships in a device plugin's own update, counted
+ * instead. Worked out each time it is shown rather than stored, so a plugin
+ * the catalog lists later is taken out of ranges read before it.
+ */
+function withoutPluginChanges(changelog: UpdateChangelog, plugins: readonly core.ChangelogPlugin[]): UpdateChangelog {
+    const routed = core.routePluginChanges(changelog.entries, plugins);
+    return { ...changelog, entries: routed.entries, plugins: routed.plugins };
+}
 
 /** The stored range for a slot when it is the pair asked for. A row that does
  *  not parse, or is for another pair, is no answer - never an error. */
@@ -195,7 +230,13 @@ export async function updateChangelog(
     slot: ChangelogSlot = "available"
 ): Promise<UpdateChangelog | null> {
     if (!base || !head || base === head) return null;
-    const key = `${base}...${head}`;
+    const [range, plugins] = await Promise.all([rangeChangelog(base, head, slot), knownPlugins()]);
+    return range ? withoutPluginChanges(range, plugins) : null;
+}
+
+/** The whole range, every entry kept: what is held in memory and stored. */
+async function rangeChangelog(base: string, head: string, slot: ChangelogSlot): Promise<UpdateChangelog | null> {
+    const key = `${STORED_VERSION}:${base}...${head}`;
     const known = kept.get(key);
     if (known) return known;
     if (inflight?.key === key) return inflight.promise;

@@ -258,6 +258,11 @@ entry has no `releases` (`pluginReleases` in `@polaris/core/device-plugins`). A 
 workflow builds it per platform into `<platform>/` before packaging (the
 `native` job). A push to main touching `clients/device-plugins/**` publishes the catalog.
 
+Commits that change one plugin carry `Plugin: <id>` or the scope `plugins/<id>`
+(`.github/CONTRIBUTING.md`): Polaris's own update list counts them as shipping
+with a plugin update instead of listing them, since `releases` is where that
+plugin's notes are read.
+
 **Any change to what a package holds needs a new version.** An app compares
 versions, not bytes: a package republished under a version it already holds is
 never taken (0.1.4 of the Stream 100 went out twice, and the computers that had

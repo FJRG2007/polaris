@@ -9,9 +9,11 @@ import { describe, expect, it } from "vitest";
 import {
     DEFAULT_SECURITY_UPDATE,
     buildChangelog,
+    changelogPluginOf,
     fixedSeverityFromWriteUp,
     parseCommit,
     parseSecurityUpdatePolicy,
+    routePluginChanges,
     securityPolicyLowers,
     securityUpdateRunsAt,
     worstSeverity
@@ -166,5 +168,46 @@ describe("the security update policy", () => {
         expect(securityPolicyLowers(base, { critical: "quiet", high: "immediate" })).toBe(true);
         expect(securityPolicyLowers({ critical: "quiet", high: "off" }, { critical: "immediate", high: "off" })).toBe(false);
         expect(securityPolicyLowers({ critical: "quiet", high: "quiet" }, { critical: "quiet", high: "off" })).toBe(true);
+    });
+});
+
+describe("changes that ship with a device plugin", () => {
+    const PLUGINS = [{ id: "hercules-stream100", names: ["Hercules Stream 100", "Hercules Stream 100"] }];
+    const of = (message: string) => changelogPluginOf(parseCommit("p1", message)!, PLUGINS);
+
+    it("takes a plugins commit whose subject names a catalogued plugin, by name or without its brand", () => {
+        expect(of("✨ feat(plugins): Hercules Stream 100 0.1.23 - knob presses run any action, and an idle screen with this computer's figures")).toBe("hercules-stream100");
+        expect(of("✨ feat(plugins): profiles for the Stream 100 that switch by themselves in a call, a meeting, a game or an app")).toBe("hercules-stream100");
+        expect(of("✨ feat(plugins): a plugin's settings open at once, and the page offers to take the Stream 100 back from Hercules Stream Control")).toBe("hercules-stream100");
+    });
+
+    it("takes a Plugin trailer or a plugins/<id> scope whatever the subject says", () => {
+        expect(of("✨ feat(plugins): custom actions for device buttons - open, run, hotkeys, macros, two states, launcher entries\n\nPlugin: hercules-stream100")).toBe("hercules-stream100");
+        expect(of("🐛 fix(plugins/hercules-stream100): custom action editor follows the settings rules, and a chosen program opens through the launcher's own start")).toBe("hercules-stream100");
+        expect(parseCommit("p2", "🐛 fix(plugins/hercules-stream100): x")?.plugin).toBe("hercules-stream100");
+        expect(parseCommit("p3", "🐛 fix(plugins): x\n\nPlugin: Not An Id")?.plugin).toBeNull();
+    });
+
+    it("keeps the plugin system's own changes, other scopes and security fixes in Polaris's list", () => {
+        expect(of("🐛 fix(plugins): the cards get the apps' menu and width, and a new version shows without a restart")).toBeNull();
+        expect(of("✨ feat(plugins): custom actions for device buttons - open, run, hotkeys, macros, two states, launcher entries")).toBeNull();
+        expect(of("✨ feat(chat): the Stream 100 mutes a call")).toBeNull();
+        expect(of("🐛 fix(plugins): Hercules Stream 100 reads past its buffer\n\nSecurity: high VULN-0099")).toBeNull();
+        expect(changelogPluginOf(parseCommit("p4", "✨ feat(plugins): Stream 100 profiles")!, [])).toBeNull();
+        // "Stream" alone is no plugin's name: a one-word tail is never an alias.
+        expect(changelogPluginOf(parseCommit("p5", "✨ feat(plugins): stream overlays")!, [{ id: "acme-stream", names: ["Acme Stream"] }])).toBeNull();
+    });
+
+    it("counts what it takes out, and reads rows stored before entries carried a plugin", () => {
+        const log = buildChangelog([
+            { sha: "a", message: "✨ feat(plugins): Hercules Stream 100 0.1.23 - knob presses run any action, and an idle screen with this computer's figures" },
+            { sha: "b", message: "✨ feat(mail): a reply opens on a line of your own" },
+            { sha: "c", message: "🐛 fix(plugins): custom action editor follows the settings rules, and a chosen program opens through the launcher's own start\n\nPlugin: hercules-stream100" }
+        ]);
+        const routed = routePluginChanges(log.entries, PLUGINS);
+        expect(routed.plugins).toBe(2);
+        expect(routed.entries.map((entry) => entry.sha)).toEqual(["b"]);
+        const stored = log.entries.map(({ plugin: _plugin, ...rest }) => rest) as unknown as typeof log.entries;
+        expect(routePluginChanges(stored, PLUGINS).plugins).toBe(1);
     });
 });
