@@ -133,6 +133,8 @@ pub struct Settings {
     /// Control (`clients/desktop/src/main/plugins/hercules-official.ts`, `Layout`).
     pub pages: Vec<Page>,
     pub profiles: Vec<Profile>,
+    /// How the screen looks; every value defaults to today's page.
+    pub look: crate::theme::Look,
 }
 
 impl Default for Settings {
@@ -147,6 +149,7 @@ impl Default for Settings {
             brightness: 80,
             pages: Vec::new(),
             profiles: Vec::new(),
+            look: crate::theme::Look::default(),
         }
     }
 }
@@ -188,6 +191,8 @@ impl Settings {
             .retain(|profile| usize::from(profile.page) < settings.pages.len().max(1));
         settings.tuning = settings.tuning.clamped();
         settings.brightness = settings.brightness.clamp(10, 100);
+        set(&mut settings.look, stored.get("look"));
+        settings.look = settings.look.clone().clamped();
         settings
     }
 }

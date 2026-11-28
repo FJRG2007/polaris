@@ -158,6 +158,8 @@ pub struct Screen {
     pub playing: Option<NowPlaying>,
     /// The idle page, shown instead of `mode`'s while it is set.
     pub idle: Option<Idle>,
+    /// How it looks: colours, label size and pictures.
+    pub theme: std::sync::Arc<Theme>,
 }
 
 impl Screen {
@@ -180,117 +182,42 @@ pub fn latest() -> Option<Screen> {
     LATEST.lock().ok().and_then(|latest| latest.clone())
 }
 
-const BACKGROUND: u8 = 0;
-const TEXT: u8 = 1;
-const DIM: u8 = 2;
-const TRACK: u8 = 3;
-const FILL: u8 = 4;
-const MUTED: u8 = 5;
-const DIVIDER: u8 = 6;
+use crate::theme::{self, Theme};
 
-/// The page's colours as RGB, by palette index.
-const COLORS: [(u8, u8, u8); 7] = [
-    (16, 18, 22),
-    (240, 242, 245),
-    (140, 146, 156),
-    (48, 52, 60),
-    (64, 150, 255),
-    (235, 80, 80),
-    (36, 40, 46),
-];
+const BACKGROUND: u8 = theme::BACKGROUND as u8;
+const TEXT: u8 = theme::TEXT as u8;
+const DIM: u8 = theme::DIM as u8;
+const TRACK: u8 = theme::TRACK as u8;
+const FILL: u8 = theme::FILL as u8;
+const MUTED: u8 = theme::MUTED as u8;
+const DIVIDER: u8 = theme::DIVIDER as u8;
 
-fn palette() -> [u16; PALETTE_COLORS] {
-    let mut palette = [0u16; PALETTE_COLORS];
-    for (entry, (red, green, blue)) in palette.iter_mut().zip(COLORS) {
-        *entry = display::rgb565(red, green, blue);
-    }
-    palette
+/// The page's letters: Roboto Medium (SIL Open Font License 1.1,
+/// `assets/Roboto-LICENSE.txt`), drawn from its outlines at the size each
+/// line asks for, with smooth edges, instead of a 5x7 bitmap blown up into
+/// blocks.
+static FONT_DATA: &[u8] = include_bytes!("../assets/Roboto-Medium.ttf");
+
+fn font() -> &'static ab_glyph::FontRef<'static> {
+    static FONT: std::sync::OnceLock<ab_glyph::FontRef<'static>> = std::sync::OnceLock::new();
+    FONT.get_or_init(|| {
+        ab_glyph::FontRef::try_from_slice(FONT_DATA).expect("the bundled font reads")
+    })
 }
 
-/// Rows above a letter's body, where an accent goes.
-const ACCENT_ROWS: usize = 2;
-/// A glyph's height in font dots: the accent rows, then a 5x7 body.
-const GLYPH_ROWS: usize = ACCENT_ROWS + 7;
-
-/// A 5x7 letter body, one row per byte, bit 4 the leftmost column.
-fn body(c: char) -> [u8; 7] {
-    match c {
-        '0' => [0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e],
-        '1' => [0x04, 0x0c, 0x04, 0x04, 0x04, 0x04, 0x0e],
-        '2' => [0x0e, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1f],
-        '3' => [0x1f, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0e],
-        '4' => [0x02, 0x06, 0x0a, 0x12, 0x1f, 0x02, 0x02],
-        '5' => [0x1f, 0x10, 0x1e, 0x01, 0x01, 0x11, 0x0e],
-        '6' => [0x06, 0x08, 0x10, 0x1e, 0x11, 0x11, 0x0e],
-        '7' => [0x1f, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08],
-        '8' => [0x0e, 0x11, 0x11, 0x0e, 0x11, 0x11, 0x0e],
-        '9' => [0x0e, 0x11, 0x11, 0x0f, 0x01, 0x02, 0x0c],
-        'A' => [0x0e, 0x11, 0x11, 0x11, 0x1f, 0x11, 0x11],
-        'B' => [0x1e, 0x11, 0x11, 0x1e, 0x11, 0x11, 0x1e],
-        'C' => [0x0e, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0e],
-        'D' => [0x1c, 0x12, 0x11, 0x11, 0x11, 0x12, 0x1c],
-        'E' => [0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x1f],
-        'F' => [0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x10],
-        'G' => [0x0e, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0f],
-        'H' => [0x11, 0x11, 0x11, 0x1f, 0x11, 0x11, 0x11],
-        'I' => [0x0e, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0e],
-        'J' => [0x07, 0x02, 0x02, 0x02, 0x02, 0x12, 0x0c],
-        'K' => [0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11],
-        'L' => [0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1f],
-        'M' => [0x11, 0x1b, 0x15, 0x15, 0x11, 0x11, 0x11],
-        'N' => [0x11, 0x11, 0x19, 0x15, 0x13, 0x11, 0x11],
-        'O' => [0x0e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e],
-        'P' => [0x1e, 0x11, 0x11, 0x1e, 0x10, 0x10, 0x10],
-        'Q' => [0x0e, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0d],
-        'R' => [0x1e, 0x11, 0x11, 0x1e, 0x14, 0x12, 0x11],
-        'S' => [0x0f, 0x10, 0x10, 0x0e, 0x01, 0x01, 0x1e],
-        'T' => [0x1f, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04],
-        'U' => [0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e],
-        'V' => [0x11, 0x11, 0x11, 0x11, 0x11, 0x0a, 0x04],
-        'W' => [0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0a],
-        'X' => [0x11, 0x11, 0x0a, 0x04, 0x0a, 0x11, 0x11],
-        'Y' => [0x11, 0x11, 0x11, 0x0a, 0x04, 0x04, 0x04],
-        'Z' => [0x1f, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1f],
-        '%' => [0x18, 0x19, 0x02, 0x04, 0x08, 0x13, 0x03],
-        '-' => [0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00],
-        '+' => [0x00, 0x04, 0x04, 0x1f, 0x04, 0x04, 0x00],
-        '.' => [0x00, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x0c],
-        ':' => [0x00, 0x0c, 0x0c, 0x00, 0x0c, 0x0c, 0x00],
-        '/' => [0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x00],
-        '&' => [0x0c, 0x12, 0x14, 0x08, 0x15, 0x12, 0x0d],
-        '\'' => [0x0c, 0x04, 0x08, 0x00, 0x00, 0x00, 0x00],
-        '(' => [0x02, 0x04, 0x08, 0x08, 0x08, 0x04, 0x02],
-        ')' => [0x08, 0x04, 0x02, 0x02, 0x02, 0x04, 0x08],
-        '_' => [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f],
-        '!' => [0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04],
-        '?' => [0x0e, 0x11, 0x01, 0x02, 0x04, 0x00, 0x04],
-        '¡' => [0x04, 0x00, 0x04, 0x04, 0x04, 0x04, 0x04],
-        '¿' => [0x04, 0x00, 0x04, 0x08, 0x10, 0x11, 0x0e],
-        ',' => [0x00, 0x00, 0x00, 0x00, 0x0c, 0x04, 0x08],
-        '"' => [0x0a, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00],
-        '#' => [0x0a, 0x1f, 0x0a, 0x0a, 0x1f, 0x0a, 0x00],
-        ' ' => [0; 7],
-        // Anything the font has no letter for: a hollow box.
-        _ => [0x1f, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1f],
-    }
-}
-
-/// A letter with its accent: the accent rows, then the body.
-fn glyph(c: char) -> [u8; GLYPH_ROWS] {
-    let (base, accent) = match c {
-        'Á' => ('A', [0x02, 0x04]),
-        'É' => ('E', [0x02, 0x04]),
-        'Í' => ('I', [0x02, 0x04]),
-        'Ó' => ('O', [0x02, 0x04]),
-        'Ú' => ('U', [0x02, 0x04]),
-        'Ñ' => ('N', [0x0d, 0x16]),
-        'Ü' => ('U', [0x00, 0x0a]),
-        other => (other, [0, 0]),
-    };
-    let mut rows = [0u8; GLYPH_ROWS];
-    rows[..ACCENT_ROWS].copy_from_slice(&accent);
-    rows[ACCENT_ROWS..].copy_from_slice(&body(base));
-    rows
+/// Pixels per em for a capital letter `cap` pixels tall.
+fn em_for_cap(cap: f32) -> f32 {
+    use ab_glyph::Font;
+    static RATIO: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+    let ratio = *RATIO.get_or_init(|| {
+        let font = font();
+        let glyph = font.glyph_id('H').with_scale(1000.0);
+        font.outline_glyph(glyph)
+            .map(|outline| outline.px_bounds().height() / 1000.0)
+            .filter(|ratio| *ratio > 0.1)
+            .unwrap_or(0.711)
+    });
+    cap / ratio
 }
 
 /// The text as the font can draw it: upper case; the Spanish accents kept
@@ -313,15 +240,51 @@ fn printable(text: &str) -> Vec<char> {
         .collect()
 }
 
-struct Canvas {
-    pixels: Vec<u8>,
+/// A page being drawn, in full colour at the panel's own 480x272: letters
+/// and pictures are blended here and only the finished page is put into
+/// the palette ([`Canvas::finish`]).
+struct Canvas<'a> {
+    pixels: Vec<(u8, u8, u8)>,
+    theme: &'a Theme,
 }
 
-impl Canvas {
-    fn rect(&mut self, x: usize, y: usize, width: usize, height: usize, color: u8) {
+impl<'a> Canvas<'a> {
+    /// A page of the theme's background colour, or its picture.
+    fn new(theme: &'a Theme) -> Self {
+        let pixels = match &theme.background {
+            Some(picture) => picture
+                .rgba
+                .chunks_exact(4)
+                .map(|pixel| (pixel[0], pixel[1], pixel[2]))
+                .collect(),
+            None => vec![theme.colors[usize::from(BACKGROUND)]; WIDTH * HEIGHT],
+        };
+        Self { pixels, theme }
+    }
+
+    fn color(&self, role: u8) -> (u8, u8, u8) {
+        self.theme.colors[usize::from(role) % theme::ROLES]
+    }
+
+    fn rect(&mut self, x: usize, y: usize, width: usize, height: usize, role: u8) {
+        let color = self.color(role);
         for row in y.min(HEIGHT)..(y + height).min(HEIGHT) {
             let start = row * WIDTH;
             self.pixels[start + x.min(WIDTH)..start + (x + width).min(WIDTH)].fill(color);
+        }
+    }
+
+    /// `picture` with its top-left corner at `(left, top)`, over what is there.
+    fn picture(&mut self, picture: &theme::Picture, left: usize, top: usize) {
+        for y in 0..picture.height.min(HEIGHT.saturating_sub(top)) {
+            let row = (top + y) * WIDTH;
+            for x in 0..picture.width.min(WIDTH.saturating_sub(left)) {
+                let at = (y * picture.width + x) * 4;
+                let source = &picture.rgba[at..at + 4];
+                let under = self.pixels[row + left + x];
+                self.pixels[row + left + x] =
+                    theme::mix(under, (source[0], source[1], source[2]), source[3]);
+            }
         }
     }
 
@@ -337,32 +300,91 @@ impl Canvas {
         chars
     }
 
-    /// Text from `left`, its letters' tops at `y` (accents sit above), at
-    /// `scale` pixels per font dot, cut to `max` characters.
-    fn text_at(&mut self, text: &str, left: usize, y: usize, scale: usize, max: usize, color: u8) {
-        let advance = 6 * scale;
-        let top = y.saturating_sub(ACCENT_ROWS * scale);
-        for (index, c) in Self::fit(text, max).iter().enumerate() {
-            for (row, bits) in glyph(*c).iter().enumerate() {
-                for column in 0..5 {
-                    if bits & (0x10 >> column) != 0 {
-                        let x = left + index * advance + column * scale;
-                        self.rect(x, top + row * scale, scale, scale, color);
-                    }
-                }
+    /// `chars` with capitals `cap` pixels tall, placed from x = 0 on the
+    /// baseline, and how wide they are.
+    fn layout(chars: &[char], cap: usize) -> (Vec<ab_glyph::Glyph>, f32) {
+        use ab_glyph::{Font, ScaleFont};
+        let font = font();
+        let scaled = font.as_scaled(em_for_cap(cap as f32));
+        let mut glyphs = Vec::with_capacity(chars.len());
+        let mut caret = 0.0f32;
+        let mut previous: Option<ab_glyph::GlyphId> = None;
+        for c in chars {
+            let id = font.glyph_id(*c);
+            if let Some(previous) = previous {
+                caret += scaled.kern(previous, id);
             }
+            glyphs.push(id.with_scale_and_position(scaled.scale(), ab_glyph::point(caret, 0.0)));
+            caret += scaled.h_advance(id);
+            previous = Some(id);
+        }
+        (glyphs, caret)
+    }
+
+    /// How wide `text` is drawn at `scale` ([`Canvas::text_at`]), cut to `max` characters.
+    fn width(text: &str, scale: usize, max: usize) -> usize {
+        Self::layout(&Self::fit(text, max), 7 * scale).1.ceil() as usize
+    }
+
+    /// Text from `left`, its capitals' tops at `y` (accents sit above),
+    /// `cap` pixels tall, cut to `max` characters.
+    fn draw_text(&mut self, text: &str, left: usize, y: usize, cap: usize, max: usize, role: u8) {
+        use ab_glyph::Font;
+        let color = self.color(role);
+        let baseline = (y + cap) as f32;
+        let (glyphs, _) = Self::layout(&Self::fit(text, max), cap);
+        for mut glyph in glyphs {
+            glyph.position.x += left as f32;
+            glyph.position.y = baseline;
+            let Some(outline) = font().outline_glyph(glyph) else {
+                continue;
+            };
+            let bounds = outline.px_bounds();
+            let pixels = &mut self.pixels;
+            outline.draw(|gx, gy, coverage| {
+                let x = bounds.min.x as i64 + i64::from(gx);
+                let y = bounds.min.y as i64 + i64::from(gy);
+                if x < 0 || y < 0 || x as usize >= WIDTH || y as usize >= HEIGHT {
+                    return;
+                }
+                let at = y as usize * WIDTH + x as usize;
+                let amount = (coverage.clamp(0.0, 1.0) * 255.0).round() as u8;
+                pixels[at] = theme::mix(pixels[at], color, amount);
+            });
         }
     }
 
+    /// Text from `left`, its capitals' tops at `y`, `7 * scale` pixels tall
+    /// (the old 5x7 font's body at that scale, so every line keeps its
+    /// place), cut to `max` characters.
+    fn text_at(&mut self, text: &str, left: usize, y: usize, scale: usize, max: usize, role: u8) {
+        self.draw_text(text, left, y, 7 * scale, max, role);
+    }
+
+    /// Text centred on `center`, capitals `cap` pixels tall.
+    fn text_cap(&mut self, text: &str, center: usize, y: usize, cap: usize, max: usize, role: u8) {
+        let width = Self::layout(&Self::fit(text, max), cap).1.ceil() as usize;
+        self.draw_text(text, center.saturating_sub(width / 2), y, cap, max, role);
+    }
+
     /// Text centred on `center`, otherwise as [`Canvas::text_at`].
-    fn text(&mut self, text: &str, center: usize, y: usize, scale: usize, max: usize, color: u8) {
-        let count = Self::fit(text, max).len();
-        let width = (count * 6 * scale).saturating_sub(scale);
-        let left = center.saturating_sub(width / 2);
-        self.text_at(text, left, y, scale, max, color);
+    fn text(&mut self, text: &str, center: usize, y: usize, scale: usize, max: usize, role: u8) {
+        self.text_cap(text, center, y, 7 * scale, max, role);
+    }
+
+    /// The page in the theme's palette.
+    fn finish(self) -> IndexedFrame {
+        let theme = self.theme;
+        IndexedFrame {
+            palette: theme.palette,
+            pixels: self
+                .pixels
+                .iter()
+                .map(|color| theme.index_of(*color))
+                .collect(),
+        }
     }
 }
-
 /// Column width: one column under each knob.
 const COLUMN: usize = WIDTH / 4;
 const LABEL_Y: usize = 18;
@@ -380,15 +402,10 @@ pub fn render(screen: &Screen) -> Option<IndexedFrame> {
     if screen.is_off() {
         return None;
     }
-    let mut canvas = Canvas {
-        pixels: vec![BACKGROUND; WIDTH * HEIGHT],
-    };
+    let mut canvas = Canvas::new(&screen.theme);
     if let Some(idle) = &screen.idle {
         idle_page(&mut canvas, idle);
-        return Some(IndexedFrame {
-            palette: palette(),
-            pixels: canvas.pixels,
-        });
+        return Some(canvas.finish());
     }
     match (screen.mode, &screen.call, &screen.playing) {
         (DisplayMode::Call, Some(call), _) => call_page(&mut canvas, call, screen.locale),
@@ -397,20 +414,28 @@ pub fn render(screen: &Screen) -> Option<IndexedFrame> {
         }
         _ => mixer_page(&mut canvas, &screen.knobs),
     }
-    Some(IndexedFrame {
-        palette: palette(),
-        pixels: canvas.pixels,
-    })
+    Some(canvas.finish())
 }
 
-fn mixer_page(canvas: &mut Canvas, knobs: &[Knob; 4]) {
+fn mixer_page(canvas: &mut Canvas<'_>, knobs: &[Knob; 4]) {
     for (index, knob) in knobs.iter().enumerate() {
         let left = index * COLUMN;
         let center = left + COLUMN / 2;
         if index > 0 {
             canvas.rect(left, 12, 1, HEIGHT - 24, DIVIDER);
         }
-        canvas.text(&knob.label, center, LABEL_Y, 2, 9, TEXT);
+        // A knob's picture takes the top of its column; its name then moves
+        // under the value, into the room above the bar.
+        let theme = canvas.theme;
+        let cap = theme.label_size.cap_height();
+        let label_top = match &theme.knob_images[index] {
+            Some(picture) => {
+                canvas.picture(picture, center - theme::KNOB_IMAGE_SIDE / 2, 6);
+                VALUE_Y + 34
+            }
+            None => (LABEL_Y + 7).saturating_sub(cap / 2),
+        };
+        canvas.text_cap(&knob.label, center, label_top, cap, 9, TEXT);
         let (value, color) = match knob.volume {
             None => ("-".to_owned(), DIM),
             Some(volume) if knob.muted => (format!("{volume}%"), MUTED),
@@ -438,18 +463,23 @@ const IDLE_ROW_HEIGHT: usize = 44;
 
 /// The clock large at the top, then one row per figure: its name on the
 /// left, its value on the right and a thin bar under it when it has one.
-fn idle_page(canvas: &mut Canvas, idle: &Idle) {
+fn idle_page(canvas: &mut Canvas<'_>, idle: &Idle) {
     canvas.text(&idle.clock, WIDTH / 2, 14, 7, 8, TEXT);
     for (index, row) in idle.rows.iter().take(IDLE_ROWS).enumerate() {
         let top = IDLE_ROW_TOP + index * IDLE_ROW_HEIGHT;
         canvas.text_at(&row.label, MARGIN, top, 3, 9, DIM);
-        let value = Canvas::fit(&row.value, 14).len();
-        let right = (WIDTH - MARGIN).saturating_sub((value * 18).saturating_sub(3));
+        let right = (WIDTH - MARGIN).saturating_sub(Canvas::width(&row.value, 3, 14));
         canvas.text_at(&row.value, right, top, 3, 14, TEXT);
         if let Some(percent) = row.percent {
             let width = WIDTH - 2 * MARGIN;
             canvas.rect(MARGIN, top + 28, width, 4, TRACK);
-            canvas.rect(MARGIN, top + 28, width * usize::from(percent.min(100)) / 100, 4, FILL);
+            canvas.rect(
+                MARGIN,
+                top + 28,
+                width * usize::from(percent.min(100)) / 100,
+                4,
+                FILL,
+            );
         }
     }
 }
@@ -461,7 +491,7 @@ const CALL_ROW_HEIGHT: usize = 30;
 
 /// The call: how many are in it, this computer's microphone and sound, and
 /// the people in it (who is speaking, who is muted).
-fn call_page(canvas: &mut Canvas, call: &Call, locale: Locale) {
+fn call_page(canvas: &mut Canvas<'_>, call: &Call, locale: Locale) {
     let count = call.participants.len();
     let header = format!("{} - {count}", locale.pick("In call", "En llamada"));
     canvas.text(&header, WIDTH / 2, 16, 3, 24, TEXT);
@@ -502,7 +532,7 @@ fn call_page(canvas: &mut Canvas, call: &Call, locale: Locale) {
         } else {
             ""
         };
-        let width = state.chars().count() * 12;
+        let width = Canvas::width(state, 2, 11);
         canvas.text_at(state, WIDTH - MARGIN - width, y, 2, 11, MUTED);
     }
     if count > shown {
@@ -542,7 +572,7 @@ fn wrap(text: &str, width: usize, lines: usize) -> Vec<String> {
 }
 
 /// What is playing: playing or paused, the title (two lines) and the artist.
-fn playing_page(canvas: &mut Canvas, playing: &NowPlaying, locale: Locale) {
+fn playing_page(canvas: &mut Canvas<'_>, playing: &NowPlaying, locale: Locale) {
     let state = if playing.playing {
         locale.pick("Now playing", "Suena ahora")
     } else {
@@ -568,6 +598,11 @@ pub const TILE_EVERY: Duration = Duration::from_millis(40);
 /// the panel goes dark when that cadence stops (cont1nuity/hercules-stream-linux,
 /// `docs/PROTOCOL.md`).
 pub const HEARTBEAT_EVERY: Duration = Duration::from_millis(20);
+/// How long a finished idle page stays before the next one starts. A page
+/// takes 32 tiles, 1.3 s, and the firmware refines it coarse to fine, so an
+/// idle page redrawn every second (its CPU and memory figures change that
+/// often) was never finished: the panel sat in its blocky first passes.
+pub const IDLE_HOLD: Duration = Duration::from_secs(2);
 
 /// A pixel the panel holds that Polaris does not know (nothing drawn yet in
 /// this session, or the screen was switched off since).
@@ -593,6 +628,13 @@ pub struct Painter {
     queue: VecDeque<Vec<u8>>,
     /// The newest page asked for.
     shown: Option<Screen>,
+    /// An idle page that waits for the one being drawn to finish and stay
+    /// [`IDLE_HOLD`]; only the newest is kept.
+    pending: Option<Screen>,
+    /// The palette the panel holds, once one went out.
+    palette: Option<[u16; PALETTE_COLORS]>,
+    /// The next tile carries the target's palette (the look changed).
+    palette_due: bool,
     /// Its picture, while the screen is on.
     target: Option<IndexedFrame>,
     /// The panel if the firmware fills each sample's block.
@@ -618,6 +660,9 @@ impl Default for Painter {
             sequence: Sequence::default(),
             queue: VecDeque::new(),
             shown: None,
+            pending: None,
+            palette: None,
+            palette_due: false,
             target: None,
             filled: vec![UNKNOWN; WIDTH * HEIGHT],
             sampled: vec![UNKNOWN; WIDTH * HEIGHT],
@@ -644,10 +689,34 @@ fn samples(tile: usize) -> impl Iterator<Item = usize> {
 impl Painter {
     /// Asks for `screen` to be drawn. Unchanged pages cost nothing; a page
     /// that comes in mid-draw supersedes the one being drawn.
+    ///
+    /// An idle page that follows another idle page does not: it waits for
+    /// the page on the panel to be finished and stay [`IDLE_HOLD`], so the
+    /// clock and figures are always seen whole. Anything somebody did (a
+    /// knob, a button, the idle page coming or going) still goes at once.
     pub fn show(&mut self, screen: &Screen) {
         if self.shown.as_ref() == Some(screen) {
+            self.pending = None;
             return;
         }
+        if self.pending.as_ref() == Some(screen) {
+            return;
+        }
+        let both_idle = screen.idle.is_some()
+            && self
+                .shown
+                .as_ref()
+                .is_some_and(|shown| shown.idle.is_some())
+            && self.set_up;
+        if both_idle {
+            self.pending = Some(screen.clone());
+            return;
+        }
+        self.pending = None;
+        self.apply(screen);
+    }
+
+    fn apply(&mut self, screen: &Screen) {
         let previous = self.shown.replace(screen.clone());
         let Some(frame) = render(screen) else {
             if self.set_up || previous.is_none() {
@@ -663,7 +732,25 @@ impl Painter {
         } else if previous.is_some_and(|previous| previous.brightness != screen.brightness) {
             self.brightness_due = true;
         }
+        if !self.setup_due && self.palette != Some(frame.palette) {
+            // Another look: every index on the panel means another colour
+            // now, so the new palette goes first and the page is drawn whole.
+            self.palette_due = true;
+            self.filled.fill(UNKNOWN);
+            self.sampled.fill(UNKNOWN);
+        }
         self.target = Some(frame);
+    }
+
+    /// Starts the waiting idle page once the panel has shown the last one,
+    /// whole, for [`IDLE_HOLD`].
+    fn promote(&mut self, now: Instant) {
+        if self.pending.is_none() || self.is_drawing() || !due(self.last_tile, now, IDLE_HOLD) {
+            return;
+        }
+        if let Some(screen) = self.pending.take() {
+            self.apply(&screen);
+        }
     }
 
     /// The screen went off: what it shows next is set up and drawn whole.
@@ -671,6 +758,9 @@ impl Painter {
         self.set_up = false;
         self.setup_due = false;
         self.brightness_due = false;
+        self.palette_due = false;
+        self.palette = None;
+        self.pending = None;
         self.target = None;
         self.filled.fill(UNKNOWN);
         self.sampled.fill(UNKNOWN);
@@ -717,6 +807,8 @@ impl Painter {
         let brightness = display::brightness_command(screen.brightness);
         if std::mem::take(&mut self.setup_due) {
             self.brightness_due = false;
+            self.palette_due = false;
+            self.palette = self.target.as_ref().map(|target| target.palette);
             let palette = self
                 .target
                 .as_ref()
@@ -730,10 +822,17 @@ impl Painter {
             ]
             .concat();
         }
+        let mut out = Vec::new();
         if std::mem::take(&mut self.brightness_due) {
-            return brightness.to_vec();
+            out.extend_from_slice(&brightness);
         }
-        Vec::new()
+        if std::mem::take(&mut self.palette_due) {
+            if let Some(target) = self.target.as_ref() {
+                out.extend_from_slice(&target.palette_command());
+                self.palette = Some(target.palette);
+            }
+        }
+        out
     }
 
     /// The next drawing transfer's body, when one is owed.
@@ -742,7 +841,7 @@ impl Painter {
             return Some(body);
         }
         let tile = self.next_tile();
-        if tile.is_none() && !self.setup_due && !self.brightness_due {
+        if tile.is_none() && !self.setup_due && !self.brightness_due && !self.palette_due {
             return None;
         }
         let prefix = self.prefix();
@@ -757,6 +856,7 @@ impl Painter {
     /// The next transfer due at `now`, ready to write as is, or `None` when
     /// nothing is due yet ([`Painter::wait`] says for how long).
     pub fn next(&mut self, now: Instant) -> Option<Vec<u8>> {
+        self.promote(now);
         let draw_due = self.is_drawing() && due(self.last_tile, now, TILE_EVERY);
         let body = if std::mem::take(&mut self.ack) {
             vec![ACK, END]
@@ -787,16 +887,21 @@ impl Painter {
         ));
         if self.is_drawing() {
             idle.min(remaining(self.last_tile, now, TILE_EVERY))
+        } else if self.pending.is_some() {
+            idle.min(remaining(self.last_tile, now, IDLE_HOLD))
         } else {
             idle
         }
     }
 
     /// Whether the panel does not show the newest page yet.
+    ///
+    /// An idle page waiting its turn ([`Painter::show`]) is not drawing yet.
     pub fn is_drawing(&self) -> bool {
         !self.queue.is_empty()
             || self.setup_due
             || self.brightness_due
+            || self.palette_due
             || self.next_tile().is_some()
     }
 }

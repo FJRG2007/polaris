@@ -3,6 +3,10 @@
     "pictureSource": "https://www.hercules.com/en/product/stream-100",
     "releases": [
         {
+            "version": "0.1.24",
+            "notes": "a sharper, steadier screen: letters are drawn smooth at the panel's own resolution instead of blown-up blocks, the idle screen is always seen whole instead of redrawing half-finished every second, and you can pick the size of each knob's name. A background colour or picture and a picture per knob are drawn too, once Polaris' page offers them."
+        },
+        {
             "version": "0.1.23",
             "notes": "custom actions and an idle screen: a lit button or a knob press can open a file, folder or website, run a program, press a hotkey, run a Polaris launcher entry or a macro of those, with two states if you like, and after the seconds you choose the screen shows the clock, CPU, memory, disk and, on Linux, network until you touch a control. Custom actions need Polaris for desktop 0.1.137 or later; hotkeys are pressed on Windows."
         },

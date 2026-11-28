@@ -690,6 +690,39 @@
             "max": 100,
             "min": 10,
             "step": 5
+        },
+        {
+            "default": "medium",
+            "group": "screen",
+            "key": "labelSize",
+            "kind": "choice",
+            "label": {
+                "en-US": "Knob name size",
+                "es-ES": "Tamaño del nombre de cada rueda"
+            },
+            "options": [
+                {
+                    "label": {
+                        "en-US": "Small",
+                        "es-ES": "Pequeño"
+                    },
+                    "value": "small"
+                },
+                {
+                    "label": {
+                        "en-US": "Medium",
+                        "es-ES": "Mediano"
+                    },
+                    "value": "medium"
+                },
+                {
+                    "label": {
+                        "en-US": "Large",
+                        "es-ES": "Grande"
+                    },
+                    "value": "large"
+                }
+            ]
         }
     ],
     "statusTexts": {
@@ -711,6 +744,6 @@
         }
     },
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.23",
+    "version": "0.1.24",
     "view": "view/index.html"
 }

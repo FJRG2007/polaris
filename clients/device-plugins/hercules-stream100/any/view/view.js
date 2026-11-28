@@ -65,7 +65,8 @@ const WORDS = {
             }
         },
         categories: { calls: "Calls", music: "Music", games: "Games", browser: "Browser", system: "System sounds", other: "Other apps", output: "Whole output", none: "Nothing" },
-        displays: { mixer: "Volume of each knob", call: "People in the call", nowPlaying: "What is playing", off: "Off" }
+        displays: { mixer: "Volume of each knob", call: "People in the call", nowPlaying: "What is playing", off: "Off" },
+        labelSizes: { small: "Small", medium: "Medium", large: "Large" }
     },
     es: {
         screen: "Vista previa de la pantalla del Stream 100",
@@ -93,7 +94,8 @@ const WORDS = {
             }
         },
         categories: { calls: "Llamadas", music: "Música", games: "Juegos", browser: "Navegador", system: "Sonidos del sistema", other: "Otras apps", output: "Toda la salida", none: "Nada" },
-        displays: { mixer: "Volumen de cada rueda", call: "Personas en la llamada", nowPlaying: "Lo que suena", off: "Apagada" }
+        displays: { mixer: "Volumen de cada rueda", call: "Personas en la llamada", nowPlaying: "Lo que suena", off: "Apagada" },
+        labelSizes: { small: "Pequeño", medium: "Mediano", large: "Grande" }
     }
 };
 
