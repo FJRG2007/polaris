@@ -21,6 +21,7 @@ import { z } from "zod";
 import { apiPermission } from "@/lib/api-session";
 import { followRuntimeLogs, readableServices } from "@/lib/deploy/runtime-logs";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { untilShutdown } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,7 +84,7 @@ export async function GET(request: Request): Promise<Response> {
                 }
             };
 
-            request.signal.addEventListener("abort", close);
+            untilShutdown(request.signal).addEventListener("abort", close);
             beat = setInterval(() => {
                 if (closed) return;
                 try {

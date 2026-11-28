@@ -18,6 +18,7 @@ import { prisma } from "@polaris/db";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { resolveSeat } from "@/lib/chat/meeting-seat";
 import { subscribeMeetingEvents } from "@/lib/chat/meeting-events";
+import { untilShutdown } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,7 +109,7 @@ export async function GET(
                 if (event.kind === "roster" && !admitted) void recheckAdmission();
             });
 
-            request.signal.addEventListener("abort", () => {
+            untilShutdown(request.signal).addEventListener("abort", () => {
                 stop();
                 try {
                     controller.close();

@@ -14,6 +14,7 @@
  */
 
 import type { MetricSubjectType } from "./metrics-shared";
+import { untilShutdown } from "@/lib/shutdown";
 
 /** One tick's worth of new samples. */
 export interface MetricTick {
@@ -95,7 +96,7 @@ export function metricTickStream(request: Request, subjects: readonly string[]):
                     stop();
                 }
             };
-            request.signal.addEventListener("abort", () => {
+            untilShutdown(request.signal).addEventListener("abort", () => {
                 stop();
                 try {
                     controller.close();

@@ -24,6 +24,7 @@ import { subscribeSession } from "@/lib/agents/session-live";
 import { currentDraft, subscribeDraft } from "@/lib/agents/session-drafts";
 import type { DraftFrame } from "@/lib/agents/draft-frames";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { untilShutdown } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,7 +93,7 @@ export async function GET(
             const draft = (frame: DraftFrame) => send(`event: draft\ndata: ${JSON.stringify(frame)}\n\n`);
             unsubscribeDraft = subscribeDraft(id, draft);
             heartbeat = setInterval(() => send(": keep-alive\n\n"), HEARTBEAT_MS);
-            request.signal.addEventListener("abort", stop, { once: true });
+            untilShutdown(request.signal).addEventListener("abort", stop, { once: true });
             // The id is set even by a frame without data, so a stream dropped
             // before its first change still comes back as a reconnect.
             send(`retry: 5000\nid: ${Date.now()}\n\n`);

@@ -13013,6 +13013,10 @@ model MeetingParticipant {
     // An account's latest seat, which is where a moderator's mute is carried
     // from into the next call in the same space or group.
     @@index([userId, joinedAt])
+    // The updater's two reads: when people join calls, and whether a call has
+    // somebody on it right now.
+    @@index([joinedAt])
+    @@index([leftAt, lastSeenAt])
 }
 // One capability switched on or off for one account, regardless of their role.
 //
@@ -19999,6 +20003,9 @@ model HospitalityOrderLine {
 
     @@index([orderId])
     @@index([status, station, sentAt])
+    // When the deployment is busiest, and whether a venue is serving right now:
+    // read by the updater before it restarts anything.
+    @@index([createdAt])
 }
 
 model HospitalityPayment {
@@ -20022,6 +20029,8 @@ model HospitalityPayment {
 
     @@index([orderId])
     @@index([shiftId, method])
+    // Read by the updater the same way as order lines.
+    @@index([createdAt])
 }
 
 // A till session: opened with a float, closed with a count (Z report).

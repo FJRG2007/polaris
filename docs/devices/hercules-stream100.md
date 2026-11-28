@@ -103,10 +103,33 @@ is dropped after a few seconds: the Hercules logo, then a dark screen.
 
 Polaris draws its own page (`screen::render`): one column under each knob
 with what it follows, its volume as a number and a bar (red when muted, a
-dash when nothing it follows is playing), on a fixed seven-colour palette so a
-redraw never resends it. A page is redrawn only when it changes; a page that
-changes mid-draw waits for that draw to end; a brightness change alone is one
-`0x31` command; "Off" sends `0x13`.
+dash when nothing it follows is playing). The page is drawn in full colour
+at the panel's own 480 x 272 and put into the palette only once finished:
+letters come from the outlines of Roboto Medium (`crates/polaris-stream100/assets`,
+SIL OFL 1.1) with smooth edges, not a 5x7 bitmap blown up into blocks. The
+palette is a function of the look alone (`theme`): the page's seven colours,
+fourteen shades of each text colour over the background, and with a picture
+that picture's own colours (median cut). A redraw never resends it; a new look
+sends it on the first tile and draws the page whole, since a new palette
+recolours every pixel already on the panel.
+
+A page is redrawn only when it changes, and only the tiles that differ go out.
+A page somebody caused (a knob, a button, the idle page coming or going)
+supersedes the one being drawn at once. An idle page that replaces another
+idle page waits for the one being drawn to finish and stay 2 s
+(`screen::IDLE_HOLD`): its figures change every second and a page takes 1.3 s,
+so restarting each time kept the panel in its blocky first passes for good.
+A brightness change alone is one `0x31` command; "Off" sends `0x13`.
+
+The look's stored keys (flat plugin values; every one defaults to today's
+page): `backgroundColor`, `textColor`, `accentColor` (`#rrggbb`), `labelSize`
+(`small`, `medium`, `large`), `backgroundImage` and `knob1Image`..`knob4Image`
+(`data:image/png` or `data:image/jpeg` base64 URLs, at most 8 MB of text and
+4096 px a side), `backgroundFit` (`cover`, the default, or `contain`) and
+`knobImageFit` (`contain`, the default, or `cover`). Pictures are scaled once,
+with a Catmull-Rom filter, to the exact size they are drawn at: the whole
+screen, or a 40 px square at the top of a knob's column, whose name then moves
+under its value.
 
 The page's words follow the desktop app's language (`locale` on the plugin's
 `start`, or the system's on an app older than that): Spanish for any `es-*`

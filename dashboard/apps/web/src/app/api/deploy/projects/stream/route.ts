@@ -13,6 +13,7 @@ import { z } from "zod";
 import { onDeployChanged } from "@/lib/deploy/live";
 import { backgroundUser, userHasManage } from "@/lib/session";
 import { accessCan, projectAccess } from "@/lib/deploy-project-access";
+import { untilShutdown } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,7 +69,7 @@ export async function GET(request: Request): Promise<Response> {
                     stop();
                 }
             };
-            request.signal.addEventListener("abort", () => {
+            untilShutdown(request.signal).addEventListener("abort", () => {
                 stop();
                 try {
                     controller.close();

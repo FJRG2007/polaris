@@ -29,6 +29,7 @@ import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus, type UpdateStatus } from "@/lib/update-service";
 import { forgetSettingReads, getSetting, setSetting } from "@/lib/setting-store";
 import { installedUpdate, recordInstallFrom } from "@/lib/update-installed";
+import { postponeForActivity } from "@/lib/update-busy";
 import { currentUpdateRun, markUpdateStarted } from "@/lib/update-timing-store";
 import { notifyOperators, type OperatorAlert } from "@/lib/notifications/operators";
 import { translatorFor } from "@/lib/i18n/translate";
@@ -548,6 +549,13 @@ export async function checkForUpdate(): Promise<void> {
     if (!runsAt || Date.now() < runsAt.getTime()) return;
     // Never on top of a run already going; the next tick looks again.
     if (await updateRunning()) return;
+    // A scheduled install - the quiet hour or a picked time - steps back while a
+    // venue is in service or somebody is on a call, and the next tick looks
+    // again, up to a cap. "Immediately" means immediately and never waits.
+    const immediate =
+        policy.mode === "immediate" ||
+        (security !== null && security.policy[security.severity] === "immediate");
+    if (!immediate && (await postponeForActivity(runsAt))) return;
 
     // The moment goes in the row: it is what tells this run's result from the one
     // still sitting in the log the updater has not truncated yet.

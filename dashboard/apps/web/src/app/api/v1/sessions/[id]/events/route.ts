@@ -19,6 +19,7 @@ import { getSession } from "@/lib/agents/session-service";
 import { queryOf } from "@/lib/deploy/api/http";
 import { publicSession, streamAfter } from "@/lib/agents/session-api";
 import { SessionApiRefusal, sessionApiRoute, sessionFor } from "@/lib/agents/session-api-http";
+import { untilShutdown } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +53,7 @@ export const GET = sessionApiRoute("agents.read", false, async (context) => {
     }
     const sessionId = first.id;
     const userId = context.principal.userId;
-    const signal = context.request.signal;
+    const signal = untilShutdown(context.request.signal);
     const encoder = new TextEncoder();
     let closed = false;
     let woke = false;
