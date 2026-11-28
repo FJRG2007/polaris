@@ -41,7 +41,7 @@ import {
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { expandPermissions, impliedBy, type Permission } from "@polaris/core";
-import { SCOPE_GROUPS, SCOPE_HINTS, SCOPE_LABELS, scopeGroupKey } from "@/lib/api-key-scopes";
+import { SCOPE_GROUPS, scopeAppArea, scopeGroupKey, scopeHint, scopeLabel } from "@/lib/api-key-scopes";
 
 /** Which held scope pulled an implied one in, for the "Included with" note. */
 function includedBy(scope: Permission, selected: readonly Permission[]): Permission | null {
@@ -53,7 +53,7 @@ function includedBy(scope: Permission, selected: readonly Permission[]): Permiss
  *  own error messages, so both count. */
 function matches(scope: Permission, needle: string): boolean {
     if (!needle) return true;
-    return `${scope} ${SCOPE_LABELS[scope]} ${SCOPE_HINTS[scope]}`.toLowerCase().includes(needle);
+    return `${scope} ${scopeLabel(scope)} ${scopeHint(scope)}`.toLowerCase().includes(needle);
 }
 
 export function ScopePicker({
@@ -86,6 +86,17 @@ export function ScopePicker({
                     : undefined
         })).filter((group) => group.scopes.length > 0);
         const listed = new Set(named.flatMap((group) => group.scopes));
+        // An installed app's own permissions, one area per app under its name.
+        const apps = new Map<string, { title: string; scopes: Permission[]; app: string; levels: undefined }>();
+        for (const scope of available) {
+            const area = listed.has(scope) ? null : scopeAppArea(scope);
+            if (!area) continue;
+            const group = apps.get(area.app) ?? { title: area.title, scopes: [], app: area.app, levels: undefined };
+            group.scopes.push(scope);
+            apps.set(area.app, group);
+            listed.add(scope);
+        }
+        named.push(...apps.values());
         const rest = available.filter((scope) => !listed.has(scope));
         return rest.length > 0
             ? [
@@ -147,10 +158,10 @@ export function ScopePicker({
                                 key={scope}
                                 variant="neutral"
                                 title={t("apiKeys.scopes.includedWith", {
-                                    scope: SCOPE_LABELS[source]
+                                    scope: scopeLabel(source)
                                 })}
                             >
-                                {SCOPE_LABELS[scope]}
+                                {scopeLabel(scope)}
                             </Badge>
                         ) : (
                             <button
@@ -158,12 +169,12 @@ export function ScopePicker({
                                 type="button"
                                 onClick={() => toggle(scope, false)}
                                 aria-label={t("apiKeys.scopes.remove", {
-                                    scope: SCOPE_LABELS[scope]
+                                    scope: scopeLabel(scope)
                                 })}
-                                title={t("apiKeys.scopes.remove", { scope: SCOPE_LABELS[scope] })}
+                                title={t("apiKeys.scopes.remove", { scope: scopeLabel(scope) })}
                                 className={cn(settingType.small, "inline-flex items-center gap-1 rounded border border-transparent bg-primary/15 px-1.5 py-px font-medium leading-[18px] text-primary transition-colors hover:bg-primary/25")}
                             >
-                                {SCOPE_LABELS[scope]}
+                                {scopeLabel(scope)}
                                 <X className="size-3 shrink-0" />
                             </button>
                         );
@@ -303,20 +314,20 @@ export function ScopePicker({
                                                 />
                                                 <span className="min-w-0">
                                                     <span className="flex flex-wrap items-center gap-x-2">
-                                                        {SCOPE_LABELS[scope]}
+                                                        {scopeLabel(scope)}
                                                         <code className="text-[0.6875rem] text-muted-foreground">
                                                             {scope}
                                                         </code>
                                                         {source ? (
                                                             <span className={settingType.hint}>
                                                                 {t("apiKeys.scopes.includedWith", {
-                                                                    scope: SCOPE_LABELS[source]
+                                                                    scope: scopeLabel(source)
                                                                 })}
                                                             </span>
                                                         ) : null}
                                                     </span>
                                                     <span className={cn(settingType.hint, "block")}>
-                                                        {SCOPE_HINTS[scope]}
+                                                        {scopeHint(scope)}
                                                     </span>
                                                 </span>
                                             </label>

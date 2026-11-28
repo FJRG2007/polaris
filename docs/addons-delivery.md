@@ -46,8 +46,14 @@ key in the repository. The app catalogue says `"kind": "apps"` and has no
    }
    ```
 
-   `minPolaris` is the first Polaris release that runs the app; it is what an
-   older host shows as "Needs Polaris X - Update". A missing or malformed field
+   `minPolaris` is the first Polaris release that runs the app, and what an older
+   host shows as "Needs Polaris X - Update". Its source is the dashboard version
+   (`dashboard/apps/web/package.json`, the number the `dashboard-v*` tags carry) on
+   `origin/main` at the first commit that ships the app; for Hospitality that is
+   `0.4.5`. That version has not moved since 2026-07-21, so it is a coarse floor:
+   what actually decides whether an install runs an app is its host API, its
+   permissions and `coreTables`, not this number. `writes: true` on a permission
+   puts it in the read-only policy template's denies. A missing or malformed field
    fails the publish instead of reaching installs.
 2. Merge to main. `dashboard-publish.yml` builds every bundle, pushes it to
    `ghcr.io/fjrg2007/polaris-dashboard` by digest (`docker/app-bundles.sh push`),
@@ -111,12 +117,23 @@ never take over or widen a permission it does not own. The hard-coded entries
 stay as the built-in defaults, so every existing install and every stored role
 that names one (`hospitality.use` included) resolves exactly as before.
 
-Still static, and to be moved to the same registry before an app needs them:
-policy templates (`core/src/policy-templates.ts`), MCP scopes
-(`lib/mcp/scope-table.ts`), API key scope labels (`lib/api-key-scopes.ts`), and
-the `z.enum(PERMISSIONS)` checks in `core/src/schemas/account-security.ts` and
-`apps/installed/[id]/access-actions.ts`. An app's permissions are therefore not
-yet offered as MCP or API key scopes.
+An app's permissions are offered everywhere a built-in one is:
+
+- MCP scopes: `mcpScopes()`, `isMcpScope()` and `mcpScopeListSchema` in
+  `lib/mcp/scope-table.ts`, filed under productivity.
+- API keys: the key schemas in `core/src/schemas/account-security.ts` use
+  `permissionSchema`; the picker labels them with `scopeLabel()` and files them
+  under the app's name (`lib/api-key-scopes.ts`).
+- Sharing: `core/src/schemas/sharing.ts` and `apps/installed/[id]/access-actions.ts`.
+- Policy templates: a template applies as it stands now (`policyTemplateStatements`,
+  read live in `auth/src/policies.ts`), so read-only also denies each app's
+  `writes` permissions.
+
+A grant of a permission no app registers now - one whose app the catalogue
+dropped, or one not read yet - is stored and inert. Saving a role, a key or a
+share that holds it is neither refused nor stripped (`permissionSchema` accepts
+any `<app>.<action>` shape, `expandPermissions` keeps it), and `hasPermission`
+grants nothing for it, not even to the wildcard, until the app is back.
 
 ## Limits
 
@@ -124,5 +141,7 @@ yet offered as MCP or API key scopes.
   needs the dashboard release that carries their migration.
 - An app that uses a permission it does not declare itself, and this dashboard
   does not know, needs a newer dashboard.
-- No app opts in yet: until one adds `polaris.catalog`, the published catalogue is
-  empty and every app still arrives with the image, as before.
+- Hospitality is the first app with a `polaris.catalog` section. It keeps tables
+  in the core schema, so a host without it is told to update rather than offered
+  an install; every current image carries it anyway, and an id the image carries
+  stays the image's.

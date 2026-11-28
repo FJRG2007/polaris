@@ -26,7 +26,8 @@
  * Client-safe: no server module is imported, so the screens read it directly.
  */
 
-import { PERMISSIONS, impliedBy, type Permission } from "@polaris/core";
+import { z } from "zod";
+import { PERMISSIONS, impliedBy, isAppScopedPermission, isKnownPermission, knownPermissions, type Permission } from "@polaris/core";
 
 /**
  * The headings scopes and tools are grouped under, in the order they are
@@ -231,11 +232,27 @@ export const MCP_SCOPES: readonly McpScope[] = PERMISSIONS.flatMap((permission) 
 const KNOWN = new Set<string>(MCP_SCOPES);
 const ORDER = new Map<string, number>(MCP_SCOPES.map((scope, index) => [scope, index]));
 
+/** The permissions installed apps registered from their manifests, offered as scopes after the built-in ones. */
+function appScopes(): McpScope[] {
+    return knownPermissions().filter((permission) => !KNOWN.has(permission));
+}
+
+/** Every scope this Polaris offers now: the built-in ones and each installed app's own permissions. */
+export function mcpScopes(): McpScope[] {
+    const apps = appScopes();
+    return apps.length === 0 ? [...MCP_SCOPES] : [...MCP_SCOPES, ...apps];
+}
+
 /** Whether a string is a scope this Polaris knows. Stored grants are read
  *  through this, so a scope that no longer exists is ignored, not trusted. */
 export function isMcpScope(value: string): value is McpScope {
-    return KNOWN.has(value);
+    return KNOWN.has(value) || (isAppScopedPermission(value) && isKnownPermission(value));
 }
+
+/** A list of scopes as a request sends them: each one this Polaris offers now. */
+export const mcpScopeListSchema = z
+    .array(z.string().refine((value): value is McpScope => isMcpScope(value), "unknown scope"))
+    .max(MCP_SCOPES.length + 512);
 
 /** Whether a scope is a finer cut rather than a permission. */
 export function isMcpOnlyScope(value: string): value is McpOnlyScope {
@@ -261,7 +278,8 @@ export function isSensitiveScope(scope: McpScope): boolean {
 
 /** The heading a scope is grouped under. */
 export function scopeCategory(scope: McpScope): McpCategory {
-    return isMcpOnlyScope(scope) ? MCP_ONLY_SCOPES[scope].category : PERMISSION_CATEGORIES[scope];
+    // An app's own permission is filed under productivity, where the apps' scopes are.
+    return isMcpOnlyScope(scope) ? MCP_ONLY_SCOPES[scope].category : (PERMISSION_CATEGORIES[scope] ?? "productivity");
 }
 
 /** Scopes sorted into their categories, the categories in `MCP_CATEGORIES`'
@@ -284,7 +302,7 @@ export function isLegacyScope(scope: McpScope): boolean {
 /** Put scopes in the table's order, once each. */
 export function orderScopes(scopes: Iterable<McpScope>): McpScope[] {
     return [...new Set(scopes)].sort(
-        (left, right) => (ORDER.get(left) ?? 0) - (ORDER.get(right) ?? 0)
+        (left, right) => (ORDER.get(left) ?? ORDER.size) - (ORDER.get(right) ?? ORDER.size)
     );
 }
 

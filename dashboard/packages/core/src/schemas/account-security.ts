@@ -16,7 +16,8 @@ import { isCidr, isIpAddress } from "../cidr.js";
 import { CONTINENTS, COUNTRY_CODES } from "../geo.js";
 import { USER_AGENT_PATTERN_MAX } from "../user-agent.js";
 import { otpCodeField, TWO_FACTOR_DELIVERY_METHODS } from "./two-factor.js";
-import { expandPermissions, PERMISSIONS } from "../permissions.js";
+import { expandPermissions } from "../permissions.js";
+import { permissionSchema } from "./permission.js";
 
 /** A single IP address or CIDR range in a network allowlist. */
 export const ipRuleField = z
@@ -387,7 +388,7 @@ export const createApiKeySchema = accessRulesSchema.extend({
     environment: z.enum(API_KEY_ENVIRONMENTS).default("production"),
     /** Permissions the key may exercise; it can only ever narrow its owner's own. */
     scopes: z
-        .array(z.enum(PERMISSIONS))
+        .array(permissionSchema)
         .min(1, "Pick at least one scope")
         .transform((values) => expandPermissions(values)),
     expiresInDays: z
@@ -436,7 +437,7 @@ export const updateApiKeySchema = accessRulesSchema.extend({
     description: z.string().trim().max(API_KEY_DESCRIPTION_MAX).default(""),
     environment: z.enum(API_KEY_ENVIRONMENTS).default("production"),
     scopes: z
-        .array(z.enum(PERMISSIONS))
+        .array(permissionSchema)
         .min(1, "Pick at least one scope")
         .transform((values) => expandPermissions(values)),
     expiresInDays: z

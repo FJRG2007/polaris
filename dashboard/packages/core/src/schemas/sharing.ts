@@ -14,6 +14,7 @@
 
 import { z } from "zod";
 import { PERMISSIONS } from "../permissions.js";
+import { permissionSchema } from "./permission.js";
 import { RESOURCE_KINDS } from "../resources.js";
 
 /**
@@ -89,7 +90,7 @@ export const pendingGrantSchema = z
     .object({
         resourceKind: z.enum(RESOURCE_KINDS),
         resourceId: z.string().trim().min(1).max(200),
-        actions: z.array(z.enum(PERMISSIONS)).max(PERMISSIONS.length),
+        actions: z.array(permissionSchema).max(PERMISSIONS.length + 512),
         canShare: z.boolean().default(false),
         /** ISO 8601, or null for no end date. */
         expiresAt: z.string().datetime().nullable().default(null),

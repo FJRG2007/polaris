@@ -16,8 +16,16 @@ import {
     policyDocumentSchema,
     policyTemplateDocument,
     policyTemplateName,
+    policyTemplateOf,
+    policyTemplateStatements,
     type PolicyStatement
 } from "@polaris/core";
+
+/** A system template's live statements, or null for an administrator's own policy. */
+function templateStatements(name: string): PolicyStatement[] | null {
+    const template = policyTemplateOf(name);
+    return template ? [...policyTemplateStatements(template)] : null;
+}
 
 /** The kinds of principal a policy can attach to. */
 export type PrincipalType = "user" | "group" | "role";
@@ -231,7 +239,9 @@ export const resolvePrincipalPolicyStatementsBySource = perRequest(
                     policyName: policy.name,
                     principalType: attachment.principalType as PrincipalType,
                     principalId: attachment.principalId,
-                    statements: parseDocument(policy.document)
+                    // A template applies as it stands now, an installed app's own
+                    // writes included, not as it was when the stored copy was written.
+                    statements: templateStatements(policy.name) ?? parseDocument(policy.document)
                 }
             ];
         });

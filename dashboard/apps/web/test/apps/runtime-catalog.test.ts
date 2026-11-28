@@ -182,3 +182,21 @@ describe("what CI publishes is what an install reads", () => {
         expect(appEntryFit(opened!.apps[0]!, KNOWN_PERMISSIONS)).toEqual({ ok: true });
     });
 });
+
+describe("the apps in this repository that opt in", () => {
+    it("writes hospitality's catalogue entry from its package.json, and the reader accepts it", async () => {
+        const { readFileSync } = await import("node:fs");
+        const writer = pathToFileURL(join(__dirname, "../../../../scripts/app-catalog.mjs")).href;
+        const { buildCatalog } = (await import(writer)) as {
+            buildCatalog: (packages: unknown[], index: unknown, hostApi: string, issued: string) => Buffer;
+        };
+        const pkg = JSON.parse(readFileSync(join(__dirname, "../../../hospitality/package.json"), "utf8")) as unknown;
+        const index = { apps: { hospitality: { file: "hospitality.zip", digest: `sha256:${"f".repeat(64)}`, size: 4096 } } };
+        const read = readAppCatalog(JSON.parse(buildCatalog([pkg], index, HOST_API, "2026-11-28T00:00:00.000Z").toString("utf8")));
+        const entry = read?.apps.find((app) => app.id === "hospitality");
+        expect(entry).toMatchObject({ minPolaris: "0.4.5", coreTables: true });
+        expect(entry?.permissionDefs.map((definition) => definition.key)).toEqual(["hospitality.use", "hospitality.manage"]);
+        // Its tables are in the core schema, so a host without them is told to update.
+        expect(appEntryFit(entry!, KNOWN_PERMISSIONS)).toEqual({ ok: false, needs: "polaris", version: "0.4.5" });
+    });
+});

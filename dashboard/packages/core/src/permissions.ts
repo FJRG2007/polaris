@@ -415,6 +415,8 @@ export interface AppPermissionDefinition {
     readonly label: string;
     /** Other permissions of the same app this one carries with it. */
     readonly implies?: readonly string[];
+    /** It changes something: the read-only policy template denies it. */
+    readonly writes?: boolean;
 }
 
 type AppPermissionRegistry = Map<string, { app: string; area: string; definitions: readonly AppPermissionDefinition[] }>;
@@ -461,6 +463,24 @@ function appDefinition(permission: string): { app: string; area: string; definit
 export function knownPermissions(): Permission[] {
     const registered = [...appRegistry.values()].flatMap((entry) => entry.definitions.map((definition) => definition.key));
     return registered.length === 0 ? [...PERMISSIONS] : [...PERMISSIONS, ...(registered as Permission[])];
+}
+
+/**
+ * Whether `permission` has the shape of an app's own (`<app>.<action>`) and is no
+ * built-in one. A stored grant of such a permission is kept even when no app has
+ * registered it now (an app the catalogue dropped, or one not read yet): saving
+ * never strips or refuses it, and it is inert - `hasPermission` grants nothing for
+ * a permission this Polaris does not know.
+ */
+export function isAppScopedPermission(permission: string): boolean {
+    return APP_KEY.test(permission) && !BUILT_IN.has(permission);
+}
+
+/** The registered app permissions that change something, for the read-only template. */
+export function appWritePermissions(): Permission[] {
+    return [...appRegistry.values()].flatMap((entry) =>
+        entry.definitions.filter((definition) => definition.writes).map((definition) => definition.key as Permission)
+    );
 }
 
 /** Whether `permission` is one this Polaris knows, built in or registered by an app. */
@@ -552,7 +572,12 @@ export function expandPermissions(granted: Iterable<Permission>): Permission[] {
         expanded.add(permission);
         for (const implied of impliedBy(permission)) expanded.add(implied);
     }
-    return knownPermissions().filter((permission) => expanded.has(permission));
+    const known = knownPermissions();
+    const ordered = known.filter((permission) => expanded.has(permission));
+    // A grant this Polaris does not know now (a dropped app's) is kept, after the rest.
+    if (ordered.length === expanded.size) return ordered;
+    const listed = new Set<Permission>(known);
+    return [...ordered, ...[...expanded].filter((permission) => !listed.has(permission))];
 }
 
 /**
@@ -561,6 +586,9 @@ export function expandPermissions(granted: Iterable<Permission>): Permission[] {
  * everything without enumerating each key.
  */
 export function hasPermission(granted: Iterable<GrantedPermission>, required: Permission): boolean {
+    // A permission nobody registered (a dropped app's) is granted to nobody, the
+    // wildcard included: a stored grant of it stays inert until the app is back.
+    if (!isKnownPermission(required)) return false;
     for (const grant of granted) {
         if (grant === ALL_PERMISSIONS || grant === required) return true;
     }

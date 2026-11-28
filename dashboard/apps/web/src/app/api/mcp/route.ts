@@ -28,7 +28,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { mcpTools } from "@/lib/mcp/catalog";
 import { readCappedBody } from "@/lib/request-body";
-import { MCP_SCOPES, type McpScope } from "@/lib/mcp/scope-table";
+import { mcpScopes, type McpScope } from "@/lib/mcp/scope-table";
 import { TURN_TOKEN_PREFIX, readTurnToken } from "@/lib/polar/claude-subscription/mcp-token";
 import { authenticateApiKey } from "@/lib/api-key-auth";
 import { withKeyUsage } from "@/lib/api-usage/recorder";
@@ -142,9 +142,10 @@ const SESSION_SCOPES: McpScope[] = ["tasks.read", "tasks.manage", "agents.read"]
 /** What a subscription chat turn may reach: every tool its person could use
  *  in Polar Chat, except starting and steering agents, for the same reason a
  *  session may not. */
-const TURN_SCOPES: McpScope[] = MCP_SCOPES.filter(
-    (scope) => scope !== "agents.manage" && scope !== "agents.coordinate" && scope !== "agents.report"
-);
+const turnScopes = (): McpScope[] =>
+    mcpScopes().filter(
+        (scope) => scope !== "agents.manage" && scope !== "agents.coordinate" && scope !== "agents.report"
+    );
 
 /** A connected app carries no address rules of its own; its person's still
  *  apply, through `evaluateAccountAccess`. */
@@ -242,7 +243,7 @@ async function callerFor(
     if (token.startsWith(TURN_TOKEN_PREFIX)) {
         const turn = readTurnToken(token);
         if (!turn) return null;
-        const scopes = await sessionScopes(turn.userId, TURN_SCOPES);
+        const scopes = await sessionScopes(turn.userId, turnScopes());
         if (!scopes) return null;
         return { userId: turn.userId, isAdmin: false, scopes };
     }

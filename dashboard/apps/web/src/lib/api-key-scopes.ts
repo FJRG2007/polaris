@@ -9,7 +9,7 @@
  * @polaris/auth.
  */
 
-import type { Permission } from "@polaris/core";
+import { permissionMeta, type Permission } from "@polaris/core";
 import type { ScopeLevels } from "@/lib/scope-levels";
 
 export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
@@ -282,4 +282,20 @@ export function groupScopes(
     }).filter((group) => group.scopes.length > 0);
     const listed = new Set<string>(groups.flatMap((group) => group.scopes));
     return { groups, rest: scopes.filter((scope) => !listed.has(scope)) };
+}
+
+/** What a scope is called: the table's words, or an installed app's own label from its manifest. */
+export function scopeLabel(scope: Permission): string {
+    return (SCOPE_LABELS as Readonly<Record<string, string>>)[scope] ?? permissionMeta(scope).label;
+}
+
+/** The longer sentence under a scope; an app's own permission has its label only. */
+export function scopeHint(scope: Permission): string {
+    return (SCOPE_HINTS as Readonly<Record<string, string>>)[scope] ?? "";
+}
+
+/** The area an installed app's own permission is filed under (its name), or null for a built-in one. */
+export function scopeAppArea(scope: Permission): { title: string; app: string } | null {
+    const meta = permissionMeta(scope);
+    return meta.app && !(scope in SCOPE_LABELS) ? { title: meta.area, app: meta.app } : null;
 }

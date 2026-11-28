@@ -71,7 +71,9 @@ export const runtimeAppEntrySchema = z.object({
             z.object({
                 key: z.string().regex(PERMISSION),
                 label: localized(80),
-                implies: z.array(z.string().regex(PERMISSION)).max(8).default([])
+                implies: z.array(z.string().regex(PERMISSION)).max(8).default([]),
+                /** It changes something: the read-only policy template denies it. */
+                writes: z.boolean().default(false)
             })
         )
         .max(16)
@@ -181,7 +183,7 @@ export function runtimeManifest(entry: RuntimeAppEntry, fit: RuntimeAppFit, loca
 export type RuntimeAppView = Omit<AppManifest, "icon"> & {
     readonly nav?: RuntimeAppEntry["nav"];
     /** Its own permissions, labelled in the reader's language, for a runnable entry. */
-    readonly permissionDefs?: readonly { key: string; label: string; implies: readonly string[] }[];
+    readonly permissionDefs?: readonly { key: string; label: string; implies: readonly string[]; writes: boolean }[];
 };
 
 /** The entries a dashboard lists, with the ones written for a host API it has moved past left out. */
@@ -198,7 +200,8 @@ export function runtimeViews(catalog: RuntimeAppCatalog | null, known: ReadonlyS
         const permissionDefs = entry.permissionDefs.map((definition) => ({
             key: definition.key,
             label: entryText(definition.label, locale),
-            implies: definition.implies
+            implies: definition.implies,
+            writes: definition.writes
         }));
         views.push({ ...view, ...(entry.nav ? { nav: entry.nav } : {}), ...(permissionDefs.length ? { permissionDefs } : {}) });
     }

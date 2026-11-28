@@ -6,7 +6,50 @@
     "description": "Hospitality: run a bar or restaurant - the menu, the floor, orders, the kitchen and the till - on the local network. An installable Polaris app.",
     "polaris": {
         "id": "hospitality",
-        "extension": "src/lib/hospitality-extension.ts#hospitalityExtension"
+        "extension": "src/lib/hospitality-extension.ts#hospitalityExtension",
+        "catalog": {
+            "minPolaris": "0.4.5",
+            "name": {
+                "en-US": "Hospitality",
+                "es-ES": "Hostelería"
+            },
+            "summary": {
+                "en-US": "Run a bar or restaurant on your own network.",
+                "es-ES": "Lleva un bar o restaurante en tu propia red."
+            },
+            "description": {
+                "en-US": "Keep the menu with prices, taxes and allergens, import it from a spreadsheet and change prices in bulk. Waiters take orders from a phone or tablet and the bar sees them at once, all on the venue's own network, with no internet needed. Uninstalling keeps the menu and every order.",
+                "es-ES": "Ten la carta con precios, IVA y alérgenos, impórtala de una hoja y cambia precios de golpe. Los camareros toman comandas desde el móvil o la tablet y la barra las ve al momento, todo en la red del local, sin necesitar internet. Al desinstalar se conservan la carta y los pedidos."
+            },
+            "category": "Productivity",
+            "nav": {
+                "category": "work",
+                "permission": "hospitality.use"
+            },
+            "permissions": [
+                "hospitality.use",
+                "hospitality.manage"
+            ],
+            "permissionDefs": [
+                {
+                    "key": "hospitality.use",
+                    "label": {
+                        "en-US": "Take orders and use the till"
+                    }
+                },
+                {
+                    "key": "hospitality.manage",
+                    "label": {
+                        "en-US": "Run the menu, the floor and the reports"
+                    },
+                    "implies": [
+                        "hospitality.use"
+                    ],
+                    "writes": true
+                }
+            ],
+            "coreTables": true
+        }
     },
     "dependencies": {
         "@polaris/app-host": "0.1.0",

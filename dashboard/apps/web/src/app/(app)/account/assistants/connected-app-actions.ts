@@ -24,7 +24,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { editableScopes, mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { getTranslations } from "@/lib/i18n/request";
 import { newDeviceRefusal } from "@/lib/device-grace";
-import { MCP_SCOPES, expandScopes, orderScopes, type McpScope } from "@/lib/mcp/scope-table";
+import { expandScopes, mcpScopeListSchema, orderScopes, type McpScope } from "@/lib/mcp/scope-table";
 import { localized } from "@/app/(app)/account/security/action-messages";
 import { ipPolicyNarrows, ipPolicySchema, type IpPolicy } from "@/lib/mcp/oauth/ip-policy";
 import {
@@ -73,7 +73,7 @@ export async function disconnectAppAction(id: unknown): Promise<{ error?: string
 
 const changeSchema = z.object({
     id: z.string().uuid(),
-    scopes: z.array(z.enum(MCP_SCOPES as [McpScope, ...McpScope[]])).max(MCP_SCOPES.length)
+    scopes: mcpScopeListSchema
 });
 
 /** Change what a connected app may do. Answers with the set it now holds. */

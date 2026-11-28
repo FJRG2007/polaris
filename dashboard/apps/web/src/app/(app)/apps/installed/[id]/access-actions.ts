@@ -9,7 +9,7 @@
  */
 
 import { z } from "zod";
-import { PERMISSIONS } from "@polaris/core";
+import { PERMISSIONS, permissionSchema } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { listInstallAccess, revokeInstallAccess, shareInstall, type InstallAccessView } from "@/lib/apps/install-sharing";
 
@@ -18,7 +18,7 @@ const shareSchema = z.object({
     /** An email address or a username; which one it is decides whether this ends
      *  in a grant or an invite. */
     identifier: z.string().trim().min(1).max(254),
-    actions: z.array(z.enum(PERMISSIONS)).min(1).max(PERMISSIONS.length),
+    actions: z.array(permissionSchema).min(1).max(PERMISSIONS.length + 512),
     canShare: z.boolean(),
     /** Null for no end date. */
     expiresInDays: z.number().int().min(1).max(365).nullable()

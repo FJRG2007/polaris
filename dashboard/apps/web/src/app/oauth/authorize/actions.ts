@@ -21,14 +21,14 @@ import { mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { getTranslations } from "@/lib/i18n/request";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { currentOrigin } from "@/lib/mcp/oauth/origin";
-import { MCP_SCOPES, expandScopes, scopeRequires, type McpScope } from "@/lib/mcp/scope-table";
+import { expandScopes, mcpScopeListSchema, scopeRequires, type McpScope } from "@/lib/mcp/scope-table";
 import { localized } from "@/app/(app)/account/security/action-messages";
 import { answerUrl, checkAuthorizationRequest, readParams } from "@/lib/mcp/oauth/authorize";
 
 const answerSchema = z.object({
     query: z.string().max(16 * 1024),
     allow: z.boolean(),
-    scopes: z.array(z.enum(MCP_SCOPES as [McpScope, ...McpScope[]])).max(MCP_SCOPES.length)
+    scopes: mcpScopeListSchema
 });
 
 export async function answerAuthorizationAction(

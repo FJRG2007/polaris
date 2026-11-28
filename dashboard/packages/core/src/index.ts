@@ -200,6 +200,7 @@ export * from "./schemas/file-request.js";
 export * from "./schemas/snippet.js";
 export * from "./schemas/vault.js";
 export * from "./schemas/auth.js";
+export * from "./schemas/permission.js";
 export * from "./schemas/usernames.js";
 export * from "./schemas/minors.js";
 export * from "./schemas/profile.js";

@@ -17,7 +17,7 @@
  */
 
 import type { PolicyStatement } from "./authz.js";
-import { CHAT_CAPABILITIES, type Permission } from "./permissions.js";
+import { appWritePermissions, CHAT_CAPABILITIES, type Permission } from "./permissions.js";
 
 /** The prefix a ready-made policy's stored name carries, and nothing else may. */
 export const POLICY_TEMPLATE_PREFIX = "polaris:";
@@ -155,7 +155,18 @@ export function policyTemplateOf(name: string): PolicyTemplate | null {
     return POLICY_TEMPLATES.find((template) => template.key === key) ?? null;
 }
 
+/**
+ * A template's statements as they apply now: the built-in ones, and for
+ * read-only the write permissions installed apps registered from their manifests
+ * (`writes: true`), so an app's own writes are denied with every other.
+ */
+export function policyTemplateStatements(template: PolicyTemplate): readonly PolicyStatement[] {
+    if (template.key !== "read-only") return template.statements;
+    const writes = appWritePermissions();
+    return writes.length === 0 ? template.statements : [...template.statements, deny(...writes)];
+}
+
 /** A template's statements as the document text a policy stores. */
 export function policyTemplateDocument(template: PolicyTemplate): string {
-    return JSON.stringify({ statements: template.statements });
+    return JSON.stringify({ statements: policyTemplateStatements(template) });
 }
