@@ -15,6 +15,8 @@
 //!   is loaded only while the controller is plugged in.
 //! - [`ownership`]: who holds the device on this machine, and what to offer.
 //! - [`settings`]: stored values, defaults, and the declarative settings schema.
+//! - [`theme`]: the screen's colours, label size and pictures, and the
+//!   palette they are drawn with.
 //! - [`plugin`]: the same settings as the plugin page's flat fields.
 //! - [`sdk`]: the Hercules SDK's input state, as the same reports.
 //! - [`engine`]: reports in, volume changes and Polaris actions out.
@@ -39,6 +41,7 @@ pub mod screen;
 pub mod sdk;
 pub mod session;
 pub mod settings;
+pub mod theme;
 
 #[cfg(feature = "native")]
 pub mod native;

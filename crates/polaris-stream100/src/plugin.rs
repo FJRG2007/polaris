@@ -197,6 +197,11 @@ pub fn plugin_settings() -> Value {
     list.push(json!({ "kind": "choice", "key": "display", "group": "screen", "label": label("Screen shows", "La pantalla muestra"), "hint": label("With no call or nothing playing it shows the knobs. macOS does not let apps read what is playing.", "Sin llamada o sin nada sonando muestra las ruedas. macOS no deja a las apps leer lo que suena."), "options": options(DISPLAY_CHOICES), "default": "mixer" }));
     list.push(json!({ "kind": "range", "key": "idleAfter", "group": "screen", "label": label("Show this computer's stats after (seconds, 0 = never)", "Mostrar datos del ordenador tras (segundos, 0 = nunca)"), "hint": label("Clock, CPU, memory, disk and Linux network until a control is touched. GPU load is left out: no light way to read it.", "Hora, CPU, memoria, disco y red en Linux hasta tocar un control. Sin carga de GPU: no hay forma ligera de leerla."), "min": 0, "max": 600, "step": 5, "default": 0 }));
     list.push(json!({ "kind": "range", "key": "brightness", "group": "screen", "label": label("Screen brightness", "Brillo de la pantalla"), "min": 10, "max": 100, "step": 5, "default": defaults.brightness }));
+    list.push(json!({ "kind": "choice", "key": "labelSize", "group": "screen", "label": label("Knob name size", "Tamaño del nombre de cada rueda"), "options": [
+        { "value": "small", "label": label("Small", "Pequeño") },
+        { "value": "medium", "label": label("Medium", "Mediano") },
+        { "value": "large", "label": label("Large", "Grande") }
+    ], "default": "medium" }));
     Value::Array(list)
 }
 
@@ -271,7 +276,29 @@ pub fn settings_from_plugin(values: &Map<String, Value>) -> Settings {
         // layout (`Settings::from_json`).
         pages: Vec::new(),
         profiles: Vec::new(),
+        look: look_from_plugin(values),
     }
+}
+
+/// The screen's look from its flat values (`backgroundColor`, `textColor`,
+/// `accentColor`, `labelSize`, `backgroundImage`, `backgroundFit`,
+/// `knob1Image`..`knob4Image`, `knobImageFit`); anything missing or that
+/// does not read keeps today's look.
+pub fn look_from_plugin(values: &Map<String, Value>) -> crate::theme::Look {
+    use crate::theme::{Fit, LabelSize, Look};
+    let text = |key: &str| values.get(key).and_then(Value::as_str).unwrap_or_default().to_owned();
+    let defaults = Look::default();
+    Look {
+        background_color: text("backgroundColor"),
+        text_color: text("textColor"),
+        accent_color: text("accentColor"),
+        label_size: LabelSize::from_value(&text("labelSize")).unwrap_or(defaults.label_size),
+        background_image: text("backgroundImage"),
+        background_fit: Fit::from_value(&text("backgroundFit")).unwrap_or(defaults.background_fit),
+        knob_images: std::array::from_fn(|knob| text(&format!("knob{}Image", knob + 1))),
+        knob_image_fit: Fit::from_value(&text("knobImageFit")).unwrap_or(defaults.knob_image_fit),
+    }
+    .clamped()
 }
 
 #[cfg(test)]

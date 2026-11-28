@@ -56,11 +56,14 @@ pub struct Engine {
     call: Option<Call>,
     playing: Option<NowPlaying>,
     idle: Option<Idle>,
+    /// The look decoded once (pictures scaled, palette built), not per page.
+    theme: std::sync::Arc<crate::theme::Theme>,
 }
 
 impl Engine {
     pub fn new(settings: Settings, knobs: KnobMap) -> Self {
         Self {
+            theme: std::sync::Arc::new(crate::theme::Theme::new(&settings.look)),
             settings,
             decoder: Decoder::new(knobs),
             encoders: Default::default(),
@@ -79,6 +82,9 @@ impl Engine {
     /// New settings apply from the next report; what was turned under the old
     /// ones is dropped rather than applied to a knob's new target.
     pub fn set_settings(&mut self, settings: Settings) {
+        if settings.look != *self.theme.look() {
+            self.theme = std::sync::Arc::new(crate::theme::Theme::new(&settings.look));
+        }
         self.settings = settings;
         self.encoders.iter_mut().for_each(Encoder::discard);
     }
@@ -285,6 +291,7 @@ impl Engine {
             call: self.call.clone(),
             playing: self.playing.clone(),
             idle: self.idle.clone(),
+            theme: self.theme.clone(),
         }
     }
 
