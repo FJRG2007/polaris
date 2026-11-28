@@ -239,7 +239,12 @@
         "tax": "VAT {rate}",
         "noShift": "Open the register first.",
         "shiftOpen": "The register is already open.",
-        "overpaid": "That is more than is left to pay."
+        "overpaid": "That is more than is left to pay.",
+        "checksTitle": "Open checks",
+        "checksEmpty": "No check is waiting to be paid.",
+        "noPlace": "No table",
+        "checkPaid": "{paid} already paid",
+        "collect": "Collect"
     },
     "pay": {
         "title": "Pay {amount}",
@@ -271,7 +276,9 @@
         "reason": "Reason",
         "remove": "Remove",
         "apply": "Apply",
-        "line": "Discount on {name}"
+        "line": "Discount on {name}",
+        "comp": "On the house",
+        "reasonHint": "Say why: it goes on the record."
     },
     "offline": {
         "queued": "No network: saved on this device, it will be sent",

@@ -239,7 +239,12 @@
         "tax": "IVA {rate}",
         "noShift": "Abre antes la caja.",
         "shiftOpen": "La caja ya está abierta.",
-        "overpaid": "Es más de lo que queda."
+        "overpaid": "Es más de lo que queda.",
+        "checksTitle": "Por cobrar",
+        "checksEmpty": "Ninguna cuenta espera cobro.",
+        "noPlace": "Sin mesa",
+        "checkPaid": "{paid} ya pagado",
+        "collect": "Cobrar"
     },
     "pay": {
         "title": "Cobrar {amount}",
@@ -271,7 +276,9 @@
         "reason": "Motivo",
         "remove": "Quitar",
         "apply": "Aplicar",
-        "line": "Descuento en {name}"
+        "line": "Descuento en {name}",
+        "comp": "Invita la casa",
+        "reasonHint": "Di el motivo: queda registrado."
     },
     "offline": {
         "queued": "Sin red: guardado aquí, se enviará",

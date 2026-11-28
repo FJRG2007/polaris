@@ -9,6 +9,7 @@
 
 import * as till from "../lib/till";
 import { resolveVenue } from "../lib/catalog";
+import { readOpenChecks, type OpenCheck } from "../lib/service-load";
 import { ownVenue } from "../lib/audit";
 import { venueOnly } from "../model/order-schemas";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
@@ -64,13 +65,15 @@ export async function readTillAction(raw: unknown): Promise<Outcome<{ till: Awai
 
 /** The till screen's load in one request: which venue (and its currency), and its X report. */
 export async function readTillScreenAction(raw: unknown): Promise<
-    Outcome<{ venue: { id: string; currency: string } | null; till: Awaited<ReturnType<typeof till.xReport>> | null }>
+    Outcome<{ venue: { id: string; currency: string } | null; till: Awaited<ReturnType<typeof till.xReport>> | null; checks: OpenCheck[] }>
 > {
     const input = tillScreenInput.safeParse(raw);
     if (!input.success) return invalid();
     return outcome("hospitality.manage", async () => {
         const venue = await resolveVenue(input.data.venueId);
-        return { venue, till: venue ? await till.xReport(venue.id) : null };
+        if (!venue) return { venue, till: null, checks: [] };
+        const [report, checks] = await Promise.all([till.xReport(venue.id), readOpenChecks(venue.id)]);
+        return { venue, till: report, checks };
     });
 }
 

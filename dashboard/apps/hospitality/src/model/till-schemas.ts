@@ -27,7 +27,8 @@ export const discountInput = z.object({
             kind: z.enum(["percent", "amount"]),
             /** Basis points for percent (up to 100 %), cents for amount. */
             value: z.number().int().min(1).max(100_000_000),
-            reason: z.string().trim().max(80).default("")
+            /** Why: every discount and every comp says so, for the audit and the Z. */
+            reason: z.string().trim().min(1).max(80)
         })
         .refine((d) => d.kind !== "percent" || d.value <= 10_000, { path: ["value"] })
         .nullable()

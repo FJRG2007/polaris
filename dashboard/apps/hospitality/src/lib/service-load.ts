@@ -10,12 +10,33 @@
  */
 
 import { readMenu, type MenuView } from "./catalog";
-import { readService, type ServiceView } from "./orders";
+import { remainingDue } from "../model/pricing";
+import { readService, type OrderView, type ServiceView } from "./orders";
 
 export interface ServiceScreenView {
     readonly menu: MenuView;
     /** Null when there is no venue yet: there is no floor to draw. */
     readonly service: ServiceView | null;
+}
+
+export interface OpenCheck {
+    readonly order: OrderView;
+    /** The table's name, or the order's own label (bar, takeaway). */
+    readonly place: string;
+    readonly left: number;
+}
+
+/**
+ * Every check still open at a venue with what is left to collect, part-paid
+ * ones first: the register settles a table that left it for later.
+ */
+export async function readOpenChecks(venueId: string): Promise<OpenCheck[]> {
+    const service = await readService(venueId);
+    const names = new Map(service.rooms.flatMap((r) => r.tables.map((t) => [t.id, t.name] as const)));
+    return service.orders
+        .map((order) => ({ order, place: (order.tableId && names.get(order.tableId)) || order.label, left: remainingDue(order.totals.total, order.paid) }))
+        .filter((check) => check.left > 0 && check.order.lines.length > 0)
+        .sort((a, b) => Number(b.order.paid > 0) - Number(a.order.paid > 0) || a.order.openedAt.localeCompare(b.order.openedAt));
 }
 
 export async function readServiceScreen(venueId: string | null): Promise<ServiceScreenView> {

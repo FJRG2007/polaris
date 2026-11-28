@@ -17,11 +17,12 @@ import type { closeShift, xReport } from "../lib/till";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { OrderView } from "../lib/orders";
 import { useOfflineQueue, type OfflineQueue } from "./offline";
+import type { OpenCheck } from "../lib/service-load";
 import { changeDue, itemsDue, lineTotal, quickTenders, splitEvenly } from "../model/pricing";
 import { readCache, unwrap, useHospitalityT } from "./i18n";
 import { useHospitalityFormat } from "./format";
 import { LoadFailed, NoVenue } from "./states";
-import { Banknote, CreditCard, Minus, Percent, Plus } from "lucide-react";
+import { Banknote, CreditCard, Gift, Minus, Percent, Plus } from "lucide-react";
 import { closeShiftAction, openShiftAction, payAction, readTillScreenAction, setDiscountAction } from "../actions/till";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
 
@@ -38,6 +39,8 @@ export function TillScreen({ manager }: { manager: boolean }) {
     const [count, setCount] = useState("");
     const [closed, setClosed] = useState<Closed | null>(null);
     const [failed, setFailed] = useState<string | null>(null);
+    const [checks, setChecks] = useState<OpenCheck[]>([]);
+    const [collecting, setCollecting] = useState<OrderView | null>(null);
     const money = useMoney(venue?.currency ?? "EUR");
     const fail = (caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message });
     // One id per cash movement being typed, so a retry is the same movement.
@@ -49,6 +52,7 @@ export function TillScreen({ manager }: { manager: boolean }) {
                 setFailed(null);
                 if (answer.venue) setVenue(answer.venue);
                 setTill(answer.till);
+                setChecks(answer.checks);
             })
             .catch((caught: Error) => setFailed(caught.message));
     }, [t]);
@@ -93,7 +97,21 @@ export function TillScreen({ manager }: { manager: boolean }) {
             <section className="flex min-w-0 flex-col gap-2">
                 <h2 className="truncate text-lg font-semibold">{t("till.openSince", { name: till.shift.openedByName })}</h2>
                 <Report report={till.report} money={money} hideExpected />
+                <OpenChecks checks={checks} money={money} onCollect={setCollecting} />
             </section>
+            {collecting && venue ? (
+                <PayDialog
+                    order={collecting}
+                    queue={queue}
+                    currency={venue.currency}
+                    onClose={() => { setCollecting(null); load(); }}
+                    onPaid={(ticketNo) => {
+                        setCollecting(null);
+                        toast.show({ title: t("pay.done", { ticket: ticketNo ?? "" }) });
+                        load();
+                    }}
+                />
+            ) : null}
             <section className="flex min-w-0 flex-col gap-4">
                 <div className="flex flex-col gap-2 rounded-lg border p-3">
                     <h3 className="font-medium">{t("till.moveTitle")}</h3>
@@ -156,6 +174,29 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
         <div className={cn("flex min-w-0 justify-between gap-3", strong && "font-semibold")}>
             <span className="min-w-0 truncate" title={label}>{label}</span>
             <span className="shrink-0 tabular-nums">{value}</span>
+        </div>
+    );
+}
+
+/** Checks still open, part-paid first, with what is left: settle a table that left it for later. */
+function OpenChecks(props: { checks: OpenCheck[]; money: (c: number) => string; onCollect: (order: OrderView) => void }) {
+    const t = useHospitalityT();
+    return (
+        <div className="flex min-w-0 flex-col gap-2 rounded-lg border p-3">
+            <h3 className="font-medium">{t("till.checksTitle")}</h3>
+            {props.checks.length === 0 ? <p className="text-sm text-muted-foreground">{t("till.checksEmpty")}</p> : null}
+            {props.checks.map((c) => (
+                <div key={c.order.id} className="flex min-w-0 items-center gap-2">
+                    <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate font-medium" title={c.place}>{c.place || t("till.noPlace")}</span>
+                        {c.order.paid > 0 ? <span className="truncate text-xs">{t("till.checkPaid", { paid: props.money(c.order.paid) })}</span> : null}
+                    </span>
+                    <span className="shrink-0 font-semibold tabular-nums">{props.money(c.left)}</span>
+                    <Button className={TOUCH} variant="outline" onClick={() => props.onCollect(c.order)}>
+                        <Banknote aria-hidden /> {t("till.collect")}
+                    </Button>
+                </div>
+            ))}
         </div>
     );
 }
@@ -373,7 +414,8 @@ export function DiscountDialog(props: { orderId: string; version?: number; lineI
     const [value, setValue] = useState("");
     const [reason, setReason] = useState("");
     const n = kind === "percent" ? Math.round(Number(value.replace(",", ".")) * 100) : parsePrice(value);
-    const ok = n !== null && Number.isFinite(n) && n > 0 && (kind === "amount" || n <= 10_000);
+    const why = reason.trim();
+    const ok = n !== null && Number.isFinite(n) && n > 0 && (kind === "amount" || n <= 10_000) && why !== "";
     const save = (discount: { kind: "percent" | "amount"; value: number; reason: string } | null) =>
         unwrap(() => setDiscountAction({ orderId: props.orderId, version: props.version, lineId: props.lineId ?? null, discount }), t("errors.saveFailed"))
             .then(() => { props.onSaved(); props.onClose(); })
@@ -389,10 +431,15 @@ export function DiscountDialog(props: { orderId: string; version?: number; lineI
                         <Select value={kind} onValueChange={(k) => setKind(k as "percent" | "amount")} options={[{ value: "percent", label: "%" }, { value: "amount", label: t("prices.amount") }]} />
                         <Input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder={kind === "percent" ? "10" : "0,00"} aria-label={t("prices.value")} />
                     </div>
-                    <Input value={reason} maxLength={80} onChange={(e) => setReason(e.target.value)} placeholder={t("discount.reason")} />
+                    <Input value={reason} maxLength={80} onChange={(e) => setReason(e.target.value)} placeholder={t("discount.reason")} aria-label={t("discount.reason")} aria-required />
+                    {why === "" ? <p className="text-xs text-muted-foreground">{t("discount.reasonHint")}</p> : null}
                     <div className="flex gap-2">
                         <Button className={TOUCH} variant="outline" onClick={() => save(null)}>{t("discount.remove")}</Button>
-                        <Button className={`flex-1 ${TOUCH}`} disabled={!ok} onClick={() => ok && n !== null && save({ kind, value: n, reason })}>
+                        {/* A comp: the whole line (or check) free, with its reason, audited like any discount. */}
+                        <Button className={TOUCH} variant="outline" disabled={why === ""} onClick={() => why !== "" && save({ kind: "percent", value: 10_000, reason: why })}>
+                            <Gift aria-hidden /> {t("discount.comp")}
+                        </Button>
+                        <Button className={`flex-1 ${TOUCH}`} disabled={!ok} onClick={() => ok && n !== null && save({ kind, value: n, reason: why })}>
                             <Percent aria-hidden /> {t("discount.apply")}
                         </Button>
                     </div>

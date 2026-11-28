@@ -361,6 +361,9 @@ function OrderPanel(props: {
                             <Minus aria-hidden />
                         </Button>
                         <span className="w-6 shrink-0 text-end tabular-nums">{d.quantity}</span>
+                        <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("order.more")} onClick={() => setDrafts((all) => all.map((x) => (x.id === d.id ? { ...x, quantity: Math.min(x.quantity + 1, 99) } : x)))}>
+                            <Plus aria-hidden />
+                        </Button>
                         <button type="button" className="flex min-w-0 flex-1 text-start" aria-label={t("order.change", { name: d.product.name })} onClick={() => setPicking({ product: d.product, draft: d })}>
                             <LineName name={d.product.name} extras={[...draftModifiers(d).map((m) => m.name), d.note]} />
                         </button>
