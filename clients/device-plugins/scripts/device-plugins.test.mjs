@@ -35,6 +35,14 @@ test("only packaged files count as a change of the package", () => {
     assert.equal(packagedPath("hercules-stream100", "clients/device-plugins/other/any/main.cjs"), false);
 });
 
+test("what cargo never compiles into the module is not a change of the package", () => {
+    assert.equal(packagedPath("hercules-stream100", "crates/polaris-stream100/examples/manifest.rs"), false);
+    assert.equal(packagedPath("hercules-stream100", "crates/polaris-stream100/benches/decode.rs"), false);
+    assert.equal(packagedPath("hercules-stream100", "crates/polaris-stream100/README.md"), false);
+    assert.equal(packagedPath("hercules-stream100", "crates/polaris-stream100-node/build.rs"), true);
+    assert.equal(packagedPath("hercules-stream100", "crates/polaris-stream100/Cargo.toml"), true);
+});
+
 test("a package changed under a published version is refused; a raised version passes", () => {
     const published = [{ id: "hercules-stream100", version: "0.1.4" }];
     const changed = ["clients/device-plugins/hercules-stream100/any/main.cjs", "docs/device-plugins.md"];
