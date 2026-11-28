@@ -143,8 +143,8 @@ interface ReplicaProps {
     readonly locale: string;
     /** Several settings at once, saved together (a swap is two). */
     readonly onChange: (patch: Values) => void;
-    /** The setting's own picker, as the settings section draws it. */
-    readonly control: (setting: ReplicaSlot) => ReactNode;
+    /** The setting's own picker, as the settings section draws it (a knob's icon too). */
+    readonly control: (setting: PluginSetting) => ReactNode;
 }
 
 /** The device with its controls in place, the actions to drag onto them, and the selected control's pickers. */
@@ -275,6 +275,10 @@ export function DeviceReplica({ manifest, layout, values, live = null, levels = 
         );
     };
 
+    // A selected knob's icon is set right beside it, not looked for further down the page.
+    const knobIndex = current ? layout.knobs.findIndex((knob) => knob.turn?.key === current.key || knob.press?.key === current.key) : -1;
+    const knobIcon = knobIndex === -1 ? null : (manifest.settings.find((setting) => setting.key === `knob${knobIndex + 1}Image` && setting.kind === "image") ?? null);
+
     const swapWith = current ? [...slots.values()].filter((other) => replicaDrop({ from: "slot", key: current.key }, other, slots, values) !== null) : [];
     const libraryTarget = current;
 
@@ -332,6 +336,14 @@ export function DeviceReplica({ manifest, layout, values, live = null, levels = 
                                     />
                                 ) : null}
                             </div>
+                            {knobIcon ? (
+                                <div className="flex min-w-0 flex-col gap-1.5">
+                                    <p className={cn(settingType.small, "truncate text-foreground-subtle")} title={pluginText(knobIcon.label, locale)}>
+                                        {pluginText(knobIcon.label, locale)}
+                                    </p>
+                                    {control(knobIcon)}
+                                </div>
+                            ) : null}
                         </div>
                     ) : null}
                 </div>

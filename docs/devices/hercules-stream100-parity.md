@@ -22,7 +22,7 @@ Status: **have** (before this change), **added** (this change), **not yet**
 | VU meter colour | `accentColor`, for every knob's volume bar | added (one colour for all knobs, not one per knob) |
 | VU meter solid or gradient levels | - | not yet: the device draws a solid bar; a gradient needs the render path (`screen.rs`) |
 | Change the appearance of the VU meters and the action area | `labelSize` (knob name size) | have |
-| Track icon from a library or a custom 32 x 32 picture | `knob1Image`..`knob4Image`, cut square on the page, drawn at 40 x 40, contain or cover (`knobImageFit`) | added (custom picture; no built-in library) |
+| Track icon from a library or a custom 32 x 32 picture | `knob1Image`..`knob4Image`, cut square on the page, drawn at 40 x 40, contain or cover (`knobImageFit`) | added (custom image, or one of the page's icon gallery: search, categories, a color, drawn at the device's size; set from the selected knob on the drawing of the device) |
 | ON / OFF status icon (OFF shown while muted) | - | not yet: one picture per knob; a muted one turns the value and bar red instead |
 | Inactive source greyed | a dash when nothing it follows plays | have |
 | Track name, up to 10 characters | the name of what it follows (Calls, Music, ...) | not yet: no free-text setting kind |

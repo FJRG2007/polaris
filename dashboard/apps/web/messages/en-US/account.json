@@ -2853,13 +2853,25 @@
             "holds": "{name}: {value}"
         },
         "look": {
-            "choose": "Choose picture",
+            "choose": "Choose image",
             "replace": "Replace",
-            "remove": "Remove picture",
-            "defaultColor": "Default colour",
-            "useDefault": "Use the default colour",
-            "unreadable": "That picture could not be read",
-            "preview": "Preview of the device's screen"
+            "remove": "Remove image",
+            "defaultColor": "Default color",
+            "useDefault": "Use the default color",
+            "unreadable": "That image could not be read",
+            "preview": "Preview of the device's screen",
+            "icons": "Icons",
+            "findIcon": "Find an icon",
+            "noIcon": "No icon matches",
+            "iconColor": "Icon color",
+            "iconFor": "Icon for {name}",
+            "category": {
+                "audio": "Audio",
+                "calls": "Calls",
+                "media": "Media",
+                "apps": "Apps",
+                "system": "System"
+            }
         }
     }
 }

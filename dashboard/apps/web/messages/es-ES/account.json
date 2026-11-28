@@ -2859,7 +2859,19 @@
             "defaultColor": "Por defecto",
             "useDefault": "Usar el color por defecto",
             "unreadable": "No se pudo leer esa imagen",
-            "preview": "Vista previa de la pantalla"
+            "preview": "Vista previa de la pantalla",
+            "icons": "Iconos",
+            "findIcon": "Buscar un icono",
+            "noIcon": "Ningún icono coincide",
+            "iconColor": "Color del icono",
+            "iconFor": "Icono de {name}",
+            "category": {
+                "audio": "Audio",
+                "calls": "Llamadas",
+                "media": "Multimedia",
+                "apps": "Apps",
+                "system": "Sistema"
+            }
         }
     }
 }

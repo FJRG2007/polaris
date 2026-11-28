@@ -11,7 +11,8 @@
  */
 
 import { useState } from "react";
-import { ImagePlus, RotateCcw, Trash2 } from "lucide-react";
+import { IconGallery } from "./plugin-icons";
+import { ImagePlus, LayoutGrid, RotateCcw, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PluginLevels, PluginLive } from "@/lib/device-plugins-client";
 import { CROP_ACCEPTED, ImageCropDialog } from "@/components/image-cropper";
@@ -95,6 +96,9 @@ export function ImageSettingControl({ setting, value, label, onChange, width }: 
     const [busy, setBusy] = useState(false);
     const current = isPluginImageValue(value) ? value : null;
     const ratio = setting.width / setting.height;
+    // A small square is an icon: the gallery offers ready ones, as Stream Control's icon library does.
+    const icon = setting.width === setting.height && setting.width <= 128;
+    const [gallery, setGallery] = useState(false);
     return (
         <div className={cn("flex min-w-0 items-center gap-2", width)}>
             {current ? (
@@ -105,6 +109,25 @@ export function ImageSettingControl({ setting, value, label, onChange, width }: 
                 <ImagePlus className="size-4 shrink-0" />
                 <span className="min-w-0 truncate">{say(t, current ? "replace" : "choose")}</span>
             </Button>
+            {icon ? (
+                <Popover open={gallery} onOpenChange={setGallery}>
+                    <PopoverTrigger asChild>
+                        <Button type="button" variant="outline" className="shrink-0 gap-2" aria-label={say(t, "icons")}>
+                            <LayoutGrid className="size-4 shrink-0" />
+                            <span className="hidden sm:inline">{say(t, "icons")}</span>
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] p-3">
+                        <IconGallery
+                            size={setting.width}
+                            onPick={(url) => {
+                                setGallery(false);
+                                onChange(url);
+                            }}
+                        />
+                    </PopoverContent>
+                </Popover>
+            ) : null}
             {current ? (
                 <Button type="button" variant="ghost" size="icon" className="shrink-0" aria-label={say(t, "remove")} title={say(t, "remove")} onClick={() => onChange("")}>
                     <Trash2 className="size-4 shrink-0" />
