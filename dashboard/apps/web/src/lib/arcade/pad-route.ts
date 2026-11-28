@@ -5,6 +5,7 @@
 
 import { readerWords } from "@/lib/i18n/reader-words";
 import { backgroundUser, sessionCan, type SessionUser } from "@/lib/session";
+import { untilShutdown } from "@/lib/shutdown";
 
 /** Idle keep-alive, so a proxy does not drop a quiet stream. */
 const HEARTBEAT_MS = 25_000;
@@ -66,7 +67,7 @@ export async function padStream<T>(
         },
         cancel: end
     });
-    request.signal.addEventListener("abort", end);
+    untilShutdown(request.signal).addEventListener("abort", end);
     return new Response(stream, {
         headers: {
             "Content-Type": "text/event-stream; charset=utf-8",

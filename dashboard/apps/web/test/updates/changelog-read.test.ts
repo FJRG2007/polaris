@@ -17,7 +17,12 @@ vi.mock("@/lib/setting-store", () => ({
 }));
 const auditLog = vi.hoisted(() => ({ findMany: vi.fn(async () => [] as { at: Date }[]) }));
 const session = vi.hoisted(() => ({ findMany: vi.fn(async () => [] as { createdAt: Date }[]) }));
-vi.mock("@polaris/db", () => ({ prisma: { auditLog, session } }));
+const hospitalityOrderLine = vi.hoisted(() => ({ findMany: vi.fn(async () => [] as { createdAt: Date }[]) }));
+const hospitalityPayment = vi.hoisted(() => ({ findMany: vi.fn(async () => [] as { createdAt: Date }[]) }));
+const meetingParticipant = vi.hoisted(() => ({ findMany: vi.fn(async () => [] as { joinedAt: Date }[]) }));
+vi.mock("@polaris/db", () => ({
+    prisma: { auditLog, session, hospitalityOrderLine, hospitalityPayment, meetingParticipant }
+}));
 const catalog = vi.hoisted(() => ({
     plugins: [{ id: "hercules-stream100", name: "Hercules Stream 100", claims: [{ name: "Hercules Stream 100" }] }]
 }));
@@ -167,5 +172,27 @@ describe("the quietest hour", () => {
         expect(hour).toBe(0);
         await quietHour(now);
         expect(auditLog.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("counts a venue's orders and payments and the calls, not only sign-ins", async () => {
+        // The audit log is busy from 05:00 to 22:00, so on its own midnight is
+        // the quietest. The venue serves from 23:00 to 03:00, and a call ran at
+        // 03:00, which leaves 04:00 as the hour nobody is working.
+        auditLog.findMany.mockResolvedValue(
+            Array.from({ length: 60 }, (_, index) => ({ at: new Date(2026, 10, 1, 5 + (index % 18)) }))
+        );
+        const service = [23, 0, 1, 2];
+        hospitalityOrderLine.findMany.mockResolvedValue(
+            Array.from({ length: 40 }, (_, index) => ({ createdAt: new Date(2026, 10, 2, service[index % 4]!) }))
+        );
+        hospitalityPayment.findMany.mockResolvedValue(
+            Array.from({ length: 8 }, (_, index) => ({ createdAt: new Date(2026, 10, 2, service[index % 4]!) }))
+        );
+        meetingParticipant.findMany.mockResolvedValue([{ joinedAt: new Date(2026, 10, 3, 3) }]);
+        const hour = await quietHour(new Date(2026, 10, 20, 12));
+        expect(hour).toBe(4);
+        for (const read of [hospitalityOrderLine, hospitalityPayment, meetingParticipant]) {
+            expect(read.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: expect.any(Number) }));
+        }
     });
 });

@@ -22,6 +22,7 @@ import { typingAllowed } from "@/lib/privacy-service";
 import { chatPrivacyOf } from "@/lib/chat/vanish";
 import { holdStreamScope } from "@/lib/chat/stream-scope";
 import { backgroundUser, sessionCan } from "@/lib/session";
+import { untilShutdown } from "@/lib/shutdown";
 
 /** How long one "may I see them typing" answer is trusted on a stream. */
 const TYPING_TRUST_MS = 60_000;
@@ -436,7 +437,7 @@ export async function GET(request: Request): Promise<Response> {
                 // under them only because the frame named their account too.
             }, { userId: actor.id, channels: scope.reachable() });
 
-            request.signal.addEventListener("abort", () => {
+            untilShutdown(request.signal).addEventListener("abort", () => {
                 stop();
                 try {
                     controller.close();
