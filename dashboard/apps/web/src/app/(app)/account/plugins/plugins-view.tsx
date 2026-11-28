@@ -713,7 +713,8 @@ function PluginSettings({ bridge, manifest }: { bridge: PluginsBridge; manifest:
     }, [loaded]);
 
     if (manifest.settings.length === 0) return <p className={cn(settingType.body, "text-muted-foreground")}>{say(t, "detail.noSettings")}</p>;
-    if (!values) return <Skeleton className="h-24 w-full" />;
+    // Only a first visit waits (later ones draw the kept values at once); a device's drawing is tall, so its wait is too, and nothing jumps when it lands.
+    if (!values) return <Skeleton className={cn("w-full", replicaLayout(manifest) ? "h-[28rem]" : "h-24")} />;
 
     /**
      * Several settings at once (a swap on the device is two), saved one after
