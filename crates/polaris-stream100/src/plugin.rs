@@ -227,12 +227,22 @@ fn look_settings() -> Vec<Value> {
         json!({ "kind": "color", "key": "textColor", "group": "look", "label": label("Text colour", "Color del texto"), "fallback": default_color(TEXT), "default": "" }),
         json!({ "kind": "color", "key": "accentColor", "group": "look", "label": label("Volume bar colour", "Color de la barra de volumen"), "fallback": default_color(FILL), "default": "" }),
         json!({ "kind": "image", "key": "backgroundImage", "group": "look", "label": label("Background picture", "Imagen de fondo"), "hint": label("Drawn behind everything at 480 x 272, like Stream Control's background.", "Se dibuja detrás de todo a 480 x 272, como el fondo de Stream Control."), "width": crate::display::WIDTH, "height": crate::display::HEIGHT, "default": "" }),
-        fit("backgroundFit", "Background picture fit", "Ajuste de la imagen de fondo", "cover"),
+        fit(
+            "backgroundFit",
+            "Background picture fit",
+            "Ajuste de la imagen de fondo",
+            "cover",
+        ),
     ];
     for knob in 1..=4 {
         list.push(json!({ "kind": "image", "key": format!("knob{knob}Image"), "group": "look", "label": label(&format!("Knob {knob} icon"), &format!("Icono de la rueda {knob}")), "width": KNOB_IMAGE_SIDE, "height": KNOB_IMAGE_SIDE, "default": "" }));
     }
-    list.push(fit("knobImageFit", "Knob icon fit", "Ajuste de los iconos", "contain"));
+    list.push(fit(
+        "knobImageFit",
+        "Knob icon fit",
+        "Ajuste de los iconos",
+        "contain",
+    ));
     list
 }
 
