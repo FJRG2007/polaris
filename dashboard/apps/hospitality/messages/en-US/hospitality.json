@@ -91,7 +91,7 @@
         "peanuts": "Peanuts",
         "soy": "Soy",
         "milk": "Milk",
-        "nuts": "Nuts",
+        "nuts": "Tree nuts",
         "celery": "Celery",
         "mustard": "Mustard",
         "sesame": "Sesame",
@@ -107,7 +107,7 @@
         "till": "Till"
     },
     "service": {
-        "noFloor": "No room yet",
+        "noFloor": "No dining room yet",
         "noFloorHint": "Set up the venue from the Menu tab first."
     },
     "floor": {
@@ -147,8 +147,8 @@
         "remove": "Remove",
         "less": "One less",
         "status": {
-            "pending": "to send",
-            "sent": "sent",
+            "pending": "not sent yet",
+            "sent": "fired",
             "ready": "ready",
             "served": "served",
             "void": "void"
@@ -165,7 +165,7 @@
     "kitchen": {
         "station": "Station",
         "all": "All stations",
-        "undo": "Undo",
+        "undo": "Undo bump",
         "empty": "Nothing waiting",
         "minutes": "{count} min",
         "allReady": "All ready"
@@ -193,7 +193,7 @@
         "orders": "Orders",
         "sales": "Sales",
         "discounts": "Discounts",
-        "tips": "Tips",
+        "tips": "Tips taken",
         "tax": "VAT {rate} %",
         "noShift": "Open the till first.",
         "shiftOpen": "The till is already open.",
@@ -207,7 +207,7 @@
         "card": "Card {amount}",
         "done": "Paid. Ticket {ticket}",
         "methods": {
-            "cash": "Cash",
+            "cash": "In cash",
             "card": "Card",
             "other": "Other"
         }
