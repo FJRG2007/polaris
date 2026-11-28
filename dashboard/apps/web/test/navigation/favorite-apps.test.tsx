@@ -21,6 +21,7 @@ import { useEffect, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 
+const bridge: { current: unknown } = { current: null };
 const save = vi.fn<(input: unknown) => Promise<{ error?: string }>>();
 const show = vi.fn();
 
@@ -34,6 +35,11 @@ vi.mock("@/app/(app)/app-launcher-actions", () => ({
 }));
 vi.mock("@/app/(app)/launcher-waiting-actions", () => ({
     markLauncherReadAction: async () => ({})
+}));
+// A stand-in for the desktop app's bridge, so the test can be "inside" it.
+vi.mock("@/lib/desktop-bridge", async (original) => ({
+    ...(await original<typeof import("@/lib/desktop-bridge")>()),
+    desktopBridge: () => bridge.current
 }));
 vi.mock("@polaris/ui", async (original) => ({
     ...(await original<typeof import("@polaris/ui")>()),
@@ -267,6 +273,41 @@ describe("the Overview rail", () => {
         );
         expect(screen.getByText("Favoritos")).toBeTruthy();
         expect(screen.getByRole("button", { name: "Más apps" })).toBeTruthy();
+    });
+});
+
+describe("More apps", () => {
+    const apps = [
+        { id: "drive", label: "Drive", icon: HardDrive, href: "/drive" },
+        { id: "chat", label: "Chat", icon: MessageCircle, href: "/chat" },
+        { id: "mail", label: "Mail", icon: Mail, href: "/mail" }
+    ];
+    afterEach(() => {
+        bridge.current = null;
+    });
+
+    it("opens the app grid with every app, never the search, in the browser and in the desktop app", async () => {
+        const showLauncher = vi.fn(async () => true);
+        for (const desktop of [false, true]) {
+            cleanup();
+            showLauncher.mockClear();
+            bridge.current = desktop ? { showLauncher } : null;
+            const user = userEvent.setup();
+            mount(
+                [],
+                <>
+                    <AppSidebar appIds={["overview", "drive", "chat", "mail"]} />
+                    <AppLauncher apps={apps} currentAppId="drive" />
+                </>
+            );
+            await user.click(screen.getByRole("button", { name: "More apps" }));
+            await screen.findByRole("menu");
+            const tiles = [...document.querySelectorAll("[data-launcher-tile]")].map((n) =>
+                n.getAttribute("data-launcher-tile")
+            );
+            expect(tiles.sort()).toEqual(["chat", "drive", "mail"]);
+            expect(showLauncher).not.toHaveBeenCalled();
+        }
     });
 });
 

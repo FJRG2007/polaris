@@ -18,7 +18,6 @@
 import { useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { arrangedPrefs, sameOrder, type LauncherPrefs } from "@/lib/app-launcher";
-import { openDesktopLauncher } from "@/lib/search/open-search";
 import { saveFavoriteAppsAction } from "@/app/(app)/app-launcher-actions";
 import { FavoriteAppsContext, type FavoriteApps } from "@/components/favorite-apps-context";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -129,18 +128,17 @@ export function FavoriteAppsProvider({
                 }),
             launcherOpen,
             setLauncherOpen,
-            // In the desktop app, the app's launcher, which lists every app as
-            // well; elsewhere the app menu in the top bar.
-            openLauncher: () =>
-                openDesktopLauncher(null, () => {
-                    let frames = 0;
-                    const wait = () => {
-                        const drawer = document.querySelector('[role="dialog"][data-state="open"]');
-                        if (drawer && frames++ < DRAWER_WAIT_FRAMES) requestAnimationFrame(wait);
-                        else setLauncherOpen(true);
-                    };
-                    requestAnimationFrame(wait);
-                })
+            // Always the app menu with every app. Never the search: the desktop
+            // app's launcher is for searching, and "More apps" is for browsing.
+            openLauncher: () => {
+                let frames = 0;
+                const wait = () => {
+                    const drawer = document.querySelector('[role="dialog"][data-state="open"]');
+                    if (drawer && frames++ < DRAWER_WAIT_FRAMES) requestAnimationFrame(wait);
+                    else setLauncherOpen(true);
+                };
+                requestAnimationFrame(wait);
+            }
         }),
         [prefs, launcherOpen, save]
     );
