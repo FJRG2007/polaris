@@ -16,6 +16,7 @@ import { useMoney } from "./menu-screen";
 import { DiscountDialog, PayDialog } from "./till-screen";
 import { LineDialog, MoveDialog } from "./order-dialogs";
 import { chooseModifiers } from "../model/modifiers";
+import { repeatRound } from "../model/rounds";
 import { markBilledAction } from "../actions/till";
 import { lineTotal, orderTotals } from "../model/pricing";
 import { TABLE_SHAPES } from "../model/order-schemas";
@@ -24,7 +25,7 @@ import type { MenuView, ProductView } from "../lib/catalog";
 import { useHospitalityLive, useHospitalityMode } from "./live-client";
 import { readCache, unwrap, useHospitalityT, writeCache } from "./i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRightLeft, Euro, Minus, Move, Percent, Plus, Receipt, Save, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Euro, Minus, Move, Percent, Plus, Receipt, Repeat, Save, Send, Trash2 } from "lucide-react";
 import type { LineView, OrderView, RoomView, ServiceView, TableView } from "../lib/orders";
 import { Button, EmptyState, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
 import { readServiceAction, removeLineAction, restoreLineAction, saveFloorAction } from "../actions/orders";
@@ -386,6 +387,13 @@ function OrderPanel(props: {
         }
     };
 
+    /** "Otra ronda": the last round fired, back as drafts at today's menu, to be checked and sent. */
+    const repeat = () => {
+        const round = repeatRound(sent, props.menu.products);
+        setDrafts((all) => [...all, ...round.lines.map((l) => ({ id: crypto.randomUUID(), ...l }))]);
+        if (round.missing > 0) toast.show({ title: t("order.repeatMissing", { count: round.missing }) });
+    };
+
     // No confirm on the hot path: the line goes at once and the note offers it back.
     // The version shown goes with it, so a line another device just changed is not removed blind.
     const remove = (line: { id: string; name: string }) =>
@@ -500,8 +508,8 @@ function OrderPanel(props: {
                 {props.order ? (
                     <>
                         {props.manager ? (
-                            <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("discount.title")} onClick={() => setDiscounting("order")}>
-                                <Percent aria-hidden />
+                            <Button className={TOUCH} variant="outline" size="lg" onClick={() => setDiscounting("order")}>
+                                <Percent aria-hidden /> {t("discount.title")}
                             </Button>
                         ) : null}
                         <Button className={TOUCH}
@@ -516,8 +524,11 @@ function OrderPanel(props: {
                         >
                             <Receipt aria-hidden /> {t("order.bill")}
                         </Button>
-                        <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("order.move")} disabled={drafts.length > 0} onClick={() => setMoving(true)}>
-                            <ArrowRightLeft aria-hidden />
+                        <Button className={TOUCH} variant="outline" size="lg" disabled={!sent.some((l) => l.sentAt)} onClick={repeat}>
+                            <Repeat aria-hidden /> {t("order.repeat")}
+                        </Button>
+                        <Button className={TOUCH} variant="outline" size="lg" disabled={drafts.length > 0} onClick={() => setMoving(true)}>
+                            <ArrowRightLeft aria-hidden /> {t("order.move")}
                         </Button>
                         <Button className={TOUCH} variant="outline" size="lg" disabled={drafts.length > 0} onClick={() => setPaying(true)}>
                             <Euro aria-hidden /> {t("order.pay")}

@@ -147,6 +147,8 @@
             "3": "Dessert"
         },
         "send": "Send",
+        "repeat": "Same again",
+        "repeatMissing": "{count, plural, one {# item is} other {# items are}} no longer on the menu",
         "sent": "Sent to kitchen and bar",
         "remove": "Remove",
         "less": "One less",

@@ -147,6 +147,8 @@
             "3": "Postre"
         },
         "send": "Marchar",
+        "repeat": "Otra ronda",
+        "repeatMissing": "{count, plural, one {# producto ya no esta} other {# productos ya no estan}} en la carta",
         "sent": "Enviado a cocina y barra",
         "remove": "Quitar",
         "less": "Uno menos",
