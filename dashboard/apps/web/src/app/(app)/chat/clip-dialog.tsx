@@ -122,6 +122,8 @@ export function ClipDialog({
 
     useEffect(() => {
         if (!open) return;
+        // View once is chosen for each clip, not carried over from the last one.
+        setOnce(undefined);
         let live = true;
         const look = () => {
             void callDevices().then((found) => {

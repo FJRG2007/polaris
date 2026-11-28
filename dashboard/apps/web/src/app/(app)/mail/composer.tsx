@@ -1432,7 +1432,12 @@ function SendLaterMenu({
                         </DropdownMenuItem>
                     ))}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => setAsking(true)}>
+                    <DropdownMenuItem
+                        onSelect={() => {
+                            setCustom("");
+                            setAsking(true);
+                        }}
+                    >
                         {t("compose.pickTime")}
                     </DropdownMenuItem>
                     {chosen ? (

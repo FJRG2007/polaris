@@ -93,6 +93,7 @@ import {
     Skeleton,
     Textarea,
     cn,
+    useResetOnOpen,
     useToast
 } from "@polaris/ui";
 
@@ -492,6 +493,25 @@ export function ShareDialog({
     const [linkCapability, setLinkCapability] = useState(linkCapabilities[0] ?? "");
     const [linkRules, setLinkRules] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
     const [madeLink, setMadeLink] = useState<string | null>(null);
+    // The add box, an open limits editor and a link being made start over on
+    // every open: what was typed for one share is not offered to the next.
+    useResetOnOpen(open, () => {
+        setQuery("");
+        setFound([]);
+        setActive(0);
+        setStaged([]);
+        setCapability(capabilities[0] ?? "");
+        setActions(core.grantActions(subject, capabilities[0] ?? "", []));
+        setLimits(EMPTY_LIMITS);
+        setNotify(true);
+        setMessage("");
+        setEditing(null);
+        setLogGrant(null);
+        setDraftAudience(null);
+        setLinkCapability(linkCapabilities[0] ?? "");
+        setLinkRules(EMPTY_LINK_ADVANCED);
+        setMadeLink(null);
+    });
     const audiences: core.LinkAudience[] = [
         "restricted",
         ...(setup?.org ? (["org"] as const) : []),

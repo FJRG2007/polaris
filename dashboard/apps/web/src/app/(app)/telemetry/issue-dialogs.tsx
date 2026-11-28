@@ -172,6 +172,7 @@ export function CreateTaskDialog({
         setMade(null);
         setError("");
         setAssign(true);
+        setQuery("");
     }, [issue, t]);
 
     useEffect(() => {

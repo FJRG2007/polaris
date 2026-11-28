@@ -22,7 +22,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    ProgressBar
+    ProgressBar,
+    useResetOnOpen
 } from "@polaris/ui";
 import type { KeptPick } from "@/components/file-picker/as-files";
 import { DropZone } from "@/components/drop-zone";
@@ -167,6 +168,12 @@ export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
     const job = phase.kind === "job" ? phase.job : null;
     const running = job?.status === "running";
     const busy = phase.kind === "uploading" || running;
+    // The picked archive and its error start empty on every open; the phase is
+    // left alone, since it follows an import the server is running.
+    useResetOnOpen(open, () => {
+        setFile(null);
+        setPickError(null);
+    });
 
     // The last day's import, running or ended but not yet seen, is picked up again.
     useEffect(() => {

@@ -301,7 +301,7 @@ export function ItemDialog({
     // an id belonging to the vault chosen before it.
     useEffect(() => {
         setCollectionId(collections[0]?.id ?? "");
-    }, [collections]);
+    }, [collections, item]);
 
     /** Make the folder that was just typed and file this item in it. */
     async function createFolder(): Promise<void> {

@@ -81,7 +81,7 @@ export function MoveDialog({
     // stale id from the vault before it selected.
     useEffect(() => {
         setCollectionId(collections[0]?.id ?? "");
-    }, [collections]);
+    }, [collections, item]);
 
     async function onMove(): Promise<void> {
         if (!item || !target) return;

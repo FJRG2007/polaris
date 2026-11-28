@@ -599,7 +599,12 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                         {t("sidebar.newChannel")}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onSelect={() => setNewCategory(true)}>
+                                    <DropdownMenuItem
+                                        onSelect={() => {
+                                            setCategoryName("");
+                                            setNewCategory(true);
+                                        }}
+                                    >
                                         <FolderPlus className="size-3.5" />
                                         {t("sidebar.newCategory")}
                                     </DropdownMenuItem>

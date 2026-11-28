@@ -139,6 +139,10 @@ export function ShareDialog({
         setLoading(true);
         setError("");
         setOutcome(null);
+        setUserIds([]);
+        setEmails([]);
+        setDraftEmail("");
+        setNote("");
         void (async () => {
             const result = await runAction(() => polls.taskShare(taskId), setError);
             if (result?.error) setError(result.error);

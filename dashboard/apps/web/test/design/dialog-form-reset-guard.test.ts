@@ -5,8 +5,10 @@
  * content starts again by construction. State kept by the component that
  * renders the `Dialog` root does not: that component stays mounted. Every such
  * component whose dialog fields are its own state must reset them on open -
- * `useResetOnOpen`, an effect on the open state, or a render-time reseed from
- * the record - or be listed below with the reason it has not been moved yet.
+ * `useResetOnOpen` or an effect on that dialog's open state, a render-time
+ * reseed from the record, or every action that opens it setting the field -
+ * and each dialog is checked on its own, so a component with two dialogs and
+ * a reset for one of them fails for the other.
  */
 
 import ts from "typescript";
@@ -20,34 +22,17 @@ const FIELD_ATTRS = new Set(["value", "checked", "defaultValue", "selected", "de
 const CHANGE = /^on(Change|ValueChange|CheckedChange|Input|Select)$/;
 
 /**
- * Owners whose dialog is one step of a longer flow (a nested confirm, a picker,
- * a second dialog sharing the same state) or whose fields are also page state.
- * Each needs the flow's own open state passed by hand; tracked in
- * docs/bugs/BUG-0078. Remove an entry once it resets; never add one to pass.
+ * Fields a dialog keeps across a close on purpose, by `file#Component(open
+ * state)`: what it shows is not something the reader typed. Each entry names
+ * the reason; never add one to make a form pass.
  */
-const PENDING = new Set([
-    "apps/web/src/app/(app)/apps/deploy/import-site.tsx#ImportSiteButton",
-    "apps/game-servers/src/screens/installed/game-console.tsx#GameConsole",
-    "apps/web/src/app/(app)/chat/chat-sidebar.tsx#ChatSidebarList",
-    "apps/web/src/app/(app)/drive/files-view.tsx#FilesView"
-]);
-
-/**
- * Owners with nothing to start from scratch: the dialog is not a form (the
- * state it keeps is the record or the view itself), or the action that opens
- * it sets every field.
- */
-const NOT_A_FORM = new Set([
-    // The task sheet edits the task in place and saves as it goes.
-    "apps/web/src/app/(app)/tasks/task-panel.tsx#TaskPanel",
+const KEPT = new Map<string, string[]>([
+    // The progress bar follows an import the server runs whether the dialog is open or not.
+    ["apps/web/src/app/(app)/apps/deploy/import-site.tsx#ImportSiteButton(open)", ["setPhase"]],
     // The enlarged map keeps the map style the reader picked.
-    "apps/web/src/app/(app)/chat/location-card.tsx#LocationCard",
-    // Shows the new webhook address read-only, and drops it when closed.
-    "apps/web/src/app/(app)/apps/deploy/settings/automations-section.tsx#AutomationsSection",
-    // A confirm with no fields, and a one-time secret dropped when closed.
-    "apps/web/src/app/(app)/automations/[id]/alert-fields.tsx#AlertInFields",
-    // "Until a moment" sets the moment to an hour from now every time it opens it.
-    "apps/web/src/components/account-menu.tsx#AccountMenu"
+    ["apps/web/src/app/(app)/chat/location-card.tsx#LocationCard(big && !phone)", ["setStyle"]],
+    // The open state of the delete confirm inside the task sheet, set by its menu item.
+    ["apps/web/src/app/(app)/tasks/task-panel.tsx#TaskPanel(openId !== null)", ["setConfirmDelete"]]
 ]);
 
 function sources(): string[] {
@@ -79,9 +64,44 @@ function nameOf(sf: ts.SourceFile, n: ts.FunctionLikeDeclaration): string {
     return parent && ts.isVariableDeclaration(parent) ? parent.name.getText(sf) : "";
 }
 
-const mentions = (text: string, id: string) => new RegExp(`\\b${id.replace(/\$/g, "\\$")}\\b`).test(text);
+const mentions = (text: string, id: string) =>
+    new RegExp(`\\b${id.replace(/\$/g, "\\$")}\\b`).test(text);
 
-/** The components in one file that keep their dialog's fields and never reset them. */
+/** The expression a dialog is open on: its `open` prop, or the condition it is rendered under. */
+function openOf(sf: ts.SourceFile, dialog: ts.JsxElement): string | null {
+    const attr = dialog.openingElement.attributes.properties.find(
+        (p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === "open"
+    );
+    const given = attr?.initializer
+        ?.getText(sf)
+        .replace(/^\{([\s\S]*)\}$/, "$1")
+        .trim();
+    if (given && given !== "true") return given;
+    // `{shown && <Dialog open>}` or `{shown ? <Dialog open> : null}`
+    let up: ts.Node = dialog.parent;
+    while (ts.isParenthesizedExpression(up)) up = up.parent;
+    if (
+        ts.isBinaryExpression(up) &&
+        up.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+    )
+        return up.left.getText(sf);
+    if (ts.isConditionalExpression(up)) return up.condition.getText(sf);
+    // Always open: whoever renders the component mounts it only while shown.
+    return null;
+}
+
+const ids = (text: string) => text.match(/[A-Za-z_$][\w$]*/g) ?? [];
+const CLOSED = new Set(["false", "null", "undefined", '""', "''", "[]", "0"]);
+
+/**
+ * Every dialog in one file whose fields are kept by the component rendering
+ * its root and are not put back when it opens, as `Component(open state)`.
+ * Each dialog is judged on its own: a reset tied to one dialog's open state
+ * does not cover another dialog of the same component.
+ */
+/** The KEPT entries some dialog still needs, filled in as files are read. */
+const used = new Set<string>();
+
 function offenders(file: string, text: string): string[] {
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const out: string[] = [];
@@ -89,11 +109,22 @@ function offenders(file: string, text: string): string[] {
         const name = nameOf(sf, fn);
         const states: { value: string; setter: string }[] = [];
         const dialogs: ts.JsxElement[] = [];
-        const effects: ts.CallExpression[] = [];
+        const resets: { on: string; body: string }[] = [];
         const seeds: string[] = [];
-        let hook = false;
+        const handlers: ts.FunctionLikeDeclaration[] = [];
+        const locals = new Map<string, string>();
         const walk = (n: ts.Node) => {
             if (n !== fn && isFn(n) && /^[A-Z]/.test(nameOf(sf, n))) return;
+            if (n !== fn && isFn(n)) {
+                handlers.push(n);
+                const own = nameOf(sf, n);
+                if (own) locals.set(own, n.getText(sf));
+            }
+            if (ts.isVariableDeclaration(n) && n.initializer && ts.isIdentifier(n.name)) {
+                // `const reset = useCallback(() => ..., [])`
+                if (ts.isCallExpression(n.initializer))
+                    locals.set(n.name.text, n.initializer.getText(sf));
+            }
             if (
                 ts.isVariableDeclaration(n) &&
                 n.initializer &&
@@ -107,27 +138,37 @@ function offenders(file: string, text: string): string[] {
             }
             if (ts.isCallExpression(n)) {
                 const callee = n.expression.getText(sf);
-                if (callee === "useResetOnOpen") hook = true;
-                if (/^(React\.)?use(Layout)?Effect$/.test(callee)) effects.push(n);
+                const [first, second] = n.arguments;
+                if (callee === "useResetOnOpen" && first && second)
+                    resets.push({ on: first.getText(sf), body: second.getText(sf) });
+                if (/^(React\.)?use(Layout)?Effect$/.test(callee) && first && second)
+                    resets.push({ on: second.getText(sf), body: first.getText(sf) });
             }
             if (ts.isIfStatement(n) && fn.body && n.parent === fn.body) seeds.push(n.getText(sf));
-            if (ts.isJsxElement(n) && ROOTS.has(n.openingElement.tagName.getText(sf))) dialogs.push(n);
+            if (ts.isJsxElement(n) && ROOTS.has(n.openingElement.tagName.getText(sf)))
+                dialogs.push(n);
             ts.forEachChild(n, walk);
         };
         ts.forEachChild(fn, walk);
-        if (!dialogs.length || hook || !name) return;
-        const open = dialogs[0]!.openingElement.attributes.properties.find(
-            (p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && p.name.getText(sf) === "open"
-        );
-        const always = !open || !open.initializer || open.initializer.getText(sf) === "{true}";
-        if (dialogs.length === 1 && always) return;
-        const fields = new Set<string>();
+        if (!name) return;
+        // A body and the local functions it calls, one level deep.
+        const expand = (body: string) =>
+            [body, ...ids(body).flatMap((id) => (locals.has(id) ? [locals.get(id)!] : []))].join(
+                "\n"
+            );
         for (const dialog of dialogs) {
+            const open = openOf(sf, dialog);
+            if (open === null) continue;
+            const openIds = ids(open);
+            const opening = states.filter((s) => openIds.includes(s.value));
+            const fields = new Set<string>();
             const scan = (n: ts.Node) => {
                 if (ts.isJsxAttribute(n) && n.initializer) {
                     const attr = n.name.getText(sf);
                     const value = n.initializer.getText(sf);
                     for (const s of states) {
+                        // The open state itself is the record the opener hands in.
+                        if (opening.includes(s)) continue;
                         if (FIELD_ATTRS.has(attr) && mentions(value, s.value)) fields.add(s.setter);
                         if (CHANGE.test(attr) && mentions(value, s.setter)) fields.add(s.setter);
                     }
@@ -135,17 +176,39 @@ function offenders(file: string, text: string): string[] {
                 ts.forEachChild(n, scan);
             };
             scan(dialog);
+            if (!fields.size) continue;
+            const tied = resets
+                .filter((r) => openIds.some((v) => mentions(r.on, v)))
+                .map((r) => expand(r.body));
+            // The actions that open it; each one has to set the field itself.
+            const openers = handlers.filter((h) => {
+                const params = h.parameters.map((p) => p.name.getText(sf));
+                const calls: ts.CallExpression[] = [];
+                const find = (n: ts.Node) => {
+                    if (ts.isCallExpression(n)) calls.push(n);
+                    if (n === h || !isFn(n)) ts.forEachChild(n, find);
+                };
+                find(h);
+                return calls.some((call) => {
+                    const arg = call.arguments[0]?.getText(sf) ?? "";
+                    const state = opening.find((s) => s.setter === call.expression.getText(sf));
+                    // `onOpenChange={(next) => setOpen(next)}` only passes the close on.
+                    const passed = params.includes(arg) && state?.value === open;
+                    return state !== undefined && arg !== "" && !CLOSED.has(arg) && !passed;
+                });
+            });
+            const covered = (setter: string) =>
+                tied.some((body) => body.includes(setter)) ||
+                seeds.some((seed) => expand(seed).includes(`${setter}(`)) ||
+                (openers.length > 0 &&
+                    openers.every((h) => expand(h.getText(sf)).includes(`${setter}(`)));
+            const key = `${file}#${name}(${open.replace(/\s+/g, " ")})`;
+            const kept = KEPT.get(key) ?? [];
+            const left = [...fields].filter((setter) => !covered(setter));
+            for (const setter of kept) if (left.includes(setter)) used.add(`${key}:${setter}`);
+            const missing = left.filter((setter) => !kept.includes(setter));
+            if (missing.length) out.push(`${key}: ${missing.join(", ")}`);
         }
-        if (!fields.size) return;
-        const openVars = open?.initializer?.getText(sf).match(/[A-Za-z_$][\w$]*/g) ?? [];
-        const effectResets = effects.some((effect) => {
-            const deps = effect.arguments[1];
-            if (!deps || !openVars.some((v) => mentions(deps.getText(sf), v))) return false;
-            const body = effect.arguments[0]?.getText(sf) ?? "";
-            return [...fields].some((setter) => body.includes(setter));
-        });
-        const reseeds = seeds.some((seed) => [...fields].some((setter) => seed.includes(`${setter}(`)));
-        if (!effectResets && !reseeds) out.push(name);
     };
     const all = (n: ts.Node) => {
         if (isFn(n) && /^[A-Z]/.test(nameOf(sf, n))) visit(n);
@@ -160,17 +223,40 @@ describe("dialog forms reset when they open", () => {
     for (const file of sources()) {
         const text = readFileSync(file, "utf8");
         if (!/<(Dialog|Sheet)\b/.test(text)) continue;
-        const rel = relative(DASHBOARD, file).split("\\").join("/");
-        for (const name of offenders(rel, text)) {
-            if (!NOT_A_FORM.has(`${rel}#${name}`)) found.push(`${rel}#${name}`);
-        }
+        found.push(...offenders(relative(DASHBOARD, file).split("\\").join("/"), text));
     }
 
-    it("leaves no dialog owner holding last time's values", () => {
-        expect(found.filter((key) => !PENDING.has(key))).toEqual([]);
+    it("leaves no dialog holding last time's values", () => {
+        expect(found).toEqual([]);
     });
 
-    it("lists only owners that still need it", () => {
-        expect([...PENDING].filter((key) => !found.includes(key))).toEqual([]);
+    it("checks each dialog of a component on its own", () => {
+        const two = `
+            function Folder() {
+                const [naming, setNaming] = useState(false);
+                const [name, setName] = useState("");
+                const [moving, setMoving] = useState(false);
+                const [where, setWhere] = useState("");
+                useResetOnOpen(naming, () => setName(""));
+                return (
+                    <>
+                        <Dialog open={naming}><Input value={name} onChange={(e) => setName(e.target.value)} /></Dialog>
+                        <Dialog open={moving}><Input value={where} onChange={(e) => setWhere(e.target.value)} /></Dialog>
+                    </>
+                );
+            }`;
+        expect(offenders("folder.tsx", two)).toEqual(["folder.tsx#Folder(moving): setWhere"]);
+        const seeded = two.replace(
+            "const [where",
+            'const open = () => { setWhere(""); setMoving(true); };\n const [where'
+        );
+        expect(offenders("folder.tsx", seeded)).toEqual([]);
+    });
+
+    it("keeps on purpose only fields that would otherwise fail", () => {
+        const listed = [...KEPT].flatMap(([key, setters]) =>
+            setters.map((setter) => `${key}:${setter}`)
+        );
+        expect(listed.filter((entry) => !used.has(entry))).toEqual([]);
     });
 });

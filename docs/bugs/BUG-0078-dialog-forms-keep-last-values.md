@@ -37,8 +37,11 @@ do not stay in memory. A flow that steps through a confirm passes the open state
 of the whole flow (Add phone: number -> password -> save), so the step in
 between keeps what was typed.
 
-A codemod applied it to 83 owners; the rest were checked by hand. The ledger of
-every Dialog owner (fixed / verified / not affected / pending) is kept with the
-change. `dialog-form-reset-guard.test.ts` parses every dialog owner and fails
-when one keeps its fields without a reset; its PENDING list names the 29 owners
-with multi-step flows that still need the flow state passed by hand.
+A codemod applied it to 83 owners; the rest were checked by hand, dialog by
+dialog in the components that render several. `dialog-form-reset-guard.test.ts`
+parses every Dialog and Sheet root and judges each on its own open state: a
+field passes when a reset tied to that dialog's open state, a render-time
+reseed, or every action that opens the dialog puts it back. A component with
+two dialogs and a reset for only one fails for the other. The few fields kept
+on purpose (an import's progress, the map style) are listed with the reason,
+and the test fails when an entry is no longer needed.
