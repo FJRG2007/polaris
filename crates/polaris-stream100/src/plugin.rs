@@ -135,6 +135,7 @@ pub fn plugin_groups() -> Value {
         { "key": "buttons", "label": label("Lit buttons", "Botones iluminados"), "hint": label("What each button does in a Polaris call.", "Lo que hace cada botón en una llamada de Polaris."), "look": "buttons" },
         { "key": "turning", "label": label("How the knobs turn", "Cómo giran las ruedas"), "look": "rows" },
         { "key": "screen", "label": label("Screen", "Pantalla"), "hint": label("What the controller's screen shows with Polaris' driver.", "Lo que muestra la pantalla del controlador con el driver de Polaris."), "look": "rows" },
+        { "key": "look", "label": label("Look", "Aspecto"), "hint": label("Colours and pictures on the screen, like Stream Control's graphic settings.", "Colores e imágenes de la pantalla, como los ajustes gráficos de Stream Control."), "look": "rows" },
     ])
 }
 
@@ -197,7 +198,52 @@ pub fn plugin_settings() -> Value {
     list.push(json!({ "kind": "choice", "key": "display", "group": "screen", "label": label("Screen shows", "La pantalla muestra"), "hint": label("With no call or nothing playing it shows the knobs. macOS does not let apps read what is playing.", "Sin llamada o sin nada sonando muestra las ruedas. macOS no deja a las apps leer lo que suena."), "options": options(DISPLAY_CHOICES), "default": "mixer" }));
     list.push(json!({ "kind": "range", "key": "idleAfter", "group": "screen", "label": label("Show this computer's stats after (seconds, 0 = never)", "Mostrar datos del ordenador tras (segundos, 0 = nunca)"), "hint": label("Clock, CPU, memory, disk and Linux network until a control is touched. GPU load is left out: no light way to read it.", "Hora, CPU, memoria, disco y red en Linux hasta tocar un control. Sin carga de GPU: no hay forma ligera de leerla."), "min": 0, "max": 600, "step": 5, "default": 0 }));
     list.push(json!({ "kind": "range", "key": "brightness", "group": "screen", "label": label("Screen brightness", "Brillo de la pantalla"), "min": 10, "max": 100, "step": 5, "default": defaults.brightness }));
+    list.push(json!({ "kind": "choice", "key": "labelSize", "group": "screen", "label": label("Knob name size", "Tamaño del nombre de cada rueda"), "options": [
+        { "value": "small", "label": label("Small", "Pequeño") },
+        { "value": "medium", "label": label("Medium", "Mediano") },
+        { "value": "large", "label": label("Large", "Grande") }
+    ], "default": "medium" }));
+    list.extend(look_settings());
     Value::Array(list)
+}
+
+/// Today's colours as `#rrggbb`, shown by the page while nothing is picked.
+fn default_color(role: usize) -> String {
+    let (red, green, blue) = crate::theme::DEFAULT_COLORS[role];
+    format!("#{red:02x}{green:02x}{blue:02x}")
+}
+
+/// The screen's look (`look_from_plugin`): every value empty or today's by default.
+fn look_settings() -> Vec<Value> {
+    use crate::theme::{BACKGROUND, FILL, KNOB_IMAGE_SIDE, TEXT};
+    let fit = |key: &str, en: &str, es: &str, default: &str| {
+        json!({ "kind": "choice", "key": key, "group": "look", "label": label(en, es), "options": [
+            { "value": "cover", "label": label("Fill the space", "Llenar el espacio") },
+            { "value": "contain", "label": label("Show it whole", "Mostrarla entera") }
+        ], "default": default })
+    };
+    let mut list = vec![
+        json!({ "kind": "color", "key": "backgroundColor", "group": "look", "label": label("Background colour", "Color de fondo"), "fallback": default_color(BACKGROUND), "default": "" }),
+        json!({ "kind": "color", "key": "textColor", "group": "look", "label": label("Text colour", "Color del texto"), "fallback": default_color(TEXT), "default": "" }),
+        json!({ "kind": "color", "key": "accentColor", "group": "look", "label": label("Volume bar colour", "Color de la barra de volumen"), "fallback": default_color(FILL), "default": "" }),
+        json!({ "kind": "image", "key": "backgroundImage", "group": "look", "label": label("Background picture", "Imagen de fondo"), "hint": label("Drawn behind everything at 480 x 272, like Stream Control's background.", "Se dibuja detrás de todo a 480 x 272, como el fondo de Stream Control."), "width": crate::display::WIDTH, "height": crate::display::HEIGHT, "default": "" }),
+        fit(
+            "backgroundFit",
+            "Background picture fit",
+            "Ajuste de la imagen de fondo",
+            "cover",
+        ),
+    ];
+    for knob in 1..=4 {
+        list.push(json!({ "kind": "image", "key": format!("knob{knob}Image"), "group": "look", "label": label(&format!("Knob {knob} icon"), &format!("Icono de la rueda {knob}")), "width": KNOB_IMAGE_SIDE, "height": KNOB_IMAGE_SIDE, "default": "" }));
+    }
+    list.push(fit(
+        "knobImageFit",
+        "Knob icon fit",
+        "Ajuste de los iconos",
+        "contain",
+    ));
+    list
 }
 
 fn number(values: &Map<String, Value>, key: &str) -> Option<u8> {
@@ -271,7 +317,35 @@ pub fn settings_from_plugin(values: &Map<String, Value>) -> Settings {
         // layout (`Settings::from_json`).
         pages: Vec::new(),
         profiles: Vec::new(),
+        look: look_from_plugin(values),
     }
+}
+
+/// The screen's look from its flat values (`backgroundColor`, `textColor`,
+/// `accentColor`, `labelSize`, `backgroundImage`, `backgroundFit`,
+/// `knob1Image`..`knob4Image`, `knobImageFit`); anything missing or that
+/// does not read keeps today's look.
+pub fn look_from_plugin(values: &Map<String, Value>) -> crate::theme::Look {
+    use crate::theme::{Fit, LabelSize, Look};
+    let text = |key: &str| {
+        values
+            .get(key)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
+    };
+    let defaults = Look::default();
+    Look {
+        background_color: text("backgroundColor"),
+        text_color: text("textColor"),
+        accent_color: text("accentColor"),
+        label_size: LabelSize::from_value(&text("labelSize")).unwrap_or(defaults.label_size),
+        background_image: text("backgroundImage"),
+        background_fit: Fit::from_value(&text("backgroundFit")).unwrap_or(defaults.background_fit),
+        knob_images: std::array::from_fn(|knob| text(&format!("knob{}Image", knob + 1))),
+        knob_image_fit: Fit::from_value(&text("knobImageFit")).unwrap_or(defaults.knob_image_fit),
+    }
+    .clamped()
 }
 
 #[cfg(test)]

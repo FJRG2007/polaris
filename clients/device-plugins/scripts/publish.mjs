@@ -48,6 +48,14 @@ function filesUnder(dir, prefix = "") {
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
+/**
+ * The setting kinds a catalog entry lists (`PLUGIN_SETTING_KINDS_BEFORE_LOOK`
+ * in packages/core/src/device-plugins.ts): a desktop app before 0.1.138 refuses
+ * the whole signed catalog over one kind it does not know. The package's own
+ * manifest keeps every setting; only an app new enough to install it reads it.
+ */
+const CATALOG_SETTING_KINDS = ["toggle", "choice", "range", "action"];
+
 /** The legacy string's ceiling in the catalog schema (`pluginEntrySchema.changelog`): longer and no client reads the catalog. */
 const CHANGELOG_MAX = 4000;
 
@@ -102,6 +110,7 @@ for (const id of existsSync(source) ? readdirSync(source).sort() : []) {
     };
     plugins.push({
         ...manifest,
+        settings: (manifest.settings ?? []).filter((setting) => CATALOG_SETTING_KINDS.includes(setting.kind)),
         packages,
         ...(listing.icon ? { icon: picture(listing.icon) } : {}),
         ...(listing.picture ? { picture: picture(listing.picture) } : {}),

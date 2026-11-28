@@ -27,7 +27,7 @@ pub const ENTRY: &str = "main.cjs";
 pub const VIEW: &str = "view/index.html";
 
 /// The first desktop release with the plugin host.
-pub const MIN_APP_VERSION: &str = "0.1.75";
+pub const MIN_APP_VERSION: &str = "0.1.138";
 
 pub fn manifest() -> Value {
     let entries: serde_json::Map<String, Value> = PLATFORMS

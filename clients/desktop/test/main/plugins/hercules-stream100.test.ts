@@ -250,7 +250,7 @@ describe("Hercules Stream 100 plugin", () => {
         const manifest = readPluginManifest(JSON.parse(readFileSync(new URL("manifest.json", folder), "utf8")))!;
         const root = fileURLToPath(new URL("any/", folder));
         const view = createRequire(import.meta.url)(fileURLToPath(new URL("any/view/view.js", folder))) as {
-            wordsFor(locale: string): { categories: Record<string, string>; displays: Record<string, string>; caption: string; driver: Record<string, unknown> & { failed: Record<string, string> } };
+            wordsFor(locale: string): { categories: Record<string, string>; displays: Record<string, string>; labelSizes: Record<string, string>; fits: Record<string, string>; caption: string; driver: Record<string, unknown> & { failed: Record<string, string> } };
             readDriver(value: unknown): { state: string; hercules: boolean; installed: boolean; failure: string | null } | null;
             driverSentence(driver: unknown): string | null;
             DRIVER_FAILURES: readonly string[];
@@ -275,7 +275,7 @@ describe("Hercules Stream 100 plugin", () => {
             const words = view.wordsFor("en-US");
             for (const setting of manifest.settings) {
                 if (setting.kind === "choice") {
-                    const labels = setting.key === "display" ? words.displays : words.categories;
+                    const labels = setting.key === "display" ? words.displays : setting.key === "labelSize" ? words.labelSizes : setting.key.endsWith("Fit") ? words.fits : words.categories;
                     expect(Object.keys(labels).sort(), setting.key).toEqual(setting.options.map((option) => option.value).sort());
                 }
                 if (setting.key in view.DEFAULTS) expect(view.DEFAULTS[setting.key], setting.key).toBe(setting.default);
@@ -338,7 +338,8 @@ describe("Hercules Stream 100 plugin", () => {
         });
         it("lays its settings out as the controller: knobs as dials, buttons as buttons", () => {
             const looks = Object.fromEntries(manifest.groups.map((group) => [group.key, group.look]));
-            for (const setting of manifest.settings) {
+            // The look's pictures and fits name a knob too, but they are the screen's, drawn as rows.
+            for (const setting of manifest.settings.filter((item) => item.group !== "look")) {
                 if (setting.key.startsWith("knob")) expect(looks[setting.group!], setting.key).toBe("dials");
                 if (setting.key.startsWith("button")) expect(looks[setting.group!], setting.key).toBe("buttons");
             }

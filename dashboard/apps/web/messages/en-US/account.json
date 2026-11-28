@@ -2839,6 +2839,27 @@
                 "hint": "Buttons that run it will do nothing.",
                 "confirm": "Delete"
             }
+        },
+        "replica": {
+            "library": "Actions",
+            "libraryHint": "Drag one onto a knob or button, or select a control and press one.",
+            "find": "Find an action",
+            "volume": "Volume",
+            "call": "In a call",
+            "more": "More actions",
+            "noMatch": "No action matches.",
+            "press": "Press",
+            "swap": "Swap with",
+            "holds": "{name}: {value}"
+        },
+        "look": {
+            "choose": "Choose picture",
+            "replace": "Replace",
+            "remove": "Remove picture",
+            "defaultColor": "Default colour",
+            "useDefault": "Use the default colour",
+            "unreadable": "That picture could not be read",
+            "preview": "Preview of the device's screen"
         }
     }
 }
