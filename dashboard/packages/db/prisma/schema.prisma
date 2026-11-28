@@ -19874,6 +19874,8 @@ model HospitalityCategory {
 
 model HospitalityProduct {
     id          String   @id @default(uuid(7)) @db.Uuid
+    // Set for a product only one area sells (its own menu); null is the shared catalogue.
+    areaId      String?  @db.Uuid
     categoryId  String   @db.Uuid
     name        String
     description String   @default("")
@@ -19905,6 +19907,8 @@ model HospitalityProduct {
 model HospitalityRoom {
     id        String   @id @default(uuid(7)) @db.Uuid
     venueId   String   @db.Uuid
+    // The area (outlet) it belongs to; null is the venue's default area.
+    areaId    String?  @db.Uuid
     name      String
     position  Float    @default(0)
     createdAt DateTime @default(now())
@@ -19913,6 +19917,7 @@ model HospitalityRoom {
     tables HospitalityTable[]
 
     @@index([venueId, position])
+    @@index([areaId])
 }
 
 model HospitalityTable {
@@ -19939,6 +19944,8 @@ model HospitalityOrder {
     id         String    @id @db.Uuid
     venueId    String    @db.Uuid
     tableId    String?   @db.Uuid
+    // The area it was taken in (from its room), kept for reports.
+    areaId     String?   @db.Uuid
     // A label for an order with no table ("Barra", "Para llevar 3").
     label      String    @default("")
     // open, billed (bill printed), paid, void.
@@ -19965,6 +19972,7 @@ model HospitalityOrder {
 
     @@index([venueId, status, openedAt])
     @@index([tableId, status])
+    @@index([areaId])
     @@index([shiftId])
 }
 
@@ -20028,6 +20036,8 @@ model HospitalityPayment {
 model HospitalityShift {
     id           String    @id @default(uuid(7)) @db.Uuid
     venueId      String    @db.Uuid
+    // An area with a till of its own closes its own shift; null is the venue's till.
+    areaId       String?   @db.Uuid
     openedById   String?   @db.Uuid
     openedByName String    @default("")
     openedAt     DateTime  @default(now())
@@ -20092,6 +20102,7 @@ model HospitalityVenue {
     rooms     HospitalityRoom[]
     staff     HospitalityStaff[]
     devices   HospitalityDevice[]
+    areas     HospitalityArea[]
     overrides HospitalityPriceOverride[]
 }
 
@@ -20117,6 +20128,11 @@ model HospitalityPriceOverride {
 model HospitalityDevice {
     id          String    @id @default(uuid(7)) @db.Uuid
     venueId     String    @db.Uuid
+    // terminal (takes orders) or display (a station's screen).
+    role        String    @default("terminal")
+    // Areas it opens on (empty: all) and, for a display, its station.
+    areaIds     String[]  @default([]) @db.Uuid
+    stationId   String?   @db.Uuid
     name        String
     // sha256 of the device's token; the token itself is never stored.
     tokenHash   String    @unique
@@ -20150,6 +20166,80 @@ model HospitalityDeviceLink {
     @@index([expiresAt])
 }
 
+// An independent unit of a venue - a rooftop bar, a terrace, a restaurant
+// floor - with its own menu, prices, staff, devices, stations, printers, till
+// and ticket texts, rolled up into the venue's reports. A venue with none has
+// one implicit area that inherits everything, so a simple bar never sees this.
+model HospitalityArea {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    venueId     String   @db.Uuid
+    name        String
+    // Shown as a group label ("Planta 1", "Azotea"); empty for none.
+    floorLabel  String   @default("")
+    // shared (the whole catalogue), subset (only products listed for it) or own
+    // (only its own products, plus any it lists from the catalogue).
+    menuMode    String   @default("shared")
+    // Its own till and X/Z, or the venue's (false).
+    ownTill     Boolean  @default(false)
+    // Ticket texts; empty inherits the venue's.
+    header      String   @default("")
+    footer      String   @default("")
+    position    Float    @default(0)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    venue     HospitalityVenue          @relation(fields: [venueId], references: [id], onDelete: Cascade)
+    overrides HospitalityAreaOverride[]
+
+    @@index([venueId, position])
+}
+
+// The third layer of a price: catalogue -> venue override -> area override.
+model HospitalityAreaOverride {
+    areaId    String   @db.Uuid
+    productId String   @db.Uuid
+    // Null keeps the venue's price.
+    price     Int?
+    // Null keeps the venue's availability.
+    available Boolean?
+    // On a subset or own menu, whether this catalogue product is sold here.
+    listed    Boolean  @default(true)
+    updatedAt DateTime @updatedAt
+
+    area HospitalityArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+    @@id([areaId, productId])
+    @@index([productId])
+}
+
+// Where dishes are made: a kitchen, a bar, any station; optionally one area's.
+model HospitalityStation {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    venueId   String   @db.Uuid
+    areaId    String?  @db.Uuid
+    name      String
+    // kitchen, bar, other.
+    kind      String   @default("kitchen")
+    // The printer layer's id of its ticket printer, if any.
+    printerId String?
+    position  Float    @default(0)
+    createdAt DateTime @default(now())
+
+    @@index([venueId, position])
+}
+
+// A category goes to a station; a rule with an area overrides the venue's.
+model HospitalityRouting {
+    id         String  @id @default(uuid(7)) @db.Uuid
+    venueId    String  @db.Uuid
+    areaId     String? @db.Uuid
+    categoryId String  @db.Uuid
+    stationId  String  @db.Uuid
+
+    @@unique([venueId, areaId, categoryId])
+    @@index([stationId])
+}
+
 model HospitalityStaff {
     id        String   @id @default(uuid(7)) @db.Uuid
     venueId   String   @db.Uuid
@@ -20160,6 +20250,8 @@ model HospitalityStaff {
     role      String   @default("waiter")
     // A scrypt hash of the PIN, when the venue asks for one.
     pinHash   String?
+    // Areas this person works in (empty: all of the venue).
+    areaIds   String[] @default([]) @db.Uuid
     active    Boolean  @default(true)
     createdAt DateTime @default(now())
 
