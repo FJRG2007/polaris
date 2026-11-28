@@ -57,7 +57,8 @@ import {
     Switch,
     cn,
     DateInput,
-    pollWhileVisible
+    pollWhileVisible,
+    useResetOnOpen
 } from "@polaris/ui";
 
 type Overview = NonNullable<Awaited<ReturnType<typeof actions.databaseOverviewAction>>["overview"]>;
@@ -104,6 +105,12 @@ export function DatabaseManageDialog({
     const [full, setFull] = useState(false);
     const [confirm, setConfirm] = useState<Confirmation | null>(null);
     const [confirmError, setConfirmError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setError(null);
+        setTab("database");
+        setConfirm(null);
+        setConfirmError(null);
+    });
     const [pending, startTransition] = useTransition();
 
     const signal = useUnmountSignal();

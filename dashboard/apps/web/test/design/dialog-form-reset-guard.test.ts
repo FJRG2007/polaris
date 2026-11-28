@@ -28,7 +28,6 @@ const CHANGE = /^on(Change|ValueChange|CheckedChange|Input|Select)$/;
 const PENDING = new Set([
     "apps/web/src/app/(app)/apps/deploy/import-site.tsx#ImportSiteButton",
     "apps/game-servers/src/screens/installed/game-console.tsx#GameConsole",
-    "apps/web/src/app/(app)/apps/deploy/database-panel.tsx#DatabaseManageDialog",
     "apps/web/src/app/(app)/automations/[id]/alert-fields.tsx#AlertInFields",
     "apps/web/src/app/(app)/chat/chat-sidebar.tsx#ChatSidebarList",
     "apps/web/src/app/(app)/drive/drive-explorer.tsx#DriveExplorer",
