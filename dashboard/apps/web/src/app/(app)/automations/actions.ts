@@ -21,6 +21,8 @@ import { stepUpGranted } from "@/lib/step-up-grant";
 import * as secrets from "@/lib/automations/secrets";
 import * as organize from "@/lib/automations/organize";
 import * as appEvents from "@/lib/automations/app-events";
+import { getLocale } from "@/lib/i18n/request";
+import { appWordsFor, type AppWords } from "@/lib/automations/app-words";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { LegacyRunRow } from "@/lib/app-extensions/types";
 import type { RunActor } from "@/lib/automations/types";
@@ -102,7 +104,7 @@ export async function getAutomationAction(
     if (!parsed.success) return invalid();
     try {
         const who = await actor();
-        const [found, appNodes, eventApps, appSteps] = await Promise.all([
+        const [found, appNodes, eventApps, appSteps, appEventViews] = await Promise.all([
             service.getAutomation(who, parsed.data),
             appAutomationNodeSlots().catch(() => ({})),
             requirePermission("automations.use").then((user) => appEvents.eventApps(user)),
@@ -114,12 +116,15 @@ export async function getAutomationAction(
                     ]);
                     return appStepViews(user, isAppInstalled);
                 })
+                .catch(() => []),
+            requirePermission("automations.use")
+                .then((user) => appEvents.appEventViews(user))
                 .catch(() => [])
         ]);
         const unnamed = core.LOCALES.some(
             (locale) => translate(locale, "automations.create.untitled") === found.name
         );
-        const automation = { ...found, appNodes, eventApps, appSteps, unnamed };
+        const automation = { ...found, appNodes, eventApps, appSteps, appEvents: appEventViews, unnamed };
         const shelf = await service.shelfOf(parsed.data);
         return {
             ok: true,
@@ -516,11 +521,15 @@ export async function listLegacyRunsAction(
     }
 }
 
-export async function getRunAction(runId: unknown): Promise<Result<{ run: history.RunDetail }>> {
+export async function getRunAction(
+    runId: unknown
+): Promise<Result<{ run: history.RunDetail; appWords: AppWords }>> {
     const parsed = id.safeParse(runId);
     if (!parsed.success) return invalid();
     try {
-        return { ok: true, run: await history.getRun(await actor(), parsed.data) };
+        const [run, locale] = await Promise.all([history.getRun(await actor(), parsed.data), getLocale()]);
+        // The words of the app steps and events it ran, so the screen names them without the editor.
+        return { ok: true, run, appWords: appWordsFor(run.graph, locale) };
     } catch (caught) {
         return failure(caught);
     }

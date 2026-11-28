@@ -209,7 +209,8 @@ Inventory of today's per-app registries:
 | --- | --- | --- |
 | Permissions, roles, scopes, minors, policy templates | manifest `permissionDefs` -> `registerAppPermissions` | runtime |
 | Nav entry, name, logo, marketplace listing | manifest (`nav`, `name`, `logo`) | runtime |
-| Automation trigger events | manifest `events` -> `registerAppEvents` (`core/src/automation-app-events.ts`); built-in `APP_EVENTS` stay as defaults | runtime; a withdrawn app's events stop being events, so its triggers are reported as problems instead of firing |
+| Automation trigger events | manifest `events` (name, label, typed `fields`, `permission`: one of the app's own, else its `nav.permission`) -> `registerAppEvents` (`core/src/automation-app-events.ts`); built-in `APP_EVENTS` stay as defaults | runtime: offered in the trigger picker under the app to who holds the permission (`appEventViews` in `lib/automations/app-events.ts`), picked as an "On event" trigger on its name, its fields offered to later steps as `trigger.payload.<field>`; an event with no usable permission fires but is offered to nobody; a withdrawn app's events stop being events, so its triggers are reported as problems instead of firing |
+| Naming an app's step or trigger | the manifest's own words: the editor's detail (`appSteps`, `appEvents`), a run's answer (`appWords`, `lib/automations/app-words.ts`, reader's language), else the manifests the browser registered (`app-step-words.ts`) | runtime: a run opened from a link names them without the editor |
 | Automation actions (nodes), typed input and output | bundle `AppExtension.automationNodes`, schema-checked (`lib/automations/node-registry.ts`) | runtime already; a run reaching an uninstalled app's node is refused with `appMissing` |
 | Scheduled jobs | bundle `AppExtension.jobs` | runtime already |
 | Search / launcher records, favorites | bundle `searchRecords`, `favorites` | runtime already |

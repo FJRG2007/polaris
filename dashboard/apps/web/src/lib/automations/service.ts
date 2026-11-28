@@ -7,6 +7,7 @@
  */
 
 import type { AppStepView } from "./app-steps";
+import type { AppEventView } from "./app-events";
 import type { AppSlot } from "@/lib/app-extensions/types";
 import { prisma } from "@polaris/db";
 import { cancelRun, loadGraph } from "./engine";
@@ -185,6 +186,8 @@ export interface AutomationDetail {
     readonly eventApps?: readonly core.AppEventApp[];
     /** The steps installed apps declare in their manifests, this account may add. */
     readonly appSteps?: readonly AppStepView[];
+    /** The events installed apps declare in their manifests, this account may start automations on. */
+    readonly appEvents?: readonly AppEventView[];
     /** Still under the name it was created with, in any language; filled in by the screen's action. */
     readonly unnamed?: boolean;
     readonly id: string;

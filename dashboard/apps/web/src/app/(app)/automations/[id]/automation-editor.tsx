@@ -1299,6 +1299,8 @@ export function NodeList({ nodes, onChange, only, addLabel, onAdded, ...rest }: 
                             ...Object.keys(rest.detail.appNodes ?? {}),
                             ...(rest.detail.eventApps ?? [])
                         ]}
+                        appSteps={rest.detail.appSteps}
+                        appEvents={rest.detail.appEvents}
                         assist={
                             <PolarAssist
                                 target={{

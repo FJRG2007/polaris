@@ -53,8 +53,9 @@ import {
     Puzzle,
     type LucideIcon
 } from "lucide-react";
-import { rememberAppSteps } from "../app-step-words";
+import { appEventLabel, rememberAppEvents, rememberAppSteps } from "../app-step-words";
 import type { AppStepView } from "@/lib/automations/app-steps";
+import type { AppEventView } from "@/lib/automations/app-events";
 import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { JsonEditor, JsonView } from "@/components/json-view";
@@ -122,7 +123,11 @@ export function nodeSubtitle(t: T, node: core.GraphNode): string | null {
 }
 
 export function nodeLabel(t: T, node: core.GraphNode | undefined): string {
-    return node ? node.alias || nodeTitle(t, node.type) : t("nodes.unknown");
+    if (!node) return t("nodes.unknown");
+    if (node.alias) return node.alias;
+    // An app's own event is named as its manifest words it.
+    const event = node.type === "core.onEvent" ? (node.config as { name?: unknown } | null)?.name : null;
+    return (typeof event === "string" ? appEventLabel(event) : null) ?? nodeTitle(t, node.type);
 }
 
 /** Anything copied on this page when the system clipboard is out of reach (no permission, an insecure origin). */
@@ -735,6 +740,7 @@ export function CanvasEditor({
                 stepsOnly={insertOn !== null}
                 apps={[...Object.keys(detail.appNodes ?? {}), ...(detail.eventApps ?? [])]}
                 appSteps={detail.appSteps}
+                appEvents={detail.appEvents}
                 assist={
                     readOnly ? undefined : (
                         <PolarAssist
@@ -849,6 +855,7 @@ export function Palette({
     title,
     apps,
     appSteps = [],
+    appEvents = [],
     assist,
     onOpenChange,
     onPick
@@ -863,16 +870,22 @@ export function Palette({
     apps: readonly string[];
     /** The steps installed apps declare in their manifests, this account may add. */
     appSteps?: readonly AppStepView[];
+    /** The events installed apps declare in their manifests, this account may start automations on. */
+    appEvents?: readonly AppEventView[];
     onOpenChange: (open: boolean) => void;
     onPick: (value: string) => void;
 }) {
     const t = useTranslations("automations");
     rememberAppSteps(appSteps);
-    const stepApps = new Map(appSteps.map((step) => [step.app, step.appName]));
+    rememberAppEvents(appEvents);
+    const stepApps = new Map([
+        ...appSteps.map((step) => [step.app, step.appName] as const),
+        ...appEvents.map((event) => [event.app, event.appName] as const)
+    ]);
     const groups = useMemo<AddGroup[]>(
         () =>
             catalog
-                .catalogGroups({ triggers: !stepsOnly, steps: !triggersOnly, apps, appSteps })
+                .catalogGroups({ triggers: !stepsOnly, steps: !triggersOnly, apps, appSteps, appEvents })
                 .map((group) => {
                     const Icon = GROUP_ICONS[group.id] ?? Puzzle;
                     const appName = stepApps.get(group.id);
@@ -896,14 +909,18 @@ export function Palette({
                             ),
                         items: group.items.map((item) => ({
                             value: item.value,
-                            label: item.preset
+                            label: item.appEvent
+                                ? (appEventLabel(item.appEvent) ?? item.appEvent)
+                                : item.preset
                                 ? t(`picker.presets.${item.preset}`)
                                 : item.schedule
                                   ? t(`picker.schedules.${item.schedule}`)
                                   : item.form
                                     ? t("picker.websiteForm")
                                     : nodeTitle(t, item.type),
-                            description: item.preset
+                            description: item.appEvent
+                                ? t("picker.presetHint", { name: item.appEvent })
+                                : item.preset
                                 ? t("picker.presetHint", {
                                       name: catalog.EVENT_PRESETS[item.preset].name
                                   })
@@ -916,7 +933,7 @@ export function Palette({
                         }))
                     };
                 }),
-        [stepsOnly, triggersOnly, apps.join(","), appSteps, t]
+        [stepsOnly, triggersOnly, apps.join(","), appSteps, appEvents, t]
     );
     return (
         <AddBlockDialog

@@ -136,6 +136,37 @@ export async function eventApps(user: SessionUser): Promise<core.AppEventApp[]> 
     return answers.filter((app): app is core.AppEventApp => app !== null);
 }
 
+/** What the trigger menu needs of one event an installed app declares in its manifest. */
+export interface AppEventView {
+    /** `<app id>.<event>`: the name an "On event" trigger listens for. */
+    readonly name: string;
+    readonly app: string;
+    readonly appName: string;
+    readonly label: string;
+    /** Its payload fields, offered to later steps as `trigger.payload.<field>`. */
+    readonly fields: readonly string[];
+}
+
+/**
+ * The manifest events this account may build automations on, of the apps
+ * installed here: each behind the permission it declares - one of the app's
+ * own - so a trigger its runner could never receive is not offered.
+ */
+export async function appEventViews(
+    user: SessionUser,
+    installed: (app: string) => Promise<boolean> = isAppInstalled
+): Promise<AppEventView[]> {
+    const views = await Promise.all(
+        core.registeredAppEvents().map(async (event): Promise<AppEventView | null> => {
+            if (!event.permission) return null;
+            if (!(await installed(event.app).catch(() => false))) return null;
+            if (!(await sessionCan(user, event.permission as core.Permission).catch(() => false))) return null;
+            return { name: event.name, app: event.app, appName: event.appName, label: event.label, fields: event.fields };
+        })
+    );
+    return views.filter((view): view is AppEventView => view !== null);
+}
+
 /** What an app's own bundle says when it emits one of its declared events. */
 export interface OwnAppEvent {
     /** The app's id: the event must be one its manifest declared under it. */

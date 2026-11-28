@@ -9,6 +9,7 @@
 import Link from "next/link";
 import { took } from "../runs-view";
 import { AlarmEpisodeCard } from "./alarm-episode";
+import { rememberAppEvents, rememberAppSteps } from "../../app-step-words";
 import { JsonView } from "@/components/json-view";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
@@ -56,6 +57,11 @@ export function RunDetailView({ runId }: { runId: string }) {
         polls.run(runId)
     );
     const run = data?.run;
+    // The run's own app steps and events, named as their manifests word them.
+    if (data && "appWords" in data) {
+        rememberAppSteps(data.appWords.steps);
+        rememberAppEvents(data.appWords.events);
+    }
 
     // A run still going is refetched until it ends.
     const going = !!run && !core.runFinished(run.status);

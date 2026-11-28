@@ -39,6 +39,8 @@ export interface CatalogItem {
     readonly schedule?: SchedulePresetKey;
     /** Set on the website form: the webhook trigger as a form endpoint. */
     readonly form?: true;
+    /** Set on an event an installed app's manifest declares: its name, worded by the manifest. */
+    readonly appEvent?: string;
 }
 
 export interface CatalogGroup {
@@ -105,6 +107,9 @@ const schedule = (key: SchedulePresetKey): CatalogItem => ({
 /** The webhook trigger set up as a website form's endpoint. */
 export const WEBSITE_FORM_VALUE = "core.webhook#form";
 const websiteForm: CatalogItem = { value: WEBSITE_FORM_VALUE, type: "core.webhook", form: true };
+/** How an app's manifest names one of its events: `<app id>.<event>`. */
+const APP_EVENT_NAME = /^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,63}$/;
+const appEvent = (name: string): CatalogItem => ({ value: `core.onEvent#${name}`, type: "core.onEvent", appEvent: name });
 const preset = (key: PresetKey): CatalogItem => ({
     value: `core.onEvent#${key}`,
     type: "core.onEvent",
@@ -176,6 +181,8 @@ export function catalogGroups(options: {
     readonly apps: readonly string[];
     /** The steps installed apps declare in their manifests, offered under each app. */
     readonly appSteps?: readonly { readonly app: string; readonly type: string }[];
+    /** The events installed apps declare in their manifests, offered as triggers under each app. */
+    readonly appEvents?: readonly { readonly app: string; readonly name: string }[];
 }): CatalogGroup[] {
     const places = options.apps.includes(PLACES_APP);
     const crm = options.apps.includes(CRM_APP);
@@ -224,6 +231,8 @@ export function catalogGroups(options: {
         for (const app of core.APP_EVENT_APPS)
             if (options.apps.includes(app))
                 groups.push({ id: app, items: APP_EVENT_PRESETS[app].map(preset) });
+        // The events installed apps declare in their manifests, under each app.
+        for (const event of options.appEvents ?? []) groups.push({ id: event.app, items: [appEvent(event.name)] });
     }
     if (options.steps === false) return mergeSame(groups);
     groups.push(
@@ -297,8 +306,11 @@ export function pickedNode(
             config: preset.kind === "once" ? { kind: "once", at: nextWholeHour(now) } : structuredClone(preset)
         };
     }
+    if (type !== "core.onEvent") return null;
+    // An app's own event, by the name its manifest gives it.
+    if (APP_EVENT_NAME.test(key)) return { type, config: { name: key, outcomes: [] } };
     const config = Object.hasOwn(EVENT_PRESETS, key) ? EVENT_PRESETS[key as PresetKey] : null;
-    return type === "core.onEvent" && config ? { type, config: { ...config, outcomes: [] } } : null;
+    return config ? { type, config: { ...config, outcomes: [] } } : null;
 }
 
 /** `YYYY-MM-DDTHH:00` of the hour after `now`, on this device's clock. */
