@@ -24,7 +24,8 @@ import {
     DialogTitle,
     Input,
     Select,
-    Skeleton
+    Skeleton,
+    useResetOnOpen
 } from "@polaris/ui";
 import { usePlacesT } from "../use-places-t";
 import { hostUi } from "@polaris/app-host/client";
@@ -193,6 +194,12 @@ export function RoomsDialog({
     const [newFloor, setNewFloor] = useState("");
     const [newRoom, setNewRoom] = useState("");
     const [newRoomFloor, setNewRoomFloor] = useState("");
+    useResetOnOpen(open, () => {
+        setNewFloor("");
+        setNewRoom("");
+        setNewRoomFloor("");
+        setError(null);
+    });
     const [removing, setRemoving] = useState<Removing>(null);
     const [sharingRoom, setSharingRoom] = useState<RoomView | null>(null);
     const [busy, setBusy] = useState(false);
