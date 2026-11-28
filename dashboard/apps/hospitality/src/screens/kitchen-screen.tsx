@@ -126,7 +126,7 @@ export function KitchenScreen() {
                                         </li>
                                     ))}
                                 </ul>
-                                <Button className="m-2" size={mode === "basic" ? "lg" : "primary"} onClick={() => bump(ticket.lines.map((l) => l.id), true)}>
+                                <Button className="m-2" size={mode === "basic" ? "lg" : "md"} onClick={() => bump(ticket.lines.map((l) => l.id), true)}>
                                     <Check aria-hidden /> {t("kitchen.allReady")}
                                 </Button>
                             </article>

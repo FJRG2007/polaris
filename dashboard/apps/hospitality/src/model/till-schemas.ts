@@ -40,7 +40,9 @@ export const payInput = z.object({
                     amount: cents.min(1),
                     tip: cents.default(0),
                     /** Cash handed over; 0 for card. Never less than what it pays. */
-                    tendered: cents.default(0)
+                    tendered: cents.default(0),
+                    /** The lines it covers, when the bill is split by item. */
+                    lineIds: z.array(id).max(200).default([])
                 })
                 .refine((p) => p.method !== "cash" || p.tendered === 0 || p.tendered >= p.amount + p.tip, { path: ["tendered"] })
         )

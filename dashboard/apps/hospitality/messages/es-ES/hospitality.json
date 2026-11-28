@@ -154,13 +154,22 @@
             "void": "anulado"
         },
         "bill": "Cuenta",
-        "pay": "Cobrar"
+        "pay": "Cobrar",
+        "pick": "Elige {count}",
+        "upTo": "Hasta {count}",
+        "note": "Nota para cocina",
+        "add": "Poner",
+        "more": "Uno más",
+        "change": "Cambiar {name}",
+        "move": "Mover"
     },
     "orders": {
         "tableGone": "Esa mesa ya no está en la sala.",
         "gone": "Ese pedido ya no existe.",
         "closed": "Ese pedido ya está cerrado.",
-        "soldOut": "Hay algo agotado en él."
+        "soldOut": "Hay algo agotado en él.",
+        "modifiers": "Elige las opciones que necesita.",
+        "tableBusy": "Una mesa que quitaste tiene una cuenta abierta."
     },
     "kitchen": {
         "station": "Puesto",
@@ -210,17 +219,38 @@
             "cash": "Efectivo",
             "card": "Tarjeta",
             "other": "Otro"
-        }
+        },
+        "modes": {
+            "whole": "Todo",
+            "items": "Por plato",
+            "even": "A partes"
+        },
+        "tip": "Bote",
+        "noTip": "Nada",
+        "fewer": "Menos gente",
+        "more": "Más gente",
+        "parts": "{count} personas, {amount} cada una",
+        "short": "Faltan {amount} para el total",
+        "pickItems": "Toca lo que paga esta persona."
     },
     "discount": {
         "title": "Descuento",
         "reason": "Motivo",
         "remove": "Quitar",
-        "apply": "Aplicar"
+        "apply": "Aplicar",
+        "line": "Descuento en {name}"
     },
     "offline": {
         "queued": "Sin red: guardado aquí, se enviará",
         "waiting": "{count} en espera",
         "waitingHint": "Guardado en este aparato; sale en cuanto vuelva la red"
+    },
+    "move": {
+        "title": "Pasar a otra mesa",
+        "whole": "Toda",
+        "some": "Algunos",
+        "joins": "{table} está abierta: se suman a su cuenta.",
+        "confirm": "Mover",
+        "done": "Pasado a {table}"
     }
 }

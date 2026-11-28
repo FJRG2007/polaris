@@ -161,6 +161,7 @@ export async function pay(input: PayInput, actor: { id: string; name: string }):
                 amount: p.amount,
                 tip: p.tip,
                 tendered: p.tendered,
+                lineIds: p.lineIds,
                 byId: actor.id,
                 byName: actor.name
             })),

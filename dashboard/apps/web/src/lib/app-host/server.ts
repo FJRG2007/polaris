@@ -632,6 +632,7 @@ export const serverHost = {
     storageTarget: {
         driverForTarget: later(load.storageTarget, "driverForTarget"),
         placeFile: later(load.storageTarget, "placeFile"),
+        resolveTargetChoice: later(load.storageTarget, "resolveTargetChoice"),
         safeName: later(load.storageTarget, "safeName"),
         storageTargetOptions: later(load.storageTarget, "storageTargetOptions")
     },

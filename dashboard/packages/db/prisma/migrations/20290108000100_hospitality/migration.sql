@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS "HospitalityPayment" (
     "amount" INTEGER NOT NULL,
     "tip" INTEGER NOT NULL DEFAULT 0,
     "tendered" INTEGER NOT NULL DEFAULT 0,
+    "lineIds" UUID[] DEFAULT ARRAY[]::UUID[],
     "byId" UUID,
     "byName" TEXT NOT NULL DEFAULT '',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

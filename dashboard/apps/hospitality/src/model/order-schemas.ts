@@ -45,6 +45,18 @@ export const lineOnly = z.object({ lineId: id });
 
 export const moveInput = z.object({ orderId: id, tableId: id });
 
+export const splitInput = z.object({
+    orderId: id,
+    tableId: id,
+    /** Used only when the table has no order yet. */
+    targetOrderId: id,
+    lines: z
+        .array(z.object({ lineId: id, quantity: z.number().int().min(1).max(999), newLineId: id }))
+        .min(1)
+        .max(200)
+});
+export type SplitInput = z.infer<typeof splitInput>;
+
 export const floorInput = z.object({
     venueId: id,
     roomId: id.nullable(),

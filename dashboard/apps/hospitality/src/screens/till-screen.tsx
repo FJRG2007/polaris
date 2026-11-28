@@ -15,9 +15,10 @@ import { useHospitalityLive } from "./live-client";
 import { readMenuAction } from "../actions/catalog";
 import type { closeShift, xReport } from "../lib/till";
 import { useCallback, useEffect, useState } from "react";
-import { changeDue, quickTenders } from "../model/pricing";
+import type { OrderView } from "../lib/orders";
+import { changeDue, itemsDue, lineTotal, quickTenders, splitEvenly } from "../model/pricing";
 import { readCache, unwrap, useHospitalityT } from "./i18n";
-import { Banknote, CreditCard, Percent } from "lucide-react";
+import { Banknote, CreditCard, Minus, Percent, Plus } from "lucide-react";
 import { closeShiftAction, moveCashAction, openShiftAction, payAction, readTillAction, setDiscountAction } from "../actions/till";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, EmptyState, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
 
@@ -165,59 +166,150 @@ function Report({ report, money, hideExpected }: { report: NonNullable<Till>["re
     );
 }
 
-/** Taking payment: cash with one-tap amounts and the change, card, or both. */
-export function PayDialog(props: { orderId: string; due: number; currency: string; onClose: () => void; onPaid: (ticketNo: string | null) => void }) {
+/** Suggested tips, as percentages of what is being paid. */
+const TIP_PERCENTS = [5, 10] as const;
+
+type PayMode = "whole" | "items" | "even";
+
+/**
+ * Taking payment: the whole bill, some items (split by item) or one equal
+ * part; a tip on top; then cash with one-tap amounts and the change, or card.
+ */
+export function PayDialog(props: { order: OrderView; currency: string; onClose: () => void; onPaid: (ticketNo: string | null) => void; }) {
     const t = useHospitalityT();
     const toast = useToast();
     const money = useMoney(props.currency);
+    const left = Math.max(0, props.order.totals.total - props.order.paid);
+    const live = props.order.lines.filter((l) => l.status !== "void");
+    const open = live.filter((l) => !props.order.paidLineIds.includes(l.id));
+    const [mode, setMode] = useState<PayMode>("whole");
+    const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
+    const [parts, setParts] = useState(2);
+    const [tipPercent, setTipPercent] = useState<number | null>(null);
+    const [tipTyped, setTipTyped] = useState("");
     const [tendered, setTendered] = useState("");
     const [pending, setPending] = useState(false);
+    const due = Math.min(
+        left,
+        mode === "items" ? itemsDue(live, props.order.totals.total, chosen) : mode === "even" ? (splitEvenly(left, parts)[0] ?? 0) : left
+    );
+    const tip = tipPercent !== null ? Math.round((due * tipPercent) / 100) : (parsePrice(tipTyped) ?? 0);
+    const total = due + tip;
     const typed = parsePrice(tendered);
-    const pay = (method: "cash" | "card", amount: number, handed: number) => {
-        if (pending) return;
+    const pay = (method: "cash" | "card", handed: number) => {
+        if (pending || due <= 0) return;
         setPending(true);
-        unwrap(() => payAction({ orderId: props.orderId, payments: [{ id: crypto.randomUUID(), method, amount, tendered: handed }] }), t("errors.saveFailed"))
+        const lineIds = mode === "items" ? [...chosen] : [];
+        unwrap(() => payAction({ orderId: props.order.id, payments: [{ id: crypto.randomUUID(), method, amount: due, tip, tendered: handed, lineIds }] }), t("errors.saveFailed"))
             .then((answer) => {
-                if (method === "cash" && handed > amount) toast.show({ title: t("pay.change", { amount: money(changeDue(amount, handed)) }) });
+                if (method === "cash" && handed > total) toast.show({ title: t("pay.change", { amount: money(changeDue(total, handed)) }) });
                 if (answer.closed) props.onPaid(answer.ticketNo);
                 else props.onClose();
             })
             .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }))
             .finally(() => setPending(false));
     };
+    const toggle = (id: string) =>
+        setChosen((all) => {
+            const next = new Set(all);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
     return (
-        <Dialog open onOpenChange={(open) => !open && props.onClose()}>
+        <Dialog open onOpenChange={(isOpen) => !isOpen && props.onClose()}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{t("pay.title", { amount: money(props.due) })}</DialogTitle>
+                    <DialogTitle>{t("pay.title", { amount: money(total) })}</DialogTitle>
                 </DialogHeader>
-                <div className="flex flex-col gap-3">
-                    <div className="grid grid-cols-2 gap-2">
-                        {quickTenders(props.due).map((amount) => (
-                            <Button key={amount} size="lg" variant="outline" disabled={pending} onClick={() => pay("cash", props.due, amount)}>
-                                <Banknote aria-hidden /> {money(amount)}
+                <div className="flex max-h-[75dvh] flex-col gap-3 overflow-y-auto">
+                    <div className="grid grid-cols-3 gap-1.5">
+                        {(["whole", "items", "even"] as const).map((m) => (
+                            <Button key={m} size="sm" variant={mode === m ? "primary" : "outline"} aria-pressed={mode === m} onClick={() => setMode(m)}>
+                                <span className="truncate">{t(`pay.modes.${m}`)}</span>
                             </Button>
                         ))}
                     </div>
-                    <div className="flex gap-2">
-                        <Input inputMode="decimal" value={tendered} onChange={(e) => setTendered(e.target.value)} placeholder={t("pay.handed")} aria-label={t("pay.handed")} />
-                        <Button disabled={pending || typed === null || typed <= 0} onClick={() => typed !== null && pay("cash", Math.min(typed, props.due), typed)}>
-                            {t("pay.methods.cash")}
+                    {mode === "items" ? (
+                        <ul className="flex flex-col gap-1">
+                            {open.map((l) => (
+                                <li key={l.id}>
+                                    <button
+                                        type="button"
+                                        aria-pressed={chosen.has(l.id)}
+                                        onClick={() => toggle(l.id)}
+                                        className={cn("flex w-full min-w-0 items-center gap-2 rounded-md border px-2 py-1.5 text-start text-sm", chosen.has(l.id) && "border-primary bg-primary/10")}
+                                    >
+                                        <span className="w-6 shrink-0 text-end tabular-nums">{l.quantity}</span>
+                                        <span className="min-w-0 flex-1 truncate" title={l.name}>{l.name}</span>
+                                        <span className="shrink-0 tabular-nums">{money(lineTotal(l))}</span>
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
+                    {mode === "even" ? (
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" size="icon" aria-label={t("pay.fewer")} disabled={parts <= 2} onClick={() => setParts(parts - 1)}>
+                                <Minus aria-hidden />
+                            </Button>
+                            <span className="min-w-0 flex-1 truncate text-center">{t("pay.parts", { count: parts, amount: money(due) })}</span>
+                            <Button variant="outline" size="icon" aria-label={t("pay.more")} disabled={parts >= 50} onClick={() => setParts(parts + 1)}>
+                                <Plus aria-hidden />
+                            </Button>
+                        </div>
+                    ) : null}
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="me-1 text-sm text-muted-foreground">{t("pay.tip")}</span>
+                        <Button size="sm" variant={tipPercent === null && !tipTyped ? "primary" : "outline"} onClick={() => { setTipPercent(null); setTipTyped(""); }}>
+                            {t("pay.noTip")}
                         </Button>
+                        {TIP_PERCENTS.map((p) => (
+                            <Button key={p} size="sm" variant={tipPercent === p ? "primary" : "outline"} onClick={() => { setTipPercent(p); setTipTyped(""); }}>
+                                {p} %
+                            </Button>
+                        ))}
+                        <Input
+                            className="w-24"
+                            inputMode="decimal"
+                            value={tipTyped}
+                            onChange={(e) => { setTipTyped(e.target.value); setTipPercent(null); }}
+                            placeholder="0,00"
+                            aria-label={t("pay.tip")}
+                        />
                     </div>
-                    {typed !== null && typed > props.due ? <p className="text-lg font-semibold">{t("pay.change", { amount: money(changeDue(props.due, typed)) })}</p> : null}
-                    {typed !== null && typed < props.due && typed > 0 ? <p className="text-sm text-muted-foreground">{t("pay.partial", { amount: money(props.due - typed) })}</p> : null}
-                    <Button size="lg" disabled={pending} onClick={() => pay("card", props.due, 0)}>
-                        <CreditCard aria-hidden /> {t("pay.card", { amount: money(props.due) })}
-                    </Button>
+                    {due > 0 ? (
+                        <>
+                            <div className="grid grid-cols-2 gap-2">
+                                {quickTenders(total).map((amount) => (
+                                    <Button key={amount} size="lg" variant="outline" disabled={pending} onClick={() => pay("cash", amount)}>
+                                        <Banknote aria-hidden /> {money(amount)}
+                                    </Button>
+                                ))}
+                            </div>
+                            <div className="flex gap-2">
+                                <Input inputMode="decimal" value={tendered} onChange={(e) => setTendered(e.target.value)} placeholder={t("pay.handed")} aria-label={t("pay.handed")} />
+                                <Button disabled={pending || typed === null || typed < total} onClick={() => typed !== null && pay("cash", typed)}>
+                                    {t("pay.methods.cash")}
+                                </Button>
+                            </div>
+                            {typed !== null && typed > total ? <p className="text-lg font-semibold">{t("pay.change", { amount: money(changeDue(total, typed)) })}</p> : null}
+                            {typed !== null && typed < total && typed > 0 ? <p className="text-sm text-muted-foreground">{t("pay.short", { amount: money(total - typed) })}</p> : null}
+                            <Button size="lg" disabled={pending} onClick={() => pay("card", 0)}>
+                                <CreditCard aria-hidden /> {t("pay.card", { amount: money(total) })}
+                            </Button>
+                            {due < left ? <p className="text-sm text-muted-foreground">{t("pay.partial", { amount: money(left - due) })}</p> : null}
+                        </>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">{t("pay.pickItems")}</p>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>
     );
 }
-
-/** A discount on the whole order, with a reason; Remove takes it off. */
-export function DiscountDialog(props: { orderId: string; onClose: () => void; onSaved: () => void }) {
+/** A discount on the whole order or on one line, with a reason; Remove takes it off. */
+export function DiscountDialog(props: { orderId: string; lineId?: string; lineName?: string; onClose: () => void; onSaved: () => void }) {
     const t = useHospitalityT();
     const toast = useToast();
     const [kind, setKind] = useState<"percent" | "amount">("percent");
@@ -226,14 +318,14 @@ export function DiscountDialog(props: { orderId: string; onClose: () => void; on
     const n = kind === "percent" ? Math.round(Number(value.replace(",", ".")) * 100) : parsePrice(value);
     const ok = n !== null && Number.isFinite(n) && n > 0 && (kind === "amount" || n <= 10_000);
     const save = (discount: { kind: "percent" | "amount"; value: number; reason: string } | null) =>
-        unwrap(() => setDiscountAction({ orderId: props.orderId, discount }), t("errors.saveFailed"))
+        unwrap(() => setDiscountAction({ orderId: props.orderId, lineId: props.lineId ?? null, discount }), t("errors.saveFailed"))
             .then(() => { props.onSaved(); props.onClose(); })
             .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }));
     return (
         <Dialog open onOpenChange={(open) => !open && props.onClose()}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{t("discount.title")}</DialogTitle>
+                    <DialogTitle className="truncate">{props.lineName ? t("discount.line", { name: props.lineName }) : t("discount.title")}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <div className="flex gap-2">

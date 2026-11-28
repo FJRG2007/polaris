@@ -154,13 +154,22 @@
             "void": "void"
         },
         "bill": "Bill",
-        "pay": "Pay"
+        "pay": "Pay",
+        "pick": "Pick {count}",
+        "upTo": "Up to {count}",
+        "note": "Note for the kitchen",
+        "add": "Add",
+        "more": "One more",
+        "change": "Change {name}",
+        "move": "Move"
     },
     "orders": {
         "tableGone": "That table is no longer on the floor.",
         "gone": "That order is no longer there.",
         "closed": "That order is already closed.",
-        "soldOut": "Something on it is sold out."
+        "soldOut": "Something on it is sold out.",
+        "modifiers": "Pick the options this one needs.",
+        "tableBusy": "A table you removed still has an open order."
     },
     "kitchen": {
         "station": "Station",
@@ -210,17 +219,38 @@
             "cash": "In cash",
             "card": "Card",
             "other": "Other"
-        }
+        },
+        "modes": {
+            "whole": "All",
+            "items": "By item",
+            "even": "Equal parts"
+        },
+        "tip": "Tip",
+        "noTip": "None",
+        "fewer": "Fewer people",
+        "more": "More people",
+        "parts": "{count} people, {amount} each",
+        "short": "{amount} short of the total",
+        "pickItems": "Tap what this person is paying for."
     },
     "discount": {
         "title": "Discount",
         "reason": "Reason",
         "remove": "Remove",
-        "apply": "Apply"
+        "apply": "Apply",
+        "line": "Discount on {name}"
     },
     "offline": {
         "queued": "No network: saved on this device, it will be sent",
         "waiting": "{count} waiting",
         "waitingHint": "Saved on this device; sent as soon as the network is back"
+    },
+    "move": {
+        "title": "Move to another table",
+        "whole": "All of it",
+        "some": "Some items",
+        "joins": "{table} is open: these join its order.",
+        "confirm": "Move",
+        "done": "Moved to {table}"
     }
 }

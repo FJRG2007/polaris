@@ -7,7 +7,7 @@
 
 import * as orders from "../lib/orders";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
-import { addLinesInput, floorInput, lineOnly, moveInput, openOrderInput, sendInput, venueOnly } from "../model/order-schemas";
+import { addLinesInput, floorInput, lineOnly, moveInput, openOrderInput, sendInput, splitInput, venueOnly } from "../model/order-schemas";
 
 export async function readServiceAction(raw: unknown): Promise<Outcome<{ service: orders.ServiceView }>> {
     const input = venueOnly.safeParse(raw);
@@ -47,6 +47,12 @@ export async function moveOrderAction(raw: unknown): Promise<Outcome<{ id: strin
     return outcome("hospitality.use", async (user) => ({
         id: await orders.moveOrder(input.data.orderId, input.data.tableId, user.id)
     }));
+}
+
+export async function splitOrderAction(raw: unknown): Promise<Outcome<{ id: string }>> {
+    const input = splitInput.safeParse(raw);
+    if (!input.success) return invalid();
+    return outcome("hospitality.use", async (user) => ({ id: await orders.splitOrder(input.data, user) }));
 }
 
 export async function saveFloorAction(raw: unknown): Promise<Outcome<{ id: string }>> {

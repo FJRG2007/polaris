@@ -184,7 +184,7 @@ export async function bulkPrice(input: BulkPriceInput, actorId: string): Promise
     });
     const changes = products
         .map((p) => ({ id: p.id, price: changedPrice(p.price, input) }))
-        .filter((p, i) => p.price !== products[i].price);
+        .filter((p, i) => p.price !== products[i]?.price);
     await prisma.$transaction(
         changes.map((c) => prisma.hospitalityProduct.update({ where: { id: c.id }, data: { price: c.price } }))
     );

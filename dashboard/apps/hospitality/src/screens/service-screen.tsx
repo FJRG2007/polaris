@@ -13,16 +13,18 @@
 
 import { useMoney } from "./menu-screen";
 import { DiscountDialog, PayDialog } from "./till-screen";
+import { LineDialog, MoveDialog } from "./order-dialogs";
+import { chooseModifiers } from "../model/modifiers";
 import { markBilledAction } from "../actions/till";
-import { orderTotals } from "../model/pricing";
+import { lineTotal, orderTotals } from "../model/pricing";
 import { TABLE_SHAPES } from "../model/order-schemas";
 import { readMenuAction } from "../actions/catalog";
 import type { MenuView, ProductView } from "../lib/catalog";
 import { useHospitalityLive, useHospitalityMode } from "./live-client";
 import { readCache, unwrap, useHospitalityT, writeCache } from "./i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Euro, Minus, Move, Percent, Plus, Receipt, Save, Send, Trash2 } from "lucide-react";
-import type { OrderView, RoomView, ServiceView, TableView } from "../lib/orders";
+import { ArrowLeft, ArrowRightLeft, Euro, Minus, Move, Percent, Plus, Receipt, Save, Send, Trash2 } from "lucide-react";
+import type { LineView, OrderView, RoomView, ServiceView, TableView } from "../lib/orders";
 import { Button, EmptyState, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
 import { readServiceAction, removeLineAction, saveFloorAction } from "../actions/orders";
 import { useOfflineQueue } from "./offline";
@@ -31,7 +33,7 @@ const COURSES = ["0", "1", "2", "3"] as const;
 const LINE_STATUSES = ["pending", "sent", "ready", "served", "void"] as const;
 
 function courseKey(course: number): (typeof COURSES)[number] {
-    return COURSES[Math.min(Math.max(course, 0), 3)];
+    return COURSES[Math.min(Math.max(course, 0), 3)] ?? "0";
 }
 
 function lineStatus(status: string): (typeof LINE_STATUSES)[number] {
@@ -86,7 +88,8 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
 
     const room = service?.rooms.find((r) => r.id === roomId) ?? service?.rooms[0] ?? null;
     const byTable = useMemo(() => new Map((service?.orders ?? []).map((o) => [o.tableId, o])), [service]);
-    const table = room?.tables.find((x) => x.id === tableId) ?? null;
+    const table = service?.rooms.flatMap((r) => r.tables).find((x) => x.id === tableId) ?? null;
+    const busy = useMemo(() => new Set((service?.orders ?? []).flatMap((o) => (o.tableId ? [o.tableId] : []))), [service]);
 
     if (!menu || !service) {
         return (
@@ -102,7 +105,7 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
             <section className={cn("min-h-0 min-w-0 flex-1 flex-col overflow-auto p-3", table ? "hidden md:flex" : "flex")}>
                 <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
                     {service.rooms.map((r) => (
-                        <Button key={r.id} variant={r.id === room.id ? "primary" : "outline"} size={basic ? "lg" : "primary"} onClick={() => setRoomId(r.id)}>
+                        <Button key={r.id} variant={r.id === room.id ? "primary" : "outline"} size={basic ? "lg" : "md"} onClick={() => setRoomId(r.id)}>
                             <span className="max-w-40 truncate" title={r.name}>{r.name}</span>
                         </Button>
                     ))}
@@ -127,6 +130,9 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
                     menu={menu}
                     basic={basic}
                     manager={manager}
+                    rooms={service.rooms}
+                    busy={busy}
+                    onMoved={(id) => { setTableId(id); load(); }}
                     onClose={() => setTableId(null)}
                     onChanged={load}
                 />
@@ -288,6 +294,14 @@ interface Draft {
     readonly product: ProductView;
     quantity: number;
     course: number;
+    modifierIds: string[];
+    note: string;
+}
+
+/** A draft's options priced from its product, as the server will price them. */
+function draftModifiers(d: Draft) {
+    const choice = chooseModifiers(d.product.modifiers, d.modifierIds);
+    return choice.ok ? choice.modifiers : [];
 }
 
 function OrderPanel(props: {
@@ -297,6 +311,9 @@ function OrderPanel(props: {
     menu: MenuView;
     basic: boolean;
     manager: boolean;
+    rooms: RoomView[];
+    busy: ReadonlySet<string>;
+    onMoved: (tableId: string) => void;
     onClose: () => void;
     onChanged: () => void;
 }) {
@@ -309,20 +326,24 @@ function OrderPanel(props: {
     const [course, setCourse] = useState(0);
     const [sending, setSending] = useState(false);
     const [paying, setPaying] = useState(false);
-    const [discounting, setDiscounting] = useState(false);
+    const [discounting, setDiscounting] = useState<LineView | "order" | null>(null);
+    const [moving, setMoving] = useState(false);
+    /** The product whose options are being picked, and the draft it edits (null: a new one). */
+    const [picking, setPicking] = useState<{ product: ProductView; draft: Draft | null } | null>(null);
     const products = props.menu.products.filter((p) => p.categoryId === category);
     const sent = props.order?.lines.filter((l) => l.status !== "void") ?? [];
     const preview = orderTotals([
         ...sent,
-        ...drafts.map((d) => ({ unitPrice: d.product.price, quantity: d.quantity, taxRateBp: d.product.taxRateBp }))
+        ...drafts.map((d) => ({ unitPrice: d.product.price, quantity: d.quantity, taxRateBp: d.product.taxRateBp, modifiers: draftModifiers(d) }))
     ], props.order?.discount);
 
     const add = (product: ProductView) => {
         if (!product.available) return;
+        if (product.modifiers.length > 0) return setPicking({ product, draft: null });
         setDrafts((all) => {
-            const same = all.find((d) => d.product.id === product.id && d.course === course);
+            const same = all.find((d) => d.product.id === product.id && d.course === course && d.modifierIds.length === 0 && !d.note);
             if (same) return all.map((d) => (d === same ? { ...d, quantity: d.quantity + 1 } : d));
-            return [...all, { id: crypto.randomUUID(), product, quantity: 1, course }];
+            return [...all, { id: crypto.randomUUID(), product, quantity: 1, course, modifierIds: [], note: "" }];
         });
     };
 
@@ -345,9 +366,9 @@ function OrderPanel(props: {
                     : [{ id: `open:${orderId}`, kind: "open", payload: { id: orderId, venueId: props.venueId, tableId: props.table.id, covers: props.table.seats } }]),
                 ...(drafts.length
                     ? [{
-                          id: `add:${drafts[0].id}`,
+                          id: `add:${drafts[0]?.id ?? orderId}`,
                           kind: "add",
-                          payload: { orderId, lines: drafts.map((d) => ({ id: d.id, productId: d.product.id, quantity: d.quantity, course: d.course })) }
+                          payload: { orderId, lines: drafts.map((d) => ({ id: d.id, productId: d.product.id, quantity: d.quantity, course: d.course, modifierIds: d.modifierIds, note: d.note })) }
                       }]
                     : []),
                 { id: `send:${crypto.randomUUID()}`, kind: "send", payload: { orderId, course: null } }
@@ -412,9 +433,14 @@ function OrderPanel(props: {
                 {sent.map((l) => (
                     <div key={l.id} className="flex min-w-0 items-center gap-2 py-1 text-sm">
                         <span className="w-6 shrink-0 text-end tabular-nums">{l.quantity}</span>
-                        <span className="min-w-0 flex-1 truncate" title={l.name}>{l.name}</span>
+                        <LineName name={l.name} extras={[...l.modifiers.map((m) => m.name), l.note]} />
                         <span className="shrink-0 text-xs text-muted-foreground">{t(`order.status.${lineStatus(l.status)}`)}</span>
-                        <span className="w-16 shrink-0 text-end tabular-nums">{money(l.unitPrice * l.quantity)}</span>
+                        <span className={cn("w-16 shrink-0 text-end tabular-nums", l.discount && "text-emerald-700 dark:text-emerald-400")}>{money(lineTotal(l))}</span>
+                        {props.manager ? (
+                            <Button variant="ghost" size="icon" aria-label={t("discount.line", { name: l.name })} onClick={() => setDiscounting(l)}>
+                                <Percent aria-hidden />
+                            </Button>
+                        ) : null}
                         <Button variant="ghost" size="icon" aria-label={t("order.remove")} onClick={() => remove(l.id)}>
                             <Trash2 aria-hidden />
                         </Button>
@@ -426,9 +452,11 @@ function OrderPanel(props: {
                             <Minus aria-hidden />
                         </Button>
                         <span className="w-6 shrink-0 text-end tabular-nums">{d.quantity}</span>
-                        <span className="min-w-0 flex-1 truncate" title={d.product.name}>{d.product.name}</span>
+                        <button type="button" className="flex min-w-0 flex-1 text-start" aria-label={t("order.change", { name: d.product.name })} onClick={() => setPicking({ product: d.product, draft: d })}>
+                            <LineName name={d.product.name} extras={[...draftModifiers(d).map((m) => m.name), d.note]} />
+                        </button>
                         <span className="shrink-0 text-xs">{t(`order.courses.${courseKey(d.course)}`)}</span>
-                        <span className="w-16 shrink-0 text-end tabular-nums">{money(d.product.price * d.quantity)}</span>
+                        <span className="w-16 shrink-0 text-end tabular-nums">{money(lineTotal({ unitPrice: d.product.price, quantity: d.quantity, taxRateBp: d.product.taxRateBp, modifiers: draftModifiers(d) }))}</span>
                     </div>
                 ))}
             </div>
@@ -442,7 +470,7 @@ function OrderPanel(props: {
                 {props.order ? (
                     <>
                         {props.manager ? (
-                            <Button variant="ghost" size="icon" aria-label={t("discount.title")} onClick={() => setDiscounting(true)}>
+                            <Button variant="ghost" size="icon" aria-label={t("discount.title")} onClick={() => setDiscounting("order")}>
                                 <Percent aria-hidden />
                             </Button>
                         ) : null}
@@ -458,6 +486,9 @@ function OrderPanel(props: {
                         >
                             <Receipt aria-hidden /> {t("order.bill")}
                         </Button>
+                        <Button variant="ghost" size="icon" aria-label={t("order.move")} disabled={drafts.length > 0} onClick={() => setMoving(true)}>
+                            <ArrowRightLeft aria-hidden />
+                        </Button>
                         <Button variant="outline" size="lg" disabled={drafts.length > 0} onClick={() => setPaying(true)}>
                             <Euro aria-hidden /> {t("order.pay")}
                         </Button>
@@ -469,8 +500,7 @@ function OrderPanel(props: {
             </footer>
             {paying && props.order ? (
                 <PayDialog
-                    orderId={props.order.id}
-                    due={Math.max(0, props.order.totals.total - props.order.paid)}
+                    order={props.order}
                     currency={venue?.currency ?? "EUR"}
                     onClose={() => { setPaying(false); props.onChanged(); }}
                     onPaid={(ticketNo) => {
@@ -482,8 +512,53 @@ function OrderPanel(props: {
                 />
             ) : null}
             {discounting && props.order ? (
-                <DiscountDialog orderId={props.order.id} onClose={() => setDiscounting(false)} onSaved={props.onChanged} />
+                <DiscountDialog
+                    orderId={props.order.id}
+                    lineId={discounting === "order" ? undefined : discounting.id}
+                    lineName={discounting === "order" ? undefined : discounting.name}
+                    onClose={() => setDiscounting(null)}
+                    onSaved={props.onChanged}
+                />
+            ) : null}
+            {moving && props.order ? (
+                <MoveDialog
+                    order={props.order}
+                    fromTableId={props.table.id}
+                    rooms={props.rooms}
+                    busy={props.busy}
+                    onClose={() => setMoving(false)}
+                    onMoved={(id) => { setMoving(false); props.onMoved(id); }}
+                />
+            ) : null}
+            {picking ? (
+                <LineDialog
+                    product={picking.product}
+                    modifierIds={picking.draft?.modifierIds ?? []}
+                    note={picking.draft?.note ?? ""}
+                    money={money}
+                    onClose={() => setPicking(null)}
+                    onConfirm={(modifierIds, note) => {
+                        const editing = picking.draft;
+                        setDrafts((all) =>
+                            editing
+                                ? all.map((d) => (d.id === editing.id ? { ...d, modifierIds, note } : d))
+                                : [...all, { id: crypto.randomUUID(), product: picking.product, quantity: 1, course, modifierIds, note }]
+                        );
+                        setPicking(null);
+                    }}
+                />
             ) : null}
         </section>
+    );
+}
+
+/** A line's name with its options and note in small print under it. */
+function LineName({ name, extras }: { name: string; extras: string[] }) {
+    const detail = extras.filter(Boolean).join(" · ");
+    return (
+        <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate" title={name}>{name}</span>
+            {detail ? <span className="truncate text-xs text-muted-foreground" title={detail}>{detail}</span> : null}
+        </span>
     );
 }

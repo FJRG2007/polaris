@@ -20012,6 +20012,8 @@ model HospitalityPayment {
     tip       Int      @default(0)
     // What the customer handed over (cash), to print the change.
     tendered  Int      @default(0)
+    // The lines this payment covered when the bill was split by item.
+    lineIds   String[] @default([]) @db.Uuid
     byId      String?  @db.Uuid
     byName    String   @default("")
     createdAt DateTime @default(now())

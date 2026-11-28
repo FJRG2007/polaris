@@ -76,13 +76,23 @@ export function allocate(total: number, weights: readonly number[]): number[] {
         .sort((a, b) => b.rest - a.rest || a.i - b.i);
     for (const { i } of order) {
         if (left <= 0) break;
-        floors[i] += 1;
+        floors[i] = (floors[i] ?? 0) + 1;
         left -= 1;
     }
     return floors;
 }
 
 /** `total` cents into `parts` even shares; the first shares carry the odd cents. */
+/**
+ * What the chosen lines owe of an order's total: the total (after the order's
+ * discount) shared over every line by its own total, then summed for the chosen
+ * ones. Paying every line one by one adds back up to the total to the cent.
+ */
+export function itemsDue(lines: ReadonlyArray<PricedLine & { readonly id: string }>, total: number, chosen: ReadonlySet<string>): number {
+    const shares = allocate(total, lines.map((l) => lineTotal(l)));
+    return lines.reduce((sum, line, i) => sum + (chosen.has(line.id) ? (shares[i] ?? 0) : 0), 0);
+}
+
 export function splitEvenly(total: number, parts: number): number[] {
     const n = Math.max(1, Math.floor(parts));
     return allocate(total, Array.from({ length: n }, () => 1));
@@ -123,7 +133,7 @@ export function orderTotals(lines: readonly PricedLine[], discount?: Discount | 
     const off = allocate(orderDiscount, totals);
     const byRate = new Map<number, number>();
     live.forEach((line, i) => {
-        byRate.set(line.taxRateBp, (byRate.get(line.taxRateBp) ?? 0) + totals[i] - off[i]);
+        byRate.set(line.taxRateBp, (byRate.get(line.taxRateBp) ?? 0) + (totals[i] ?? 0) - (off[i] ?? 0));
     });
     const taxes = [...byRate.entries()]
         .filter(([, amount]) => amount !== 0)

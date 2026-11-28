@@ -12,10 +12,12 @@
  */
 
 import { z } from "zod";
-import { prisma } from "@polaris/db";
+import { chooseModifiers } from "../model/modifiers";
+import { modifierGroupSchema } from "../model/schemas";
+import { Prisma, prisma } from "@polaris/db";
 import { HospitalityRefusal } from "./outcome";
 import { publishHospitalityChange } from "./live";
-import type { AddLinesInput, FloorInput, OpenOrderInput } from "../model/order-schemas";
+import type { AddLinesInput, FloorInput, OpenOrderInput, SplitInput } from "../model/order-schemas";
 import { orderTotals, type Discount, type OrderTotals, type PricedModifier } from "../model/pricing";
 
 export interface TableView {
@@ -66,6 +68,8 @@ export interface OrderView {
     readonly lines: LineView[];
     readonly totals: OrderTotals;
     readonly paid: number;
+    /** Lines already paid for by item, so a split shows only what is left. */
+    readonly paidLineIds: string[];
 }
 
 export interface ServiceView {
@@ -103,7 +107,7 @@ export async function readService(venueId: string): Promise<ServiceView> {
             orderBy: { openedAt: "asc" },
             include: {
                 lines: { orderBy: { createdAt: "asc" } },
-                payments: { select: { amount: true } }
+                payments: { select: { amount: true, lineIds: true } }
             },
             take: 500
         })
@@ -154,7 +158,8 @@ export async function readService(venueId: string): Promise<ServiceView> {
                 discount,
                 lines,
                 totals: orderTotals(lines, discount),
-                paid: order.payments.reduce((sum, p) => sum + p.amount, 0)
+                paid: order.payments.reduce((sum, p) => sum + p.amount, 0),
+                paidLineIds: order.payments.flatMap((p) => p.lineIds)
             };
         })
     };
@@ -235,15 +240,12 @@ export async function addLines(input: AddLinesInput, actor: { id: string; name: 
         const p = product.get(line.productId);
         const o = own.get(line.productId);
         if (!p || !p.available || o?.available === false) throw new HospitalityRefusal("orders.soldOut");
-        // The price of each chosen option comes from the product, never from the device.
-        const groups = z
-            .array(z.object({ options: z.array(z.object({ id: z.string(), name: z.string(), price: z.number().int() })) }))
-            .safeParse(p.modifiers ?? []);
-        const options = new Map((groups.success ? groups.data : []).flatMap((g) => g.options).map((opt) => [opt.id, opt]));
-        const modifiers = line.modifierIds.flatMap((id) => {
-            const opt = options.get(id);
-            return opt ? [{ name: opt.name, price: opt.price }] : [];
-        });
+        // The price of each chosen option comes from the product, never from the device,
+        // and a line missing a required choice (or with too many) is refused.
+        const groups = z.array(modifierGroupSchema).safeParse(p.modifiers ?? []);
+        const choice = chooseModifiers(groups.success ? groups.data : [], line.modifierIds);
+        if (!choice.ok) throw new HospitalityRefusal("orders.modifiers");
+        const modifiers = choice.modifiers;
         return {
             id: line.id,
             orderId: order.id,
@@ -304,12 +306,70 @@ export async function moveOrder(orderId: string, tableId: string, actorId: strin
     return target?.id ?? orderId;
 }
 
+/**
+ * Splits a table: the chosen quantities of the chosen lines go to another
+ * table - onto the order already there, or a new one with the id the device
+ * made. Part of a line (two of three beers) leaves as a new line with the id
+ * the device made, so a replay finds it stored and moves nothing twice.
+ */
+export async function splitOrder(input: SplitInput, actor: { id: string; name: string }): Promise<string> {
+    const order = await liveOrder(input.orderId);
+    const table = await prisma.hospitalityTable.findFirst({ where: { id: input.tableId, room: { venueId: order.venueId } }, select: { id: true } });
+    if (!table) throw new HospitalityRefusal("orders.tableGone");
+    const already = await prisma.hospitalityOrderLine.findMany({ where: { id: { in: input.lines.map((l) => l.newLineId) } }, select: { orderId: true } });
+    if (already[0]) return already[0].orderId;
+    const existing = await prisma.hospitalityOrder.findFirst({
+        where: { tableId: input.tableId, status: { in: LIVE }, id: { not: order.id } },
+        select: { id: true }
+    });
+    const lines = await prisma.hospitalityOrderLine.findMany({
+        where: { orderId: order.id, id: { in: input.lines.map((l) => l.lineId) }, status: { not: "void" } }
+    });
+    const byId = new Map(lines.map((l) => [l.id, l]));
+    const targetId = existing?.id ?? input.targetOrderId;
+    await prisma.$transaction(async (tx) => {
+        if (!existing) {
+            await tx.hospitalityOrder.create({
+                data: { id: targetId, venueId: order.venueId, tableId: input.tableId, waiterId: actor.id, waiterName: actor.name }
+            });
+        }
+        for (const move of input.lines) {
+            const line = byId.get(move.lineId);
+            if (!line) throw new HospitalityRefusal("orders.gone");
+            const quantity = Math.min(move.quantity, line.quantity);
+            if (quantity === line.quantity) {
+                await tx.hospitalityOrderLine.update({ where: { id: line.id }, data: { orderId: targetId } });
+                continue;
+            }
+            const { id: _id, orderId: _orderId, createdAt: _createdAt, ...rest } = line;
+            await tx.hospitalityOrderLine.update({ where: { id: line.id }, data: { quantity: line.quantity - quantity } });
+            await tx.hospitalityOrderLine.create({
+                data: {
+                    ...rest,
+                    id: move.newLineId,
+                    orderId: targetId,
+                    quantity,
+                    modifiers: (line.modifiers ?? []) as Prisma.InputJsonValue,
+                    discount: line.discount === null ? Prisma.DbNull : (line.discount as Prisma.InputJsonValue)
+                }
+            });
+        }
+    });
+    publishHospitalityChange({ venueId: order.venueId, actorId: actor.id, topic: "orders" });
+    return targetId;
+}
+
 /** Saves a room's plan: tables kept are moved, new ones made, missing ones removed. */
 export async function saveFloor(input: FloorInput, actorId: string): Promise<string> {
     const room = input.roomId
         ? await prisma.hospitalityRoom.update({ where: { id: input.roomId }, data: { name: input.name }, select: { id: true, venueId: true } })
         : await prisma.hospitalityRoom.create({ data: { venueId: input.venueId, name: input.name, position: Date.now() }, select: { id: true, venueId: true } });
     const keep = input.tables.flatMap((t) => (t.id ? [t.id] : []));
+    const leaving = await prisma.hospitalityTable.findMany({ where: { roomId: room.id, id: { notIn: keep } }, select: { id: true } });
+    const busy = leaving.length
+        ? await prisma.hospitalityOrder.count({ where: { status: { in: LIVE }, tableId: { in: leaving.map((x) => x.id) } } })
+        : 0;
+    if (busy > 0) throw new HospitalityRefusal("orders.tableBusy");
     await prisma.$transaction([
         prisma.hospitalityTable.deleteMany({ where: { roomId: room.id, id: { notIn: keep } } }),
         ...input.tables.map(({ id, ...data }) =>

@@ -56,17 +56,17 @@ export async function flush(store: QueueStore, send: Transport): Promise<FlushRe
     const ops = (await store.all()).sort((a, b) => a.queuedAt - b.queuedAt);
     let sent = 0;
     const refused: Array<{ op: QueuedOp; error: string }> = [];
-    for (let i = 0; i < ops.length; i++) {
+    for (const [i, op] of ops.entries()) {
         let delivery: Delivery;
         try {
-            delivery = await send(ops[i]);
+            delivery = await send(op);
         } catch {
             delivery = { status: "offline" };
         }
         if (delivery.status === "offline") return { sent, refused, left: ops.length - i };
-        await store.remove(ops[i].id);
+        await store.remove(op.id);
         if (delivery.status === "ok") sent += 1;
-        else refused.push({ op: ops[i], error: delivery.error });
+        else refused.push({ op, error: delivery.error });
     }
     return { sent, refused, left: 0 };
 }
