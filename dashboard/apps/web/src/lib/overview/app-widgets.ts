@@ -19,7 +19,8 @@
 import { z } from "zod";
 import type * as core from "@polaris/core";
 import { appWidgetDefinitions } from "@/lib/app-extensions/registry";
-import type { AppWidgetInput, AppWidgetView } from "@/lib/app-extensions/types";
+import { requireUser, sessionCan } from "@/lib/session";
+import type { AppWidgetDefinition, AppWidgetInput, AppWidgetView } from "@/lib/app-extensions/types";
 
 /** A kind of card on offer, as the Customize panel lists it. */
 export interface AppWidgetKind {
@@ -33,14 +34,38 @@ export interface AppWidgetKind {
 /** What one card reads as: its view, or the reason it could not be read. */
 export type AppWidgetReadout =
     | { readonly ok: true; readonly view: AppWidgetView }
-    | { readonly ok: false; readonly reason: "gone" | "failed" };
+    | { readonly ok: false; readonly reason: "gone" | "denied" | "failed" };
+
+/**
+ * Whether this request's reader may use a kind: its `permission`, when it names
+ * one, held now, and under the app's own id - a card can never stand behind
+ * somebody else's permission. One check per permission per call.
+ */
+function permissionGate(): (app: string, definition: AppWidgetDefinition) => Promise<boolean> {
+    const asked = new Map<string, Promise<boolean>>();
+    return (app, definition) => {
+        const permission = definition.permission;
+        if (!permission) return Promise.resolve(true);
+        if (!permission.startsWith(`${app}.`)) return Promise.resolve(false);
+        let answer = asked.get(permission);
+        if (!answer) {
+            answer = requireUser()
+                .then((user) => sessionCan(user, permission as core.Permission))
+                .catch(() => false);
+            asked.set(permission, answer);
+        }
+        return answer;
+    };
+}
 
 /** Every kind the installed apps offer, named in the reader's language. One
  *  app failing to describe itself leaves the others on offer. */
 export async function availableAppWidgetKinds(): Promise<AppWidgetKind[]> {
     const offered = await appWidgetDefinitions();
+    const may = permissionGate();
     const described = await Promise.all(
         offered.map(async ({ app, definition }) => {
+            if (!(await may(app, definition))) return null;
             try {
                 const words = await definition.describe();
                 return {
@@ -63,9 +88,10 @@ export async function availableAppWidgetKinds(): Promise<AppWidgetKind[]> {
 }
 
 async function definitionOf(app: string, kind: string) {
-    return (await appWidgetDefinitions()).find(
+    const definition = (await appWidgetDefinitions()).find(
         (offered) => offered.app === app && offered.definition.kind === kind
     )?.definition;
+    return definition && (await permissionGate()(app, definition)) ? definition : undefined;
 }
 
 /** What one kind can watch, for the picker. Nothing for a kind not on offer. */
@@ -86,12 +112,14 @@ export async function readAppWidgets(
     cards: readonly core.AppWidgetPreference[]
 ): Promise<Record<string, AppWidgetReadout>> {
     const offered = await appWidgetDefinitions();
+    const may = permissionGate();
     const entries = await Promise.all(
         cards.map(async (card): Promise<[string, AppWidgetReadout]> => {
             const definition = offered.find(
                 (one) => one.app === card.app && one.definition.kind === card.kind
             )?.definition;
             if (!definition) return [card.id, { ok: false, reason: "gone" }];
+            if (!(await may(card.app, definition))) return [card.id, { ok: false, reason: "denied" }];
             try {
                 return [card.id, { ok: true, view: await definition.read(card.targets) }];
             } catch (caught) {

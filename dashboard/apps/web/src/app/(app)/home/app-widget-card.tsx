@@ -59,7 +59,11 @@ export function AppWidgetBody({
     if (!readout.ok) {
         return (
             <WidgetUnavailable>
-                {readout.reason === "gone" ? t("appCards.gone") : t("appCards.readFailed")}
+                {readout.reason === "gone"
+                    ? t("appCards.gone")
+                    : readout.reason === "denied"
+                      ? t("appCards.denied")
+                      : t("appCards.readFailed")}
             </WidgetUnavailable>
         );
     }

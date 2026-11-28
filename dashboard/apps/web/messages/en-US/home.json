@@ -210,6 +210,7 @@
         "remove": "Remove card",
         "gone": "The app this card is from is not available right now.",
         "readFailed": "This card could not be read just now. It will try again.",
+        "denied": "You no longer have access to what this card shows.",
         "cannotDo": "That could not be done.",
         "empty": "Nothing to show yet.",
         "pick": "Choose what to show",

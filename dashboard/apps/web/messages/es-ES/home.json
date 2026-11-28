@@ -210,6 +210,7 @@
         "remove": "Quitar tarjeta",
         "gone": "La app de esta tarjeta no está disponible ahora mismo.",
         "readFailed": "No se ha podido leer esta tarjeta. Lo volverá a intentar.",
+        "denied": "Ya no tienes acceso a lo que muestra esta tarjeta.",
         "cannotDo": "No se ha podido hacer.",
         "empty": "Todavía no hay nada que mostrar.",
         "pick": "Elegir qué mostrar",

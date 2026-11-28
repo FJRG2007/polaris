@@ -675,6 +675,12 @@ export interface AppWidgetDefinition {
     readonly kind: string;
     /** How wide it starts. */
     readonly defaultSize: "sm" | "md" | "lg" | "xl";
+    /**
+     * What a reader needs to add it, see it and press it: one of the app's own
+     * permissions. Checked by the dashboard before the app is asked; a card
+     * already on an Overview whose reader lost it says so instead of reading.
+     */
+    readonly permission?: string;
     /** The name and one line about it, in the reader's language. */
     readonly describe: () => Promise<{ readonly label: string; readonly hint: string }>;
     /** What the reader may pick for it, or an empty list when there is nothing

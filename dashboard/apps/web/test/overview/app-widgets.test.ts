@@ -15,6 +15,29 @@ const read = vi.fn();
 const act = vi.fn(async () => ({}));
 const describeCard = vi.fn(async () => ({ label: "Fixture card", hint: "What the fixture shows" }));
 let installed = true;
+let guardedKinds = false;
+const GUARDED = [
+    {
+        kind: "guarded",
+        defaultSize: "sm" as const,
+        permission: "fixture-app.manage",
+        describe: async () => ({ label: "Guarded card", hint: "Managers only" }),
+        targets: async () => [],
+        read: (targets: readonly string[]) => read(targets),
+        act: (targets: readonly string[], input: unknown) => act(targets, input)
+    },
+    {
+        kind: "borrowed",
+        defaultSize: "sm" as const,
+        // Not under the app's own id: never offered, whoever reads.
+        permission: "deploy.read",
+        describe: async () => ({ label: "Borrowed card", hint: "" }),
+        targets: async () => [],
+        read: (targets: readonly string[]) => read(targets),
+        act: (targets: readonly string[], input: unknown) => act(targets, input)
+    }
+];
+const can = vi.fn(async (_user: unknown, _permission: string) => true);
 
 const FIXTURE = {
     id: "fixture-app",
@@ -26,12 +49,17 @@ const FIXTURE = {
             targets: async () => [{ id: "t1", label: "Thing one" }],
             read,
             act
-        }
+        },
+        ...(guardedKinds ? GUARDED : [])
     ]
 };
 
 vi.mock("@/lib/app-extensions/installed", () => ({ installedExtensions: () => [FIXTURE] }));
 vi.mock("@/lib/apps/install-presence", () => ({ isAppInstalled: async () => installed }));
+vi.mock("@/lib/session", () => ({
+    requireUser: async () => ({ id: "u1", isAdmin: false }),
+    sessionCan: (user: unknown, permission: string) => can(user, permission)
+}));
 
 const widgets = await import("@/lib/overview/app-widgets");
 
@@ -46,6 +74,7 @@ const card = (targets: string[], kind = "readings") => ({
 beforeEach(() => {
     vi.clearAllMocks();
     installed = true;
+    can.mockImplementation(async () => true);
     read.mockResolvedValue({ items: [] });
 });
 
@@ -154,5 +183,42 @@ describe("a press", () => {
             widgets.appWidgetInputSchema.safeParse({ item: "t1", control: "x", value: Number.NaN })
                 .success
         ).toBe(false);
+    });
+});
+
+describe("a card behind the app's own permission", () => {
+    beforeEach(() => {
+        guardedKinds = true;
+        return () => {
+            guardedKinds = false;
+        };
+    });
+
+    it("is offered only to a reader holding it, and never behind another app's", async () => {
+        const kinds = (await widgets.availableAppWidgetKinds()).map((kind) => kind.kind);
+        expect(kinds).toContain("guarded");
+        expect(kinds).not.toContain("borrowed");
+        can.mockImplementation(async () => false);
+        const without = (await widgets.availableAppWidgetKinds()).map((kind) => kind.kind);
+        expect(without).toEqual(["readings"]);
+        expect(kinds).toEqual(["readings", "guarded"]);
+        expect(can).toHaveBeenCalledWith(expect.anything(), "fixture-app.manage");
+    });
+
+    it("says so on a card already on the Overview once the reader lost it, without asking the app", async () => {
+        can.mockImplementation(async () => false);
+        expect(await widgets.readAppWidgets([card(["t1"], "guarded")])).toEqual({
+            card0001: { ok: false, reason: "denied" }
+        });
+        expect(read).not.toHaveBeenCalled();
+        expect(await widgets.actOnAppWidget(card(["t1"], "guarded"), { item: "t1", control: "x", value: true })).toEqual({ error: "gone" });
+        expect(act).not.toHaveBeenCalled();
+    });
+
+    it("reads as gone once its app is uninstalled", async () => {
+        installed = false;
+        expect(await widgets.readAppWidgets([card(["t1"], "guarded")])).toEqual({
+            card0001: { ok: false, reason: "gone" }
+        });
     });
 });
