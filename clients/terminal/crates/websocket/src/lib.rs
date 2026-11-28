@@ -154,9 +154,9 @@ impl WebSocket {
     /// [`Self::connect_with_headers`], verifying the server's certificate with
     /// `config` rather than the platform's roots alone.
     #[cfg(not(target_family = "wasm"))]
-    pub async fn connect_with_headers_and_tls_config<'a>(
+    pub async fn connect_with_headers_and_tls_config(
         url: &str,
-        headers: Vec<(&'a str, String)>,
+        headers: Vec<(&str, String)>,
         config: std::sync::Arc<rustls::ClientConfig>,
     ) -> anyhow::Result<Self> {
         let request = build_request_with_headers(url, headers)?;
