@@ -1660,8 +1660,15 @@ export function installedAppHref(
     return tab ? `${base}/${install.id}/${tab}` : `${base}/${install.id}`;
 }
 
-let runtimeApps: readonly AppManifest[] = [];
-let allApps: readonly AppManifest[] = POLARIS_APP_CATALOG;
+/**
+ * Kept on the process (and the window), not in this module: Next evaluates a
+ * module once per bundle layer, and the server action that installs an app must
+ * see the apps the page listing it registered.
+ */
+const runtime = ((globalThis as Record<symbol, unknown>)[Symbol.for("polaris.apps.runtime")] ??= {
+    apps: [],
+    all: null
+}) as { apps: readonly AppManifest[]; all: readonly AppManifest[] | null };
 
 /**
  * Apps from the published catalogue, beside the ones this image carries. An id
@@ -1671,23 +1678,27 @@ let allApps: readonly AppManifest[] = POLARIS_APP_CATALOG;
  */
 export function setRuntimeApps(apps: readonly AppManifest[]): void {
     const baked = new Set(POLARIS_APP_CATALOG.map((app) => app.id));
-    runtimeApps = apps.filter((app) => !baked.has(app.id));
-    allApps = runtimeApps.length ? [...POLARIS_APP_CATALOG, ...runtimeApps] : POLARIS_APP_CATALOG;
+    runtime.apps = apps.filter((app) => !baked.has(app.id));
+    runtime.all = runtime.apps.length ? [...POLARIS_APP_CATALOG, ...runtime.apps] : null;
 }
 
 /** The apps registered from the published catalogue. */
 export function catalogRuntimeApps(): readonly AppManifest[] {
-    return runtimeApps;
+    return runtime.apps;
+}
+
+function everyApp(): readonly AppManifest[] {
+    return runtime.all ?? POLARIS_APP_CATALOG;
 }
 
 /** Every app manifest, offered or not. */
 export function catalogApps(): readonly AppManifest[] {
-    return allApps;
+    return everyApp();
 }
 
 /** Look up an app manifest by id. */
 export function findApp(id: string): AppManifest | undefined {
-    return allApps.find((app) => app.id === id);
+    return everyApp().find((app) => app.id === id);
 }
 
 /** Whether an app is one the marketplace still offers at all. Everything else
@@ -1699,7 +1710,7 @@ export function isOffered(app: AppManifest): boolean {
 
 /** Apps that are installable now (declared, not coming soon). */
 export function installableApps(): readonly AppManifest[] {
-    return allApps.filter((app) => !app.comingSoon && isOffered(app));
+    return everyApp().filter((app) => !app.comingSoon && isOffered(app));
 }
 
 /** Whether an app provides a given capability. */
@@ -1794,6 +1805,6 @@ const CATEGORY_ORDER: readonly AppCategory[] = [
 export function appsByCategory(): ReadonlyArray<{ category: AppCategory; apps: AppManifest[] }> {
     return CATEGORY_ORDER.map((category) => ({
         category,
-        apps: allApps.filter((app) => app.category === category && isOffered(app))
+        apps: everyApp().filter((app) => app.category === category && isOffered(app))
     })).filter((group) => group.apps.length > 0);
 }

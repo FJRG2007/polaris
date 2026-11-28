@@ -54,6 +54,7 @@ import {
     uninstallRefusal as mailServerUninstallRefusal
 } from "@/lib/mail-server/app-install";
 import {
+    catalogApps,
     findApp,
     isAllowedEnvValue,
     isInstallable,
@@ -422,7 +423,8 @@ export async function listInstalledApps(
  * install would refuse.
  */
 export async function instanceWideInstallIds(): Promise<string[]> {
-    const catalogIds = POLARIS_APP_CATALOG.filter((app) => app.instanceWide).map((app) => app.id);
+    // catalogApps, not the image's list: an app from the published catalogue is instance-wide too.
+    const catalogIds = catalogApps().filter((app) => app.instanceWide).map((app) => app.id);
     const rows = await prisma.installedApp.findMany({
         where: { catalogId: { in: catalogIds }, status: { not: "removed" } },
         select: { id: true }

@@ -5,6 +5,8 @@
  */
 
 import { generateKeyPairSync, sign } from "node:crypto";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/app-bundles/store", () => ({ bundleRoot: () => "/nonexistent-polaris-test" }));
@@ -160,5 +162,23 @@ describe("merged into the catalog every screen reads", () => {
         expect(findApp("bakery")).toBeUndefined();
         expect(POLARIS_APPS.some((nav) => nav.id === "bakery")).toBe(false);
         setRuntimeApps([]);
+    });
+});
+
+describe("what CI publishes is what an install reads", () => {
+    it("opens the catalogue scripts/app-catalog.mjs writes and signs", async () => {
+        const writer = pathToFileURL(join(__dirname, "../../../../scripts/app-catalog.mjs")).href;
+        const { buildCatalog, signatureFile } = (await import(writer)) as {
+            buildCatalog: (packages: unknown[], index: unknown, hostApi: string, issued: string) => Buffer;
+            signatureFile: (bytes: Uint8Array, pem: string) => string;
+        };
+        const about = { minPolaris: "0.1.140", name: { "en-US": "Bakery" }, summary: { "en-US": "Run a bakery." }, description: { "en-US": "Orders." }, category: "Productivity", nav: { category: "work", permission: "deploy.read" }, permissions: ["deploy.read"] };
+        const packages = [{ name: "@polaris-app/bakery", version: "1.0.0", polaris: { id: "bakery", catalog: about } }];
+        const index = { apps: { bakery: { file: "bakery.zip", digest: `sha256:${"d".repeat(64)}`, size: 4096 } } };
+        const bytes = buildCatalog(packages, index, HOST_API, "2026-11-28T00:00:00.000Z");
+        const pem = privateKey.export({ format: "pem", type: "pkcs8" }).toString();
+        const opened = openAppCatalog(bytes, signatureFile(bytes, pem), keys);
+        expect(opened?.apps.map((app) => app.id)).toEqual(["bakery"]);
+        expect(appEntryFit(opened!.apps[0]!, KNOWN_PERMISSIONS)).toEqual({ ok: true });
     });
 });

@@ -486,6 +486,14 @@ jobs:
         run: |
           bash dashboard/docker/app-bundles.sh push "$RUNNER_TEMP/app-bundles"
           echo "list=$(jq -c '.apps | map_values(.manifest)' "$RUNNER_TEMP/app-bundles/index.json")" >> "$GITHUB_OUTPUT"
+      # What the `app-catalog` job lists each app's bundle as, once `tag` has named them.
+      - uses: actions/upload-artifact@v4
+        if: env.PUBLISH == 'true'
+        with:
+          name: app-bundles-index
+          path: ${{ runner.temp }}/app-bundles/index.json
+          if-no-files-found: error
+          retention-days: 7
       # The Minecraft worlds a server can be created on, one artifact per map,
       # outside every bundle: a dashboard downloads one only when a server is
       # built on it. Content-addressed, so a world that did not change is only
@@ -1311,6 +1319,54 @@ jobs:
   # app look it up by the stamp a server's /api/version answers. Only once the
   # image is tagged: a manifest for a build nobody can pull would only ever
   # vouch for nothing. See docs/integrity.md.
+  # The published app catalogue (docs/addons-delivery.md): every app that opts in
+  # with `polaris.catalog`, pinned to the bundle this run just published and `tag`
+  # named `latest-app-<id>`, signed with the device plugin catalog's key and put on
+  # the `app-catalog` release. An installed Polaris reads it at runtime, so an app
+  # published after its image was built reaches it without a dashboard update.
+  # Only after `tag`: a catalogue naming a bundle nothing tagged would point at a
+  # blob ghcr-prune.yml deletes. From main alone, like the images.
+  app-catalog:
+    needs: [web, tag]
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.web.result == 'success' && needs.tag.result == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.dry_run) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            dashboard/apps/*/package.json
+            dashboard/packages/app-host/package.json
+            dashboard/scripts/app-catalog.mjs
+            dashboard/scripts/test/app-catalog.test.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - run: node --test dashboard/scripts/test/app-catalog.test.mjs
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-bundles-index
+          path: ${{ runner.temp }}/bundles
+      - name: Build and sign the catalogue
+        env:
+          DEVICE_ADDONS_SIGNING_KEY: ${{ secrets.DEVICE_ADDONS_SIGNING_KEY }}
+        run: node dashboard/scripts/app-catalog.mjs "$RUNNER_TEMP/bundles/index.json" "$RUNNER_TEMP/app-catalog"
+      - name: Publish on the app-catalog release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: ${{ runner.temp }}/app-catalog
+        run: |
+          if ! gh release view app-catalog -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create app-catalog -R "$GITHUB_REPOSITORY" --title "App catalogue" --notes "The signed catalogue of Polaris apps an install can add without an update. Updated by CI." --latest=false
+          fi
+          # The catalogue first, its signature after it: a reader between the two
+          # sees a pair that does not check out and keeps the copy it holds.
+          gh release upload app-catalog -R "$GITHUB_REPOSITORY" --clobber catalog.json
+          gh release upload app-catalog -R "$GITHUB_REPOSITORY" --clobber catalog.json.sig
+
   integrity:
     needs: [web, tag]
     if: ${{ !cancelled() && needs.web.result == 'success' && needs.tag.result == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.dry_run) }}
