@@ -19,7 +19,8 @@ vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
 vi.mock("../../src/main/launcher-stores", () => ({
     storeApps: (...args: unknown[]) => storeApps(...args),
     isPackagedAppId: () => true,
-    isVettedLaunchUri: () => true
+    isVettedLaunchUri: () => true,
+    gameFolders: () => Promise.resolve([])
 }));
 
 beforeEach(() => {

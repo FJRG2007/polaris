@@ -102,9 +102,9 @@ HKEY_CURRENT_USER\\System\\GameConfigStore\\Children\\b2
     });
 
     it("EA app: an InstallData title whose game folder is on a drive", async () => {
-        dirs.set("C:\ProgramData\EA Desktop\InstallData", ["Fixture Game", "base-Origin.SFT.50.0000000", "Gone Game"]);
-        dirs.set("D:\EA Games\Fixture Game", []);
-        expect(await stores.eaAppFolders("C:\ProgramData", "CD")).toEqual([{ name: "Fixture Game", folder: "D:\EA Games\Fixture Game", store: "ea:fixture-game" }]);
+        dirs.set("C:\\ProgramData\\EA Desktop\\InstallData", ["Fixture Game", "base-Origin.SFT.50.0000000", "Gone Game"]);
+        dirs.set("D:\\EA Games\\Fixture Game", []);
+        expect(await stores.eaAppFolders("C:\\ProgramData", "CD")).toEqual([{ name: "Fixture Game", folder: "D:\\EA Games\\Fixture Game", store: "ea:fixture-game" }]);
     });
 
     it("Origin: the LocalContent manifest of an installed game", async () => {

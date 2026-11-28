@@ -80,7 +80,8 @@ vi.mock("../../src/main/call-hotkeys", () => ({ holdGlobalKey: vi.fn((key: strin
 vi.mock("../../src/main/launcher-apps", () => ({
     installedApps: vi.fn(() => []),
     installedAppsRead: vi.fn(() => Promise.resolve()),
-    openListedApp: vi.fn(() => false)
+    openListedApp: vi.fn(() => false),
+    installedGames: vi.fn(() => [])
 }));
 vi.mock("../../src/main/game-detect", () => ({ runningPrograms: vi.fn(() => Promise.resolve([])) }));
 vi.mock("../../src/main/open-external", () => ({ openExternal: vi.fn() }));

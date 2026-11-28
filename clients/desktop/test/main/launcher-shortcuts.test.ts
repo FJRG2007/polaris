@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("electron", () => ({ shell: { openPath: vi.fn(), openExternal: vi.fn() } }));
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
-vi.mock("../../src/main/launcher-stores", () => ({ storeApps: vi.fn(async () => []), isPackagedAppId: () => true, isVettedLaunchUri: () => true }));
+vi.mock("../../src/main/launcher-stores", () => ({ storeApps: vi.fn(async () => []), isPackagedAppId: () => true, isVettedLaunchUri: () => true, gameFolders: async () => [] }));
 
 const { isProgramShortcut } = await import("../../src/main/launcher-apps");
 
