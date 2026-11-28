@@ -45,3 +45,14 @@ Stores without a vetted launch link (Rockstar, EA, Battle.net, Game Bar) are rea
 for folders only: the Start menu shortcut or uninstall entry that already opens
 the game becomes a Game through its folder. The user's "Treat as Application"
 still wins.
+
+## Sources checked on the web (2026-11-28)
+
+| Source | Status | Reference |
+|---|---|---|
+| Steam `libraryfolders.vdf`, `appmanifest_*.acf` (`AppState`: `appid`, `name`, `installdir`, `StateFlags`; `installdir` is a folder name under `<library>\steamapps\common`) | sourced doc | docs.rs `steamlocate`, `game-scanner` (`steam/acf.rs`), `game-detector` |
+| Origin `%ProgramData%\Origin\LocalContent\<title>\*.mfst`, URL-encoded `dipinstallpath` | sourced doc (community write-up); not on this PC | modding.wiki "game detection" (Vortex developer docs) |
+| Xbox `MicrosoftGame.config` sits in the root of a GDK game's content | sourced doc | learn.microsoft.com GDK "MicrosoftGame.config overview" and packaging guide; the `XboxGames\<title>\Content` layout is only seen on this PC, not documented there |
+| GOG | sourced doc: GOG's installers and Galaxy write `HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\<id>` (`gameID`, `gameName`, path). The reader uses the `_is1` uninstall entries and `goggame-<id>.info` instead; the `GOG.com\Games` key is a possible second source, not yet read | GameFinder wiki "GOG Galaxy"; gog.com forum "querying install path" |
+| EA app | the EA app's own data is encrypted (GameFinder's EA Desktop handler decrypts it), which is why `InstallData` folders plus the `EA Games\<title>` folder are used; verified here, no doc found | github.com/erri120/GameFinder |
+| Battle.net, Ubisoft Connect, Rockstar registry keys, Game Bar `GameConfigStore` | no documentation found by search; Rockstar verified on a real install, the rest unverified | - |
