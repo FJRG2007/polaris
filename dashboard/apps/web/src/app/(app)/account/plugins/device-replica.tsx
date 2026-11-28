@@ -2,7 +2,7 @@
 
 /**
  * A device's knobs and buttons drawn where they sit on the device, with the
- * actions beside it, the way Stream Deck and Hercules Stream Control edit a
+ * actions beside it, the way Stream Deck and controller vendors edit a
  * controller: drag an action onto a knob's turn or press or onto a button,
  * drag one control onto another to swap them, or select a control and assign
  * from its picker or the list - drag is never the only way. The layout comes
