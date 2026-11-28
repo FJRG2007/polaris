@@ -18,13 +18,13 @@ Status: **done** (on branch `hospitality-app`), **partial**, **planned (Mn)**,
 | Feature | Products | Polaris |
 | --- | --- | --- |
 | Products and categories, colours per category | all | done (M1) |
-| Product images (upload, camera, paste) on the order grid | Sq To Ls Rv La Lo Od TB Su Gl | partial (M1: picture link shown on the grid); upload/camera/crop via Polaris storage planned (M5) |
+| Product images (upload, camera, paste) on the order grid | Sq To Ls Rv La Lo Od TB Su Gl | done (choose, camera, drop or paste; cropped square to WebP; stored on the NAS when there is one). Category pictures planned |
 | Variants / sizes (cana, doble, jarra) | all | partial (M1: stored as modifier groups; editor in M2) |
 | Modifier groups (required/optional, min/max, extra price) | all | done (M1) |
 | Allergens (14 EU allergens) per product | Rv Ag La Ls Gl Ht | done (M1) |
 | Descriptions and menu translations for tourists | Rv La Ls Od | M6 (QR menu) |
 | Tax rates per product (IVA 10 / 21 / 4 / 0) | all | done (M1) |
-| Import / export CSV and XLSX | Sq To Ls Rv Ag Lo Od Gl uC Ch | done (M1: CSV, Excel-compatible, `;` or `,`); native XLSX planned (M5) |
+| Import / export CSV and XLSX | Sq To Ls Rv Ag Lo Od Gl uC Ch | done (CSV with `;` or `,`, and native .xlsx both ways) |
 | Bulk price update (percent / fixed, per category) | Ls Rv Ag Gl Ht | done (M1) |
 | Time-based prices / happy hour | To Ls Rv Ag La Gl | M7 |
 | Menu of the day (fixed-price set menu with choices) | Rv Ag La Gl Ht | M7 |
@@ -38,11 +38,11 @@ Status: **done** (on branch `hospitality-app`), **partial**, **planned (Mn)**,
 | Floor plan with rooms / terrace, tables placed by drag | Sq To Ls Rv Ag La Od TB Gl Ht Fl | done (M2: rooms, drag on a grid) |
 | Table shapes, seats, rename | Sq To Ls Rv Od TB Fl | done (M2) |
 | Live table status (free / open / bill asked) | all restaurant ones | done (M2: free, open, not sent, bill asked) |
-| Merge and split tables, move an order to another table | To Ls Rv Ag TB Gl Fl | partial (M2: move and merge server-side; split of a table planned) |
+| Merge and split tables, move an order to another table | To Ls Rv Ag TB Gl Fl | done (move all of it, join an open table, or move some items and quantities to split a table) |
 | Order taking on phone / tablet / handheld | Sq To Ls Rv Ag La Od TB Gl Ht | done (M2: phone full screen, tablet/desktop side by side) |
 | Handheld (PDA) terminal flow, one-hand, small screen, PWA | To Rv Ag Gl Ht | M5 |
 | Courses and "marchar" (fire the next course) | To Ls Rv Ag TB Gl | done (M2: course per line, Send fires) |
-| Notes and modifiers per line | all | partial (M2: stored and priced on the server; picker UI planned) |
+| Notes and modifiers per line | all | done (option picker with required groups and limits, kitchen note per line) |
 | Covers (number of guests) | To Ls Rv TB Fl | partial (M2: seats of the table; editable later) |
 | Takeaway and delivery orders | Sq To Ls Rv La Lo Od TB | M7 |
 | Self-order QR at the table / kiosk | Sq To Ls Rv La Od | M6 |
@@ -62,11 +62,11 @@ Status: **done** (on branch `hospitality-app`), **partial**, **planned (Mn)**,
 
 | Feature | Products | Polaris |
 | --- | --- | --- |
-| Discounts: line / order, percent / amount, reasons | all | partial (M3: order discount in the UI; line discount server-side) |
+| Discounts: line / order, percent / amount, reasons | all | done (order and line, percent or amount, with a reason) |
 | Discounts gated by permission | Sq To Ls Rv Ag Od TB | done (M3: `hospitality.manage`; a dedicated permission planned) |
-| Split bill (by item, equal parts) | Sq To Ls Rv Ag Od TB Su | partial (M3: pay in parts; even-split math tested, by-item UI planned) |
+| Split bill (by item, equal parts) | Sq To Ls Rv Ag Od TB Su | done (by item, remembering what is paid; equal parts; whole bill) |
 | Cash, card, mixed payments, change due | all | done (M3: quick notes, change, partial payments) |
-| Tips | Sq To Ls TB Su | partial (M3: stored per payment and in the report; no UI to enter yet) |
+| Tips | Sq To Ls TB Su | done (5 %, 10 % or a typed amount at payment; in the X/Z report). Per-venue suggestions planned (M7) |
 | Card terminal integration | Sq To Ls Rv Su | no - card terminal is a separate device; amount recorded as card |
 | Shift open with float, close with count | Sq Ls Rv Ag Lo Od Gl Ht uC Ch | done (M3) |
 | Cash in / out with reason | Ls Rv Ag Lo Od Gl uC Ch | done (M3) |
