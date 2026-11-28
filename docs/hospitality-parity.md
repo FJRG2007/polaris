@@ -35,15 +35,15 @@ Status: **done** (on branch `hospitality-app`), **partial**, **planned (Mn)**,
 
 | Feature | Products | Polaris |
 | --- | --- | --- |
-| Floor plan with rooms / terrace, tables placed by drag | Sq To Ls Rv Ag La Od TB Gl Ht Fl | planned (M2) |
-| Table shapes, seats, rename | Sq To Ls Rv Od TB Fl | planned (M2) |
-| Live table status (free / open / bill asked) | all restaurant ones | planned (M2) |
-| Merge and split tables, move an order to another table | To Ls Rv Ag TB Gl Fl | planned (M2) |
-| Order taking on phone / tablet / handheld | Sq To Ls Rv Ag La Od TB Gl Ht | planned (M2) |
+| Floor plan with rooms / terrace, tables placed by drag | Sq To Ls Rv Ag La Od TB Gl Ht Fl | done (M2: rooms, drag on a grid) |
+| Table shapes, seats, rename | Sq To Ls Rv Od TB Fl | done (M2) |
+| Live table status (free / open / bill asked) | all restaurant ones | done (M2: free, open, not sent, bill asked) |
+| Merge and split tables, move an order to another table | To Ls Rv Ag TB Gl Fl | partial (M2: move and merge server-side; split of a table planned) |
+| Order taking on phone / tablet / handheld | Sq To Ls Rv Ag La Od TB Gl Ht | done (M2: phone full screen, tablet/desktop side by side) |
 | Handheld (PDA) terminal flow, one-hand, small screen, PWA | To Rv Ag Gl Ht | M5 |
-| Courses and "marchar" (fire the next course) | To Ls Rv Ag TB Gl | planned (M2) |
-| Notes and modifiers per line | all | planned (M2) |
-| Covers (number of guests) | To Ls Rv TB Fl | planned (M2) |
+| Courses and "marchar" (fire the next course) | To Ls Rv Ag TB Gl | done (M2: course per line, Send fires) |
+| Notes and modifiers per line | all | partial (M2: stored and priced on the server; picker UI planned) |
+| Covers (number of guests) | To Ls Rv TB Fl | partial (M2: seats of the table; editable later) |
 | Takeaway and delivery orders | Sq To Ls Rv La Lo Od TB | M7 |
 | Self-order QR at the table / kiosk | Sq To Ls Rv La Od | M6 |
 | Reservations and waiting list | Sq To Ls Rv TB | M6 |
@@ -53,33 +53,33 @@ Status: **done** (on branch `hospitality-app`), **partial**, **planned (Mn)**,
 
 | Feature | Products | Polaris |
 | --- | --- | --- |
-| Kitchen / bar display per station | Sq To Ls Rv Ag La Od TB Gl | planned (M3) |
-| Timers and colour by age | Sq To Ls Rv Od TB | planned (M3) |
-| Bump (mark done), recall | Sq To Ls Rv Od TB | planned (M3) |
+| Kitchen / bar display per station | Sq To Ls Rv Ag La Od TB Gl | done (M3) |
+| Timers and colour by age | Sq To Ls Rv Od TB | done (M3: green, amber 10 min, red 20 min) |
+| Bump (mark done), recall | Sq To Ls Rv Od TB | done (M3: tap to bump, undo instead of confirm) |
 | Kitchen ticket printing per station | all | interface done (`apps/hospitality/src/model/print-contract.ts`); driver on `hospitality-printing` |
 
 ## Payments and cash
 
 | Feature | Products | Polaris |
 | --- | --- | --- |
-| Discounts: line / order, percent / amount, reasons | all | planned (M3) |
-| Discounts gated by permission | Sq To Ls Rv Ag Od TB | planned (M3) |
-| Split bill (by item, equal parts) | Sq To Ls Rv Ag Od TB Su | planned (M3) |
-| Cash, card, mixed payments, change due | all | planned (M3) |
-| Tips | Sq To Ls TB Su | planned (M3) |
+| Discounts: line / order, percent / amount, reasons | all | partial (M3: order discount in the UI; line discount server-side) |
+| Discounts gated by permission | Sq To Ls Rv Ag Od TB | done (M3: `hospitality.manage`; a dedicated permission planned) |
+| Split bill (by item, equal parts) | Sq To Ls Rv Ag Od TB Su | partial (M3: pay in parts; even-split math tested, by-item UI planned) |
+| Cash, card, mixed payments, change due | all | done (M3: quick notes, change, partial payments) |
+| Tips | Sq To Ls TB Su | partial (M3: stored per payment and in the report; no UI to enter yet) |
 | Card terminal integration | Sq To Ls Rv Su | no - card terminal is a separate device; amount recorded as card |
-| Shift open with float, close with count | Sq Ls Rv Ag Lo Od Gl Ht uC Ch | planned (M3) |
-| Cash in / out with reason | Ls Rv Ag Lo Od Gl uC Ch | planned (M3) |
-| Blind count | Ls Rv Ag Gl | planned (M3) |
-| X and Z reports | Rv Ag Gl Ht uC Ch Fl | planned (M4) |
-| Shift handover between staff | Rv Ag Gl Ht | planned (M3) |
+| Shift open with float, close with count | Sq Ls Rv Ag Lo Od Gl Ht uC Ch | done (M3) |
+| Cash in / out with reason | Ls Rv Ag Lo Od Gl uC Ch | done (M3) |
+| Blind count | Ls Rv Ag Gl | done (M3: expected shown only after the count) |
+| X and Z reports | Rv Ag Gl Ht uC Ch Fl | done (M3/M4: X live, Z numbered per venue; printing via the printer layer) |
+| Shift handover between staff | Rv Ag Gl Ht | done (M3: open orders carry to the next shift) |
 | Cash drawer kick | all | interface done (`openDrawer`); driver on `hospitality-printing` |
 
 ## Fiscal (Spain)
 
 | Feature | Products | Polaris |
 | --- | --- | --- |
-| Simplified invoice numbering, unbroken series per year | Rv Ag La Gl Ht | planned (M3) |
+| Simplified invoice numbering, unbroken series per year | Rv Ag La Gl Ht | done (M3: per venue and year, counter in the closing transaction) |
 | Full invoice to a company on request | Rv Ag La Gl Ht | M7 |
 | Verifactu (chained hash + QR, AEAT submission) | Rv Ag La Gl Ht | no - fiscal signing not implemented; tickets are not Verifactu records yet |
 | TicketBAI (Basque Country) | Rv Ag Gl | no - same as above |
@@ -89,7 +89,7 @@ Status: **done** (on branch `hospitality-app`), **partial**, **planned (Mn)**,
 | Feature | Products | Polaris |
 | --- | --- | --- |
 | Works with no internet on the local network | Rv Ag Gl Ht uC Fl Ch Lo | done (M1: served by the venue's own Polaris; no external call in the path) |
-| Device keeps taking orders when it loses the LAN | Sq To Ls Lo | planned (M4) |
+| Device keeps taking orders when it loses the LAN | Sq To Ls Lo | done (M4: IndexedDB queue, replay with device-made ids) |
 
 ## Stock, staff, customers
 

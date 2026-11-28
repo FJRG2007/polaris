@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { prisma } from "@polaris/db";
+import { Prisma, prisma } from "@polaris/db";
 import { HospitalityRefusal } from "./outcome";
 import { changedPrice } from "../model/pricing";
 import { publishHospitalityChange } from "./live";
@@ -149,7 +149,7 @@ export async function deleteCategory(id: string, actorId: string): Promise<void>
 
 export async function saveProduct(input: ProductInput, actorId: string): Promise<string> {
     const { id, modifiers, ...rest } = input;
-    const data = { ...rest, modifiers: modifiers as unknown as object };
+    const data = { ...rest, modifiers: modifiers as unknown as Prisma.InputJsonValue };
     const saved = id
         ? await prisma.hospitalityProduct.update({ where: { id }, data, select: { id: true } })
         : await prisma.hospitalityProduct.create({ data: { ...data, position: Date.now() }, select: { id: true } });

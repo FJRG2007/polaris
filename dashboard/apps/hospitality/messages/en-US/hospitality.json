@@ -98,5 +98,129 @@
         "sulphites": "Sulphites",
         "lupin": "Lupin",
         "molluscs": "Molluscs"
+    },
+    "tabs": {
+        "label": "Hospitality",
+        "service": "Service",
+        "menu": "Menu",
+        "kitchen": "Kitchen",
+        "till": "Till"
+    },
+    "service": {
+        "noFloor": "No room yet",
+        "noFloorHint": "Set up the venue from the Menu tab first."
+    },
+    "floor": {
+        "edit": "Edit floor",
+        "done": "Done",
+        "table": "Table",
+        "roomName": "Room name",
+        "addTable": "Table",
+        "tableName": "Table name",
+        "fewerSeats": "Fewer seats",
+        "moreSeats": "More seats",
+        "removeTable": "Remove table",
+        "seats": "{count, plural, one {# seat} other {# seats}}",
+        "state": {
+            "free": "free",
+            "open": "open",
+            "pending": "not sent",
+            "billed": "bill asked"
+        },
+        "shape": {
+            "square": "Square",
+            "round": "Round",
+            "long": "Long"
+        }
+    },
+    "order": {
+        "back": "Back to the floor",
+        "course": "Course",
+        "courses": {
+            "0": "Now",
+            "1": "1st",
+            "2": "2nd",
+            "3": "Dessert"
+        },
+        "send": "Send",
+        "sent": "Sent to kitchen and bar",
+        "remove": "Remove",
+        "less": "One less",
+        "status": {
+            "pending": "to send",
+            "sent": "sent",
+            "ready": "ready",
+            "served": "served",
+            "void": "void"
+        },
+        "bill": "Bill",
+        "pay": "Pay"
+    },
+    "orders": {
+        "tableGone": "That table is no longer on the floor.",
+        "gone": "That order is no longer there.",
+        "closed": "That order is already closed.",
+        "soldOut": "Something on it is sold out."
+    },
+    "kitchen": {
+        "station": "Station",
+        "all": "All stations",
+        "undo": "Undo",
+        "empty": "Nothing waiting",
+        "minutes": "{count} min",
+        "allReady": "All ready"
+    },
+    "till": {
+        "openTitle": "Open the till",
+        "float": "Float",
+        "open": "Open till",
+        "openSince": "Till opened by {name}",
+        "moveTitle": "Cash in or out",
+        "in": "Cash in",
+        "out": "Cash out",
+        "amount": "Amount",
+        "reason": "Reason",
+        "record": "Record",
+        "closeTitle": "Close the till",
+        "closeHint": "Count the drawer and type what is there.",
+        "counted": "Counted",
+        "close": "Close and print Z",
+        "zTitle": "Z report {number}",
+        "expected": "Expected",
+        "short": "Short",
+        "over": "Over",
+        "next": "Done",
+        "orders": "Orders",
+        "sales": "Sales",
+        "discounts": "Discounts",
+        "tips": "Tips",
+        "tax": "VAT {rate} %",
+        "noShift": "Open the till first.",
+        "shiftOpen": "The till is already open.",
+        "overpaid": "That is more than is left to pay."
+    },
+    "pay": {
+        "title": "Pay {amount}",
+        "handed": "Cash handed",
+        "change": "Change: {amount}",
+        "partial": "{amount} left to pay",
+        "card": "Card {amount}",
+        "done": "Paid. Ticket {ticket}",
+        "methods": {
+            "cash": "Cash",
+            "card": "Card",
+            "other": "Other"
+        }
+    },
+    "discount": {
+        "title": "Discount",
+        "reason": "Reason",
+        "remove": "Remove",
+        "apply": "Apply"
+    },
+    "offline": {
+        "queued": "No network: saved on this device, it will be sent",
+        "waiting": "{count} waiting",
+        "waitingHint": "Saved on this device; sent as soon as the network is back"
     }
 }

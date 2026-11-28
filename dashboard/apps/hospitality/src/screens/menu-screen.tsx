@@ -244,7 +244,7 @@ export function HospitalityScreen({ manager }: { manager: boolean }) {
                                         <div className="mt-auto flex gap-1 pt-1">
                                             <Button
                                                 size={basic ? "lg" : "sm"}
-                                                variant={p.available ? "outline" : "default"}
+                                                variant={p.available ? "outline" : "primary"}
                                                 className="min-w-0 flex-1"
                                                 onClick={() => toggleAvailable(p)}
                                             >

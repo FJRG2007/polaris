@@ -98,5 +98,129 @@
         "sulphites": "Sulfitos",
         "lupin": "Altramuces",
         "molluscs": "Moluscos"
+    },
+    "tabs": {
+        "label": "Hostelería",
+        "service": "Servicio",
+        "menu": "Carta",
+        "kitchen": "Cocina",
+        "till": "Caja"
+    },
+    "service": {
+        "noFloor": "Aún no hay salón",
+        "noFloorHint": "Prepara antes el local en Carta."
+    },
+    "floor": {
+        "edit": "Editar sala",
+        "done": "Listo",
+        "table": "Mesa",
+        "roomName": "Nombre sala",
+        "addTable": "Mesa",
+        "tableName": "Nombre mesa",
+        "fewerSeats": "Menos sillas",
+        "moreSeats": "Más sillas",
+        "removeTable": "Quitar mesa",
+        "seats": "{count, plural, one {# silla} other {# sillas}}",
+        "state": {
+            "free": "libre",
+            "open": "abierta",
+            "pending": "sin marchar",
+            "billed": "pide cuenta"
+        },
+        "shape": {
+            "square": "Cuadrada",
+            "round": "Redonda",
+            "long": "Larga"
+        }
+    },
+    "order": {
+        "back": "Volver a sala",
+        "course": "Pase",
+        "courses": {
+            "0": "Ya",
+            "1": "1º",
+            "2": "2º",
+            "3": "Postre"
+        },
+        "send": "Marchar",
+        "sent": "Enviado a cocina y barra",
+        "remove": "Quitar",
+        "less": "Uno menos",
+        "status": {
+            "pending": "por marchar",
+            "sent": "marchado",
+            "ready": "listo",
+            "served": "servido",
+            "void": "anulado"
+        },
+        "bill": "Cuenta",
+        "pay": "Cobrar"
+    },
+    "orders": {
+        "tableGone": "Esa mesa ya no está en la sala.",
+        "gone": "Ese pedido ya no existe.",
+        "closed": "Ese pedido ya está cerrado.",
+        "soldOut": "Hay algo agotado en él."
+    },
+    "kitchen": {
+        "station": "Puesto",
+        "all": "Todos",
+        "undo": "Deshacer",
+        "empty": "Nada pendiente",
+        "minutes": "{count} min",
+        "allReady": "Todo listo"
+    },
+    "till": {
+        "openTitle": "Abrir la caja",
+        "float": "Cambio",
+        "open": "Abrir caja",
+        "openSince": "Caja abierta por {name}",
+        "moveTitle": "Entrada o salida",
+        "in": "Entrada",
+        "out": "Salida",
+        "amount": "Importe",
+        "reason": "Motivo",
+        "record": "Anotar",
+        "closeTitle": "Cerrar la caja",
+        "closeHint": "Cuenta el cajón y escribe lo que hay.",
+        "counted": "Contado",
+        "close": "Cerrar e imprimir Z",
+        "zTitle": "Informe Z {number}",
+        "expected": "Esperado",
+        "short": "Falta",
+        "over": "Sobra",
+        "next": "Listo",
+        "orders": "Pedidos",
+        "sales": "Ventas",
+        "discounts": "Descuentos",
+        "tips": "Propinas",
+        "tax": "IVA {rate} %",
+        "noShift": "Abre antes la caja.",
+        "shiftOpen": "La caja ya está abierta.",
+        "overpaid": "Es más de lo que queda."
+    },
+    "pay": {
+        "title": "Cobrar {amount}",
+        "handed": "Entregado",
+        "change": "Cambio: {amount}",
+        "partial": "Quedan {amount}",
+        "card": "Tarjeta {amount}",
+        "done": "Cobrado. Ticket {ticket}",
+        "methods": {
+            "cash": "Efectivo",
+            "card": "Tarjeta",
+            "other": "Otro"
+        }
+    },
+    "discount": {
+        "title": "Descuento",
+        "reason": "Motivo",
+        "remove": "Quitar",
+        "apply": "Aplicar"
+    },
+    "offline": {
+        "queued": "Sin red: guardado aquí, se enviará",
+        "waiting": "{count} en espera",
+        "waitingHint": "Guardado en este aparato; sale en cuanto vuelva la red"
     }
 }
