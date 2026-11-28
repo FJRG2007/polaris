@@ -36,9 +36,11 @@ function harness(granted: WantedPlugin["granted"] = ["usb", "polaris-actions"], 
     const children: FakeChild[] = [];
     const calls: string[] = [];
     const live: { id: string; live: unknown }[] = [];
+    const levels: { id: string; levels: readonly (number | null)[] }[] = [];
     const supervisor = createSupervisor({
         ...(locale ? { locale } : {}),
         onLive: (id, values) => live.push({ id, live: values }),
+        onLevels: (id, values) => levels.push({ id, levels: values }),
         fork: () => {
             const child = new FakeChild();
             children.push(child);
@@ -56,6 +58,7 @@ function harness(granted: WantedPlugin["granted"] = ["usb", "polaris-actions"], 
     return {
         supervisor,
         live,
+        levels,
         wanted,
         children,
         timers,
@@ -96,6 +99,25 @@ describe("plugin supervisor", () => {
         // A volume out of range is the wrong shape and goes nowhere.
         children[0]!.say({ type: "state", knobs: [{ label: "Calls", volume: 400, muted: false }] });
         expect(live).toHaveLength(1);
+    });
+
+    it("meters a plugin's channels only while a page watches it, and again after a restart", () => {
+        const { supervisor, wanted, children, levels, timers } = harness();
+        supervisor.want(wanted);
+        children[0]!.say({ type: "ready" });
+        expect(children[0]!.sent.some((message) => message.type === "watch")).toBe(false);
+        supervisor.watch("fixture-mixer", true);
+        supervisor.watch("fixture-mixer", true);
+        expect(children[0]!.sent.filter((message) => message.type === "watch")).toEqual([{ type: "watch", on: true }]);
+        children[0]!.say({ type: "levels", levels: [42, null, 7, 100] });
+        expect(levels).toEqual([{ id: "fixture-mixer", levels: [42, null, 7, 100] }]);
+        // A restarted process is told at once, after its start.
+        children[0]!.crash();
+        timers.shift()!.run();
+        const sent = children[1]!.sent.map((message) => message.type);
+        expect(sent.slice(0, 2)).toEqual(["start", "watch"]);
+        supervisor.watch("fixture-mixer", false);
+        expect(children[1]!.sent.at(-1)).toEqual({ type: "watch", on: false });
     });
 
     it("restarts a crashed plugin with a growing delay and gives up after five in a row", () => {

@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { ImagePlus, RotateCcw, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { PluginLive } from "@/lib/device-plugins-client";
+import type { PluginLevels, PluginLive } from "@/lib/device-plugins-client";
 import { CROP_ACCEPTED, ImageCropDialog } from "@/components/image-cropper";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { Button, cn, ColorPicker, Popover, PopoverContent, PopoverTrigger, settingType, useToast } from "@polaris/ui";
@@ -150,7 +150,7 @@ export function declaresLook(manifest: Pick<PluginManifest, "settings">): boolea
  * colour. The names are what each knob follows; the volumes are the
  * device's own, live, while it runs (a sample before it shows anything).
  */
-export function ScreenPreview({ manifest, values, names, live = null }: { manifest: Pick<PluginManifest, "settings">; values: Values; names: readonly string[]; live?: PluginLive | null }) {
+export function ScreenPreview({ manifest, values, names, live = null, levels = null }: { manifest: Pick<PluginManifest, "settings">; values: Values; names: readonly string[]; live?: PluginLive | null; levels?: PluginLevels | null }) {
     const t = useTranslations("account");
     const color = (key: string) => lookColor(manifest.settings.find((setting): setting is ColorSetting => setting.key === key && setting.kind === "color"), values[key] ?? "");
     const background = color("backgroundColor") ?? "#101216";
@@ -177,6 +177,7 @@ export function ScreenPreview({ manifest, values, names, live = null }: { manife
                 const knob = live?.knobs[index];
                 const volume = knob ? knob.volume : sample[index]!;
                 const muted = knob?.muted === true;
+                const level = levels?.[index] ?? null;
                 return (
                     <div key={index} className="relative flex min-w-0 flex-col items-center gap-0.5 px-1 py-1.5">
                         {isPluginImageValue(icon) ? (
@@ -189,8 +190,19 @@ export function ScreenPreview({ manifest, values, names, live = null }: { manife
                         <span className="font-semibold leading-tight tabular-nums" style={{ fontSize: "0.625rem", color: muted ? MUTED : undefined }}>
                             {volume === null ? "-" : `${volume}%`}
                         </span>
-                        <span className="relative mt-auto h-1/2 w-1/4 min-w-2 rounded-[1px]" style={{ backgroundColor: `${text}26` }}>
-                            <span className="absolute inset-x-0 bottom-0 rounded-[1px]" style={{ height: `${volume ?? 0}%`, backgroundColor: muted ? MUTED : accent }} />
+                        <span className="mt-auto flex h-1/2 w-2/5 min-w-3 items-end justify-center gap-[8%]">
+                            <span className="relative h-full w-3/5 rounded-[1px]" style={{ backgroundColor: `${text}26` }}>
+                                <span className="absolute inset-x-0 bottom-0 rounded-[1px]" style={{ height: `${volume ?? 0}%`, backgroundColor: muted ? MUTED : accent }} />
+                            </span>
+                            {levels ? (
+                                // What the channel plays now, beside what it is set to, like Stream Control's meters; it falls back smoothly, as a meter does.
+                                <span className="relative h-full w-1/5 rounded-[1px]" style={{ backgroundColor: `${text}14` }} data-meter={index}>
+                                    <span
+                                        className="absolute inset-x-0 bottom-0 rounded-[1px] transition-[height] duration-150 ease-out motion-reduce:transition-none"
+                                        style={{ height: `${muted ? 0 : (level ?? 0)}%`, backgroundColor: muted ? `${text}40` : `${text}b3` }}
+                                    />
+                                </span>
+                            ) : null}
                         </span>
                     </div>
                 );

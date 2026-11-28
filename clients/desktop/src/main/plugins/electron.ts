@@ -31,7 +31,7 @@ import { perfEvent } from "../perf-watch";
 import { answerInstall, pluginIdSchema, requirementKeySchema } from "./install-call";
 import { callPageAction, voiceStateNow, voiceWidgetAction } from "../voice-widget";
 import { deviceActionRequestSchema, readActionRef, PLUGIN_PERMISSIONS, pluginPlatform, pluginRequirements, pluginText, type PluginManifest, type UsbDevice } from "@polaris/core/device-plugins";
-import { app, dialog, ipcMain, net, Notification, protocol, shell, utilityProcess, webContents, type IpcMainInvokeEvent } from "electron";
+import { app, dialog, ipcMain, net, Notification, protocol, shell, utilityProcess, webContents, type IpcMainInvokeEvent, type WebContents } from "electron";
 
 let manager: PluginManager | null = null;
 /** The program keys of the games this app sees running, sent as `games` in a `polaris.state` answer. */
@@ -268,6 +268,33 @@ async function runActionRef(value: string): Promise<boolean> {
 /** Each running plugin's newest live values, for a page that opens after they came. */
 const liveValues = new Map<string, PluginLive>();
 
+/** Which pages watch which plugins' live values; a plugin meters its channels while any does. */
+const watchers = new Map<string, Set<number>>();
+/** The pages already followed for closing or reloading. */
+const followedPages = new Set<number>();
+
+function watchFrom(sender: WebContents, id: string, on: boolean): void {
+    const pages = watchers.get(id) ?? new Set<number>();
+    watchers.set(id, pages);
+    const before = pages.size > 0;
+    if (on) pages.add(sender.id);
+    else pages.delete(sender.id);
+    if (before !== pages.size > 0) manager?.watchLive(id, pages.size > 0);
+    if (!on || followedPages.has(sender.id)) return;
+    followedPages.add(sender.id);
+    // A page that closes, crashes or reloads without saying so stops watching too.
+    const forget = () => {
+        for (const plugin of watchers.keys()) watchFrom(sender, plugin, false);
+    };
+    sender.once("destroyed", () => {
+        followedPages.delete(sender.id);
+        forget();
+    });
+    sender.on("did-start-navigation", (details: { isMainFrame?: boolean; isSameDocument?: boolean; }) => {
+        if (details.isMainFrame && !details.isSameDocument) forget();
+    });
+}
+
 function broadcast(channel: string, ...args: unknown[]): void {
     for (const contents of webContents.getAllWebContents()) if (!contents.isDestroyed()) contents.send(channel, ...args);
 }
@@ -331,6 +358,7 @@ export function startDevicePlugins(showPolaris: (path?: string) => void, games: 
             liveValues.set(id, live);
             broadcast(CHANNELS.pluginsLive, id, live);
         },
+        onLevels: (id, levels) => broadcast(CHANNELS.pluginsLevels, id, levels),
         call: async (id, method, params) => {
             if (method === "settings.get") return manager?.settings(id) ?? null;
             if (method === "polaris.state") return { call: voiceStateNow(), games: runningGames() };
@@ -474,6 +502,11 @@ export function registerPluginIpc(
     };
     handle(CHANNELS.pluginsGet, (event) => (allowed(event) ? snapshotWithActions(ready()) : null));
     handle(CHANNELS.pluginsLiveGet, (event, id: unknown) => (allowed(event) && typeof id === "string" ? (liveValues.get(id) ?? null) : null));
+    handle(CHANNELS.pluginsWatch, (event, id: unknown, on: unknown) => {
+        if (!allowed(event) || typeof id !== "string" || typeof on !== "boolean") return false;
+        watchFrom(event.sender, id, on);
+        return true;
+    });
     handle(CHANNELS.pluginsRefresh, async (event) => (allowed(event) ? ready().refresh() : null));
     // Every path answers (install-call.ts): a stuck or failed update comes back to the page as a reason it can say.
     handle(CHANNELS.pluginsInstall, (event, id: unknown, accepted: unknown, requires: unknown) =>

@@ -209,6 +209,18 @@ impl Controller {
         self.engine.reset();
     }
 
+    /// What each knob's channel plays at this instant, 0-100 or `null`, as
+    /// JSON (`[42,null,7,80]`): the operating system's peak meters, a cheap
+    /// read; the sessions behind them are the kept ones (a second old at most).
+    #[napi(catch_unwind)]
+    pub fn levels_json(&mut self) -> napi::Result<String> {
+        let mixer = self.mixer()?;
+        let sessions = mixer.sessions().map_err(audio_error)?;
+        let peaks = mixer.peaks().map_err(audio_error)?;
+        let output = mixer.output_peak().map_err(audio_error)?;
+        json(&self.engine.levels(&sessions, &peaks, output))
+    }
+
     /// The apps playing audio now, as `Session[]` JSON.
     #[napi(catch_unwind)]
     pub fn sessions_json(&mut self) -> napi::Result<String> {

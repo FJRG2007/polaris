@@ -277,6 +277,10 @@ export interface PolarisDesktop {
         live?(id: string): Promise<unknown>;
         /** Called with a plugin's id and its live values each time they change. Absent from an app older than them. */
         onLive?(listener: (id: string, live: unknown) => void): () => void;
+        /** Whether this page watches a plugin's live values now (open and seen): its channels are metered only meanwhile. Absent from an app older than them. */
+        watchLive?(id: string, on: boolean): Promise<boolean>;
+        /** Called with a plugin's id and each channel's level (0-100 or null) while it is watched. Absent from an app older than them. */
+        onLevels?(listener: (id: string, levels: unknown) => void): () => void;
         /**
          * The device's official software on this computer, for the install
          * dialog and the plugin's page: `{ kind: "look" }`, `{ kind: "choose",
@@ -888,6 +892,8 @@ export const CHANNELS = {
     pluginsOpen: "desktop:plugins-open",
     pluginsLive: "desktop:plugins-live",
     pluginsLiveGet: "desktop:plugins-live-get",
+    pluginsLevels: "desktop:plugins-levels",
+    pluginsWatch: "desktop:plugins-watch",
     pluginsOfficial: "desktop:plugins-official",
     pluginsAction: "desktop:plugins-action",
     pluginsProfile: "desktop:plugins-profile",

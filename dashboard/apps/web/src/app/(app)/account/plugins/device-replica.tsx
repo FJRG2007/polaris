@@ -15,7 +15,7 @@ import { useDeviceActionOptions } from "./plugin-actions";
 import { declaresLook, ScreenPreview } from "./plugin-look";
 import { cn, Input, Select, settingType } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { PluginLive } from "@/lib/device-plugins-client";
+import type { PluginLevels, PluginLive } from "@/lib/device-plugins-client";
 import { useMemo, useState, type DragEvent, type ReactNode } from "react";
 import {
     PLUGIN_ACTIONS,
@@ -138,6 +138,8 @@ interface ReplicaProps {
     readonly values: Values;
     /** What the device shows now, followed live; null before it shows anything. */
     readonly live?: PluginLive | null;
+    /** What each channel plays now, while the page is seen. */
+    readonly levels?: PluginLevels | null;
     readonly locale: string;
     /** Several settings at once, saved together (a swap is two). */
     readonly onChange: (patch: Values) => void;
@@ -146,7 +148,7 @@ interface ReplicaProps {
 }
 
 /** The device with its controls in place, the actions to drag onto them, and the selected control's pickers. */
-export function DeviceReplica({ manifest, layout, values, live = null, locale, onChange, control }: ReplicaProps) {
+export function DeviceReplica({ manifest, layout, values, live = null, levels = null, locale, onChange, control }: ReplicaProps) {
     const t = useTranslations("account");
     const extra = useDeviceActionOptions();
     const slots = useMemo(() => {
@@ -275,7 +277,7 @@ export function DeviceReplica({ manifest, layout, values, live = null, locale, o
                 <div className="flex min-w-0 flex-col gap-4">
                     <div className="mx-auto flex w-full min-w-0 max-w-xl flex-col items-center gap-4 rounded-3xl border-2 border-border bg-muted p-4 sm:p-6">
                         {declaresLook(manifest) ? (
-                            <ScreenPreview manifest={manifest} values={values} names={layout.knobs.map((knob) => (knob.turn ? valueLabel(knob.turn) : ""))} live={live} />
+                            <ScreenPreview manifest={manifest} values={values} names={layout.knobs.map((knob) => (knob.turn ? valueLabel(knob.turn) : ""))} live={live} levels={levels} />
                         ) : (
                             <div aria-hidden className="aspect-[480/272] w-3/5 max-w-64 rounded-md border-2 border-border bg-foreground/85" />
                         )}

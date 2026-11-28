@@ -66,6 +66,16 @@ const pluginsBridge: NonNullable<PolarisDesktop["plugins"]> = {
         };
     },
     live: (id) => ipcRenderer.invoke(CHANNELS.pluginsLiveGet, id),
+    watchLive: (id, on) => ipcRenderer.invoke(CHANNELS.pluginsWatch, id, on),
+    onLevels: (listener) => {
+        const heard = (_event: unknown, id: unknown, levels: unknown) => {
+            if (typeof id === "string") listener(id, levels);
+        };
+        ipcRenderer.on(CHANNELS.pluginsLevels, heard);
+        return () => {
+            ipcRenderer.removeListener(CHANNELS.pluginsLevels, heard);
+        };
+    },
     onLive: (listener) => {
         const heard = (_event: unknown, id: unknown, live: unknown) => {
             if (typeof id === "string") listener(id, live);

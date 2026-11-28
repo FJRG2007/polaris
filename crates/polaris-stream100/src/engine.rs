@@ -196,6 +196,26 @@ impl Engine {
         commands
     }
 
+    /// What each knob's channel plays now, 0-100: the loudest of the sessions
+    /// it follows, the output's own meter for the output knob, `None` when
+    /// it follows nothing playing or the backend has no meters.
+    pub fn levels(
+        &self,
+        sessions: &[Session],
+        peaks: &[(String, f32)],
+        output: Option<f32>,
+    ) -> [Option<u8>; 4] {
+        let level = |peak: f32| (peak.clamp(0.0, 1.0) * 100.0).round() as u8;
+        std::array::from_fn(|knob| match self.targets(knob, sessions) {
+            None => output.map(level),
+            Some(ids) => peaks
+                .iter()
+                .filter(|(id, _)| ids.contains(&id.as_str()))
+                .map(|(_, peak)| level(*peak))
+                .max(),
+        })
+    }
+
     fn targets<'a>(&self, knob: usize, sessions: &'a [Session]) -> Option<Vec<&'a str>> {
         let target: &Target = &self.settings.knobs[knob % 4];
         resolve(target, sessions, |key| self.games.contains(key))
@@ -373,6 +393,36 @@ mod tests {
         let mut engine = Engine::new(Settings::default(), KnobMap::default());
         engine.feed(&report(0, [0; 4]), 0, &[], Output::default());
         engine
+    }
+
+    #[test]
+    fn each_knob_meters_the_loudest_of_what_it_follows_and_the_output_its_own() {
+        let mut engine = engine();
+        let mut knobs = Settings::default().knobs;
+        knobs[0] = Target::Program {
+            program: "spotify.exe".into(),
+        };
+        engine.set_settings(Settings {
+            knobs,
+            ..Default::default()
+        });
+        let sessions = [
+            session("a", "Spotify.exe", 50, false),
+            session("b", "spotify.exe", 50, false),
+            session("c", "notepad.exe", 50, false),
+        ];
+        let peaks = [
+            ("a".to_owned(), 0.2),
+            ("b".to_owned(), 0.654),
+            ("c".to_owned(), 1.0),
+        ];
+        let levels = engine.levels(&sessions, &peaks, Some(0.3));
+        assert_eq!(levels[0], Some(65));
+        assert_eq!(levels[3], Some(30));
+        // Nothing it follows is playing: no meter, not a silent one.
+        assert_eq!(levels[2], None);
+        // A backend without meters draws none.
+        assert_eq!(engine.levels(&sessions, &[], None), [None; 4]);
     }
 
     #[test]

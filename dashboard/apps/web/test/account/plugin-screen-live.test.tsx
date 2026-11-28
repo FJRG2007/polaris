@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PluginManifest } from "@polaris/core/device-plugins";
 import { act, cleanup, render, screen } from "@testing-library/react";
-import { readPluginLive, usePluginLive, type PluginsBridge } from "@/lib/device-plugins-client";
+import { readPluginLive, usePluginLevels, usePluginLive, type PluginsBridge } from "@/lib/device-plugins-client";
 
 vi.mock("@/components/i18n/i18n-provider", () => ({
     useLocale: () => "en",
@@ -78,6 +78,40 @@ describe("the device's screen on its page", () => {
         cleanup();
         render(<Page bridge={{} as Pick<PluginsBridge, "live" | "onLive">} />);
         expect(screen.getByText("72%")).toBeTruthy();
+    });
+
+    it("meters each channel only while the page is open and seen", async () => {
+        const watched: boolean[] = [];
+        const listeners = new Set<(id: string, levels: unknown) => void>();
+        const bridge = {
+            watchLive: vi.fn(async (_id: string, on: boolean) => {
+                watched.push(on);
+                return true;
+            }),
+            onLevels: (listener: (id: string, levels: unknown) => void) => {
+                listeners.add(listener);
+                return () => listeners.delete(listener);
+            }
+        };
+        function Metered() {
+            const levels = usePluginLevels(bridge, "stream");
+            return <ScreenPreview manifest={manifest} values={{}} names={["Calls", "Music", "Games", "Output"]} levels={levels} />;
+        }
+        const view = render(<Metered />);
+        expect(watched).toEqual([true]);
+        expect(view.container.querySelector("[data-meter]")).toBeNull();
+        act(() => listeners.forEach((listener) => listener("stream", [42, null, 0, 100])));
+        const meter = (index: number) => (view.container.querySelector(`[data-meter="${index}"] > span`) as HTMLElement).style.height;
+        expect([meter(0), meter(1), meter(3)]).toEqual(["42%", "0%", "100%"]);
+        // A hidden tab stops the metering; seen again, it starts again.
+        const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+        act(() => void document.dispatchEvent(new Event("visibilitychange")));
+        visibility.mockReturnValue("visible");
+        act(() => void document.dispatchEvent(new Event("visibilitychange")));
+        visibility.mockRestore();
+        view.unmount();
+        expect(watched).toEqual([true, false, true, false]);
+        expect(listeners.size).toBe(0);
     });
 
     it("reads only knobs of the right shape", () => {

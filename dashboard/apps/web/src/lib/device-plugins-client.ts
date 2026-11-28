@@ -473,3 +473,40 @@ export function usePluginLive(bridge: Pick<PluginsBridge, "live" | "onLive"> | n
     }, [bridge, id]);
     return live;
 }
+
+const pluginLevelsSchema = z.array(z.number().int().min(0).max(100).nullable()).max(8);
+
+/** Each channel's level, 0-100, or null for one that plays nothing it can meter. */
+export type PluginLevels = z.infer<typeof pluginLevelsSchema>;
+
+/**
+ * What each of the device's channels plays now, while this page is open and
+ * seen: the app meters them only while some page watches, so a hidden tab or
+ * a closed page costs the computer nothing. Null until a level arrives, and
+ * from an app older than them.
+ */
+export function usePluginLevels(bridge: Pick<PluginsBridge, "watchLive" | "onLevels"> | null, id: string): PluginLevels | null {
+    const [levels, setLevels] = useState<PluginLevels | null>(null);
+    useEffect(() => {
+        if (!bridge?.onLevels || !bridge.watchLive) return;
+        const watch = bridge.watchLive.bind(bridge);
+        const stop = bridge.onLevels((from, value) => {
+            if (from !== id) return;
+            const parsed = pluginLevelsSchema.safeParse(value);
+            if (parsed.success) setLevels(parsed.data);
+        });
+        const follow = () => {
+            const seen = document.visibilityState === "visible";
+            void watch(id, seen).catch(() => false);
+            if (!seen) setLevels(null);
+        };
+        follow();
+        document.addEventListener("visibilitychange", follow);
+        return () => {
+            document.removeEventListener("visibilitychange", follow);
+            stop();
+            void watch(id, false).catch(() => false);
+        };
+    }, [bridge, id]);
+    return levels;
+}

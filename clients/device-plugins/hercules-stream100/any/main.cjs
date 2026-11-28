@@ -31,6 +31,8 @@ const RENAMED = { "call.hangup": "call.leave" };
 const WAIT_MS = 500;
 /** How often the page's live values are looked at; only a change is sent. */
 const LIVE_MS = 200;
+/** How often each channel's meter is read while somebody watches the page: 25 a second, like a VU meter. */
+const LEVELS_MS = 40;
 const RETRY_MS = 3_000;
 const OWNERSHIP_EVERY_MS = 15_000;
 const CALL_TIMEOUT_MS = 10_000;
@@ -256,6 +258,9 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     let warnedPlaying = false;
     let locale = "en-US";
     let watcher = null;
+    /** The meters' timer while the page is watched, and the last levels sent. */
+    let levelsTimer = null;
+    let lastLevels = "";
     let watching = false;
     let gamesAt = -Infinity;
     let nextCall = 1;
@@ -457,6 +462,8 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
         running = false;
         if (watcher !== null) stopEvery(watcher);
         watcher = null;
+        if (levelsTimer !== null) stopEvery(levelsTimer);
+        levelsTimer = null;
         reader?.close();
         for (const resolve of pending.values()) resolve({ ok: false, error: "stopped" });
         pending.clear();
@@ -501,6 +508,29 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
                     }
                 }, LIVE_MS);
                 follower?.unref?.();
+            }
+        } else if (message.type === "watch") {
+            // The page is open and seen: meter each channel until it is not. Nobody watching, nothing is read.
+            if (levelsTimer !== null) stopEvery(levelsTimer);
+            levelsTimer = null;
+            lastLevels = "";
+            if (message.on === true && running && typeof controller?.levelsJson === "function") {
+                levelsTimer = every(() => {
+                    let read;
+                    try {
+                        read = controller.levelsJson();
+                    } catch {
+                        return;
+                    }
+                    if (read === lastLevels) return;
+                    lastLevels = read;
+                    try {
+                        send({ type: "levels", levels: JSON.parse(read) });
+                    } catch {
+                        // Skipped; the next read goes.
+                    }
+                }, LEVELS_MS);
+                levelsTimer?.unref?.();
             }
         } else if (message.type === "settings") {
             values = message.settings ?? {};

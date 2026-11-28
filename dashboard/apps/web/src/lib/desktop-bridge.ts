@@ -331,6 +331,10 @@ export interface PolarisDesktop {
         live?(id: string): Promise<unknown>;
         /** Called with a plugin's id and its live values each time they change. Absent from an app older than them. */
         onLive?(listener: (id: string, live: unknown) => void): () => void;
+        /** Whether this page watches a plugin's live values now: its channels are metered only meanwhile. Absent from an app older than them. */
+        watchLive?(id: string, on: boolean): Promise<boolean>;
+        /** Called with a plugin's id and each channel's level (0-100 or null) while it is watched. Absent from an app older than them. */
+        onLevels?(listener: (id: string, levels: unknown) => void): () => void;
     };
     /** @deprecated `plugins` by its name in desktop apps from before the rename. Removable once no supported desktop app or host predates the rename (desktop 0.1.124). */
     addons?: PolarisDesktop["plugins"];

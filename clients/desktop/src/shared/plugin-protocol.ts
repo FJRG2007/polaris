@@ -47,6 +47,8 @@ export const pluginMessageSchema = z.discriminatedUnion("type", [
     z.object({ type: z.literal("status"), state: z.enum(["connected", "sleeping", "busy", "error"]), detail: z.string().max(200).optional(), code: PLUGIN_STATUS_CODE.optional() }),
     /** What its device shows now, for the plugin's page to follow live: each knob's name, volume and mute. */
     z.object({ type: z.literal("state"), knobs: z.array(z.object({ label: z.string().max(80), volume: z.number().int().min(0).max(100).nullable(), muted: z.boolean() })).max(8) }),
+    /** What each channel plays now, 0-100 or null, sent only while a page watches (`watch`). */
+    z.object({ type: z.literal("levels"), levels: z.array(z.number().int().min(0).max(100).nullable()).max(8) }),
     callSchema
 ]);
 
@@ -64,11 +66,12 @@ export const PLUGIN_PARAMS = {
 } as const satisfies Record<PluginMethod, z.ZodType>;
 
 export type AppMessage =
-    | { readonly type: "start"; readonly id: string; readonly version: string; readonly permissions: readonly PluginPermission[]; readonly devices: readonly UsbDevice[]; readonly settings: Record<string, PluginSettingValue>; readonly locale?: string; }
+    | { readonly type: "start"; readonly id: string; readonly version: string; readonly permissions: readonly PluginPermission[]; readonly devices: readonly UsbDevice[]; readonly settings: Record<string, PluginSettingValue>; readonly locale?: string; readonly live?: boolean; }
     | { readonly type: "devices"; readonly devices: readonly UsbDevice[]; }
     | { readonly type: "settings"; readonly settings: Record<string, PluginSettingValue>; }
     | { readonly type: "reply"; readonly id: number; readonly ok: true; readonly value: unknown; }
     | { readonly type: "reply"; readonly id: number; readonly ok: false; readonly error: "permission" | "unknown-method" | "bad-params" | "failed"; }
+    | { readonly type: "watch"; readonly on: boolean; }
     | { readonly type: "stop"; };
 
 export type CallVerdict =

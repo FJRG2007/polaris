@@ -4,7 +4,7 @@
     "releases": [
         {
             "version": "0.1.26",
-            "notes": "a screen that stays sharp while it changes: turning a knob no longer keeps the whole screen in blocks, and the lines between the knobs are gone. The drawing of the device on Polaris' page shows each knob's real volume and mute as they change. Live values need Polaris for desktop 0.1.139 or later."
+            "notes": "a screen that stays sharp while it changes: turning a knob no longer keeps the whole screen in blocks, and the lines between the knobs are gone. The drawing of the device on Polaris' page shows each knob's real volume and mute as they change, and on Windows a meter of what each one is playing while the page is open. Live values need Polaris for desktop 0.1.139 or later."
         },
         {
             "version": "0.1.25",

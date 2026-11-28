@@ -26,6 +26,7 @@ use windows::Win32::Devices::DeviceAndDriverInstallation::{
 };
 use windows::Win32::Foundation::{CloseHandle, S_OK};
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+use windows::Win32::Media::Audio::Endpoints::IAudioMeterInformation;
 use windows::Win32::Media::Audio::{
     eConsole, eRender, AudioSessionStateExpired, IAudioSessionControl2, IAudioSessionManager2,
     IMMDevice, IMMDeviceEnumerator, ISimpleAudioVolume, MMDeviceEnumerator, DEVICE_STATE_ACTIVE,
@@ -79,6 +80,10 @@ pub struct CoreAudio {
     volumes: HashMap<String, ISimpleAudioVolume>,
     /// The default output's volume, until the next read of the sessions.
     output: Option<IAudioEndpointVolume>,
+    /// Each session's peak meter, by session id, from the last read.
+    meters: HashMap<String, IAudioMeterInformation>,
+    /// The default output's peak meter, until the next read of the sessions.
+    output_meter: Option<IAudioMeterInformation>,
 }
 
 impl CoreAudio {
@@ -92,6 +97,8 @@ impl CoreAudio {
                 enumerator,
                 volumes: HashMap::new(),
                 output: None,
+                meters: HashMap::new(),
+                output_meter: None,
             })
         }
     }
@@ -197,8 +204,10 @@ impl AudioSessions for CoreAudio {
     fn sessions(&mut self) -> Result<Vec<Session>, AudioError> {
         let mut out = Vec::new();
         let mut volumes = HashMap::new();
+        let mut meters = HashMap::new();
         // The default output may have changed since: look it up again on use.
         self.output = None;
+        self.output_meter = None;
         unsafe {
             for (endpoint, device) in self.endpoints()? {
                 let Ok(manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) else {
@@ -217,6 +226,9 @@ impl AudioSessions for CoreAudio {
                     let instance = take(control2.GetSessionInstanceIdentifier().map_err(backend)?);
                     let id = format!("{endpoint}|{instance}");
                     volumes.insert(id.clone(), simple.clone());
+                    if let Ok(meter) = control.cast::<IAudioMeterInformation>() {
+                        meters.insert(id.clone(), meter);
+                    }
                     out.push(Session {
                         id,
                         program: if system {
@@ -233,7 +245,39 @@ impl AudioSessions for CoreAudio {
             }
         }
         self.volumes = volumes;
+        self.meters = meters;
         Ok(out)
+    }
+
+    fn peaks(&mut self) -> Result<Vec<(String, f32)>, AudioError> {
+        // SAFETY: COM calls on live meter handles; a session that went away
+        // since answers an error and is left out.
+        Ok(self
+            .meters
+            .iter()
+            .filter_map(|(id, meter)| {
+                unsafe { meter.GetPeakValue() }
+                    .ok()
+                    .map(|peak| (id.clone(), peak))
+            })
+            .collect())
+    }
+
+    fn output_peak(&mut self) -> Result<Option<f32>, AudioError> {
+        if self.output_meter.is_none() {
+            // SAFETY: COM calls on the live device enumerator.
+            self.output_meter = unsafe {
+                self.enumerator
+                    .GetDefaultAudioEndpoint(eRender, eConsole)
+                    .and_then(|device| device.Activate::<IAudioMeterInformation>(CLSCTX_ALL, None))
+                    .ok()
+            };
+        }
+        // SAFETY: a COM call on a live meter handle.
+        Ok(self
+            .output_meter
+            .as_ref()
+            .and_then(|meter| unsafe { meter.GetPeakValue() }.ok()))
     }
 
     fn set_volume(&mut self, id: &str, volume: u8) -> Result<(), AudioError> {

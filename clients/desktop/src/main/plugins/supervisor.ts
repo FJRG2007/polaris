@@ -45,6 +45,8 @@ export interface SupervisorOptions {
     readonly onChange?: () => void;
     /** A running plugin's live values (`state` messages), passed on as they come. */
     readonly onLive?: (id: string, live: PluginLive) => void;
+    /** A running plugin's channel levels, while a page watches it ([`watch`]). */
+    readonly onLevels?: (id: string, levels: readonly (number | null)[]) => void;
     readonly log?: (id: string, level: "info" | "warn" | "error", text: string) => void;
     readonly now?: () => number;
     readonly setTimer?: (run: () => void, ms: number) => unknown;
@@ -78,6 +80,8 @@ export function createSupervisor(options: SupervisorOptions) {
     const clearTimer = options.clearTimer ?? ((timer) => clearTimeout(timer as ReturnType<typeof setTimeout>));
     const slots = new Map<string, Slot>();
     let devices: readonly UsbDevice[] = [];
+    /** The plugins a page watches now: they meter their channels, the rest read nothing. */
+    const watched = new Set<string>();
 
     const changed = () => options.onChange?.();
 
@@ -107,6 +111,7 @@ export function createSupervisor(options: SupervisorOptions) {
                 changed();
             } else if (message.type === "log") options.log?.(manifest.id, message.level, message.text);
             else if (message.type === "state") options.onLive?.(manifest.id, { knobs: message.knobs });
+            else if (message.type === "levels") options.onLevels?.(manifest.id, message.levels);
             else if (message.type === "status") {
                 slot.status = { state: message.state, ...(message.detail === undefined ? {} : { detail: message.detail }), ...(message.code === undefined ? {} : { code: message.code }) };
                 changed();
@@ -124,6 +129,7 @@ export function createSupervisor(options: SupervisorOptions) {
         });
         child.onExit(() => crashed(slot, generation));
         child.postMessage({ type: "start", id: manifest.id, version: manifest.version, permissions: slot.wanted.granted, devices, settings: slot.wanted.settings, live: true, ...(options.locale ? { locale: options.locale() } : {}) });
+        if (watched.has(manifest.id)) child.postMessage({ type: "watch", on: true });
         changed();
     }
 
@@ -187,6 +193,13 @@ export function createSupervisor(options: SupervisorOptions) {
             if (!slot) return;
             slot.wanted = { ...slot.wanted, settings };
             slot.child?.postMessage({ type: "settings", settings });
+        },
+        /** A page started or stopped watching this plugin's live values. */
+        watch(id: string, on: boolean): void {
+            if (on === watched.has(id)) return;
+            if (on) watched.add(id);
+            else watched.delete(id);
+            slots.get(id)?.child?.postMessage({ type: "watch", on });
         },
         running(): string[] {
             return [...slots.keys()];

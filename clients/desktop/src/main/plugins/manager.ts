@@ -93,6 +93,8 @@ export interface ManagerOptions {
     readonly onChange?: () => void;
     /** A running plugin's live values, as they come. */
     readonly onLive?: (id: string, live: PluginLive) => void;
+    /** A running plugin's channel levels, while a page watches it. */
+    readonly onLevels?: (id: string, levels: readonly (number | null)[]) => void;
     /** Tell the person about an update: put in, waiting for them, or rolled back. Once per version. */
     readonly notify?: (id: string, news: UpdateNews) => void;
     /** Run `work` after `ms`; answers how to cancel it. A real timer by default. */
@@ -172,6 +174,7 @@ export function createPluginManager(options: ManagerOptions) {
         call: options.call,
         onChange: runChanged,
         ...(options.onLive ? { onLive: options.onLive } : {}),
+        ...(options.onLevels ? { onLevels: options.onLevels } : {}),
         log: options.log,
         ...(options.locale ? { locale: options.locale } : {}),
         ...(options.restartTimer ? { setTimer: options.restartTimer } : {})
@@ -446,6 +449,8 @@ export function createPluginManager(options: ManagerOptions) {
     }
 
     return {
+        /** A page started or stopped watching a plugin's live values: it meters its channels only meanwhile. */
+        watchLive: (id: string, on: boolean) => supervisor.watch(id, on),
         /** Start what should run. Reads `installed.json` only. */
         start: () => serial(reconcile),
 

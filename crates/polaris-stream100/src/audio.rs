@@ -264,6 +264,16 @@ pub trait AudioSessions {
     fn output_volume(&mut self) -> Result<(u8, bool), AudioError>;
     fn set_output_volume(&mut self, volume: u8) -> Result<(), AudioError>;
     fn set_output_muted(&mut self, muted: bool) -> Result<(), AudioError>;
+    /// What each session from the last [`AudioSessions::sessions`] plays at
+    /// this instant, by id, 0.0-1.0 (the operating system's own peak meter, a
+    /// cheap read). A backend without meters has none.
+    fn peaks(&mut self) -> Result<Vec<(String, f32)>, AudioError> {
+        Ok(Vec::new())
+    }
+    /// The default output's peak meter, 0.0-1.0; `None` without one.
+    fn output_peak(&mut self) -> Result<Option<f32>, AudioError> {
+        Ok(None)
+    }
 }
 
 /// How long a read of the sessions and the output is reused. A knob report
@@ -331,6 +341,14 @@ impl<A: AudioSessions> Cached<A> {
 }
 
 impl<A: AudioSessions> AudioSessions for Cached<A> {
+    fn peaks(&mut self) -> Result<Vec<(String, f32)>, AudioError> {
+        self.inner.peaks()
+    }
+
+    fn output_peak(&mut self) -> Result<Option<f32>, AudioError> {
+        self.inner.output_peak()
+    }
+
     fn sessions(&mut self) -> Result<Vec<Session>, AudioError> {
         if let Some((at, sessions)) = &self.sessions {
             if self.is_fresh(*at) {
