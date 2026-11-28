@@ -271,5 +271,8 @@
         "open": "Mesas abiertas",
         "covers": "Comensales",
         "waiting": "En el pase"
+    },
+    "automation": {
+        "productGone": "Ese producto o local ya no está en la carta"
     }
 }

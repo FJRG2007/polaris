@@ -132,6 +132,100 @@
                         "email": false
                     }
                 }
+            ],
+            "automationSteps": [
+                {
+                    "type": "hospitality.action.setAvailability",
+                    "label": {
+                        "en-US": "Set a product's availability",
+                        "es-ES": "Cambiar la disponibilidad de un producto"
+                    },
+                    "description": {
+                        "en-US": "Take a product off the menu or put it back, everywhere or in one venue.",
+                        "es-ES": "Quita un producto de la carta o vuelve a ponerlo, en todos los locales o en uno."
+                    },
+                    "permission": "hospitality.manage",
+                    "fields": [
+                        {
+                            "key": "productId",
+                            "kind": "id",
+                            "label": {
+                                "en-US": "Product",
+                                "es-ES": "Producto"
+                            },
+                            "hint": {
+                                "en-US": "Its id, or a reference to an earlier step.",
+                                "es-ES": "Su id, o una referencia a un paso anterior."
+                            },
+                            "required": true
+                        },
+                        {
+                            "key": "venueId",
+                            "kind": "id",
+                            "label": {
+                                "en-US": "Venue",
+                                "es-ES": "Local"
+                            },
+                            "hint": {
+                                "en-US": "Empty for every venue.",
+                                "es-ES": "Vacío para todos los locales."
+                            }
+                        },
+                        {
+                            "key": "available",
+                            "kind": "boolean",
+                            "label": {
+                                "en-US": "Available",
+                                "es-ES": "Disponible"
+                            }
+                        }
+                    ],
+                    "output": {
+                        "productId": "id",
+                        "available": "boolean"
+                    }
+                },
+                {
+                    "type": "hospitality.action.fireOrder",
+                    "label": {
+                        "en-US": "Send an order to the kitchen",
+                        "es-ES": "Enviar una comanda a cocina"
+                    },
+                    "description": {
+                        "en-US": "Fire what is still pending on an order: all of it, or one course.",
+                        "es-ES": "Marcha lo pendiente de una comanda: todo, o un plato."
+                    },
+                    "permission": "hospitality.use",
+                    "fields": [
+                        {
+                            "key": "orderId",
+                            "kind": "id",
+                            "label": {
+                                "en-US": "Order",
+                                "es-ES": "Comanda"
+                            },
+                            "required": true
+                        },
+                        {
+                            "key": "course",
+                            "kind": "number",
+                            "label": {
+                                "en-US": "Course",
+                                "es-ES": "Plato"
+                            },
+                            "hint": {
+                                "en-US": "Empty for everything pending.",
+                                "es-ES": "Vacío para todo lo pendiente."
+                            },
+                            "min": 0,
+                            "max": 9
+                        }
+                    ],
+                    "output": {
+                        "orderId": "id",
+                        "sent": "number"
+                    }
+                }
             ]
         }
     },

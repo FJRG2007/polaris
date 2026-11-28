@@ -14,6 +14,8 @@ const cards = () => import("./overview-cards");
 
 export const hospitalityExtension: AppExtension = {
     id: "hospitality",
+    // The steps its manifest declares, done once the host has checked them.
+    automationSteps: async () => (await import("./automation-steps")).hospitalitySteps,
     // Its Overview card, read only once somebody has it on screen.
     overviewWidgets: () => [
         {

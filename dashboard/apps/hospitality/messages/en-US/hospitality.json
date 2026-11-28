@@ -271,5 +271,8 @@
         "open": "Open tables",
         "covers": "Covers",
         "waiting": "At the pass"
+    },
+    "automation": {
+        "productGone": "That product or venue is not on the menu any more"
     }
 }
