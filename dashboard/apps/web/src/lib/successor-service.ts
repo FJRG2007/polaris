@@ -28,6 +28,9 @@
 
 import { findableBy, resolveNamedAccount } from "@/lib/people-search";
 import { prisma } from "@polaris/db";
+import { NAME_SUCCESSOR_PURPOSE } from "@/lib/successor-constants";
+
+export { NAME_SUCCESSOR_PURPOSE };
 import { normalizePersonName } from "@polaris/core";
 import { contactLines } from "@/lib/privacy-service";
 
@@ -67,46 +70,102 @@ export async function getSuccessor(userId: string): Promise<SuccessorView | null
     };
 }
 
+/** What a typed identifier turned out to mean, for the dialog that lets the
+ *  holder pick before anything is asked of them. */
+export type SuccessorLookup =
+    | { kind: "match"; person: { userId: string; name: string; username: string | null } }
+    | { kind: "self" | "none" | "ambiguous" };
+
+/**
+ * Whether `term` is one of the holder's own identifiers: the main address, any
+ * address they added (proved or not - it is theirs either way), the username.
+ * Compared lowercased and without a leading "@". A name is handled by the
+ * lookup, because somebody else may share it.
+ */
+async function isOwnLogin(viewerId: string, term: string): Promise<boolean> {
+    const me = await prisma.user.findUnique({
+        where: { id: viewerId },
+        select: { email: true, username: true, emails: { select: { email: true } } }
+    });
+    if (!me) return false;
+    const lowered = term.toLowerCase();
+    const handle = lowered.replace(/^@/, "");
+    return (
+        me.email.toLowerCase() === lowered ||
+        (me.username !== null && me.username.toLowerCase() === handle) ||
+        me.emails.some((one) => one.email.toLowerCase() === lowered)
+    );
+}
+
 /**
  * Find the one account a typed identifier means.
  *
  * A username or an address is unique, so it answers on its own. A name is not,
- * which is why two people called the same thing is an error rather than a guess:
- * the whole point of the field is to hand somebody your account, and picking the
- * wrong Ana Garcia is not a mistake anybody would catch by reading the row back.
+ * which is why two people called the same thing is "ambiguous" rather than a
+ * guess: the whole point of the field is to hand somebody your account, and
+ * picking the wrong Ana Garcia is not a mistake anybody would catch by reading
+ * the row back. The holder's own identifiers answer "self", whichever of them
+ * was typed.
  *
  * The name is compared after the same normalization every name is stored
- * through, so "ana  garcia" finds the account written "Ana Garcia" without the
- * lookup depending on which database is underneath.
+ * through, so "ana  garcia" finds the account written "Ana Garcia". By login
+ * under the same rule as every people search, and by name only among accounts
+ * the viewer may find - otherwise this would say whether an address or a full
+ * name has an account here. A match carries only the name and handle, never
+ * the address that was typed.
  */
-async function findPerson(
+export async function lookupSuccessor(
     viewerId: string,
     identifier: string
-): Promise<{ id: string; name: string }> {
-    // By login under the same rule as every people search, and by name only
-    // among accounts the viewer may find - otherwise this field would say
-    // whether an address or a full name has an account here.
-    const byLogin = await resolveNamedAccount({ id: viewerId }, identifier);
-    if (byLogin) return { id: byLogin.id, name: byLogin.name };
+): Promise<SuccessorLookup> {
+    const term = identifier.trim();
+    if (!term) return { kind: "none" };
+    if (await isOwnLogin(viewerId, term)) return { kind: "self" };
+
+    const byLogin = await resolveNamedAccount({ id: viewerId }, term);
+    if (byLogin) {
+        if (byLogin.id === viewerId) return { kind: "self" };
+        return {
+            kind: "match",
+            person: { userId: byLogin.id, name: byLogin.name, username: byLogin.username }
+        };
+    }
 
     const named = await prisma.user.findMany({
-        where: { name: normalizePersonName(identifier) },
-        select: { id: true, name: true },
+        where: { name: normalizePersonName(term) },
+        select: { id: true, name: true, username: true },
         take: 20
     });
     const findable = await findableBy(
         viewerId,
         named.map((one) => one.id)
     );
-    const byName = named.filter((one) => findable.has(one.id)).slice(0, 2);
-    if (byName.length > 1) {
-        throw new SuccessorError(
-            "More than one account has that name - use their username or email address"
-        );
-    }
-    if (byName.length === 0)
-        throw new SuccessorError("No account matches that username, name or email address");
-    return byName[0]!;
+    const others = named.filter((one) => one.id !== viewerId && findable.has(one.id));
+    if (others.length > 1) return { kind: "ambiguous" };
+    const only = others[0];
+    if (only)
+        return {
+            kind: "match",
+            person: { userId: only.id, name: only.name, username: only.username }
+        };
+    return { kind: named.some((one) => one.id === viewerId) ? "self" : "none" };
+}
+
+/** Whether a code may be minted to name this account: somebody else, and real.
+ *  Checked before anything is sent, so a code is never spent on an add that
+ *  cannot succeed. */
+export async function canNameSuccessor(viewerId: string, candidateId: string): Promise<boolean> {
+    if (!candidateId || candidateId === viewerId) return false;
+    const row = await prisma.user.findUnique({ where: { id: candidateId }, select: { id: true } });
+    return row !== null;
+}
+
+/** The sentence for a lookup that did not end in somebody else. */
+function refusalFor(kind: "self" | "none" | "ambiguous"): string {
+    if (kind === "self") return "Name somebody else - you cannot succeed yourself";
+    if (kind === "ambiguous")
+        return "More than one account has that name - use their username or email address";
+    return "No account matches that username, name or email address";
 }
 
 /**
@@ -118,15 +177,22 @@ async function findPerson(
  * the day they did it.
  */
 export async function setSuccessor(userId: string, identifier: string): Promise<SuccessorView> {
-    const person = await findPerson(userId, identifier);
-    if (person.id === userId)
+    const found = await lookupSuccessor(userId, identifier);
+    if (found.kind !== "match") throw new SuccessorError(refusalFor(found.kind));
+    return nameSuccessor(userId, found.person.userId);
+}
+
+/** Write the designation for an account already resolved. The holder's own id
+ *  is refused here, whatever identifier led to it. */
+export async function nameSuccessor(userId: string, successorId: string): Promise<SuccessorView> {
+    if (successorId === userId)
         throw new SuccessorError("Name somebody else - you cannot succeed yourself");
 
     const acknowledgedAt = new Date();
     await prisma.accountSuccessor.upsert({
         where: { userId },
-        create: { userId, successorId: person.id, acknowledgedAt },
-        update: { successorId: person.id, acknowledgedAt }
+        create: { userId, successorId, acknowledgedAt },
+        update: { successorId, acknowledgedAt }
     });
     const view = await getSuccessor(userId);
     if (!view) throw new SuccessorError("Could not name that successor");

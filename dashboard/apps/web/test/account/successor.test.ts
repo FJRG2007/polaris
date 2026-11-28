@@ -10,6 +10,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const userFindFirst = vi.fn(async (_args: unknown) => null as unknown);
+const userFindUnique = vi.fn(async (_args: unknown) => null as unknown);
 const userFindMany = vi.fn(async (_args: unknown) => [] as unknown[]);
 const successorUpsert = vi.fn(async (_args: unknown) => ({}) as unknown);
 const successorFindUnique = vi.fn(async (_args: unknown) => null as unknown);
@@ -33,7 +34,7 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         // No administrator defaults: every field falls to the code's own.
         setting: { findUnique: async () => null, findMany: async () => [] },
-        user: { findFirst: userFindFirst, findMany: userFindMany },
+        user: { findFirst: userFindFirst, findMany: userFindMany, findUnique: userFindUnique },
         accountSuccessor: {
             upsert: successorUpsert,
             findUnique: successorFindUnique,
@@ -71,6 +72,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     userFindFirst.mockResolvedValue(null);
     userFindMany.mockResolvedValue([]);
+    userFindUnique.mockResolvedValue(null);
     successorFindUnique.mockResolvedValue(null);
 });
 

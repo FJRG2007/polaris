@@ -600,7 +600,16 @@
         "addTitle": "Añadir un sucesor",
         "removeBody": "{name} deja de poder cerrar las organizaciones de las que eres propietario. Puedes volver a nombrar a alguien cuando quieras.",
         "search": "Busca por nombre de usuario, nombre completo o correo",
-        "consent": "Al añadir un sucesor reconoces que eres el titular de esta cuenta y autorizas a Polaris a permitir que la persona indicada cierre las organizaciones de las que eres propietario en caso de tu fallecimiento. Esto no prevalece sobre las normas de herederos ni sobre el derecho sucesorio de donde vives, y no es un testamento."
+        "consent": "Al añadir un sucesor reconoces que eres el titular de esta cuenta y autorizas a Polaris a permitir que la persona indicada cierre las organizaciones de las que eres propietario en caso de tu fallecimiento. Esto no prevalece sobre las normas de herederos ni sobre el derecho sucesorio de donde vives, y no es un testamento.",
+        "searching": "Buscando...",
+        "needPerson": "Elige primero a la persona.",
+        "needCode": "Introduce el código para continuar.",
+        "lookup": {
+            "self": "Eres tú. Elige a otra persona.",
+            "none": "Ninguna cuenta coincide con ese nombre de usuario, nombre o correo",
+            "ambiguous": "Hay más de una cuenta con ese nombre: usa su nombre de usuario o su correo",
+            "failed": "No se ha podido buscar. Inténtalo de nuevo."
+        }
     },
     "authenticator": {
         "startFailed": "No se ha podido empezar la configuración. Revisa tu contraseña.",

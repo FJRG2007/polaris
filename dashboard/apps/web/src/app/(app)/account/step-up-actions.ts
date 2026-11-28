@@ -18,6 +18,7 @@ import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { localized } from "./security/action-messages";
 import { anyStepUpProofSchema, proveStepUp, sendStepUpCode, stepUpOptions, type StepUpChoice } from "@/lib/step-up";
+import { canNameSuccessor, NAME_SUCCESSOR_PURPOSE } from "@/lib/successor-service";
 import { grantStepUp, stepUpRemainingMs, STEP_UP_PURPOSES } from "@/lib/step-up-grant";
 import {
     TWO_FACTOR_DELIVERY_METHODS,
@@ -54,6 +55,15 @@ export async function sendStepUpCodeAction(purpose: unknown, method: unknown): P
     const parsedMethod = methodField.safeParse(method);
     if (!parsedPurpose.success || !parsedMethod.success) {
         return { error: (await getTranslations("accountSecurity"))("errors.codeNotSent") };
+    }
+    // A code to name a successor is only sent for somebody else: the add it
+    // unlocks would be refused, so nothing goes out for it.
+    const purposeValue = parsedPurpose.data;
+    if (purposeValue.startsWith(NAME_SUCCESSOR_PURPOSE)) {
+        const candidate = purposeValue.slice(NAME_SUCCESSOR_PURPOSE.length);
+        if (!(await canNameSuccessor(user.id, candidate))) {
+            return { error: (await getTranslations("accountSecurity"))("errors.codeNotSent") };
+        }
     }
     return localized(await sendStepUpCode(user.id, parsedPurpose.data, parsedMethod.data as TwoFactorDeliveryMethod));
 }

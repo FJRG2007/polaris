@@ -21,7 +21,7 @@
  * on the deleting end would be worth nothing.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import type { StepUpProofInput } from "@polaris/core";
@@ -32,7 +32,8 @@ import { SlowSubmitLabel } from "@/components/slow-submit-label";
 import { stepUpProofToSend } from "@/lib/step-up-proof-client";
 import { Feedback, type SettingLock } from "./setting-card";
 import { HeartHandshake, Loader2, Trash2, UserPlus } from "lucide-react";
-import { clearSuccessorAction, setSuccessorAction } from "./successor-actions";
+import { clearSuccessorAction, lookupSuccessorAction, setSuccessorAction } from "./successor-actions";
+import { NAME_SUCCESSOR_PURPOSE } from "@/lib/successor-constants";
 import {
     Button,
     Card,
@@ -146,6 +147,7 @@ function SuccessorDialog({
     const t = useTranslations("accountSecurity");
     const tc = useTranslations("common");
     const [identifier, setIdentifier] = useState("");
+    const [found, setFound] = useState<Lookup>({ kind: "idle" });
     const [proof, setProof] = useState<StepUpProofInput | null>(null);
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
@@ -153,25 +155,60 @@ function SuccessorDialog({
 
     const open = mode !== null;
     const clearing = mode === "clear";
-    const ready = proof !== null && (clearing || identifier.trim().length > 0);
+    // Naming waits for somebody else to be picked from the lookup; removing
+    // has nobody to pick.
+    const picked = found.kind === "match" ? found.person : null;
+    const ready = proof !== null && (clearing || picked !== null);
+    const reason = clearing || ready ? "" : picked ? t("successor.needCode") : t("successor.needPerson");
+
+    // The lookup follows what is typed, after a pause, and only the last
+    // answer counts: a slow reply to an earlier word must not replace a newer one.
+    useEffect(() => {
+        setProof(null);
+        const term = identifier.trim();
+        if (clearing || term.length === 0) {
+            setFound({ kind: "idle" });
+            return;
+        }
+        setFound({ kind: "searching" });
+        let live = true;
+        const timer = setTimeout(() => {
+            lookupSuccessorAction(term)
+                .then((answer) => live && setFound(answer))
+                .catch(() => live && setFound({ kind: "failed" }));
+        }, 400);
+        return () => {
+            live = false;
+            clearTimeout(timer);
+        };
+    }, [identifier, clearing]);
     const label = clearing ? t("passkeys.remove") : current ? t("successor.change") : t("successor.add");
 
     const close = () => {
         setIdentifier("");
+        setFound({ kind: "idle" });
         setProof(null);
         setError("");
         onClose();
     };
 
     const submit = async () => {
-        if (!ready || busy || !proof) return;
+        if (busy) return;
+        if (!ready || !proof) {
+            if (reason) setError(reason);
+            return;
+        }
         setBusy(true);
         setProtecting(false);
         setError("");
         const sent = await stepUpProofToSend(proof, () => setProtecting(true));
         const result = clearing
             ? await clearSuccessorAction({ proof: sent })
-            : await setSuccessorAction({ identifier: identifier.trim(), proof: sent });
+            : await setSuccessorAction({
+                  identifier: identifier.trim(),
+                  userId: picked?.userId ?? "",
+                  proof: sent
+              });
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -218,10 +255,26 @@ function SuccessorDialog({
                         </label>
                     )}
 
-                    <StepUpFields open={open} purpose="account-successor" onChange={setProof} autoSubmit />
+                    {!clearing && <LookupResult found={found} />}
 
-                    {!clearing && (
+                    {(clearing || picked) && (
+                        <StepUpFields
+                            key={picked?.userId ?? "clear"}
+                            open={open}
+                            purpose={clearing ? "account-successor" : NAME_SUCCESSOR_PURPOSE + picked?.userId}
+                            onChange={setProof}
+                            autoSubmit
+                        />
+                    )}
+
+                    {!clearing && picked && (
                         <p className={settingType.hint}>{t("successor.consent")}</p>
+                    )}
+
+                    {reason && (
+                        <p id="successor-reason" className={settingType.hint}>
+                            {reason}
+                        </p>
                     )}
 
                     <Feedback error={error} />
@@ -233,7 +286,9 @@ function SuccessorDialog({
                         <Button
                             type="submit"
                             variant={clearing ? "danger" : "primary"}
-                            disabled={busy || !ready}
+                            disabled={busy}
+                            aria-disabled={!ready || undefined}
+                            aria-describedby={reason ? "successor-reason" : undefined}
                         >
                             {busy && <Loader2 className="size-4 shrink-0 animate-spin" />}
                             {busy ? (
@@ -246,5 +301,47 @@ function SuccessorDialog({
                 </form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** What the lookup has said about what is typed. */
+type Lookup =
+    | { kind: "idle" | "searching" | "failed" | "self" | "none" | "ambiguous" }
+    | { kind: "match"; person: { userId: string; name: string; username: string | null } };
+
+/** The lookup's answer under the field: the person found, or why nobody was. */
+function LookupResult({ found }: { found: Lookup }) {
+    const t = useTranslations("accountSecurity");
+    if (found.kind === "idle") return null;
+    if (found.kind === "searching") {
+        return (
+            <p className={cn(settingType.hint, "flex items-center gap-2")} aria-live="polite">
+                <Loader2 className="size-3.5 shrink-0 animate-spin" /> {t("successor.searching")}
+            </p>
+        );
+    }
+    if (found.kind === "match") {
+        const { person } = found;
+        return (
+            <div
+                className="border-border flex items-center gap-3 rounded-md border px-3 py-2"
+                aria-live="polite"
+            >
+                <Avatar person={{ id: person.userId, name: person.name }} size={32} />
+                <div className="min-w-0">
+                    <p className={cn(settingType.body, "truncate")} title={person.name}>
+                        {person.name}
+                    </p>
+                    {person.username && (
+                        <p className={cn(settingType.hint, "truncate")}>@{person.username}</p>
+                    )}
+                </div>
+            </div>
+        );
+    }
+    return (
+        <p className={cn(settingType.hint, "text-danger")} role="alert">
+            {t(`successor.lookup.${found.kind}` as "successor.lookup.self")}
+        </p>
     );
 }

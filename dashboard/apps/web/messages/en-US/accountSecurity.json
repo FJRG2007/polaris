@@ -600,7 +600,16 @@
         "addTitle": "Add a successor",
         "removeBody": "{name} stops being able to close the organizations you own. You can name somebody again at any time.",
         "search": "Search by username, full name, or email address",
-        "consent": "By adding a successor you acknowledge that you own this account, and you authorize Polaris to let the person named above close the organizations you own in the event of your death. This does not override next-of-kin rules or estate law where you live, and it is not a will."
+        "consent": "By adding a successor you acknowledge that you own this account, and you authorize Polaris to let the person named above close the organizations you own in the event of your death. This does not override next-of-kin rules or estate law where you live, and it is not a will.",
+        "searching": "Looking...",
+        "needPerson": "Pick the person first.",
+        "needCode": "Enter the code to continue.",
+        "lookup": {
+            "self": "That is you. Pick somebody else.",
+            "none": "No account matches that username, name or email address",
+            "ambiguous": "More than one account has that name - use their username or email address",
+            "failed": "Could not search. Try again."
+        }
     },
     "authenticator": {
         "startFailed": "Could not start setup. Check your password.",
