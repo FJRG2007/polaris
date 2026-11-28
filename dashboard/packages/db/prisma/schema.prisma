@@ -19966,6 +19966,10 @@ model HospitalityOrder {
     openedAt   DateTime  @default(now())
     closedAt   DateTime?
     updatedAt  DateTime  @updatedAt
+    // Raised by every change, so a device that edits what it saw before
+    // another device's change is refused instead of overwriting it.
+    version       Int    @default(0)
+    updatedByName String @default("")
 
     lines    HospitalityOrderLine[]
     payments HospitalityPayment[]
@@ -20071,6 +20075,31 @@ model HospitalityCashMove {
     shift HospitalityShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
 
     @@index([shiftId])
+}
+
+// Every change to an order, a payment or the till, written in the same
+// transaction as the change and never updated or deleted (enforced by a trigger).
+model HospitalityAuditEvent {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    venueId   String   @db.Uuid
+    orderId   String?  @db.Uuid
+    shiftId   String?  @db.Uuid
+    // The line, payment or cash movement it is about, when there is one.
+    subjectId String?  @db.Uuid
+    // order.open, lines.add, lines.send, line.remove, line.restore, order.discount,
+    // order.move, order.split, order.billed, payment.add, order.paid, shift.open,
+    // cash.move, shift.close, kitchen.mark.
+    kind      String
+    actorId   String?  @db.Uuid
+    actorName String   @default("")
+    // user or device.
+    actorKind String   @default("user")
+    payload   Json     @default("{}")
+    at        DateTime @default(now())
+
+    @@index([venueId, at])
+    @@index([orderId, at])
+    @@index([subjectId])
 }
 
 // Numbering series, one per venue: "<venueId>:ticket:2026", "<venueId>:z".

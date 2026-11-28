@@ -6,6 +6,7 @@
  * the table it goes to, or only some items (splitting the table).
  */
 
+import { TOUCH } from "./touch";
 import { useRef, useState } from "react";
 import { useHospitalityT, unwrap } from "./i18n";
 import type { ProductView } from "../lib/catalog";
@@ -54,7 +55,7 @@ export function LineDialog(props: {
                                                 key={option.id}
                                                 variant={on ? "primary" : "outline"}
                                                 aria-pressed={on}
-                                                className="h-auto min-h-11 min-w-0 flex-col items-start py-1.5"
+                                                className={`h-auto min-h-11 min-w-0 flex-col items-start py-1.5 ${TOUCH}`}
                                                 onClick={() => setIds(toggleModifier(groups, ids, option.id))}
                                             >
                                                 <span className="w-full truncate text-start" title={option.name}>{option.name}</span>
@@ -70,7 +71,7 @@ export function LineDialog(props: {
                     })}
                     <Input value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} placeholder={t("order.note")} aria-label={t("order.note")} />
                 </div>
-                <Button size="lg" disabled={!choice.ok} onClick={() => choice.ok && props.onConfirm(ids, note.trim())}>
+                <Button className={TOUCH} size="lg" disabled={!choice.ok} onClick={() => choice.ok && props.onConfirm(ids, note.trim())}>
                     <Check aria-hidden /> {t("order.add")}
                 </Button>
             </DialogContent>
@@ -114,8 +115,8 @@ export function MoveDialog(props: {
         if (!ready || !target) return;
         setPending(true);
         const work = whole
-            ? unwrap(() => moveOrderAction({ orderId: props.order.id, tableId: target }), t("errors.saveFailed"))
-            : unwrap(() => splitOrderAction({ orderId: props.order.id, tableId: target, targetOrderId: ids.current.order, lines: chosen }), t("errors.saveFailed"));
+            ? unwrap(() => moveOrderAction({ orderId: props.order.id, tableId: target, version: props.order.version }), t("errors.saveFailed"))
+            : unwrap(() => splitOrderAction({ orderId: props.order.id, version: props.order.version, tableId: target, targetOrderId: ids.current.order, lines: chosen }), t("errors.saveFailed"));
         work.then(() => { toast.show({ title: t("move.done", { table: targetName }) }); props.onMoved(target); })
             .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }))
             .finally(() => setPending(false));
@@ -129,8 +130,8 @@ export function MoveDialog(props: {
                 </DialogHeader>
                 <div className="flex max-h-[70dvh] flex-col gap-4 overflow-y-auto">
                     <div className="grid grid-cols-2 gap-2">
-                        <Button variant={whole ? "primary" : "outline"} aria-pressed={whole} onClick={() => setWhole(true)}>{t("move.whole")}</Button>
-                        <Button variant={whole ? "outline" : "primary"} aria-pressed={!whole} onClick={() => setWhole(false)}>{t("move.some")}</Button>
+                        <Button className={TOUCH} variant={whole ? "primary" : "outline"} aria-pressed={whole} onClick={() => setWhole(true)}>{t("move.whole")}</Button>
+                        <Button className={TOUCH} variant={whole ? "outline" : "primary"} aria-pressed={!whole} onClick={() => setWhole(false)}>{t("move.some")}</Button>
                     </div>
                     {whole ? null : (
                         <ul className="flex flex-col gap-1">
@@ -139,11 +140,11 @@ export function MoveDialog(props: {
                                 const set = (q: number) => setTake({ ...take, [l.id]: Math.min(Math.max(q, 0), l.quantity) });
                                 return (
                                     <li key={l.id} className="flex min-w-0 items-center gap-2 text-sm">
-                                        <Button variant="ghost" size="icon" aria-label={t("order.less")} disabled={n === 0} onClick={() => set(n - 1)}>
+                                        <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("order.less")} disabled={n === 0} onClick={() => set(n - 1)}>
                                             <Minus aria-hidden />
                                         </Button>
                                         <span className="w-12 shrink-0 text-center tabular-nums">{n}/{l.quantity}</span>
-                                        <Button variant="ghost" size="icon" aria-label={t("order.more")} disabled={n === l.quantity} onClick={() => set(n + 1)}>
+                                        <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("order.more")} disabled={n === l.quantity} onClick={() => set(n + 1)}>
                                             <Plus aria-hidden />
                                         </Button>
                                         <span className="min-w-0 flex-1 truncate" title={l.name}>{l.name}</span>
@@ -161,7 +162,7 @@ export function MoveDialog(props: {
                                         key={x.id}
                                         variant={x.id === target ? "primary" : "outline"}
                                         aria-pressed={x.id === target}
-                                        className={cn("min-w-0", props.busy.has(x.id) && x.id !== target && "border-sky-600")}
+                                        className={cn("min-w-0", TOUCH, props.busy.has(x.id) && x.id !== target && "border-sky-600")}
                                         onClick={() => setTarget(x.id)}
                                     >
                                         <span className="truncate" title={x.name}>{x.name}</span>
@@ -172,7 +173,7 @@ export function MoveDialog(props: {
                     ))}
                     {target && props.busy.has(target) ? <p className="text-sm text-muted-foreground">{t("move.joins", { table: targetName })}</p> : null}
                 </div>
-                <Button size="lg" disabled={!ready} onClick={move}>
+                <Button className={TOUCH} size="lg" disabled={!ready} onClick={move}>
                     <ArrowRightLeft aria-hidden /> {t("move.confirm")}
                 </Button>
             </DialogContent>

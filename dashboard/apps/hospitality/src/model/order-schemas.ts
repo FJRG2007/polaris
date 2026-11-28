@@ -8,6 +8,9 @@ import { z } from "zod";
 
 const id = z.string().uuid();
 
+/** The order version the device showed; a change on a stale view is refused. */
+const version = z.number().int().min(0).optional();
+
 export const TABLE_SHAPES = ["square", "round", "long"] as const;
 
 export const venueOnly = z.object({ venueId: id });
@@ -41,12 +44,13 @@ export type AddLinesInput = z.infer<typeof addLinesInput>;
 
 export const sendInput = z.object({ orderId: id, course: z.number().int().min(0).max(9).nullable().default(null) });
 
-export const lineOnly = z.object({ lineId: id });
+export const lineOnly = z.object({ lineId: id, version });
 
-export const moveInput = z.object({ orderId: id, tableId: id });
+export const moveInput = z.object({ orderId: id, tableId: id, version });
 
 export const splitInput = z.object({
     orderId: id,
+    version,
     tableId: id,
     /** Used only when the table has no order yet. */
     targetOrderId: id,

@@ -31,21 +31,28 @@ export async function sendLinesAction(raw: unknown): Promise<Outcome<{ sent: num
     const input = sendInput.safeParse(raw);
     if (!input.success) return invalid();
     return outcome("hospitality.use", async (user) => ({
-        sent: await orders.sendLines(input.data.orderId, input.data.course, user.id)
+        sent: await orders.sendLines(input.data.orderId, input.data.course, user)
     }));
 }
 
 export async function removeLineAction(raw: unknown): Promise<Outcome<object>> {
     const input = lineOnly.safeParse(raw);
     if (!input.success) return invalid();
-    return outcome("hospitality.use", async (user) => (await orders.removeLine(input.data.lineId, user.id), {}));
+    return outcome("hospitality.use", async (user) => (await orders.removeLine(input.data.lineId, user, input.data.version), {}));
+}
+
+/** Undo of a removed line, put back from the audit trail. */
+export async function restoreLineAction(raw: unknown): Promise<Outcome<object>> {
+    const input = lineOnly.safeParse(raw);
+    if (!input.success) return invalid();
+    return outcome("hospitality.use", async (user) => (await orders.restoreLine(input.data.lineId, user), {}));
 }
 
 export async function moveOrderAction(raw: unknown): Promise<Outcome<{ id: string }>> {
     const input = moveInput.safeParse(raw);
     if (!input.success) return invalid();
     return outcome("hospitality.use", async (user) => ({
-        id: await orders.moveOrder(input.data.orderId, input.data.tableId, user.id)
+        id: await orders.moveOrder(input.data.orderId, input.data.tableId, user, input.data.version)
     }));
 }
 

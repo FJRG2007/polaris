@@ -16,6 +16,7 @@ import { chooseModifiers } from "../model/modifiers";
 import { modifierGroupSchema } from "../model/schemas";
 import { Prisma, prisma } from "@polaris/db";
 import { HospitalityRefusal } from "./outcome";
+import { audit, LIVE, touchOrder, type Actor } from "./audit";
 import { publishHospitalityChange } from "./live";
 import type { AddLinesInput, FloorInput, OpenOrderInput, SplitInput } from "../model/order-schemas";
 import { orderTotals, type Discount, type OrderTotals, type PricedModifier } from "../model/pricing";
@@ -70,6 +71,9 @@ export interface OrderView {
     readonly paid: number;
     /** Lines already paid for by item, so a split shows only what is left. */
     readonly paidLineIds: string[];
+    /** Sent back with a change, so a change made on a stale view is refused. */
+    readonly version: number;
+    readonly updatedByName: string;
 }
 
 export interface ServiceView {
@@ -90,8 +94,6 @@ function readModifiers(raw: unknown): PricedModifier[] {
     const parsed = modifiersSchema.safeParse(raw ?? []);
     return parsed.success ? parsed.data : [];
 }
-
-const LIVE = ["open", "billed"];
 
 /** A venue's rooms and tables and every order still open, with its totals. */
 export async function readService(venueId: string): Promise<ServiceView> {
@@ -159,7 +161,9 @@ export async function readService(venueId: string): Promise<ServiceView> {
                 lines,
                 totals: orderTotals(lines, discount),
                 paid: order.payments.reduce((sum, p) => sum + p.amount, 0),
-                paidLineIds: order.payments.flatMap((p) => p.lineIds)
+                paidLineIds: order.payments.flatMap((p) => p.lineIds),
+                version: order.version,
+                updatedByName: order.updatedByName
             };
         })
     };
@@ -169,7 +173,7 @@ export async function readService(venueId: string): Promise<ServiceView> {
  * Opens an order, or answers the one already open at that table: two waiters
  * tapping the same free table at once end up on the same order, not two.
  */
-export async function openOrder(input: OpenOrderInput, actor: { id: string; name: string }): Promise<string> {
+export async function openOrder(input: OpenOrderInput, actor: Actor): Promise<string> {
     const existing = await prisma.hospitalityOrder.findUnique({ where: { id: input.id }, select: { id: true } });
     if (existing) return existing.id;
     if (input.tableId) {
@@ -184,22 +188,40 @@ export async function openOrder(input: OpenOrderInput, actor: { id: string; name
         });
         if (open) return open.id;
     }
-    await prisma.hospitalityOrder.createMany({
-        data: [
-            {
-                id: input.id,
-                venueId: input.venueId,
-                tableId: input.tableId,
-                label: input.label,
-                covers: input.covers,
-                waiterId: actor.id,
-                waiterName: actor.name
-            }
-        ],
-        skipDuplicates: true
-    });
+    try {
+        await createOrder(input, actor);
+    } catch (caught) {
+        // Another device opened this table a moment ago: both end up on that order.
+        if (!(caught instanceof Prisma.PrismaClientKnownRequestError && caught.code === "P2002") || !input.tableId) throw caught;
+        const open = await prisma.hospitalityOrder.findFirst({ where: { tableId: input.tableId, status: { in: LIVE } }, select: { id: true } });
+        if (!open) throw caught;
+        return open.id;
+    }
     publishHospitalityChange({ venueId: input.venueId, actorId: actor.id, topic: "orders" });
     return input.id;
+}
+
+function createOrder(input: OpenOrderInput, actor: Actor) {
+    return prisma.$transaction(async (tx) => {
+        const made = await tx.hospitalityOrder.createMany({
+            data: [
+                {
+                    id: input.id,
+                    venueId: input.venueId,
+                    tableId: input.tableId,
+                    label: input.label,
+                    covers: input.covers,
+                    waiterId: actor.device ? null : actor.id,
+                    waiterName: actor.name,
+                    updatedByName: actor.name
+                }
+            ],
+            skipDuplicates: true
+        });
+        if (made.count > 0) {
+            await audit(tx, actor, { venueId: input.venueId, orderId: input.id, kind: "order.open", payload: { tableId: input.tableId, label: input.label, covers: input.covers } });
+        }
+    });
 }
 
 async function liveOrder(orderId: string) {
@@ -215,9 +237,10 @@ async function liveOrder(orderId: string) {
 /**
  * Adds lines at the menu's price for the order's venue. A line id already
  * stored is skipped, so a replay adds nothing. A product that is sold out or
- * gone is refused by name, so the waiter can tell the table.
+ * gone is refused by name, so the waiter can tell the table. Adding never
+ * needs the version the device saw: two waiters adding to one table both land.
  */
-export async function addLines(input: AddLinesInput, actor: { id: string; name: string }): Promise<void> {
+export async function addLines(input: AddLinesInput, actor: Actor): Promise<void> {
     const order = await liveOrder(input.orderId);
     const ids = [...new Set(input.lines.map((l) => l.productId))];
     const [products, overrides, stored] = await Promise.all([
@@ -261,48 +284,149 @@ export async function addLines(input: AddLinesInput, actor: { id: string; name: 
             byName: actor.name
         };
     });
-    await prisma.hospitalityOrderLine.createMany({ data: rows, skipDuplicates: true });
-    publishHospitalityChange({ venueId: order.venueId, actorId: actor.id, topic: "orders" });
+    const added = await prisma.$transaction(async (tx) => {
+        await touchOrder(tx, order.id, actor);
+        const made = await tx.hospitalityOrderLine.createMany({ data: rows, skipDuplicates: true });
+        if (made.count > 0) {
+            await audit(tx, actor, {
+                venueId: order.venueId,
+                orderId: order.id,
+                kind: "lines.add",
+                payload: { lines: rows.map((r) => ({ id: r.id, name: r.name, quantity: r.quantity, unitPrice: r.unitPrice })) }
+            });
+        }
+        return made.count;
+    });
+    if (added > 0) publishHospitalityChange({ venueId: order.venueId, actorId: actor.id, topic: "orders" });
 }
 
 /** Fires what is still pending ("marchar"): all of it, or one course. */
-export async function sendLines(orderId: string, course: number | null, actorId: string): Promise<number> {
+export async function sendLines(orderId: string, course: number | null, actor: Actor): Promise<number> {
     const order = await liveOrder(orderId);
-    const sent = await prisma.hospitalityOrderLine.updateMany({
-        where: { orderId, status: "pending", ...(course === null ? {} : { course }) },
-        data: { status: "sent", sentAt: new Date() }
+    const count = await prisma.$transaction(async (tx) => {
+        await touchOrder(tx, orderId, actor);
+        const sent = await tx.hospitalityOrderLine.updateMany({
+            where: { orderId, status: "pending", ...(course === null ? {} : { course }) },
+            data: { status: "sent", sentAt: new Date() }
+        });
+        if (sent.count > 0) await audit(tx, actor, { venueId: order.venueId, orderId, kind: "lines.send", payload: { course, count: sent.count } });
+        return sent.count;
     });
-    publishHospitalityChange({ venueId: order.venueId, actorId, topic: "kitchen" });
-    return sent.count;
+    publishHospitalityChange({ venueId: order.venueId, actorId: actor.id, topic: "kitchen" });
+    return count;
 }
 
-/** A pending line is simply removed; a sent one is voided so the kitchen sees it. */
-export async function removeLine(lineId: string, actorId: string): Promise<void> {
-    const line = await prisma.hospitalityOrderLine.findUnique({ where: { id: lineId }, select: { orderId: true, status: true } });
-    if (!line) return;
+const UNDO_WINDOW_MS = 10 * 60_000;
+
+/**
+ * A pending line is simply removed; a sent one is voided so the kitchen sees
+ * it. What the line was is kept in the audit event, which is what an undo
+ * puts back - never a copy sent by the device.
+ */
+export async function removeLine(lineId: string, actor: Actor, seen?: number): Promise<void> {
+    const line = await prisma.hospitalityOrderLine.findUnique({ where: { id: lineId } });
+    if (!line || line.status === "void") return;
     const order = await liveOrder(line.orderId);
-    if (line.status === "pending") await prisma.hospitalityOrderLine.delete({ where: { id: lineId } });
-    else await prisma.hospitalityOrderLine.update({ where: { id: lineId }, data: { status: "void" } });
-    publishHospitalityChange({ venueId: order.venueId, actorId, topic: "orders" });
+    await prisma.$transaction(async (tx) => {
+        await touchOrder(tx, order.id, actor, seen);
+        if (line.status === "pending") await tx.hospitalityOrderLine.delete({ where: { id: lineId } });
+        else await tx.hospitalityOrderLine.update({ where: { id: lineId }, data: { status: "void" } });
+        await audit(tx, actor, {
+            venueId: order.venueId,
+            orderId: order.id,
+            subjectId: lineId,
+            kind: "line.remove",
+            payload: { line: { ...line, createdAt: line.createdAt.toISOString(), sentAt: line.sentAt?.toISOString() ?? null, readyAt: line.readyAt?.toISOString() ?? null } }
+        });
+    });
+    publishHospitalityChange({ venueId: order.venueId, actorId: actor.id, topic: "orders" });
+}
+
+const removedLineSchema = z.object({
+    line: z
+        .object({
+            id: z.string(),
+            orderId: z.string(),
+            productId: z.string().nullable(),
+            name: z.string(),
+            unitPrice: z.number().int(),
+            taxRateBp: z.number().int(),
+            quantity: z.number().int(),
+            modifiers: z.unknown(),
+            note: z.string(),
+            course: z.number().int(),
+            station: z.string(),
+            status: z.string(),
+            discount: z.unknown(),
+            byName: z.string()
+        })
+        .passthrough()
+});
+
+/** Undo of a removal: the line comes back as it was, from the audit trail, once. */
+export async function restoreLine(lineId: string, actor: Actor): Promise<void> {
+    const event = await prisma.hospitalityAuditEvent.findFirst({
+        where: { subjectId: lineId, kind: "line.remove", at: { gte: new Date(Date.now() - UNDO_WINDOW_MS) } },
+        orderBy: { at: "desc" }
+    });
+    const parsed = removedLineSchema.safeParse(event?.payload);
+    if (!event || !parsed.success) throw new HospitalityRefusal("orders.undoExpired");
+    const was = parsed.data.line;
+    const order = await liveOrder(was.orderId);
+    const restored = await prisma.$transaction(async (tx) => {
+        await touchOrder(tx, order.id, actor);
+        const now = await tx.hospitalityOrderLine.findUnique({ where: { id: lineId }, select: { status: true } });
+        if (now && now.status !== "void") return false;
+        if (now) {
+            await tx.hospitalityOrderLine.update({ where: { id: lineId }, data: { status: was.status } });
+        } else {
+            await tx.hospitalityOrderLine.create({
+                data: {
+                    id: was.id,
+                    orderId: was.orderId,
+                    productId: was.productId,
+                    name: was.name,
+                    unitPrice: was.unitPrice,
+                    taxRateBp: was.taxRateBp,
+                    quantity: was.quantity,
+                    modifiers: (was.modifiers ?? []) as Prisma.InputJsonValue,
+                    note: was.note,
+                    course: was.course,
+                    station: was.station,
+                    status: was.status,
+                    discount: was.discount == null ? Prisma.DbNull : (was.discount as Prisma.InputJsonValue),
+                    byName: was.byName
+                }
+            });
+        }
+        await audit(tx, actor, { venueId: order.venueId, orderId: order.id, subjectId: lineId, kind: "line.restore", payload: { status: was.status } });
+        return true;
+    });
+    if (restored) publishHospitalityChange({ venueId: order.venueId, actorId: actor.id, topic: "orders" });
 }
 
 /** Moves an order to another free table, or merges it into the order already there. */
-export async function moveOrder(orderId: string, tableId: string, actorId: string): Promise<string> {
+export async function moveOrder(orderId: string, tableId: string, actor: Actor, seen?: number): Promise<string> {
     const order = await liveOrder(orderId);
+    const table = await prisma.hospitalityTable.findFirst({ where: { id: tableId, room: { venueId: order.venueId } }, select: { id: true } });
+    if (!table) throw new HospitalityRefusal("orders.tableGone");
     const target = await prisma.hospitalityOrder.findFirst({
         where: { tableId, status: { in: LIVE }, id: { not: orderId } },
         select: { id: true }
     });
-    if (target) {
-        await prisma.$transaction([
-            prisma.hospitalityOrderLine.updateMany({ where: { orderId }, data: { orderId: target.id } }),
-            prisma.hospitalityPayment.updateMany({ where: { orderId }, data: { orderId: target.id } }),
-            prisma.hospitalityOrder.update({ where: { id: orderId }, data: { status: "void", closedAt: new Date() } })
-        ]);
-    } else {
-        await prisma.hospitalityOrder.update({ where: { id: orderId }, data: { tableId } });
-    }
-    publishHospitalityChange({ venueId: order.venueId, actorId, topic: "orders" });
+    await prisma.$transaction(async (tx) => {
+        await touchOrder(tx, orderId, actor, seen);
+        if (target) {
+            await touchOrder(tx, target.id, actor);
+            await tx.hospitalityOrderLine.updateMany({ where: { orderId }, data: { orderId: target.id } });
+            await tx.hospitalityPayment.updateMany({ where: { orderId }, data: { orderId: target.id } });
+            await tx.hospitalityOrder.update({ where: { id: orderId }, data: { status: "void", closedAt: new Date() } });
+        } else {
+            await tx.hospitalityOrder.update({ where: { id: orderId }, data: { tableId } });
+        }
+        await audit(tx, actor, { venueId: order.venueId, orderId, kind: "order.move", payload: { tableId, mergedInto: target?.id ?? null } });
+    });
+    publishHospitalityChange({ venueId: order.venueId, actorId: actor.id, topic: "orders" });
     return target?.id ?? orderId;
 }
 
@@ -312,7 +436,7 @@ export async function moveOrder(orderId: string, tableId: string, actorId: strin
  * made. Part of a line (two of three beers) leaves as a new line with the id
  * the device made, so a replay finds it stored and moves nothing twice.
  */
-export async function splitOrder(input: SplitInput, actor: { id: string; name: string }): Promise<string> {
+export async function splitOrder(input: SplitInput, actor: Actor): Promise<string> {
     const order = await liveOrder(input.orderId);
     const table = await prisma.hospitalityTable.findFirst({ where: { id: input.tableId, room: { venueId: order.venueId } }, select: { id: true } });
     if (!table) throw new HospitalityRefusal("orders.tableGone");
@@ -322,20 +446,31 @@ export async function splitOrder(input: SplitInput, actor: { id: string; name: s
         where: { tableId: input.tableId, status: { in: LIVE }, id: { not: order.id } },
         select: { id: true }
     });
-    const lines = await prisma.hospitalityOrderLine.findMany({
-        where: { orderId: order.id, id: { in: input.lines.map((l) => l.lineId) }, status: { not: "void" } }
-    });
-    const byId = new Map(lines.map((l) => [l.id, l]));
     const targetId = existing?.id ?? input.targetOrderId;
     await prisma.$transaction(async (tx) => {
-        if (!existing) {
+        await touchOrder(tx, order.id, actor, input.version);
+        // Read under the lock, so the quantities split are the ones stored now.
+        const lines = await tx.hospitalityOrderLine.findMany({
+            where: { orderId: order.id, id: { in: input.lines.map((l) => l.lineId) }, status: { not: "void" } }
+        });
+        const byId = new Map(lines.map((l) => [l.id, l]));
+        if (existing) {
+            await touchOrder(tx, existing.id, actor);
+        } else {
             await tx.hospitalityOrder.create({
-                data: { id: targetId, venueId: order.venueId, tableId: input.tableId, waiterId: actor.id, waiterName: actor.name }
+                data: {
+                    id: targetId,
+                    venueId: order.venueId,
+                    tableId: input.tableId,
+                    waiterId: actor.device ? null : actor.id,
+                    waiterName: actor.name,
+                    updatedByName: actor.name
+                }
             });
         }
         for (const move of input.lines) {
             const line = byId.get(move.lineId);
-            if (!line) throw new HospitalityRefusal("orders.gone");
+            if (!line) throw new HospitalityRefusal("orders.changed");
             const quantity = Math.min(move.quantity, line.quantity);
             if (quantity === line.quantity) {
                 await tx.hospitalityOrderLine.update({ where: { id: line.id }, data: { orderId: targetId } });
@@ -354,6 +489,12 @@ export async function splitOrder(input: SplitInput, actor: { id: string; name: s
                 }
             });
         }
+        await audit(tx, actor, {
+            venueId: order.venueId,
+            orderId: order.id,
+            kind: "order.split",
+            payload: { targetOrderId: targetId, tableId: input.tableId, lines: input.lines }
+        });
     });
     publishHospitalityChange({ venueId: order.venueId, actorId: actor.id, topic: "orders" });
     return targetId;

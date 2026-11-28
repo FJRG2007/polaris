@@ -14,6 +14,8 @@ export const markInput = z.object({ lineIds: z.array(id).min(1).max(200), ready:
 
 export const discountInput = z.object({
     orderId: id,
+    /** The order version the device showed; a change on a stale view is refused. */
+    version: z.number().int().min(0).optional(),
     lineId: id.nullable().default(null),
     discount: z
         .object({

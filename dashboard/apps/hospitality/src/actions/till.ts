@@ -21,19 +21,19 @@ export async function readKitchenAction(raw: unknown): Promise<Outcome<{ tickets
 export async function markLinesAction(raw: unknown): Promise<Outcome<object>> {
     const input = markInput.safeParse(raw);
     if (!input.success) return invalid();
-    return outcome("hospitality.use", async (user) => (await till.markLines(input.data.lineIds, input.data.ready, user.id), {}));
+    return outcome("hospitality.use", async (user) => (await till.markLines(input.data.lineIds, input.data.ready, user), {}));
 }
 
 export async function setDiscountAction(raw: unknown): Promise<Outcome<object>> {
     const input = discountInput.safeParse(raw);
     if (!input.success) return invalid();
-    return outcome("hospitality.manage", async (user) => (await till.setDiscount(input.data, user.id), {}));
+    return outcome("hospitality.manage", async (user) => (await till.setDiscount(input.data, user), {}));
 }
 
 export async function markBilledAction(raw: unknown): Promise<Outcome<object>> {
     const input = orderOnly.safeParse(raw);
     if (!input.success) return invalid();
-    return outcome("hospitality.use", async (user) => (await till.markBilled(input.data.orderId, user.id), {}));
+    return outcome("hospitality.use", async (user) => (await till.markBilled(input.data.orderId, user), {}));
 }
 
 export async function payAction(raw: unknown): Promise<Outcome<{ closed: boolean; ticketNo: string | null; due: number }>> {

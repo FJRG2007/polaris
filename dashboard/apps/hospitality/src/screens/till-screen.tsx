@@ -9,6 +9,7 @@
  * Also the payment and discount dialogs the order panel opens.
  */
 
+import { TOUCH } from "./touch";
 import { useMoney } from "./menu-screen";
 import { parsePrice } from "../model/catalog-csv";
 import { useHospitalityLive } from "./live-client";
@@ -16,6 +17,7 @@ import { readMenuAction } from "../actions/catalog";
 import type { closeShift, xReport } from "../lib/till";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { OrderView } from "../lib/orders";
+import type { OfflineQueue } from "./offline";
 import { changeDue, itemsDue, lineTotal, quickTenders, splitEvenly } from "../model/pricing";
 import { readCache, unwrap, useHospitalityT } from "./i18n";
 import { Banknote, CreditCard, Minus, Percent, Plus } from "lucide-react";
@@ -61,7 +63,7 @@ export function TillScreen() {
                 <Row label={t("till.expected")} value={money(closed.expected)} />
                 <Row label={closed.difference < 0 ? t("till.short") : t("till.over")} value={money(Math.abs(closed.difference))} strong />
                 <Report report={closed.report} money={money} />
-                <Button onClick={() => { setClosed(null); load(); }}>{t("till.next")}</Button>
+                <Button className={TOUCH} onClick={() => { setClosed(null); load(); }}>{t("till.next")}</Button>
             </div>
         );
     }
@@ -72,7 +74,7 @@ export function TillScreen() {
             <div className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
                 <h2 className="text-xl font-semibold">{t("till.openTitle")}</h2>
                 <Input inputMode="decimal" value={float} onChange={(e) => setFloat(e.target.value)} placeholder="0,00" aria-label={t("till.float")} />
-                <Button size="lg" disabled={cents === null} onClick={() => cents !== null && unwrap(() => openShiftAction({ venueId: venue.id, float: cents }), t("errors.saveFailed")).then(load).catch(fail)}>
+                <Button className={TOUCH} size="lg" disabled={cents === null} onClick={() => cents !== null && unwrap(() => openShiftAction({ venueId: venue.id, float: cents }), t("errors.saveFailed")).then(load).catch(fail)}>
                     {t("till.open")}
                 </Button>
             </div>
@@ -102,7 +104,7 @@ export function TillScreen() {
                         <Input inputMode="decimal" value={move.amount} onChange={(e) => setMove({ ...move, amount: e.target.value })} placeholder="0,00" aria-label={t("till.amount")} />
                     </div>
                     <Input value={move.reason} maxLength={120} onChange={(e) => setMove({ ...move, reason: e.target.value })} placeholder={t("till.reason")} />
-                    <Button
+                    <Button className={TOUCH}
                         variant="outline"
                         disabled={!moveCents}
                         onClick={() =>
@@ -119,7 +121,7 @@ export function TillScreen() {
                     <h3 className="font-medium">{t("till.closeTitle")}</h3>
                     <p className="text-sm text-muted-foreground">{t("till.closeHint")}</p>
                     <Input inputMode="decimal" value={count} onChange={(e) => setCount(e.target.value)} placeholder="0,00" aria-label={t("till.counted")} />
-                    <Button
+                    <Button className={TOUCH}
                         disabled={countCents === null}
                         onClick={() =>
                             countCents !== null &&
@@ -175,7 +177,7 @@ type PayMode = "whole" | "items" | "even";
  * Taking payment: the whole bill, some items (split by item) or one equal
  * part; a tip on top; then cash with one-tap amounts and the change, or card.
  */
-export function PayDialog(props: { order: OrderView; currency: string; onClose: () => void; onPaid: (ticketNo: string | null) => void; }) {
+export function PayDialog(props: { order: OrderView; currency: string; queue: OfflineQueue; onClose: () => void; onPaid: (ticketNo: string | null) => void; }) {
     const t = useHospitalityT();
     const toast = useToast();
     const money = useMoney(props.currency);
@@ -206,12 +208,39 @@ export function PayDialog(props: { order: OrderView; currency: string; onClose: 
         busy.current = true;
         setPending(true);
         const lineIds = mode === "items" ? [...chosen] : [];
-        unwrap(() => payAction({ orderId: props.order.id, payments: [{ id: paymentId(`${method}:${due}:${tip}:${lineIds.join(",")}`), method, amount: due, tip, tendered: handed, lineIds }] }), t("errors.saveFailed"))
-            .then((answer) => {
-                if (method === "cash" && handed > total) toast.show({ title: t("pay.change", { amount: money(changeDue(total, handed)) }) });
-                if (answer.closed) props.onPaid(answer.ticketNo);
-                else props.onClose();
-            })
+        const id = paymentId(`${method}:${due}:${tip}:${lineIds.join(",")}`);
+        const payload = { orderId: props.order.id, payments: [{ id, method, amount: due, tip, tendered: handed, lineIds }] };
+        const change = () => method === "cash" && handed > total && toast.show({ title: t("pay.change", { amount: money(changeDue(total, handed)) }) });
+        // A payment is shown as done only once the server took it, or once it is in this
+        // device's queue that replays it (same id, so it is stored once) when the server is back.
+        // Anything already queued goes first, so the payment never overtakes the lines it pays.
+        const queued = async () => {
+            const result = await props.queue.submit([{ id: `pay:${id}`, kind: "pay", payload }]);
+            if (result.refused.length > 0) throw new Error(result.refused[0]);
+            change();
+            if (result.left > 0) {
+                toast.show({ title: t("offline.paymentQueued") });
+                return props.onClose();
+            }
+            // Sent from the queue: ask again (the same id changes nothing) for the ticket number.
+            const answer = await unwrap(() => payAction(payload), t("errors.saveFailed"));
+            if (answer.closed) props.onPaid(answer.ticketNo);
+            else props.onClose();
+        };
+        const direct = async () => {
+            let answer: Awaited<ReturnType<typeof payAction>>;
+            try {
+                answer = await payAction(payload);
+            } catch {
+                // No answer at all (no network, the server restarting): keep it on the device.
+                return queued();
+            }
+            if (!answer.ok) throw new Error(answer.error);
+            change();
+            if (answer.closed) props.onPaid(answer.ticketNo);
+            else props.onClose();
+        };
+        (props.queue.waiting > 0 ? queued() : direct())
             .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }))
             .finally(() => { busy.current = false; setPending(false); });
     };
@@ -238,7 +267,7 @@ export function PayDialog(props: { order: OrderView; currency: string; onClose: 
                 <div className="flex max-h-[75dvh] flex-col gap-3 overflow-y-auto">
                     <div className="grid grid-cols-3 gap-1.5">
                         {(["whole", "items", "even"] as const).map((m) => (
-                            <Button key={m} size="sm" variant={mode === m ? "primary" : "outline"} aria-pressed={mode === m} onClick={() => setMode(m)}>
+                            <Button className={TOUCH} key={m} size="sm" variant={mode === m ? "primary" : "outline"} aria-pressed={mode === m} onClick={() => setMode(m)}>
                                 <span className="truncate">{t(`pay.modes.${m}`)}</span>
                             </Button>
                         ))}
@@ -263,22 +292,22 @@ export function PayDialog(props: { order: OrderView; currency: string; onClose: 
                     ) : null}
                     {mode === "even" ? (
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" size="icon" aria-label={t("pay.fewer")} disabled={parts <= 2} onClick={() => setParts(parts - 1)}>
+                            <Button className={TOUCH} variant="outline" size="icon" aria-label={t("pay.fewer")} disabled={parts <= 2} onClick={() => setParts(parts - 1)}>
                                 <Minus aria-hidden />
                             </Button>
                             <span className="min-w-0 flex-1 truncate text-center">{t("pay.parts", { count: parts, amount: money(due) })}</span>
-                            <Button variant="outline" size="icon" aria-label={t("pay.more")} disabled={parts >= 50} onClick={() => setParts(parts + 1)}>
+                            <Button className={TOUCH} variant="outline" size="icon" aria-label={t("pay.more")} disabled={parts >= 50} onClick={() => setParts(parts + 1)}>
                                 <Plus aria-hidden />
                             </Button>
                         </div>
                     ) : null}
                     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                         <span className="me-1 text-sm text-muted-foreground">{t("pay.tip")}</span>
-                        <Button size="sm" variant={tipPercent === null && !tipTyped ? "primary" : "outline"} onClick={() => { setTipPercent(null); setTipTyped(""); }}>
+                        <Button className={TOUCH} size="sm" variant={tipPercent === null && !tipTyped ? "primary" : "outline"} onClick={() => { setTipPercent(null); setTipTyped(""); }}>
                             {t("pay.noTip")}
                         </Button>
                         {TIP_PERCENTS.map((p) => (
-                            <Button key={p} size="sm" variant={tipPercent === p ? "primary" : "outline"} onClick={() => { setTipPercent(p); setTipTyped(""); }}>
+                            <Button className={TOUCH} key={p} size="sm" variant={tipPercent === p ? "primary" : "outline"} onClick={() => { setTipPercent(p); setTipTyped(""); }}>
                                 {p} %
                             </Button>
                         ))}
@@ -295,20 +324,20 @@ export function PayDialog(props: { order: OrderView; currency: string; onClose: 
                         <>
                             <div className="grid grid-cols-2 gap-2">
                                 {quickTenders(total).map((amount) => (
-                                    <Button key={amount} size="lg" variant="outline" disabled={pending} onClick={() => pay("cash", amount)}>
+                                    <Button className={TOUCH} key={amount} size="lg" variant="outline" disabled={pending} onClick={() => pay("cash", amount)}>
                                         <Banknote aria-hidden /> {money(amount)}
                                     </Button>
                                 ))}
                             </div>
                             <div className="flex gap-2">
                                 <Input inputMode="decimal" value={tendered} onChange={(e) => setTendered(e.target.value)} placeholder={t("pay.handed")} aria-label={t("pay.handed")} />
-                                <Button disabled={pending || typed === null || typed < total} onClick={() => typed !== null && pay("cash", typed)}>
+                                <Button className={TOUCH} disabled={pending || typed === null || typed < total} onClick={() => typed !== null && pay("cash", typed)}>
                                     {t("pay.methods.cash")}
                                 </Button>
                             </div>
                             {typed !== null && typed > total ? <p className="text-lg font-semibold">{t("pay.change", { amount: money(changeDue(total, typed)) })}</p> : null}
                             {typed !== null && typed < total && typed > 0 ? <p className="text-sm text-muted-foreground">{t("pay.short", { amount: money(total - typed) })}</p> : null}
-                            <Button size="lg" disabled={pending} onClick={() => pay("card", 0)}>
+                            <Button className={TOUCH} size="lg" disabled={pending} onClick={() => pay("card", 0)}>
                                 <CreditCard aria-hidden /> {t("pay.card", { amount: money(total) })}
                             </Button>
                             {due < left ? <p className="text-sm text-muted-foreground">{t("pay.partial", { amount: money(left - due) })}</p> : null}
@@ -322,7 +351,7 @@ export function PayDialog(props: { order: OrderView; currency: string; onClose: 
     );
 }
 /** A discount on the whole order or on one line, with a reason; Remove takes it off. */
-export function DiscountDialog(props: { orderId: string; lineId?: string; lineName?: string; onClose: () => void; onSaved: () => void }) {
+export function DiscountDialog(props: { orderId: string; version?: number; lineId?: string; lineName?: string; onClose: () => void; onSaved: () => void }) {
     const t = useHospitalityT();
     const toast = useToast();
     const [kind, setKind] = useState<"percent" | "amount">("percent");
@@ -331,7 +360,7 @@ export function DiscountDialog(props: { orderId: string; lineId?: string; lineNa
     const n = kind === "percent" ? Math.round(Number(value.replace(",", ".")) * 100) : parsePrice(value);
     const ok = n !== null && Number.isFinite(n) && n > 0 && (kind === "amount" || n <= 10_000);
     const save = (discount: { kind: "percent" | "amount"; value: number; reason: string } | null) =>
-        unwrap(() => setDiscountAction({ orderId: props.orderId, lineId: props.lineId ?? null, discount }), t("errors.saveFailed"))
+        unwrap(() => setDiscountAction({ orderId: props.orderId, version: props.version, lineId: props.lineId ?? null, discount }), t("errors.saveFailed"))
             .then(() => { props.onSaved(); props.onClose(); })
             .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }));
     return (
@@ -347,8 +376,8 @@ export function DiscountDialog(props: { orderId: string; lineId?: string; lineNa
                     </div>
                     <Input value={reason} maxLength={80} onChange={(e) => setReason(e.target.value)} placeholder={t("discount.reason")} />
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => save(null)}>{t("discount.remove")}</Button>
-                        <Button className="flex-1" disabled={!ok} onClick={() => ok && n !== null && save({ kind, value: n, reason })}>
+                        <Button className={TOUCH} variant="outline" onClick={() => save(null)}>{t("discount.remove")}</Button>
+                        <Button className={`flex-1 ${TOUCH}`} disabled={!ok} onClick={() => ok && n !== null && save({ kind, value: n, reason })}>
                             <Percent aria-hidden /> {t("discount.apply")}
                         </Button>
                     </div>

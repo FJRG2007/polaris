@@ -173,7 +173,12 @@
         "closed": "That order is already closed.",
         "soldOut": "Something on it is sold out.",
         "modifiers": "Pick the options this one needs.",
-        "tableBusy": "A table you removed still has an open order."
+        "tableBusy": "A table you removed still has an open order.",
+        "changed": "Another device changed this table just now. It is up to date: check it and try again.",
+        "undoExpired": "That can no longer be undone.",
+        "removed": "{name} removed",
+        "undo": "Undo",
+        "lastChange": "Last change: {name}"
     },
     "kitchen": {
         "station": "Station",
@@ -246,7 +251,8 @@
     },
     "offline": {
         "queued": "No network: saved on this device, it will be sent",
-        "waiting": "{count} waiting",
+        "paymentQueued": "No network: the payment is saved on this device and will be sent",
+        "waiting": "Offline: {count} waiting",
         "waitingHint": "Saved on this device; sent as soon as the network is back"
     },
     "move": {

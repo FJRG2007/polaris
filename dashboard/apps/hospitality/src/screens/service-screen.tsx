@@ -11,6 +11,7 @@
  * prices every line and computes every total.
  */
 
+import { TOUCH } from "./touch";
 import { useMoney } from "./menu-screen";
 import { DiscountDialog, PayDialog } from "./till-screen";
 import { LineDialog, MoveDialog } from "./order-dialogs";
@@ -26,7 +27,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRightLeft, Euro, Minus, Move, Percent, Plus, Receipt, Save, Send, Trash2 } from "lucide-react";
 import type { LineView, OrderView, RoomView, ServiceView, TableView } from "../lib/orders";
 import { Button, EmptyState, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
-import { readServiceAction, removeLineAction, saveFloorAction } from "../actions/orders";
+import { readServiceAction, removeLineAction, restoreLineAction, saveFloorAction } from "../actions/orders";
 import { useOfflineQueue } from "./offline";
 
 const COURSES = ["0", "1", "2", "3"] as const;
@@ -105,12 +106,12 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
             <section className={cn("min-h-0 min-w-0 flex-1 flex-col overflow-auto p-3", table ? "hidden md:flex" : "flex")}>
                 <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
                     {service.rooms.map((r) => (
-                        <Button key={r.id} variant={r.id === room.id ? "primary" : "outline"} size={basic ? "lg" : "md"} onClick={() => setRoomId(r.id)}>
+                        <Button className={TOUCH} key={r.id} variant={r.id === room.id ? "primary" : "outline"} size={basic ? "lg" : "md"} onClick={() => setRoomId(r.id)}>
                             <span className="max-w-40 truncate" title={r.name}>{r.name}</span>
                         </Button>
                     ))}
                     {manager ? (
-                        <Button variant="ghost" onClick={() => setEditing(!editing)}>
+                        <Button className={TOUCH} variant="ghost" onClick={() => setEditing(!editing)}>
                             <Move aria-hidden /> {editing ? t("floor.done") : t("floor.edit")}
                         </Button>
                     ) : null}
@@ -214,7 +215,7 @@ function FloorEditor(props: { venueId: string; room: RoomView; onSaved: () => vo
         <div className="flex min-w-0 flex-col gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Input className="w-48" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} aria-label={t("floor.roomName")} />
-                <Button
+                <Button className={TOUCH}
                     variant="outline"
                     onClick={() => {
                         const key = crypto.randomUUID();
@@ -224,7 +225,7 @@ function FloorEditor(props: { venueId: string; room: RoomView; onSaved: () => vo
                 >
                     <Plus aria-hidden /> {t("floor.addTable")}
                 </Button>
-                <Button onClick={save}>
+                <Button className={TOUCH} onClick={save}>
                     <Save aria-hidden /> {t("actions.save")}
                 </Button>
             </div>
@@ -236,14 +237,14 @@ function FloorEditor(props: { venueId: string; room: RoomView; onSaved: () => vo
                         onValueChange={(shape) => update(current.key, { shape })}
                         options={TABLE_SHAPES.map((s) => ({ value: s, label: t(`floor.shape.${s}`) }))}
                     />
-                    <Button variant="outline" size="icon" aria-label={t("floor.fewerSeats")} onClick={() => update(current.key, { seats: Math.max(1, current.seats - 1) })}>
+                    <Button className={TOUCH} variant="outline" size="icon" aria-label={t("floor.fewerSeats")} onClick={() => update(current.key, { seats: Math.max(1, current.seats - 1) })}>
                         <Minus aria-hidden />
                     </Button>
                     <span className="tabular-nums">{t("floor.seats", { count: current.seats })}</span>
-                    <Button variant="outline" size="icon" aria-label={t("floor.moreSeats")} onClick={() => update(current.key, { seats: Math.min(60, current.seats + 1) })}>
+                    <Button className={TOUCH} variant="outline" size="icon" aria-label={t("floor.moreSeats")} onClick={() => update(current.key, { seats: Math.min(60, current.seats + 1) })}>
                         <Plus aria-hidden />
                     </Button>
-                    <Button variant="ghost" aria-label={t("floor.removeTable")} onClick={() => { setTables((all) => all.filter((x) => x.key !== current.key)); setPicked(null); }}>
+                    <Button className={TOUCH} variant="ghost" aria-label={t("floor.removeTable")} onClick={() => { setTables((all) => all.filter((x) => x.key !== current.key)); setPicked(null); }}>
                         <Trash2 aria-hidden />
                     </Button>
                 </div>
@@ -385,18 +386,47 @@ function OrderPanel(props: {
         }
     };
 
-    const remove = (lineId: string) =>
-        unwrap(() => removeLineAction({ lineId }), t("errors.saveFailed"))
-            .then(props.onChanged)
-            .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }));
+    // No confirm on the hot path: the line goes at once and the note offers it back.
+    // The version shown goes with it, so a line another device just changed is not removed blind.
+    const remove = (line: { id: string; name: string }) =>
+        unwrap(() => removeLineAction({ lineId: line.id, version: props.order?.version }), t("errors.saveFailed"))
+            .then(() => {
+                props.onChanged();
+                toast.show({
+                    key: `removed:${line.id}`,
+                    title: t("orders.removed", { name: line.name }),
+                    life: 10_000,
+                    actions: [
+                        {
+                            label: t("orders.undo"),
+                            run: async () => {
+                                const answer = await restoreLineAction({ lineId: line.id });
+                                props.onChanged();
+                                return answer.ok ? null : answer.error;
+                            }
+                        }
+                    ]
+                });
+            })
+            .catch((caught: Error) => {
+                props.onChanged();
+                toast.show({ title: t("errors.saveFailed"), body: caught.message });
+            });
 
     return (
         <section className="flex min-h-0 w-full min-w-0 flex-col border-s bg-background md:w-[28rem] lg:w-[34rem]">
             <header className="flex min-w-0 items-center gap-2 border-b p-2">
-                <Button variant="ghost" size="icon" aria-label={t("order.back")} onClick={props.onClose}>
+                <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("order.back")} onClick={props.onClose}>
                     <ArrowLeft aria-hidden />
                 </Button>
-                <h2 className="min-w-0 flex-1 truncate text-lg font-semibold">{t("floor.table")} {props.table.name}</h2>
+                <div className="flex min-w-0 flex-1 flex-col">
+                    <h2 className="truncate text-lg font-semibold">{t("floor.table")} {props.table.name}</h2>
+                    {props.order?.updatedByName ? (
+                        <span className="truncate text-xs text-muted-foreground" title={props.order.updatedByName}>
+                            {t("orders.lastChange", { name: props.order.updatedByName })}
+                        </span>
+                    ) : null}
+                </div>
                 <Select
                     aria-label={t("order.course")}
                     value={String(course)}
@@ -406,7 +436,7 @@ function OrderPanel(props: {
             </header>
             <div className="flex min-w-0 gap-1.5 overflow-x-auto border-b p-2">
                 {props.menu.categories.map((c) => (
-                    <Button key={c.id} size={props.basic ? "lg" : "sm"} variant={c.id === category ? "primary" : "outline"} onClick={() => setCategory(c.id)}>
+                    <Button className={TOUCH} key={c.id} size={props.basic ? "lg" : "sm"} variant={c.id === category ? "primary" : "outline"} onClick={() => setCategory(c.id)}>
                         <span className="max-w-32 truncate" title={c.name}>{c.name}</span>
                     </Button>
                 ))}
@@ -437,18 +467,18 @@ function OrderPanel(props: {
                         <span className="shrink-0 text-xs text-muted-foreground">{t(`order.status.${lineStatus(l.status)}`)}</span>
                         <span className={cn("w-16 shrink-0 text-end tabular-nums", l.discount && "text-emerald-700 dark:text-emerald-400")}>{money(lineTotal(l))}</span>
                         {props.manager ? (
-                            <Button variant="ghost" size="icon" aria-label={t("discount.line", { name: l.name })} onClick={() => setDiscounting(l)}>
+                            <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("discount.line", { name: l.name })} onClick={() => setDiscounting(l)}>
                                 <Percent aria-hidden />
                             </Button>
                         ) : null}
-                        <Button variant="ghost" size="icon" aria-label={t("order.remove")} onClick={() => remove(l.id)}>
+                        <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("order.remove")} onClick={() => remove(l)}>
                             <Trash2 aria-hidden />
                         </Button>
                     </div>
                 ))}
                 {drafts.map((d) => (
                     <div key={d.id} className="flex min-w-0 items-center gap-2 py-1 text-sm font-medium text-amber-700 dark:text-amber-400">
-                        <Button variant="ghost" size="icon" aria-label={t("order.less")} onClick={() => setDrafts((all) => all.flatMap((x) => (x.id !== d.id ? [x] : x.quantity > 1 ? [{ ...x, quantity: x.quantity - 1 }] : [])))}>
+                        <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("order.less")} onClick={() => setDrafts((all) => all.flatMap((x) => (x.id !== d.id ? [x] : x.quantity > 1 ? [{ ...x, quantity: x.quantity - 1 }] : [])))}>
                             <Minus aria-hidden />
                         </Button>
                         <span className="w-6 shrink-0 text-end tabular-nums">{d.quantity}</span>
@@ -470,11 +500,11 @@ function OrderPanel(props: {
                 {props.order ? (
                     <>
                         {props.manager ? (
-                            <Button variant="ghost" size="icon" aria-label={t("discount.title")} onClick={() => setDiscounting("order")}>
+                            <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("discount.title")} onClick={() => setDiscounting("order")}>
                                 <Percent aria-hidden />
                             </Button>
                         ) : null}
-                        <Button
+                        <Button className={TOUCH}
                             variant="outline"
                             size="lg"
                             onClick={() =>
@@ -486,21 +516,22 @@ function OrderPanel(props: {
                         >
                             <Receipt aria-hidden /> {t("order.bill")}
                         </Button>
-                        <Button variant="ghost" size="icon" aria-label={t("order.move")} disabled={drafts.length > 0} onClick={() => setMoving(true)}>
+                        <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("order.move")} disabled={drafts.length > 0} onClick={() => setMoving(true)}>
                             <ArrowRightLeft aria-hidden />
                         </Button>
-                        <Button variant="outline" size="lg" disabled={drafts.length > 0} onClick={() => setPaying(true)}>
+                        <Button className={TOUCH} variant="outline" size="lg" disabled={drafts.length > 0} onClick={() => setPaying(true)}>
                             <Euro aria-hidden /> {t("order.pay")}
                         </Button>
                     </>
                 ) : null}
-                <Button size="lg" onClick={send} disabled={sending || (drafts.length === 0 && !sent.some((l) => l.status === "pending"))}>
+                <Button className={TOUCH} size="lg" onClick={send} disabled={sending || (drafts.length === 0 && !sent.some((l) => l.status === "pending"))}>
                     <Send aria-hidden /> {t("order.send")}
                 </Button>
             </footer>
             {paying && props.order ? (
                 <PayDialog
                     order={props.order}
+                    queue={queue}
                     currency={venue?.currency ?? "EUR"}
                     onClose={() => { setPaying(false); props.onChanged(); }}
                     onPaid={(ticketNo) => {
@@ -514,6 +545,7 @@ function OrderPanel(props: {
             {discounting && props.order ? (
                 <DiscountDialog
                     orderId={props.order.id}
+                    version={props.order.version}
                     lineId={discounting === "order" ? undefined : discounting.id}
                     lineName={discounting === "order" ? undefined : discounting.name}
                     onClose={() => setDiscounting(null)}
