@@ -14,7 +14,7 @@ import { useRef, useState } from "react";
 import { ImagePlus, RotateCcw, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CROP_ACCEPTED, ImageCropDialog } from "@/components/image-cropper";
-import { Button, cn, ColorPicker, Popover, PopoverContent, PopoverTrigger, useToast } from "@polaris/ui";
+import { Button, cn, ColorPicker, Popover, PopoverContent, PopoverTrigger, settingType, useToast } from "@polaris/ui";
 import { isPluginImageValue, PLUGIN_COLOR, type PluginManifest, type PluginSetting, type PluginSettingValue } from "@polaris/core/device-plugins";
 
 type Words = ReturnType<typeof useTranslations<"account">>;
@@ -51,7 +51,7 @@ export function ColorSettingControl({ setting, value, label, onChange, width }: 
                 <PopoverTrigger asChild>
                     <Button type="button" variant="outline" className="min-w-0 flex-1 justify-start gap-2" aria-label={label}>
                         <span aria-hidden className="size-4 shrink-0 rounded-sm border border-border" style={{ backgroundColor: draft ?? shown }} />
-                        <span className="min-w-0 truncate font-mono text-xs">{picked || draft ? (draft ?? shown) : say(t, "defaultColor")}</span>
+                        <span className={cn(settingType.body, "min-w-0 truncate font-mono")}>{picked || draft ? (draft ?? shown) : say(t, "defaultColor")}</span>
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-64 max-w-[calc(100vw-2rem)] p-3">
@@ -162,7 +162,8 @@ export function ScreenPreview({ manifest, values, names }: { manifest: Pick<Plug
     const accent = color("accentColor") ?? "#4096ff";
     const picture = isPluginImageValue(values.backgroundImage) ? values.backgroundImage : null;
     const fit = (key: string, fallback: "cover" | "contain") => (values[key] === "contain" || values[key] === "cover" ? values[key] : fallback);
-    const size = values.labelSize === "small" ? "text-[0.5rem]" : values.labelSize === "large" ? "text-xs" : "text-[0.625rem]";
+    // A drawing of the device's screen, scaled with it: its letters follow the device's sizes, not the page's type scale.
+    const nameSize = values.labelSize === "small" ? "0.5rem" : values.labelSize === "large" ? "0.75rem" : "0.625rem";
     const sample = [72, 45, 88, 30];
     return (
         <div
@@ -183,10 +184,12 @@ export function ScreenPreview({ manifest, values, names }: { manifest: Pick<Plug
                             // eslint-disable-next-line @next/next/no-img-element -- a data: URL kept on this computer
                             <img src={icon} alt="" className={cn("size-[15%] min-h-3 min-w-3 shrink-0", fit("knobImageFit", "contain") === "contain" ? "object-contain" : "object-cover")} />
                         ) : null}
-                        <span className={cn("w-full truncate text-center font-medium leading-tight", size)} title={name}>
+                        <span className="w-full truncate text-center font-medium leading-tight" style={{ fontSize: nameSize }} title={name}>
                             {name}
                         </span>
-                        <span className="text-[0.625rem] font-semibold leading-tight">{sample[index]}%</span>
+                        <span className="font-semibold leading-tight" style={{ fontSize: "0.625rem" }}>
+                            {sample[index]}%
+                        </span>
                         <span className="relative mt-auto h-1/2 w-1/4 min-w-2 rounded-[1px]" style={{ backgroundColor: `${text}26` }}>
                             <span className="absolute inset-x-0 bottom-0 rounded-[1px]" style={{ height: `${sample[index]}%`, backgroundColor: accent }} />
                         </span>
