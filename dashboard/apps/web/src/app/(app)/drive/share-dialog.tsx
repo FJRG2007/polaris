@@ -33,7 +33,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Checkbox
+    Checkbox,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export interface ShareTarget {
@@ -66,6 +67,11 @@ export function ShareDialog({
     const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
 
     const items = targets ?? [];
+    useResetOnOpen(items.length > 0, () => {
+        setError(null);
+        setResults(null);
+        setAdvanced(EMPTY_LINK_ADVANCED);
+    });
     const many = items.length > 1;
     // Folder-only permissions are offered whenever the selection holds a folder;
     // they are ignored for the files in it, which have nothing to drop into.

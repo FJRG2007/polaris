@@ -37,7 +37,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /** A column as the form holds it: the default split into what the selector says
@@ -115,6 +116,10 @@ export function NewTableDialog({
     const [columns, setColumns] = useState<ColumnRow[]>(() => [idColumn(), blankColumn()]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+    useResetOnOpen(open, () => {
+        setName("");
+        setError("");
+    });
 
     const draft = useMemo(
         () => ({ namespace, name: name.trim(), columns: columns.map(toDraft) }),

@@ -29,7 +29,8 @@ import {
     DialogTitle,
     Select,
     Skeleton,
-    cn
+    cn,
+    useResetOnOpen
 } from "@polaris/ui";
 
 function VoteMark({ vote, label }: { vote: Vote | undefined; label: string }) {
@@ -58,6 +59,9 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
     const [editing, setEditing] = useState(false);
     const [choosing, setChoosing] = useState<string | null>(null);
     const [calendarId, setCalendarId] = useState("");
+    useResetOnOpen(choosing !== null, () => {
+        setCalendarId("");
+    });
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
     const read = useCachedRead<ProposalView>(

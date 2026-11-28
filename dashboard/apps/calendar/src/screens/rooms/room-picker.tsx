@@ -31,7 +31,8 @@ import {
     Select,
     Skeleton,
     Switch,
-    cn
+    cn,
+    useResetOnOpen
 } from "@polaris/ui";
 
 const ANY = "*";
@@ -51,6 +52,13 @@ export function RoomPicker({ open, onOpenChange, start, end, onPick }: RoomPicke
     const [floor, setFloor] = useState(ANY);
     const [features, setFeatures] = useState<string[]>([]);
     const [onlyFree, setOnlyFree] = useState(true);
+    useResetOnOpen(open, () => {
+        setQuery("");
+        setCapacity("");
+        setBuilding(ANY);
+        setFloor(ANY);
+        setOnlyFree(true);
+    });
 
     const read = useCachedRead<RoomAvailability[]>(
         open ? cacheKey("rooms-for", start, end) : null,

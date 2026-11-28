@@ -43,7 +43,8 @@ import {
     DialogTitle,
     Input,
     Switch,
-    useToast
+    useToast,
+    useResetOnOpen
 } from "@polaris/ui";
 import { ChatPeoplePicker } from "./chat-people-picker";
 import { ChannelGroupPicker, type PickedGroup } from "./channel-group-picker";
@@ -83,6 +84,14 @@ export function NewChannelDialog({
     const toast = useToast();
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    useResetOnOpen(space !== null, () => {
+        setName("");
+        setTopic("");
+        setPrivateChannel(false);
+        setMembers([]);
+        setGroups([]);
+        setError("");
+    });
 
     const stored = useMemo(() => core.normalizeChannelName(name), [name]);
     // The sidebar draws a private text room with a lock, so the field does too.

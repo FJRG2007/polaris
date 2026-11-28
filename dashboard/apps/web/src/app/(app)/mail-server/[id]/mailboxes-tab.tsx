@@ -42,7 +42,8 @@ import {
     EmptyState,
     Input,
     Select,
-    Skeleton
+    Skeleton,
+    useResetOnOpen
 } from "@polaris/ui";
 
 type Loaded = Extract<Awaited<ReturnType<typeof listMailboxesAction>>, { mailboxes: unknown }>;
@@ -280,6 +281,15 @@ function CreateDialog({
     const [addToMyMail, setAddToMyMail] = useState(true);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setDomainId("");
+        setLocalPart("");
+        setPassword("");
+        setQuotaMb("2048");
+        setDescription("");
+        setAddToMyMail(true);
+        setError(null);
+    });
     const [done, setDone] = useState<{ address: string; warning: string | null } | null>(null);
 
     const chosenDomain = domainId || domains[0]?.id || "";

@@ -22,7 +22,8 @@ import {
     DialogTitle,
     Input,
     Switch,
-    cn
+    cn,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useOptimisticToggle } from "@polaris/ui";
 
@@ -42,6 +43,10 @@ export function DomainCdnButton({
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
     const [prefix, setPrefix] = useState("");
+    useResetOnOpen(open, () => {
+        setError(null);
+        setPrefix("");
+    });
     const [pending, startTransition] = useTransition();
     const valid = cachePurgeSchema.safeParse({ domainId, prefix });
 

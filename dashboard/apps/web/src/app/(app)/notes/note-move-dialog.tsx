@@ -30,7 +30,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Select
+    Select,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /** Where a note can be put. `parentId` and `folderId` are exclusive: a nested
@@ -62,6 +63,10 @@ export function NoteMoveDialog({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [shelfId, setShelfId] = useState(from.spaceId ?? "");
+    useResetOnOpen(open, () => {
+        setError("");
+        setShelfId(from.spaceId ?? "");
+    });
 
     const shelf = useMemo(
         () => shelves.find((entry) => (entry.space?.id ?? "") === shelfId) ?? shelves[0],

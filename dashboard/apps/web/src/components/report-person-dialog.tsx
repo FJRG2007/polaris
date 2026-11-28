@@ -29,7 +29,8 @@ import {
     DialogHeader,
     DialogTitle,
     Select,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export function ReportPersonDialog({
@@ -53,6 +54,12 @@ export function ReportPersonDialog({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [sent, setSent] = useState(false);
+    useResetOnOpen(open, () => {
+        setReason("abuse");
+        setNote("");
+        setError(null);
+        setSent(false);
+    });
 
     async function send(): Promise<void> {
         setBusy(true);

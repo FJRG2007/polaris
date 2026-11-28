@@ -24,7 +24,8 @@ import {
     SegmentedControl,
     Select,
     Switch,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as catalog from "../../lib/minecraft/events/catalog";
 import { TreasureHuntOptions } from "./event-options-treasure-hunt";
@@ -1288,6 +1289,9 @@ export function EventEditor({
 }) {
     const t = useGameText("minecraft");
     const [draft, setDraft] = useState<catalog.EventPreset>(saved);
+    useResetOnOpen(open, () => {
+        setDraft(saved);
+    });
     const checked = useMemo(() => catalog.presetSchema.safeParse(draft), [draft]);
     const issues = checked.success ? [] : checked.error.issues;
     const dirty = JSON.stringify(draft) !== JSON.stringify(saved);

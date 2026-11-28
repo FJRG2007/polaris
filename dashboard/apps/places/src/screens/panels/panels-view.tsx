@@ -38,7 +38,8 @@ import {
     DialogHeader,
     DialogTitle,
     EmptyState,
-    cn
+    cn,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as actions from "./actions";
 import { usePlacesT } from "../use-places-t";
@@ -87,6 +88,9 @@ function AddCardDialog({
 }) {
     const t = usePlacesT();
     const [askFirst, setAskFirst] = useState(false);
+    useResetOnOpen(open, () => {
+        setAskFirst(false);
+    });
     const sensors = devices.filter((device) => Boolean(device.reading?.value));
     const row =
         "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md px-3 py-2 text-start text-sm hover:bg-muted";

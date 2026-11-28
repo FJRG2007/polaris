@@ -43,7 +43,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export interface SuccessorPerson {
@@ -152,6 +153,11 @@ function SuccessorDialog({
     const [protecting, setProtecting] = useState(false);
 
     const open = mode !== null;
+    useResetOnOpen(open, () => {
+        setIdentifier("");
+        setProof(null);
+        setError("");
+    });
     const clearing = mode === "clear";
     const ready = proof !== null && (clearing || identifier.trim().length > 0);
     const label = clearing ? t("passkeys.remove") : current ? t("successor.change") : t("successor.add");

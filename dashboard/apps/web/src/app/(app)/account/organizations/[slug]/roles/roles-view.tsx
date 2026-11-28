@@ -47,7 +47,8 @@ import {
     DialogTitle,
     Input,
     settingType,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /** Everything a role can be given, minus the one every role already has. */
@@ -352,6 +353,14 @@ function NewRoleDialog({
     const [held, setHeld] = useState<Set<string>>(new Set());
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    useResetOnOpen(open, () => {
+        setName("");
+        setSlug("");
+        setSlugTouched(false);
+        setDescription("");
+        setHeld(new Set());
+        setError("");
+    });
 
     const parsed = core.orgRoleSchema.safeParse({
         name,

@@ -34,7 +34,8 @@ import {
     DialogTitle,
     Input,
     settingType,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export function TeamsView({
@@ -219,6 +220,13 @@ function NewTeamDialog({
     const [slugTouched, setSlugTouched] = useState(false);
     const [description, setDescription] = useState("");
     const [error, setError] = useState("");
+    useResetOnOpen(open, () => {
+        setName("");
+        setSlug("");
+        setSlugTouched(false);
+        setDescription("");
+        setError("");
+    });
 
     const parsed = core.teamSchema.safeParse({ name, slug, description });
 

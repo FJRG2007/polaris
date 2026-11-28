@@ -24,7 +24,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    useResetOnOpen
 } from "@polaris/ui";
 import type { DriveEntry } from "./types";
 import { extractArchiveAction, previewArchiveAction } from "./actions";
@@ -100,6 +101,12 @@ export function ArchiveDialog({
     const [pending, setPending] = useState(false);
     const [previewError, setPreviewError] = useState<string | null>(null);
     const [extractError, setExtractError] = useState<string | null>(null);
+    useResetOnOpen(target !== null, () => {
+        setPassword("");
+        setDest(currentPath ? `${currentPath}/${base}` : base);
+        setPreviewError(null);
+        setExtractError(null);
+    });
 
     async function loadPreview() {
         if (!target) return;

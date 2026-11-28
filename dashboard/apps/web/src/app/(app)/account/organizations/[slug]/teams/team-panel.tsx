@@ -30,7 +30,8 @@ import {
     DialogTitle,
     Input,
     Select,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 import {
     addTeamMemberAction,
@@ -81,6 +82,11 @@ export function TeamPanel({
     const [identifier, setIdentifier] = useState("");
     const [role, setRole] = useState<core.TeamRole>("member");
     const [error, setError] = useState("");
+    useResetOnOpen(team !== null, () => {
+        setIdentifier("");
+        setRole("member");
+        setError("");
+    });
 
     const teamId = team?.id ?? null;
 

@@ -27,7 +27,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Switch
+    Switch,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export interface DropPointTarget {
@@ -66,6 +67,7 @@ export function DeleteDropPointDialog({
     const withFolder = targets.filter(hasOwnFolder);
     const anyFolder = withFolder.length > 0;
     const [deleteFolder, setDeleteFolder] = useState(true);
+    useResetOnOpen(targets.length > 0, () => setDeleteFolder(anyFolder));
 
     // Each delete is a fresh decision: an operator who kept one folder should not
     // silently keep the next one because the switch remembered. Keyed on which

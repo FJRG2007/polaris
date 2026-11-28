@@ -23,7 +23,8 @@ import {
     DialogContent,
     DialogTrigger,
     DialogDescription,
-    Checkbox
+    Checkbox,
+    useResetOnOpen
 } from "@polaris/ui";
 import { createDockerConnectionAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -37,6 +38,12 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
     const [useInstallKey, setUseInstallKey] = useState(true);
     const [tls, setTls] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setTransport(sshEnabled ? "ssh" : "socket");
+        setUseInstallKey(true);
+        setTls(false);
+        setError(null);
+    });
     const [pending, setPending] = useState(false);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {

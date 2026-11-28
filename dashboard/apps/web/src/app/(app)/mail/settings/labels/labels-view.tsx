@@ -27,7 +27,8 @@ import {
     DialogTitle,
     Input,
     settingType,
-    useToast
+    useToast,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createLabelAction, deleteLabelAction } from "@/app/(app)/mail/actions";
@@ -127,6 +128,11 @@ function AddLabelDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
     const [name, setName] = useState("");
     const [color, setColor] = useState(DEFAULT_COLOR);
     const [problem, setProblem] = useState("");
+    useResetOnOpen(open, () => {
+        setName("");
+        setColor(DEFAULT_COLOR);
+        setProblem("");
+    });
     const [saving, startSaving] = useBusy();
     const ready = name.trim().length > 0 && !saving;
 

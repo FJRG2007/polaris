@@ -35,7 +35,8 @@ import {
     DialogTitle,
     DnsRecordTable,
     Input,
-    Select
+    Select,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as polls from "./deploy-polls";
 
@@ -175,6 +176,11 @@ export function EditDomainButton({
     } | null>(null);
     const [checking, setChecking] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setSubdomain("");
+        setPort("");
+        setError(null);
+    });
     const [pending, startTransition] = useTransition();
     const asked = useRef<string | null>(null);
 

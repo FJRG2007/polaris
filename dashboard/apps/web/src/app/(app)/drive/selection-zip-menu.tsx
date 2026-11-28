@@ -27,7 +27,8 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-    Input
+    Input,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export function SelectionZipMenu({
@@ -46,6 +47,10 @@ export function SelectionZipMenu({
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [link, setLink] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setError(null);
+        setLink(null);
+    });
     const [copied, setCopied] = useState(false);
 
     function start(makeLink: boolean) {

@@ -44,7 +44,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export interface OrgSuccessorPerson {
@@ -167,6 +168,11 @@ function OrgSuccessorDialog({
     const [protecting, setProtecting] = useState(false);
 
     const open = mode !== null;
+    useResetOnOpen(open, () => {
+        setIdentifier("");
+        setProof(null);
+        setError("");
+    });
     const clearing = mode === "clear";
     const ready = proof !== null && (clearing || identifier.trim().length > 0);
 

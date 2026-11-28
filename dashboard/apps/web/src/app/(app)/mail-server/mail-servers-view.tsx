@@ -37,7 +37,8 @@ import {
     DialogTitle,
     EmptyState,
     Input,
-    Skeleton
+    Skeleton,
+    useResetOnOpen
 } from "@polaris/ui";
 import { loadPage } from "@/lib/keep-call";
 
@@ -241,6 +242,12 @@ function SetupDialog({
     const [domain, setDomain] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setServerId("local");
+        setHostname("");
+        setDomain("");
+        setError(null);
+    });
 
     // Suggest the name from the domain the way almost everybody names it.
     const suggested =

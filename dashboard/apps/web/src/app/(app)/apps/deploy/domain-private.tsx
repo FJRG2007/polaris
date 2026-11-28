@@ -22,7 +22,8 @@ import {
     DialogTitle,
     Switch,
     cn,
-    Checkbox
+    Checkbox,
+    useResetOnOpen
 } from "@polaris/ui";
 
 const DEFAULT_ACCESS: PrivateAccess = { members: true, allow: [], deny: [] };
@@ -47,6 +48,11 @@ export function DomainPrivateButton({
     const [enabled, setEnabled] = useState(access !== null);
     const [draft, setDraft] = useState<PrivateAccess>(access ?? DEFAULT_ACCESS);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setEnabled(access !== null);
+        setDraft(access ?? DEFAULT_ACCESS);
+        setError(null);
+    });
     const [saved, setSaved] = useState<"published" | "unpublished" | null>(null);
     const [pending, startTransition] = useTransition();
     const valid = !enabled || privateAccessSchema.safeParse(draft).success;

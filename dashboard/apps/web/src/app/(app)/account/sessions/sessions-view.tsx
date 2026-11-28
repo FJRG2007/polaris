@@ -53,7 +53,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 
 function Origin({ session }: { session: SessionView }) {
@@ -460,6 +461,10 @@ export function ApproveSignInDialog({
     const [pin, setPin] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(session !== null, () => {
+        setPin("");
+        setError(null);
+    });
     const box = useRef<HTMLInputElement>(null);
     // One check per PIN: the last digit and the button can both ask.
     const checking = useRef(false);

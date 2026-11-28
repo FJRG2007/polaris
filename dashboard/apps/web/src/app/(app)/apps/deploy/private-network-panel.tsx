@@ -31,7 +31,8 @@ import {
     DialogTitle,
     Input,
     Select,
-    Skeleton
+    Skeleton,
+    useResetOnOpen
 } from "@polaris/ui";
 import type {
     NamesApplied,
@@ -618,6 +619,9 @@ function AliasEditor({
     const [aliases, setAliases] = useState(view.aliases);
     const [draft, setDraft] = useState("");
     const [adding, setAdding] = useState(false);
+    useResetOnOpen(adding, () => {
+        setDraft("");
+    });
     const [error, setError] = useState<string | null>(null);
     const [pending, start] = useTransition();
 

@@ -30,7 +30,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    useToast
+    useToast,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as polls from "./chat-reads";
 
@@ -53,6 +54,10 @@ export function AddPeopleDialog({
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    useResetOnOpen(open, () => {
+        setPicked([]);
+        setError("");
+    });
 
     useEffect(() => {
         if (!open) return;

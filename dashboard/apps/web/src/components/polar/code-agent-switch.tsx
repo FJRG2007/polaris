@@ -17,7 +17,8 @@ import {
     DialogDescription,
     DialogFooter,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    useResetOnOpen
 } from "@polaris/ui";
 import { fromWire } from "@/lib/app-bundles/wire";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -76,6 +77,10 @@ export function CodeAgentSwitch({
     const [sources, setSources] = useState<readonly CodeSource[] | null>(null);
     const [failed, setFailed] = useState(false);
     const [pick, setPick] = useState<CodePick | null>(null);
+    useResetOnOpen(open, () => {
+        setFailed(false);
+        setPick(null);
+    });
     const [switching, setSwitching] = useState(false);
 
     const load = useCallback(() => {

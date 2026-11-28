@@ -36,7 +36,8 @@ import {
     DialogTitle,
     SegmentedControl,
     Skeleton,
-    cn
+    cn,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
@@ -64,6 +65,9 @@ export function WorkDetail({
     const [busy, setBusy] = useState(false);
     const [merging, setMerging] = useState(false);
     const [method, setMethod] = useState("squash");
+    useResetOnOpen(merging, () => {
+        setMethod("squash");
+    });
     const [error, setError] = useState("");
 
     const target = { owner, repo, number };

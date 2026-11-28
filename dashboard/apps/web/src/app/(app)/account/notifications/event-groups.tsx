@@ -47,7 +47,8 @@ import {
     DropdownMenuTrigger,
     cn,
     DateInput,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 import { WeekdayPicker } from "@/components/weekday-picker";
 import { NotificationGroupMark } from "@/components/notification-group-mark";
@@ -533,6 +534,11 @@ function ScheduleDialog({
     const [days, setDays] = useState(start.days);
     const [from, setFrom] = useState(core.clockTime(start.startMinute));
     const [to, setTo] = useState(core.clockTime(start.endMinute));
+    useResetOnOpen(open, () => {
+        setDays(start.days);
+        setFrom(core.clockTime(start.startMinute));
+        setTo(core.clockTime(start.endMinute));
+    });
 
     const checked = useMemo(
         () =>

@@ -34,7 +34,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as polls from "./chat-reads";
 
@@ -79,6 +80,12 @@ export function InviteDialog({
     const [editing, setEditing] = useState(false);
     const [expires, setExpires] = useState(String(core.INVITE_DEFAULT_MINUTES));
     const [uses, setUses] = useState(String(core.INVITE_DEFAULT_USES));
+    useResetOnOpen(space !== null, () => {
+        setError("");
+        setQuery("");
+        setExpires(String(core.INVITE_DEFAULT_MINUTES));
+        setUses(String(core.INVITE_DEFAULT_USES));
+    });
     const [saving, setSaving] = useState(false);
     const asked = useRef(0);
 

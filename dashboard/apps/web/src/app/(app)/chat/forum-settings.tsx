@@ -21,7 +21,8 @@ import {
     Input,
     Skeleton,
     Switch,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 import type { ChatForumTagView, ChatForumView } from "@/lib/chat/forum";
 import {
@@ -39,6 +40,9 @@ export function ForumSettings({ channelId }: { channelId: string }) {
     const [saving, setSaving] = useState(false);
     const [newTag, setNewTag] = useState("");
     const [addingTag, setAddingTag] = useState(false);
+    useResetOnOpen(addingTag, () => {
+        setNewTag("");
+    });
     const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
     const [error, setError] = useState("");
 

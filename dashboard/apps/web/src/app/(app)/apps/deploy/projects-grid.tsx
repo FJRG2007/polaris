@@ -64,7 +64,8 @@ import {
     MenuShortcut,
     ShortcutHint,
     shortcutPressed,
-    pollWhileVisible
+    pollWhileVisible,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export interface ProjectCardData {
@@ -654,6 +655,10 @@ function CreateProjectButton() {
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setName("");
+        setError(null);
+    });
     const [pending, startTransition] = useTransition();
 
     function submit() {

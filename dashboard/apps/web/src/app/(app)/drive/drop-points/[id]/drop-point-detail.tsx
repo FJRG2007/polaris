@@ -62,7 +62,8 @@ import {
     DialogDescription,
     Checkbox,
     DateInput,
-    ScrollRow
+    ScrollRow,
+    useResetOnOpen
 } from "@polaris/ui";
 import {
     deleteFileRequestAction,
@@ -736,6 +737,10 @@ function SaveTemplateDialog({
     const [name, setName] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setName("");
+        setError(null);
+    });
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();

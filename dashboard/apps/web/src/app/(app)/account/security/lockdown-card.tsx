@@ -39,7 +39,8 @@ import {
     DialogHeader,
     DialogTitle,
     settingType,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 
 type Asking = "lockdown" | "lift" | "disabled" | "deleting";
@@ -203,6 +204,11 @@ function LockdownDialog({
     const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState("");
     const open = asking !== null;
+    useResetOnOpen(open, () => {
+        setProof(null);
+        setNote("");
+        setError("");
+    });
     const words = asking ? wording(t, asking) : null;
 
     async function confirm(): Promise<void> {

@@ -73,7 +73,8 @@ import {
     SegmentedControl,
     Select,
     Switch,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useOptimisticToggle } from "@polaris/ui";
 import { DomainEnabledSwitch } from "./domain-enabled-switch";
@@ -534,6 +535,11 @@ function DomainCertificateButton({
     const [certPem, setCertPem] = useState("");
     const [keyPem, setKeyPem] = useState("");
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setCertPem("");
+        setKeyPem("");
+        setError(null);
+    });
     const [warning, setWarning] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const t = useTranslations("deployService");

@@ -20,7 +20,8 @@ import {
     AsyncSelect,
     type AsyncLoad,
     settingType,
-    cn
+    cn,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
@@ -45,6 +46,10 @@ export function AgentImportDialog({
     const [pasted, setPasted] = useState("");
     const [read, setRead] = useState<ReadAgentFile[] | null>(null);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setPasted("");
+        setError(null);
+    });
     const [pending, setPending] = useState(false);
 
     const show = (result: ReadAgentFile[] | string) => {

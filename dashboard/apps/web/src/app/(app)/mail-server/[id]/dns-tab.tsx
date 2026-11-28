@@ -43,7 +43,8 @@ import {
     DialogTitle,
     EmptyState,
     Input,
-    Skeleton
+    Skeleton,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as polls from "../mail-server-polls";
 
@@ -298,6 +299,10 @@ function AddDomainDialog({
     const [name, setName] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setName("");
+        setError(null);
+    });
     const parsed = mailDomainSchema.safeParse({ serverId, name });
     const fieldError =
         !parsed.success && name.trim() ? mailSchemaText(t, parsed.error.issues[0]?.message) : null;
@@ -372,6 +377,10 @@ function CatchAllDialog({
     const [address, setAddress] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(domain !== null, () => {
+        setAddress("");
+        setError(null);
+    });
     const [seen, setSeen] = useState<string | null>(null);
     if (domain && seen !== domain.id) {
         setSeen(domain.id);
@@ -487,6 +496,11 @@ function PublishDialog({
     const [replace, setReplace] = useState(false);
     const [applying, setApplying] = useState(false);
     const [results, setResults] = useState<Applied | null>(null);
+    useResetOnOpen(domain !== null, () => {
+        setError(null);
+        setReplace(false);
+        setResults(null);
+    });
     const domainId = domain?.id ?? null;
 
     // A fresh plan every time the dialog opens: the zone may have changed since.

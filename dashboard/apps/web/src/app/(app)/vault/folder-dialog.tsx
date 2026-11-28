@@ -28,7 +28,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    isDirty
+    isDirty,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export function FolderDialog({
@@ -52,6 +53,11 @@ export function FolderDialog({
     const [editingName, setEditingName] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setAdding("");
+        setEditingName("");
+        setError(null);
+    });
     const [confirm, confirmDialog] = useConfirm();
 
     async function save(folderId: string | null, name: string): Promise<void> {

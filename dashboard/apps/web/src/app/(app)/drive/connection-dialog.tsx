@@ -48,7 +48,8 @@ import {
     DialogContent,
     DialogTrigger,
     DialogDescription,
-    Checkbox
+    Checkbox,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import * as polls from "./drive-reads";
@@ -608,6 +609,13 @@ export function ConnectionDialog({
     const [detectMsg, setDetectMsg] = useState<string | null>(null);
     const [testing, setTesting] = useState(false);
     const [testResult, setTestResult] = useState<UnasTestResult | null>(null);
+    useResetOnOpen(open, () => {
+        setStep("provider");
+        setError(null);
+        setDetectIp("");
+        setDetectedHost("");
+        setTestResult(null);
+    });
 
     /** Reset the wizard to its first step whenever the dialog is (re)opened. */
     function onOpenChange(next: boolean) {

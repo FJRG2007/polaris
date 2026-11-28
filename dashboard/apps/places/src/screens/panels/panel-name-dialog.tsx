@@ -10,7 +10,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    useResetOnOpen
 } from "@polaris/ui";
 import { usePlacesT } from "../use-places-t";
 import { PANEL_NAME_MAX, normalizePanelName, panelNameSchema } from "../../lib/panel-layout";
@@ -34,6 +35,10 @@ export function NameDialog({
     const t = usePlacesT();
     const [name, setName] = useState(initial);
     const [error, setError] = useState("");
+    useResetOnOpen(open, () => {
+        setName(initial);
+        setError("");
+    });
     const [busy, setBusy] = useState(false);
     const normalized = normalizePanelName(name);
     const check = panelNameSchema.safeParse(normalized);

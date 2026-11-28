@@ -29,7 +29,7 @@ import { StagedChangesBanner, StagedChangesProvider } from "./staged-changes";
 import { SyncDialog } from "./settings/sync-dialog";
 import { ArrowLeftRight } from "lucide-react";
 import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "./new-environment-dialog";
-import { Button, cn, Dialog, DialogContent, DialogHeader, DialogTitle, Input, ScrollRow, Select } from "@polaris/ui";
+import { Button, cn, Dialog, DialogContent, DialogHeader, DialogTitle, Input, ScrollRow, Select, useResetOnOpen } from "@polaris/ui";
 
 /** Picking this opens the create dialog instead of switching to it. */
 const NEW_PROJECT = "__new_project__";
@@ -286,6 +286,10 @@ function NewProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
     const t = useTranslations("deployProject");
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setName("");
+        setError(null);
+    });
     const [pending, startTransition] = useTransition();
 
     function submit() {

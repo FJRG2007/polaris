@@ -19,7 +19,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as dns from "@/lib/dns-blocker/settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -143,6 +144,9 @@ function PairCard<T>({
     const t = useTranslations("dnsBlocker");
     const [open, setOpen] = useState(false);
     const [values, setValues] = useState<[string, string]>(["", ""]);
+    useResetOnOpen(open, () => {
+        setValues(["", ""]);
+    });
     const parsed = parse(values);
 
     const submit = (event: FormEvent) => {

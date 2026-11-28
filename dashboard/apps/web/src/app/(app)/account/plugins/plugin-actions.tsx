@@ -16,7 +16,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowDown, ArrowUp, Pencil, Play, Plus, Trash2, X } from "lucide-react";
 import { CodeEditor } from "@/components/json-view";
-import { Button, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Select, settingType, Switch, useToast } from "@polaris/ui";
+import { Button, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Select, settingType, Switch, useToast, useResetOnOpen } from "@polaris/ui";
 import {
     CUSTOM_ACTION_PREFIX,
     DEVICE_ACTION_KEYS,
@@ -220,6 +220,9 @@ function ActionDialog({ bridge, draft, onClose, launcher, hotkeys }: { bridge: P
     const t = useTranslations("account");
     const toast = useToast();
     const [edit, setEdit] = useState<Draft | null>(draft);
+    useResetOnOpen(edit !== null, () => {
+
+    });
     const [saving, setSaving] = useState(false);
     useEffect(() => setEdit(draft), [draft]);
     const parsed = edit ? deviceActionSchema.safeParse({ id: edit.id, name: edit.name, steps: edit.steps, ...(edit.off ? { off: edit.off } : {}) }) : null;

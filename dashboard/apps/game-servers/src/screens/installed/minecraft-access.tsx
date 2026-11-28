@@ -38,7 +38,8 @@ import {
     DialogTitle,
     Select,
     Skeleton,
-    Switch
+    Switch,
+    useResetOnOpen
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import type { AppHostTypes } from "@polaris/app-host";
@@ -272,6 +273,14 @@ function ShareDialog({
     const [canShare, setCanShare] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [issued, setIssued] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setIdentifier("");
+        setActions([]);
+        setDuration("forever");
+        setCanShare(false);
+        setError(null);
+        setIssued(null);
+    });
     const [pending, startTransition] = useTransition();
 
     function reset() {

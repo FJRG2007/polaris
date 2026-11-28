@@ -36,7 +36,8 @@ import {
     DialogTitle,
     Select,
     Textarea,
-    cn
+    cn,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export function ReportDialog({
@@ -75,6 +76,12 @@ export function ReportDialog({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [sent, setSent] = useState(false);
+    useResetOnOpen(open, () => {
+        setReason("spam");
+        setNote("");
+        setError("");
+        setSent(false);
+    });
 
     const send = async () => {
         if (!messageId && !whole) return;

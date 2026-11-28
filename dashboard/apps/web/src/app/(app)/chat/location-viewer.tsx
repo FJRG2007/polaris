@@ -12,7 +12,7 @@
  * coordinates stand in.
  */
 
-import { cn } from "@polaris/ui";
+import { cn, useResetOnOpen } from "@polaris/ui";
 import * as actions from "./actions";
 import { openLink } from "@/lib/open-link";
 import { useEffect, useState } from "react";
@@ -134,6 +134,9 @@ export function PhoneLocationViewer({
 }) {
     const t = useTranslations("chat");
     const [style, setStyle] = useState<MapStyle>("map");
+    useResetOnOpen(open, () => {
+        setStyle("map");
+    });
     const address = usePlaceAddress(messageId, open);
     const share = useSharePlace();
     const coordinates = readableCoordinates(point.latitude, point.longitude);

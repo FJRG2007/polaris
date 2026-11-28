@@ -22,7 +22,8 @@ import {
     DialogTitle,
     Textarea,
     cn,
-    useToast
+    useToast,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as shared from "@/lib/polar/subagents/shared";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -248,6 +249,10 @@ export function SubagentDialog({
     const [detail, setDetail] = useState<shared.SubagentDetail | null>(null);
     const [failed, setFailed] = useState(false);
     const [draft, setDraft] = useState("");
+    useResetOnOpen(id !== null, () => {
+        setFailed(false);
+        setDraft("");
+    });
     const [busy, setBusy] = useState(false);
     const end = useRef<HTMLDivElement>(null);
     const load = useCallback(async () => {

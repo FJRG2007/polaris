@@ -24,7 +24,8 @@ import {
     Input,
     Select,
     Skeleton,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 import { CodeEditor } from "@/components/json-view";
 import { languageForFile } from "@/lib/code-language";
@@ -508,6 +509,10 @@ export function TemplatesDialog({ open, onClose }: { open: boolean; onClose: () 
     const [editing, setEditing] = useState<{ id: string | null; draft: Draft } | null>(null);
     const [start, setStart] = useState<LibraryKey>("blank");
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setStart("blank");
+        setError(null);
+    });
 
     async function load() {
         const result = await listTemplatesAction();

@@ -38,7 +38,8 @@ import {
     DialogTitle,
     DnsRecordTable,
     EmptyState,
-    Input
+    Input,
+    useResetOnOpen
 } from "@polaris/ui";
 import {
     AlertTriangle,
@@ -118,6 +119,9 @@ export function OwnerDomainsView({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [adding, setAdding] = useState(false);
+    useResetOnOpen(adding, () => {
+        setValue("");
+    });
 
     // Empty until something has been typed: a field nobody has filled in yet is
     // incomplete, not wrong.

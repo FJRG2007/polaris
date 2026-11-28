@@ -36,7 +36,8 @@ import {
     DropdownMenuTrigger,
     Input,
     PhoneInput,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 import {
     addPhoneAction,
@@ -135,6 +136,13 @@ export function PhoneCard({
     const [confirming, setConfirming] = useState<string | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // One flow from Add to the saved number: the number, the password it
+    // re-asks for and the save in between. Opened again, it starts empty.
+    useResetOnOpen(adding !== null || busy === "add", () => {
+        setDraft("");
+        setTouched(false);
+        setPasswordError(null);
+    });
 
     // What the server reports replaces the optimistic row, and a box left open
     // for a number that is gone or confirmed in another tab closes.
@@ -554,10 +562,8 @@ function PasswordDialog({
     const t = useTranslations("account");
     const tc = useTranslations("common");
     const [password, setPassword] = useState("");
-
-    useEffect(() => {
-        if (open) setPassword("");
-    }, [open]);
+    // Empty on every open, and not kept in memory behind a closed dialog.
+    useResetOnOpen(open, () => setPassword(""));
 
     function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();

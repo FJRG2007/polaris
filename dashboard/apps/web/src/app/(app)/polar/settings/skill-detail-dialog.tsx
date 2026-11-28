@@ -23,7 +23,8 @@ import {
     Input,
     SegmentedControl,
     settingType,
-    Skeleton
+    Skeleton,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as layers from "@/lib/polar/skills/overrides";
 import { SKILL_DESCRIPTION_MAX, type SkillView } from "@/lib/polar/skills/shared";
@@ -93,6 +94,14 @@ export function SkillDetailDialog({
     const [draft, setDraft] = useState<layers.SkillText>({ description: "", instructions: "" });
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(target !== null, () => {
+        setFailed(null);
+        setAttempt(0);
+        setTab("file");
+        setTier("user");
+        setDraft({ description: "", instructions: "" });
+        setError(null);
+    });
 
     useEffect(() => {
         if (!key) return;

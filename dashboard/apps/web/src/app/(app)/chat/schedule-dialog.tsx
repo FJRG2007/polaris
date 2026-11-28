@@ -34,7 +34,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DateInput
+    DateInput,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /** `2026-09-08`, as a date input wants it. */
@@ -112,6 +113,10 @@ export function ScheduleDialog({
 
     const [date, setDate] = useState(() => toDateValue(tomorrowMorning));
     const [time, setTime] = useState(() => toTimeValue(tomorrowMorning));
+    useResetOnOpen(open, () => {
+        setDate(() => toDateValue(tomorrowMorning));
+        setTime(() => toTimeValue(tomorrowMorning));
+    });
 
     const reading = fromFields(date, time);
     const at = reading ? core.zonedInstant(reading, timeZone) : null;

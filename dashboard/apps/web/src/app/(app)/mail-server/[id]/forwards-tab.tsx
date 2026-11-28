@@ -25,7 +25,8 @@ import {
     Input,
     Select,
     Skeleton,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 
 type Loaded = Extract<Awaited<ReturnType<typeof listForwardsAction>>, { forwards: unknown }>;
@@ -146,6 +147,12 @@ function CreateForward({
     const [recipients, setRecipients] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setDomainId("");
+        setLocalPart("");
+        setRecipients("");
+        setError(null);
+    });
 
     const chosenDomain = domainId || domains[0]?.id || "";
     const list = recipients

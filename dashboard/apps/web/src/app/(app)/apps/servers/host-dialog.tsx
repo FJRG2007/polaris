@@ -35,7 +35,8 @@ import {
     DialogHeader,
     DialogContent,
     DialogTrigger,
-    DialogDescription
+    DialogDescription,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /** Which way the operator is adding this one. Quick leads, because it is the one
@@ -60,6 +61,12 @@ export function HostDialog() {
     const [environment, setEnvironment] = useState<ServerEnvironment>("unknown");
     const [environmentPicked, setEnvironmentPicked] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setAuthMethod("password");
+        setEnvironment("unknown");
+        setEnvironmentPicked(false);
+        setError(null);
+    });
     const [pending, setPending] = useState(false);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {

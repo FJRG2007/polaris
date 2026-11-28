@@ -25,7 +25,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    SegmentedControl
+    SegmentedControl,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export function NewSpaceDialog({
@@ -44,6 +45,11 @@ export function NewSpaceDialog({
     const [visibility, setVisibility] = useState("private");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    useResetOnOpen(open, () => {
+        setName("");
+        setVisibility("private");
+        setError("");
+    });
 
     const create = async () => {
         setBusy(true);

@@ -180,7 +180,8 @@ import {
     ContextMenuContent,
     ContextMenuTrigger,
     cn,
-    useShortcutHint
+    useShortcutHint,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { useShareAsked } from "./call-share-ask";
@@ -3369,6 +3370,10 @@ function InviteToCallDialog({
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    useResetOnOpen(open, () => {
+        setPicked([]);
+        setError("");
+    });
     const [link, setLink] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [opening, setOpening] = useState(false);

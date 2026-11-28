@@ -23,7 +23,8 @@ import {
     SearchableSelect,
     Select,
     Switch,
-    DateInput
+    DateInput,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as dns from "@/lib/dns-blocker/settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -415,6 +416,10 @@ function ListDialog({
     const t = useTranslations("dnsBlocker");
     const [listUrl, setListUrl] = useState("");
     const [listCategory, setListCategory] = useState<dns.DnsCategory>("ads");
+    useResetOnOpen(open, () => {
+        setListUrl("");
+        setListCategory("ads");
+    });
     const newList = dns.dnsCustomListSchema.safeParse({ url: listUrl, category: listCategory });
     const wrong = listUrl.trim() !== "" && !newList.success;
 

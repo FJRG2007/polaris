@@ -60,7 +60,8 @@ import {
     Switch,
     Textarea,
     isDirty,
-    type SelectOption
+    type SelectOption,
+    useResetOnOpen
 } from "@polaris/ui";
 import { DomainEnabledSwitch } from "./domain-enabled-switch";
 import {
@@ -1784,6 +1785,13 @@ function AutoDeployDialog({
     const [filter, setFilter] = useState(app.commitFilter ?? "");
     const [watchPaths, setWatchPaths] = useState(app.watchPaths ?? "");
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setEnabled(app.autoDeploy);
+        setBranch(app.deployBranch ?? "");
+        setFilter(app.commitFilter ?? "");
+        setWatchPaths(app.watchPaths ?? "");
+        setError(null);
+    });
     const [pending, startTransition] = useTransition();
     // Compared with what the service holds now, so a saved edit is the new baseline.
     const unchanged = !isDirty(
@@ -1904,6 +1912,11 @@ function DomainDialog({
     const [hostname, setHostname] = useState("");
     const [port, setPort] = useState("80");
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setHostname("");
+        setPort("80");
+        setError(null);
+    });
     const [pending, startTransition] = useTransition();
     // Blank is a free subdomain; anything typed has to be a name the edge can route.
     const hostnameBad = hostname.trim() !== "" && normalizeDeployHostname(hostname) === null;

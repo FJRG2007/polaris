@@ -37,7 +37,8 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-    Input
+    Input,
+    useResetOnOpen
 } from "@polaris/ui";
 import { VariablesEditor } from "./variables-editor";
 import { redeployEnvScopeAction } from "./variable-actions";
@@ -683,6 +684,9 @@ export function TagsEditor({
     const [current, setCurrent] = useState(tags);
     const [draft, setDraft] = useState("");
     const [adding, setAdding] = useState(false);
+    useResetOnOpen(adding, () => {
+        setDraft("");
+    });
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     useEffect(() => setCurrent(tags), [tags]);

@@ -21,7 +21,8 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    Input
+    Input,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export function TunnelDialog() {
@@ -36,6 +37,13 @@ export function TunnelDialog() {
     const [hostname, setHostname] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setServerId("");
+        setServiceId("");
+        setServiceTarget(null);
+        setHostname("");
+        setError(null);
+    });
 
     const normalized = normalizeHostname(hostname);
     // Empty is unfinished, not wrong: the field only complains once there is

@@ -34,7 +34,8 @@ import {
     DialogTitle,
     Input,
     Textarea,
-    Checkbox
+    Checkbox,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /** Split a comma or space separated field into its entries. */
@@ -56,6 +57,13 @@ export function NewTextDropPointButton() {
     const [requireLogin, setRequireLogin] = useState(false);
     const [allowSealed, setAllowSealed] = useState(false);
     const [advanced, setAdvanced] = useState<LinkAdvancedValue>(EMPTY_LINK_ADVANCED);
+    useResetOnOpen(open, () => {
+        setError(null);
+        setUrl(null);
+        setRequireLogin(false);
+        setAllowSealed(false);
+        setAdvanced(EMPTY_LINK_ADVANCED);
+    });
 
     function reset(): void {
         setUrl(null);

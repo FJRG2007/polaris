@@ -21,7 +21,8 @@ import {
     DialogTitle,
     Input,
     SearchableSelect,
-    Switch
+    Switch,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as dns from "@/lib/dns-blocker/settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -291,6 +292,12 @@ function GroupDialog({
     const [groupClients, setGroupClients] = useState("");
     const [groupCategories, setGroupCategories] = useState<dns.DnsCategory[]>([]);
     const [groupServices, setGroupServices] = useState<string[]>([]);
+    useResetOnOpen(open, () => {
+        setGroupName("");
+        setGroupClients("");
+        setGroupCategories([]);
+        setGroupServices([]);
+    });
     const badGroupClients = rejected(groupClients, dns.normalizeDnsClient);
     const newGroup = dns.dnsClientGroupSchema.safeParse({
         name: groupName,

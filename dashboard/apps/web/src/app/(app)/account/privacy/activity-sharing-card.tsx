@@ -41,7 +41,8 @@ import {
     DialogTitle,
     Input,
     settingType,
-    Switch
+    Switch,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /** Whether Spotify can be shown for this account, and what is missing if not. */
@@ -420,6 +421,10 @@ function OwnGames({
     const [name, setName] = useState("");
     const [running, setRunning] = useState<readonly string[] | null>(null);
     const [open, setOpen] = useState(false);
+    useResetOnOpen(open, () => {
+        setProgram("");
+        setName("");
+    });
 
     // Checked as it is typed, against the same rules the server keeps. An empty
     // field is not wrong yet, only unfinished.

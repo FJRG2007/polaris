@@ -32,7 +32,8 @@ import {
     Input,
     Select,
     Skeleton,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 import {
     addServerKeysAction,
@@ -302,6 +303,10 @@ function AddDialog(props: {
     const [text, setText] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(props.open, () => {
+        setText("");
+        setError(null);
+    });
     const lines = text.split("\n").filter((line) => line.trim() !== "");
     // Checked as it is typed, against the same schema the server applies. An
     // empty box is incomplete, not wrong, so it only disables the button.
@@ -389,6 +394,11 @@ function GenerateDialog(props: {
         publicKey: string;
         fingerprint: string;
     } | null>(null);
+    useResetOnOpen(props.open, () => {
+        setLabel("");
+        setError(null);
+        setKey(null);
+    });
 
     function close() {
         // The private key is gone from the page as soon as the dialog closes.

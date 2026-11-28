@@ -44,7 +44,8 @@ import {
     Input,
     Select,
     Skeleton,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 
 const CACHE_KEY = "polaris.cloud-servers.overview";
@@ -604,6 +605,12 @@ export function ConnectDialog({
     const [values, setValues] = useState<Record<string, string>>({});
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setProvider("hetzner");
+        setName("");
+        setValues({});
+        setError(null);
+    });
     const fields = CREDENTIAL_FIELDS[provider];
     const complete =
         name.trim().length > 0 && fields.every((f) => (values[f.key] ?? "").trim().length > 0);

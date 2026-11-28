@@ -45,7 +45,8 @@ import {
     Skeleton,
     Switch,
     cn,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 import { StoreFilters } from "@polaris/ui/store-layout";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -950,6 +951,16 @@ function AddConnector({
     const [advanced, setAdvanced] = useState(false);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setName("");
+        setUrl("");
+        setAuth("none");
+        setTransport("http");
+        setToken("");
+        setClientId("");
+        setClientSecret("");
+        setError(null);
+    });
 
     const urlBad = url.trim() !== "" && !looksLikeServer(url);
     const complete =

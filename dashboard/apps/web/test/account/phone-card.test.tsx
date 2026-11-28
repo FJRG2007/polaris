@@ -97,6 +97,38 @@ describe("PhoneCard", () => {
         await waitFor(() => expect(actions.send).toHaveBeenCalledWith("new-id"));
     });
 
+    it("opens Add empty again after a number was typed and cancelled (BUG-0078)", async () => {
+        renderCard([PRIMARY]);
+        openAdd();
+        fireEvent.change(addField(), { target: { value: "+34 600 111 444" } });
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        openAdd();
+        expect(addField().value).toBe("");
+        expect(addButton().getAttribute("aria-disabled")).toBe("true");
+    });
+
+    it("keeps the typed number across the password step, and asks for the password empty", async () => {
+        renderCard([PRIMARY]);
+        openAdd();
+        fireEvent.change(addField(), { target: { value: "+34 600 111 444" } });
+        fireEvent.click(addButton());
+        const password = await screen.findByLabelText("Current password");
+        fireEvent.change(password, { target: { value: "fixture-password" } });
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        openAdd();
+        expect(addField().value).toBe("");
+        fireEvent.change(addField(), { target: { value: "+34 600 111 555" } });
+        fireEvent.click(addButton());
+        expect(((await screen.findByLabelText("Current password")) as HTMLInputElement).value).toBe("");
+        fireEvent.change(screen.getByLabelText("Current password"), { target: { value: "fixture-password" } });
+        fireEvent.submit(screen.getByLabelText("Current password").closest("form")!);
+        await waitFor(() =>
+            expect(actions.add).toHaveBeenCalledWith({ phone: "+34600111555", password: "fixture-password" })
+        );
+    });
+
     it("opens the code box under the number Confirm was pressed for, and sends its id", async () => {
         renderCard([PRIMARY, SECOND]);
         fireEvent.click(screen.getByRole("button", { name: /^Confirm \+34/ }));

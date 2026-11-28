@@ -38,7 +38,8 @@ import {
     DialogTitle,
     DialogTrigger,
     Input,
-    Select
+    Select,
+    useResetOnOpen
 } from "@polaris/ui";
 import {
     createRunnerPoolSchema,
@@ -93,6 +94,22 @@ export function PoolDialog({ local }: { local: LocalServer }) {
     const [probing, setProbing] = useState(false);
     const [probeError, setProbeError] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setName("");
+        setServerId("");
+        setScope(EMPTY_SCOPE);
+        setLabels(DEFAULT_RUNNER_LABELS.join(", "));
+        setMaxConcurrent("1");
+        setTouchedConcurrency(false);
+        setIsolation("container");
+        setPerTarget("");
+        setMinutes("");
+        setWindow("month");
+        setJobsPerDay("");
+        setOnExhausted("pause");
+        setProbeError(null);
+        setError(null);
+    });
     const [pending, setPending] = useState(false);
 
     const server = serverId ? { local: serverId === local.id } : null;

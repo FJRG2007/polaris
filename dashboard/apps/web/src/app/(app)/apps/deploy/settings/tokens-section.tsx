@@ -38,7 +38,8 @@ import {
     DialogTitle,
     Input,
     Select,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 
 const LIFETIME_LABELS = {
@@ -239,6 +240,12 @@ function CreateTokenDialog({
     const [lifetime, setLifetime] = useState<TokenLifetime>("90d");
     const [canManage, setCanManage] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setName("");
+        setLifetime("90d");
+        setCanManage(false);
+        setError(null);
+    });
     const [pending, startTransition] = useTransition();
 
     function submit() {

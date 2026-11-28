@@ -29,7 +29,8 @@ import {
     DialogDescription,
     DialogFooter,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export function StepUpDialog({
@@ -54,6 +55,10 @@ export function StepUpDialog({
     const [busy, setBusy] = useState(false);
     const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState("");
+    useResetOnOpen(open, () => {
+        setProof(null);
+        setError("");
+    });
 
     async function confirm(): Promise<void> {
         if (!proof || busy) return;

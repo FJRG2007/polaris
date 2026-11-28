@@ -82,3 +82,4 @@ Security findings are not kept here; they live in
 | BUG-0073 | Polar's answer shows control tags such as `<final_answer>` while it streams and once saved | Polar | Fixed, watching | dashboard/apps/web/src/lib/polar/control-tags.ts | 2026-11-27 |
 | BUG-0074 | A Chat reply that asks the person a question is sent back by Enigma, and a second, odd answer follows | Polar | Fixed, watching | dashboard/apps/web/src/lib/agents/acp/pipe-commands.ts | 2026-11-28 |
 | BUG-0075 | Polaris's update list shows changes that belong to a device plugin with its own update | Updates | Fixed, watching | dashboard/packages/core/src/changelog.ts | 2026-11-28 |
+| BUG-0078 | A dialog form opens again holding what was typed the last time | UI | Fixed, watching | dashboard/packages/ui/src/lib/use-reset-on-open.ts | 2026-11-28 |

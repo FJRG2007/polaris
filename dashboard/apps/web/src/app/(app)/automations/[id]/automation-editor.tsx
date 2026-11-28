@@ -45,7 +45,8 @@ import {
     Textarea,
     isDirty,
     useToast,
-    type SelectOption
+    type SelectOption,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useOptimisticToggle } from "@polaris/ui";
 import * as core from "@polaris/core";
@@ -792,6 +793,11 @@ function VersionsDialog({
     const [busy, setBusy] = useState<string | null>(null);
     const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
     const [against, setAgainst] = useState<string>("draft");
+    useResetOnOpen(open, () => {
+        setError(null);
+        setRenaming(null);
+        setAgainst("draft");
+    });
     const [comparing, setComparing] = useState<{
         versionId: string;
         result: VersionComparison | null;

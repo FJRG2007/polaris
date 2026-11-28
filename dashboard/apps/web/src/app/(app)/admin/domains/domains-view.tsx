@@ -53,7 +53,8 @@ import {
     Input,
     Select,
     settingType,
-    Skeleton
+    Skeleton,
+    useResetOnOpen
 } from "@polaris/ui";
 import {
     CheckCircle2,
@@ -486,6 +487,10 @@ function DashboardDomains({
     const [adding, setAdding] = useState(false);
     const [open, setOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setDraft("");
+        setError(null);
+    });
 
     const candidate = draft
         .trim()

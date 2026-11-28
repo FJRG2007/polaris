@@ -22,7 +22,8 @@ import {
     DialogHeader,
     DialogTitle,
     Textarea,
-    useToast
+    useToast,
+    useResetOnOpen
 } from "@polaris/ui";
 
 const MAX_NOTE = 500;
@@ -41,6 +42,10 @@ export function StreamReportDialog({
     const prefs = useStreamPrefs();
     const [problem, setProblem] = useState<StreamProblem | null>(null);
     const [note, setNote] = useState("");
+    useResetOnOpen(open, () => {
+        setProblem(null);
+        setNote("");
+    });
     const [sending, setSending] = useState(false);
 
     const close = (next: boolean) => {

@@ -37,7 +37,8 @@ import {
     DialogTitle,
     Input,
     settingType,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FRIEND_NOTE_MAX, normalizeFriendNote } from "@/lib/friend-note";
@@ -406,6 +407,11 @@ function AddFriend({
     const [found, setFound] = useState<readonly { id: string; name: string }[]>([]);
     const [looking, setLooking] = useState(false);
     const [said, setSaid] = useState("");
+    useResetOnOpen(open, () => {
+        setQuery("");
+        setNote("");
+        setSaid("");
+    });
     const asked = useRef(0);
 
     useEffect(() => {

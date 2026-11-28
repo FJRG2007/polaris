@@ -38,7 +38,8 @@ import {
     Input,
     Select,
     settingType,
-    useToast
+    useToast,
+    useResetOnOpen
 } from "@polaris/ui";
 import {
     inviteOrgMemberAction,
@@ -518,6 +519,10 @@ function InvitePerson({
         ? defaultRole
         : (roles.find((entry) => entry.slug === "member")?.slug ?? roles[0]?.slug ?? "member");
     const [role, setRole] = useState(initial);
+    useResetOnOpen(inviting, () => {
+        setIdentifier("");
+        setRole(initial);
+    });
     const [savingDefault, setSavingDefault] = useState(false);
 
     const hint = roles.find((entry) => entry.slug === role)?.description ?? "";

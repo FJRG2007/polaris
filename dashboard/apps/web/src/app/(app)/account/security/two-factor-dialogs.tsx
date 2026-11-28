@@ -40,7 +40,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /** The `secret` query parameter of an otpauth:// URI, for manual entry. */
@@ -78,6 +79,13 @@ export function EnableTwoFactorDialog({
     const [busy, setBusy] = useState(false);
     const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setStep("password");
+        setTotpUri("");
+        setBackupCodes([]);
+        setCode("");
+        setError(null);
+    });
 
     function reset() {
         setStep("password");

@@ -27,7 +27,8 @@ import {
     DialogTitle,
     Input,
     Select,
-    Checkbox
+    Checkbox,
+    useResetOnOpen
 } from "@polaris/ui";
 
 export const NEW_ENVIRONMENT = "__new_environment__";
@@ -72,6 +73,13 @@ export function NewEnvironmentDialog({
     const [branch, setBranch] = useState("");
     const [deploy, setDeploy] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setName("");
+        setFrom(EMPTY);
+        setBranch("");
+        setDeploy(true);
+        setError(null);
+    });
     const [pending, startTransition] = useTransition();
     const cloning = from !== EMPTY;
 

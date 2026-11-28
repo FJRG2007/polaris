@@ -31,7 +31,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 import { SlowSubmitLabel } from "@/components/slow-submit-label";
 import { changePasswordAction, changePasswordOpaqueAction, recoverPasswordAction, sendRecoveryCodeAction } from "./actions";
@@ -200,6 +201,12 @@ export function RecoverPasswordDialog({
             : undefined;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setAnswers(() => questions.map(() => ""));
+        setTotpCode("");
+        setSentProof(null);
+        setError(null);
+    });
     const [done, setDone] = useState<string | null>(null);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {

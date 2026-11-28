@@ -68,7 +68,8 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     Input,
-    Select
+    Select,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /** The faces offered - kept with the rest of the app so a slide offers the
@@ -807,6 +808,10 @@ function AddressDialog({
     const tc = useTranslations("common");
     const [value, setValue] = useState("");
     const [touched, setTouched] = useState(false);
+    useResetOnOpen(kind !== null, () => {
+        setValue("");
+        setTouched(false);
+    });
     const address = kind ? safeAddress(value, kind) : null;
     const invalid = touched && value.trim() !== "" && address === null;
 

@@ -277,3 +277,4 @@ export {
     type OptimisticOptions,
     type OptimisticToggleOptions
 } from "./lib/use-optimistic-toggle";
+export { DIALOG_WIPE_MS, useResetOnOpen } from "./lib/use-reset-on-open";
