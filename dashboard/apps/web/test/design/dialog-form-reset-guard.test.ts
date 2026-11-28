@@ -28,17 +28,16 @@ const CHANGE = /^on(Change|ValueChange|CheckedChange|Input|Select)$/;
 const PENDING = new Set([
     "apps/web/src/app/(app)/apps/deploy/import-site.tsx#ImportSiteButton",
     "apps/game-servers/src/screens/installed/game-console.tsx#GameConsole",
-    "apps/web/src/app/(app)/automations/[id]/alert-fields.tsx#AlertInFields",
     "apps/web/src/app/(app)/chat/chat-sidebar.tsx#ChatSidebarList",
     "apps/web/src/app/(app)/drive/drive-explorer.tsx#DriveExplorer",
     "apps/web/src/app/(app)/drive/files-view.tsx#FilesView",
-    "apps/web/src/app/s/[token]/share-explorer.tsx#ShareExplorer",
-    "apps/web/src/components/account-menu.tsx#AccountMenu"
+    "apps/web/src/app/s/[token]/share-explorer.tsx#ShareExplorer"
 ]);
 
 /**
- * Owners whose dialog is not a form, so there is nothing to start from scratch:
- * the state it keeps is the record or the view itself.
+ * Owners with nothing to start from scratch: the dialog is not a form (the
+ * state it keeps is the record or the view itself), or the action that opens
+ * it sets every field.
  */
 const NOT_A_FORM = new Set([
     // The task sheet edits the task in place and saves as it goes.
@@ -46,7 +45,11 @@ const NOT_A_FORM = new Set([
     // The enlarged map keeps the map style the reader picked.
     "apps/web/src/app/(app)/chat/location-card.tsx#LocationCard",
     // Shows the new webhook address read-only, and drops it when closed.
-    "apps/web/src/app/(app)/apps/deploy/settings/automations-section.tsx#AutomationsSection"
+    "apps/web/src/app/(app)/apps/deploy/settings/automations-section.tsx#AutomationsSection",
+    // A confirm with no fields, and a one-time secret dropped when closed.
+    "apps/web/src/app/(app)/automations/[id]/alert-fields.tsx#AlertInFields",
+    // "Until a moment" sets the moment to an hour from now every time it opens it.
+    "apps/web/src/components/account-menu.tsx#AccountMenu"
 ]);
 
 function sources(): string[] {
