@@ -17,7 +17,7 @@
  *   Changelog: skip
  *       nothing a reader of the changelog needs (a test, a typo, CI).
  *   Plugin: <id>
- *       the commit changes one device plugin (`hercules-stream100`), which
+ *       the commit changes one device plugin (`acme-deck`), which
  *       ships in that plugin's own update, not in Polaris's. A scope of
  *       `plugins/<id>` says the same.
  *
@@ -160,7 +160,7 @@ export function buildChangelog(
 /** A device plugin as the changelog knows it: its id and the names a subject may call it by. */
 export interface ChangelogPlugin {
     readonly id: string;
-    /** Its name and the devices it claims (`Hercules Stream 100`). */
+    /** Its name and the devices it claims (`Acme Deck Pro`). */
     readonly names: readonly string[];
 }
 
@@ -169,8 +169,8 @@ const PLUGIN_SCOPES = new Set(["plugins", "plugin", "device-plugins"]);
 
 /**
  * What a subject may call a plugin: each name, and a name of three words or
- * more without its first one, the brand ("Stream 100" for "Hercules Stream
- * 100"). Lowercased, at least four characters, so a short word never matches.
+ * more without its first one, the brand ("Deck Pro" for "Acme Deck
+ * Pro"). Lowercased, at least four characters, so a short word never matches.
  */
 function pluginAliases(plugin: ChangelogPlugin): string[] {
     const aliases = new Set<string>();
