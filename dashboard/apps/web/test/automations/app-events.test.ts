@@ -276,3 +276,54 @@ describe("emitAppEvent", () => {
         error.mockRestore();
     });
 });
+
+describe("an app emitting its own declared events (host API 1.3)", () => {
+    const sent = { app: "bakery", name: "bakery.loaf-baked", payload: { loafId: "l-1", grams: 500 }, key: "l-1", permission: "bakery.use" };
+
+    beforeEach(() => {
+        core.registerAppEvents("bakery", [{ name: "bakery.loaf-baked", label: "Loaf baked", fields: { loafId: "id", grams: "number" } }]);
+    });
+
+    it("sends a declared event to the automations whose runner holds the app's permission", async () => {
+        armed("a1", "a2");
+        runners.set("u-a1", { id: "u-a1", isAdmin: false });
+        runners.set("u-a2", { id: "u-a2", isAdmin: false });
+        expect(await events.emitOwnAppEvent(sent)).toBe(true);
+        expect(emitted).toHaveLength(1);
+        expect(emitted[0]?.input).toMatchObject({
+            subjectKey: "bakery.loaf-baked",
+            payload: { name: "bakery.loaf-baked", payload: { loafId: "l-1", grams: 500 }, audience: ["a1", "a2"] },
+            dedupeKey: "bakery.loaf-baked:l-1"
+        });
+    });
+
+    it("refuses an event that is not the app's, a built-in one, a foreign permission or a payload off its shape", async () => {
+        armed("a1");
+        runners.set("u-a1", { id: "u-a1", isAdmin: false });
+        expect(await events.emitOwnAppEvent({ ...sent, app: "other" })).toBe(false);
+        expect(await events.emitOwnAppEvent({ ...sent, name: "deploy.failed" })).toBe(false);
+        expect(await events.emitOwnAppEvent({ ...sent, name: "bakery.never-declared" })).toBe(false);
+        expect(await events.emitOwnAppEvent({ ...sent, permission: "deploy.read" })).toBe(false);
+        expect(await events.emitOwnAppEvent({ ...sent, payload: { loafId: "l-1", grams: "heavy" } })).toBe(false);
+        expect(await events.emitOwnAppEvent({ ...sent, payload: { ...sent.payload, extra: 1 } })).toBe(false);
+        expect(emitted).toHaveLength(0);
+    });
+
+    it("sends nothing while the app is not installed, or to a runner without the permission", async () => {
+        armed("a1");
+        runners.set("u-a1", { id: "u-a1", isAdmin: false });
+        installed.mockResolvedValue(false);
+        expect(await events.emitOwnAppEvent(sent)).toBe(false);
+        installed.mockResolvedValue(true);
+        can.mockResolvedValue(false);
+        expect(await events.emitOwnAppEvent(sent)).toBe(false);
+        expect(emitted).toHaveLength(0);
+    });
+
+    it("stops once the app is withdrawn from the catalogue", async () => {
+        armed("a1");
+        runners.set("u-a1", { id: "u-a1", isAdmin: false });
+        core.retainAppEvents([]);
+        expect(await events.emitOwnAppEvent(sent)).toBe(false);
+    });
+});

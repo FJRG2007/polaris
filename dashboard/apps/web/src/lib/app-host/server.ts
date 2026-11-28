@@ -111,6 +111,7 @@ const load = {
     automations: once(() => import("@/lib/automations/app-bridge")),
     automationsAppEvents: once(() => import("@/lib/automations/app-events")),
     automationsGameServerEvents: once(() => import("@/lib/automations/game-server-events")),
+    appBundleMigrations: once(() => import("@/lib/app-bundles/migrations")),
     appContainerMetrics: once(() => import("@/lib/app-container-metrics")),
     appsInstallAccess: once(() => import("@/lib/apps/install-access")),
     appsInstallConfig: once(() => import("@/lib/apps/install-config")),
@@ -202,6 +203,11 @@ export const serverHost = {
     // player arriving on a server - so the screens drawing them ask again.
     activityLive: {
         announceActivity: later(load.activityLive, "announceActivity")
+    },
+    // Host API 1.3: an app's own tables, in the schema its migrations made
+    // (`app_<id>`), with parameters bound and the search path pinned to it.
+    appData: {
+        openAppDatabase: later(load.appBundleMigrations, "openAppDatabase")
     },
     apiSession: {
         apiUser: later(load.apiSession, "apiUser")
@@ -583,6 +589,8 @@ export const serverHost = {
         announceGameServerEvent: later(load.automationsGameServerEvents, "announceGameServerEvent"),
         anyListening: later(load.automationsAppEvents, "anyListening"),
         emitAppEvent: later(load.automationsAppEvents, "emitAppEvent"),
+        // Host API 1.3: an app emits the events its own manifest declared.
+        emitOwnAppEvent: later(load.automationsAppEvents, "emitOwnAppEvent"),
         appTriggers: later(load.automations, "appTriggers"),
         automationForLegacy: later(load.automations, "automationForLegacy"),
         automationsForLegacy: later(load.automations, "automationsForLegacy"),

@@ -135,3 +135,44 @@ export async function eventApps(user: SessionUser): Promise<core.AppEventApp[]> 
     );
     return answers.filter((app): app is core.AppEventApp => app !== null);
 }
+
+/** What an app's own bundle says when it emits one of its declared events. */
+export interface OwnAppEvent {
+    /** The app's id: the event must be one its manifest declared under it. */
+    readonly app: string;
+    /** `<app id>.<event>`, as the manifest's `events` list names it. */
+    readonly name: string;
+    readonly payload: Record<string, unknown>;
+    /** Once-only key, as for `emitAppEvent`. */
+    readonly key: string;
+    /** What an automation's runner needs to receive it: one of the app's own permissions. */
+    readonly permission: string;
+}
+
+/**
+ * Send an event an installed app declared in its manifest (`registerAppEvents`)
+ * from the app's own code. Refused - logged, never thrown - when the event is
+ * not the app's, the payload does not match what the manifest declared, or the
+ * permission is not one under the app's id. An automation receives it only
+ * while the app is installed and its runner holds `permission`, the same rule
+ * the app's own screens apply.
+ */
+export async function emitOwnAppEvent(event: OwnAppEvent): Promise<boolean> {
+    const { app, name, permission } = event;
+    if (core.appEventOwner(name) !== app || !name.startsWith(`${app}.`) || Object.hasOwn(core.APP_EVENTS, name)) {
+        console.error(`polaris: ${app} emitted ${name}, which is not one of its declared events`);
+        return false;
+    }
+    if (!permission.startsWith(`${app}.`)) {
+        console.error(`polaris: ${app} emitted ${name} behind ${permission}, which is not its own permission`);
+        return false;
+    }
+    if (!(await isAppInstalled(app).catch(() => false))) return false;
+    return emitAppEvent(name as core.AppEventName, event.payload as core.AppEventPayload<core.AppEventName>, {
+        key: event.key,
+        mayReceive: async (runner) => {
+            const user: SessionUser = { ...runner, email: "", name: "", sessionId: "" };
+            return sessionCan(user, permission as core.Permission);
+        }
+    });
+}

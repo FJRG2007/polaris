@@ -239,3 +239,8 @@ export function appDatabase(id: string, db?: MigrationDb) {
         transaction: within
     };
 }
+
+/** `appDatabase` as the host hands it to a bundle (host API 1.3): asynchronous, like every host service. */
+export async function openAppDatabase(id: string): Promise<ReturnType<typeof appDatabase>> {
+    return appDatabase(id);
+}

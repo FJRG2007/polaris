@@ -176,8 +176,7 @@ converged on. Code: `apps/web/src/lib/app-bundles/migrations.ts`.
   its schema (parameters bound, never string-built). Users and permissions stay
   behind the host APIs; an app never reads core tables.
 
-Not yet done: `appDatabase` is a host-side function and is not yet handed to
-bundles as a host API service (that is a host API minor bump, see below).
+A bundle reaches it as `host.appData.openAppDatabase(id)` (host API 1.3).
 Hospitality's tables stay in the core schema for now, with `coreTables: true`.
 Moving them later: ship `0001_*.sql` creating the same tables in
 `app_hospitality`, copy the rows across in a one-off host step run once under
@@ -218,7 +217,7 @@ Inventory of today's per-app registries:
 | Calendar events, presence, backups, game server cards | bundle `upcomingEvents`, `presence*`, `backupSources`, `gameServer*` | runtime already |
 | Page slots inside core screens | bundle `AppSlot` (`withBundleSlot`) | runtime already |
 | Own tables | bundle migrations (`app_<id>` schema) | runtime |
-| Emitting an app's events from its bundle | needs a host API service (`HOST_API` 1.3) | not done |
+| Emitting an app's events from its bundle | `host.automations.emitOwnAppEvent({ app, name, payload, key, permission })` (host API 1.3) | runtime: only an event the app's manifest declared, payload checked against it, received only by runners holding the app's own `permission` while the app is installed |
 | Home / overview widgets | `app/(app)/home/widgets/*` in `apps/web` | not done: static list |
 | Notification kinds | core notification groups | not done: static list |
 | Settings sections | `settingsAt` in the image catalog | not done for catalogue apps |
