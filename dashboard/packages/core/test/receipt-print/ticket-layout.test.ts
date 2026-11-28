@@ -23,7 +23,7 @@ describe("ticketToPrint", () => {
         const ticket = print.ticketDocumentSchema.parse({
             version: 1,
             kind: "receipt",
-            currency: "EUR",
+            currency: "USD",
             locale: "en-US",
             header: [{ text: "Bar Test" }],
             meta: [{ label: "Table", value: "4" }],
