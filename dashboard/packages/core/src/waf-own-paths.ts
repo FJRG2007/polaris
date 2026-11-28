@@ -90,6 +90,7 @@ export const POLARIS_ROUTE_ROOTS: readonly string[] = [
     "status",
     "status-pages",
     "hospitality",
+    "hospitality-link",
     "sw.js",
     "t",
     "tasks",

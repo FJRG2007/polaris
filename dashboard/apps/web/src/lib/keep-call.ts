@@ -61,6 +61,7 @@ export const OUTSIDE_APP_PREFIXES: readonly string[] = [
     "/edge",
     "/f",
     "/forms",
+    "/hospitality-link",
     "/k",
     "/launcher",
     "/legal",

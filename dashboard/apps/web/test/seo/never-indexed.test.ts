@@ -29,6 +29,7 @@ const NOT_TOKEN_PATHS = new Map<string, string>([
     ["api", "the API: answers JSON and files, each route checks its own caller"],
     ["cli", "the CLI's own downloads, the same file for everybody"],
     ["edge", "the edge's sign-in check, called by Traefik rather than a browser"],
+    ["hospitality-link", "a till or handheld linking itself: shows a short code to approve, no token in the address"],
     ["o", "an organization's public page, by its public slug"],
     ["oauth", "sign-in screens"],
     ["season-icon", "the tab and app icon for the current season, the same file for everybody"],
