@@ -100,11 +100,13 @@ export function useQuickAi(host: QuickAiHost) {
 
     /** Ends the conversation: the stream stops (and the call upstream with it). */
     const reset = useCallback(() => {
+        setActive(false);
+        // Nothing to end: no state is touched, so a closed panel stays still.
+        if (messages.length === 0 && !error) return;
         void stop();
         setMessages([]);
         clearError();
-        setActive(false);
-    }, [stop, setMessages, clearError]);
+    }, [messages.length, error, stop, setMessages, clearError]);
 
     const startOver = useCallback(() => {
         void stop();
@@ -112,7 +114,10 @@ export function useQuickAi(host: QuickAiHost) {
         clearError();
     }, [stop, setMessages, clearError]);
 
-    useEffect(() => () => void stop(), [stop]);
+    // Unmounted (the page left): the stream stops, and the call upstream with it.
+    const stopRef = useRef(stop);
+    stopRef.current = stop;
+    useEffect(() => () => void stopRef.current(), []);
 
     const lastAnswer = useMemo(() => {
         const last = [...messages].reverse().find((message) => message.role === "assistant");

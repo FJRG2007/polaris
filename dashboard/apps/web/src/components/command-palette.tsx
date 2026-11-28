@@ -310,12 +310,14 @@ export function CommandPalette({
         )
     );
     const quickActive = quick.active;
-    const quickReset = quick.reset;
     const quickEscape = quick.escape;
-    // A closed panel ends the conversation, and the answer being written with it.
+    const quickResetRef = useRef(quick.reset);
+    quickResetRef.current = quick.reset;
+    // A closed panel ends the conversation, and the answer being written with
+    // it. On the change only, so a re-render while closed never resets again.
     useEffect(() => {
-        if (!open) quickReset();
-    }, [open, quickReset]);
+        if (!open) quickResetRef.current();
+    }, [open]);
     // Escape inside Quick AI stops the answer, then goes back to the search,
     // as Raycast's does; it never closes the panel. Taken before the dialog's
     // own Escape (a capture listener on the document) can see it.
