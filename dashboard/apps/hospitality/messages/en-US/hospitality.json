@@ -53,7 +53,7 @@
         "category": "Category",
         "description": "Description",
         "sku": "Code",
-        "image": "Picture link",
+        "image": "Image",
         "allergens": "Allergens"
     },
     "category": {
@@ -61,7 +61,7 @@
         "edit": "Edit category",
         "name": "Name",
         "station": "Made at",
-        "color": "Colour"
+        "color": "Color"
     },
     "stations": {
         "kitchen": "Kitchen",
@@ -108,7 +108,7 @@
         "service": "Service",
         "menu": "Menu",
         "kitchen": "Kitchen",
-        "till": "Till",
+        "till": "Register",
         "devices": "Devices"
     },
     "service": {
@@ -132,7 +132,7 @@
             "free": "free",
             "open": "open",
             "pending": "not sent",
-            "billed": "bill asked",
+            "billed": "check asked",
             "seated": "seated",
             "kitchen": "in kitchen",
             "served": "served",
@@ -178,7 +178,7 @@
             "served": "served",
             "void": "void"
         },
-        "bill": "Bill",
+        "bill": "Check",
         "pay": "Pay",
         "pick": "Pick {count}",
         "upTo": "Up to {count}",
@@ -197,7 +197,7 @@
         "soldOut": "Something on it is sold out.",
         "modifiers": "Pick the options this one needs.",
         "tableBusy": "A table you removed still has an open order.",
-        "paidBeforeClose": "Part of this table was paid before the till was closed, so it cannot join another order. Move only the unpaid items instead.",
+        "paidBeforeClose": "Part of this table was paid before the register was closed, so it cannot join another order. Move only the unpaid items instead.",
         "changed": "Another device changed this table just now. It is up to date: check it and try again.",
         "undoExpired": "That can no longer be undone.",
         "removed": "{name} removed",
@@ -213,17 +213,17 @@
         "allReady": "All ready"
     },
     "till": {
-        "openTitle": "Open the till",
+        "openTitle": "Open the register",
         "float": "Float",
-        "open": "Open till",
-        "openSince": "Till opened by {name}",
+        "open": "Open register",
+        "openSince": "Register opened by {name}",
         "moveTitle": "Cash in or out",
         "in": "Cash in",
         "out": "Cash out",
         "amount": "Amount",
         "reason": "Reason",
         "record": "Record",
-        "closeTitle": "Close the till",
+        "closeTitle": "Close the register",
         "closeHint": "Count the drawer and type what is there.",
         "counted": "Counted",
         "close": "Close and print Z",
@@ -237,8 +237,8 @@
         "discounts": "Discounts",
         "tips": "Tips taken",
         "tax": "VAT {rate}",
-        "noShift": "Open the till first.",
-        "shiftOpen": "The till is already open.",
+        "noShift": "Open the register first.",
+        "shiftOpen": "The register is already open.",
         "overpaid": "That is more than is left to pay."
     },
     "pay": {
@@ -288,15 +288,15 @@
         "done": "Moved to {table}"
     },
     "picture": {
-        "choose": "Choose picture",
+        "choose": "Choose image",
         "remove": "Remove",
         "hint": "Or drop or paste one here",
-        "failed": "The picture could not be stored."
+        "failed": "The image could not be saved."
     },
     "devices": {
         "badCode": "That code is wrong or has expired. Ask the device for a new one.",
         "linkTitle": "Link a device",
-        "linkHint": "Open Hospitality on the handheld, till or kitchen screen and type the code it shows.",
+        "linkHint": "Open Hospitality on the handheld, register or kitchen screen and type the code it shows.",
         "code": "Code",
         "name": "Name",
         "namePlaceholder": "Terrace PDA",

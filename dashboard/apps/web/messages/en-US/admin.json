@@ -3194,7 +3194,7 @@
                 "topics": "Receive alerts from other systems"
             },
             "hospitality": {
-                "use": "Take orders and use the till",
+                "use": "Take orders and use the register",
                 "manage": "Run the menu, the floor and the reports"
             }
         }

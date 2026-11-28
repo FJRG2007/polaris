@@ -53,7 +53,7 @@
         "category": "Familia",
         "description": "Descripción",
         "sku": "Código",
-        "image": "Enlace foto",
+        "image": "Imagen",
         "allergens": "Alérgenos"
     },
     "category": {
@@ -288,7 +288,7 @@
         "done": "Pasado a {table}"
     },
     "picture": {
-        "choose": "Elegir foto",
+        "choose": "Elegir imagen",
         "remove": "Quitar",
         "hint": "O suéltala o pégala aquí",
         "failed": "No se pudo guardar la foto."

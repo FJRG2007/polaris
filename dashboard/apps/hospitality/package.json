@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "Hospitality: run a bar or restaurant - the menu, the floor, orders, the kitchen and the till - on the local network. An installable Polaris app.",
+    "description": "Hospitality: run a bar or restaurant - the menu, the floor, orders, the kitchen and the register - on the local network. An installable Polaris app.",
     "polaris": {
         "id": "hospitality",
         "extension": "src/lib/hospitality-extension.ts#hospitalityExtension"

@@ -600,6 +600,7 @@ function ImportDialog(props: { onClose: () => void; onSaved: () => void }) {
         >
             <p className="text-sm text-muted-foreground">{t("import.hint")}</p>
             <Button
+                type="button"
                 variant="outline"
                 className="self-start"
                 onClick={() =>

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * A product's or category's picture: chosen through the shared picker (this
+ * A product's or category's image: chosen through the shared picker (this
  * computer, the phone's camera or gallery, Drive), dropped on the box or pasted. Every picture goes through the crop
  * dialog Polaris uses for every picture (square, resized, WebP, no EXIF) and is
  * stored by the app's own image route; the product keeps the address it gives.
@@ -55,11 +55,11 @@ export function PictureField(props: { value: string; onChange: (url: string) => 
                 {props.value ? <img src={props.value} alt="" className="size-full object-cover" /> : <ImageUp aria-hidden className="size-6 text-muted-foreground" />}
             </div>
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => void choose({ accept: ACCEPTED, title: t("picture.choose") }).then((files) => take(files[0]))}>
+                <Button type="button" size="sm" variant="outline" onClick={() => void choose({ accept: ACCEPTED, title: t("picture.choose") }).then((files) => take(files[0]))}>
                     <ImageUp aria-hidden /> {t("picture.choose")}
                 </Button>
                 {props.value ? (
-                    <Button size="sm" variant="ghost" onClick={() => props.onChange("")}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => props.onChange("")}>
                         <X aria-hidden /> {t("picture.remove")}
                     </Button>
                 ) : null}
