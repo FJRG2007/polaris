@@ -260,7 +260,8 @@ function actionsNow(): DeviceActions {
  * what each button does.
  */
 async function polarisState(id: string) {
-    const values = (await manager?.settings(id)) ?? {};
+    // Names are extra: a settings file that cannot be read still answers the call and the games.
+    const values = (await manager?.settings(id).catch(() => null)) ?? {};
     const actions = heldActionNames(values, await actionsNow().list().catch(() => []), (entry) => launcherEntries().find((item) => item.entry === entry)?.label);
     return { call: voiceStateNow(), games: runningGames(), actions };
 }
