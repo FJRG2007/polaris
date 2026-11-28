@@ -113,7 +113,9 @@
     },
     "service": {
         "noFloor": "Aún no hay salón",
-        "noFloorHint": "Prepara antes el local en Carta."
+        "noFloorHint": "Prepara antes el local en Carta.",
+        "noFloorAsk": "Pide a un encargado que prepare el local.",
+        "setUp": "Preparar el local"
     },
     "floor": {
         "edit": "Editar sala",

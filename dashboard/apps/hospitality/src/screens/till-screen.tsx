@@ -20,14 +20,15 @@ import type { OrderView } from "../lib/orders";
 import { useOfflineQueue, type OfflineQueue } from "./offline";
 import { changeDue, itemsDue, lineTotal, quickTenders, splitEvenly } from "../model/pricing";
 import { readCache, unwrap, useHospitalityT } from "./i18n";
+import { LoadFailed, NoVenue } from "./states";
 import { Banknote, CreditCard, Minus, Percent, Plus } from "lucide-react";
 import { closeShiftAction, openShiftAction, payAction, readTillAction, setDiscountAction } from "../actions/till";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, EmptyState, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
 
 type Till = Awaited<ReturnType<typeof xReport>>;
 type Closed = Awaited<ReturnType<typeof closeShift>>;
 
-export function TillScreen() {
+export function TillScreen({ manager }: { manager: boolean }) {
     const t = useHospitalityT();
     const toast = useToast();
     const [venue, setVenue] = useState<{ id: string; currency: string } | null>(null);
@@ -36,6 +37,7 @@ export function TillScreen() {
     const [move, setMove] = useState({ kind: "out", amount: "", reason: "" });
     const [count, setCount] = useState("");
     const [closed, setClosed] = useState<Closed | null>(null);
+    const [failed, setFailed] = useState<string | null>(null);
     const money = useMoney(venue?.currency ?? "EUR");
     const fail = (caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message });
     // One id per cash movement being typed, so a retry is the same movement.
@@ -44,19 +46,21 @@ export function TillScreen() {
     const load = useCallback(() => {
         unwrap(() => readMenuAction({ venueId: readCache<string>("venue") }), t("errors.loadFailed"))
             .then((answer) => {
+                setFailed(null);
                 const v = answer.menu.venues.find((x) => x.id === answer.menu.venueId);
                 if (!v) return setTill(null);
                 setVenue({ id: v.id, currency: v.currency });
                 return unwrap(() => readTillAction({ venueId: v.id }), t("errors.loadFailed")).then((x) => setTill(x.till));
             })
-            .catch((caught: Error) => toast.show({ title: t("errors.loadFailed"), body: caught.message }));
-    }, [t, toast]);
+            .catch((caught: Error) => setFailed(caught.message));
+    }, [t]);
     useEffect(load, [load]);
     const queue = useOfflineQueue(load, (error) => toast.show({ title: t("errors.saveFailed"), body: error }));
     useHospitalityLive(venue?.id ?? null, load);
 
+    if (failed && till === undefined) return <LoadFailed message={failed} onRetry={load} />;
     if (till === undefined) return <Skeleton className="m-4 h-48" />;
-    if (!venue) return <EmptyState title={t("service.noFloor")} description={t("service.noFloorHint")} />;
+    if (!venue) return <NoVenue manager={manager} />;
 
     if (closed) {
         return (

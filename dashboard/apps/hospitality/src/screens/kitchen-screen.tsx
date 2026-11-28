@@ -10,11 +10,12 @@
 import { Check, Undo2 } from "lucide-react";
 import type { KitchenTicket } from "../lib/till";
 import { readMenuAction } from "../actions/catalog";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { readKitchenAction } from "../actions/till";
 import { useOfflineQueue } from "./offline";
 import { useHospitalityLive, useHospitalityMode } from "./live-client";
 import { readCache, unwrap, useHospitalityT, writeCache } from "./i18n";
+import { LoadFailed } from "./states";
 import { Button, EmptyState, Select, Skeleton, cn, useToast } from "@polaris/ui";
 
 function minutesSince(iso: string, now: number): number {
@@ -31,11 +32,15 @@ export function KitchenScreen() {
     const [tickets, setTickets] = useState<KitchenTicket[] | null>(() => readCache<KitchenTicket[]>(`kitchen:${station}`));
     const [undo, setUndo] = useState<string[] | null>(null);
     const [now, setNow] = useState(() => Date.now());
+    const [failed, setFailed] = useState<string | null>(null);
+    const shown = useRef(tickets);
+    shown.current = tickets;
 
     const load = useCallback(() => {
         unwrap(() => readMenuAction({ venueId: readCache<string>("venue") }), t("errors.loadFailed"))
             .then((answer) => {
                 setVenueId(answer.menu.venueId);
+                setFailed(null);
                 if (!answer.menu.venueId) return setTickets([]);
                 return unwrap(
                     () => readKitchenAction({ venueId: answer.menu.venueId, station: station === "all" ? null : station }),
@@ -45,7 +50,8 @@ export function KitchenScreen() {
                     writeCache(`kitchen:${station}`, k.tickets);
                 });
             })
-            .catch((caught: Error) => toast.show({ title: t("errors.loadFailed"), body: caught.message }));
+            // With nothing on screen yet the failure takes the screen; with tickets showing, they stay and a toast says it.
+            .catch((caught: Error) => (shown.current === null ? setFailed(caught.message) : toast.show({ title: t("errors.loadFailed"), body: caught.message })));
     }, [station, t, toast]);
     useEffect(load, [load]);
     useHospitalityLive(venueId, load);
@@ -97,7 +103,9 @@ export function KitchenScreen() {
                     </Button>
                 ) : null}
             </div>
-            {tickets === null ? (
+            {failed && tickets === null ? (
+                <LoadFailed message={failed} onRetry={load} />
+            ) : tickets === null ? (
                 <div className="grid gap-3 sm:grid-cols-3" aria-busy>
                     {[0, 1, 2].map((i) => <Skeleton key={i} className="h-40" />)}
                 </div>

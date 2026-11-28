@@ -27,9 +27,10 @@ import { readCache, unwrap, useHospitalityT, writeCache } from "./i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRightLeft, Euro, Minus, Move, Percent, Plus, Receipt, Repeat, Save, Send, Trash2 } from "lucide-react";
 import type { LineView, OrderView, RoomView, ServiceView, TableView } from "../lib/orders";
-import { Button, EmptyState, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
+import { Button, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
 import { readServiceAction, removeLineAction, restoreLineAction, saveFloorAction } from "../actions/orders";
 import { useOfflineQueue } from "./offline";
+import { LoadFailed, NoVenue } from "./states";
 
 const COURSES = ["0", "1", "2", "3"] as const;
 const LINE_STATUSES = ["pending", "sent", "ready", "served", "void"] as const;
@@ -62,7 +63,6 @@ const STATE_CLASS: Record<TableState, string> = {
 
 export function ServiceScreen({ manager }: { manager: boolean }) {
     const t = useHospitalityT();
-    const toast = useToast();
     const [mode] = useHospitalityMode();
     const basic = mode === "basic";
     const [menu, setMenu] = useState<MenuView | null>(() => readCache<MenuView>("menu"));
@@ -70,12 +70,14 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
     const [roomId, setRoomId] = useState<string | null>(null);
     const [tableId, setTableId] = useState<string | null>(null);
     const [editing, setEditing] = useState(false);
+    const [failed, setFailed] = useState<string | null>(null);
     const venueId = menu?.venueId ?? null;
 
     const load = useCallback(() => {
         unwrap(() => readMenuAction({ venueId: readCache<string>("venue") }), t("errors.loadFailed"))
             .then((answer) => {
                 setMenu(answer.menu);
+                setFailed(null);
                 writeCache("menu", answer.menu);
                 if (!answer.menu.venueId) return;
                 return unwrap(() => readServiceAction({ venueId: answer.menu.venueId }), t("errors.loadFailed")).then((s) => {
@@ -83,8 +85,8 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
                     writeCache("service", s.service);
                 });
             })
-            .catch((caught: Error) => toast.show({ title: t("errors.loadFailed"), body: caught.message }));
-    }, [t, toast]);
+            .catch((caught: Error) => setFailed(caught.message));
+    }, [t]);
     useEffect(load, [load]);
     useHospitalityLive(venueId, load);
 
@@ -93,6 +95,9 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
     const table = service?.rooms.flatMap((r) => r.tables).find((x) => x.id === tableId) ?? null;
     const busy = useMemo(() => new Set((service?.orders ?? []).flatMap((o) => (o.tableId ? [o.tableId] : []))), [service]);
 
+    // A venue that is not set up yet has no floor to wait for: say so, and point a manager at where it is set up.
+    if (menu && !venueId) return <NoVenue manager={manager} />;
+    if (failed && (!menu || !service)) return <LoadFailed message={failed} onRetry={load} />;
     if (!menu || !service) {
         return (
             <div className="grid gap-3 p-4 sm:grid-cols-4" aria-busy>
@@ -100,7 +105,7 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
             </div>
         );
     }
-    if (!venueId || !room) return <EmptyState title={t("service.noFloor")} description={t("service.noFloorHint")} />;
+    if (!venueId || !room) return <NoVenue manager={manager} />;
 
     return (
         <div className="flex h-[calc(100dvh-4rem)] min-h-0 flex-col md:flex-row">

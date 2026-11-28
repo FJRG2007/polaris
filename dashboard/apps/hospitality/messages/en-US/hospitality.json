@@ -113,7 +113,9 @@
     },
     "service": {
         "noFloor": "No dining room yet",
-        "noFloorHint": "Set up the venue from the Menu tab first."
+        "noFloorHint": "Set up the venue from the Menu tab first.",
+        "noFloorAsk": "Ask a manager to set up the venue.",
+        "setUp": "Set up the venue"
     },
     "floor": {
         "edit": "Edit floor",

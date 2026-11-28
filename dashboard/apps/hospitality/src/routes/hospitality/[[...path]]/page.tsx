@@ -66,7 +66,7 @@ export default async function HospitalityPage({ params }: { params: Promise<Reco
             ) : tab === "kitchen" ? (
                 <KitchenScreen />
             ) : tab === "till" ? (
-                <TillScreen />
+                <TillScreen manager={manager} />
             ) : tab === "devices" ? (
                 <DevicesScreen />
             ) : (

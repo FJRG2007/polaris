@@ -11,6 +11,7 @@ import { readMenuAction } from "../actions/catalog";
 import { Link2, Pencil, Unlink } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { readCache, unwrap, useHospitalityT } from "./i18n";
+import { LoadFailed, NoVenue } from "./states";
 import { approveDeviceAction, listDevicesAction, renameDeviceAction, revokeDeviceAction } from "../actions/devices";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, EmptyState, Input, Skeleton, useToast } from "@polaris/ui";
 
@@ -25,17 +26,19 @@ export function DevicesScreen() {
     const [linking, setLinking] = useState(false);
     const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
     const [revoking, setRevoking] = useState<DeviceView | null>(null);
+    const [failed, setFailed] = useState<string | null>(null);
     const fail = (caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message });
 
     const load = useCallback(() => {
         unwrap(() => readMenuAction({ venueId: readCache<string>("venue") }), t("errors.loadFailed"))
             .then((answer) => {
                 setVenueId(answer.menu.venueId);
+                setFailed(null);
                 if (!answer.menu.venueId) return setDevices([]);
                 return unwrap(() => listDevicesAction({ venueId: answer.menu.venueId }), t("errors.loadFailed")).then((x) => setDevices(x.devices));
             })
-            .catch((caught: Error) => toast.show({ title: t("errors.loadFailed"), body: caught.message }));
-    }, [t, toast]);
+            .catch((caught: Error) => setFailed(caught.message));
+    }, [t]);
     useEffect(load, [load]);
 
     const seen = (at: string | null) =>
@@ -56,8 +59,9 @@ export function DevicesScreen() {
             .finally(() => setLinking(false));
     };
 
+    if (failed && venueId === undefined) return <LoadFailed message={failed} onRetry={load} />;
     if (venueId === undefined) return <Skeleton className="m-4 h-48" />;
-    if (!venueId) return <EmptyState title={t("service.noFloor")} description={t("service.noFloorHint")} />;
+    if (!venueId) return <NoVenue manager />;
 
     return (
         <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4 p-4">
