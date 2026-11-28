@@ -132,13 +132,29 @@
             "free": "free",
             "open": "open",
             "pending": "not sent",
-            "billed": "bill asked"
+            "billed": "bill asked",
+            "seated": "seated",
+            "kitchen": "in kitchen",
+            "served": "served",
+            "paying": "paying"
         },
         "shape": {
             "square": "Square",
             "round": "Round",
-            "long": "Long"
-        }
+            "long": "Long",
+            "label": "Shape"
+        },
+        "covers": "{count, plural, one {# guest} other {# guests}}",
+        "minutes": "{count} min",
+        "summary": "{free} free - {covers} guests",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "fit": "Fit all",
+        "legend": "Table states",
+        "width": "Width",
+        "depth": "Depth",
+        "chairs": "Chairs",
+        "editHint": "Tap a table to change it, drag it to move it."
     },
     "order": {
         "back": "Back to the floor",
@@ -170,7 +186,9 @@
         "add": "Add",
         "more": "One more",
         "change": "Change {name}",
-        "move": "Move"
+        "move": "Move",
+        "fewerGuests": "Fewer guests",
+        "moreGuests": "More guests"
     },
     "orders": {
         "tableGone": "That table is no longer on the floor.",

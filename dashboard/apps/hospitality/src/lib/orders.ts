@@ -538,3 +538,17 @@ export async function saveFloor(input: FloorInput, actorId: string): Promise<str
     publishHospitalityChange({ venueId: room.venueId, actorId, topic: "floor" });
     return room.id;
 }
+
+/** Sets how many guests are at the table; every floor redraws its chairs. */
+export async function setCovers(orderId: string, covers: number, actor: Actor): Promise<void> {
+    const order = await prisma.hospitalityOrder.findUnique({ where: { id: orderId }, select: { venueId: true, status: true, covers: true } });
+    if (!order || !LIVE.includes(order.status)) throw new HospitalityRefusal("orders.gone");
+    ownVenue(actor, order.venueId);
+    if (order.covers === covers) return;
+    await prisma.$transaction(async (tx) => {
+        await touchOrder(tx, orderId, actor);
+        await tx.hospitalityOrder.update({ where: { id: orderId }, data: { covers } });
+        await audit(tx, actor, { venueId: order.venueId, orderId, kind: "order.covers", payload: { from: order.covers, to: covers } });
+    });
+    publishHospitalityChange({ venueId: order.venueId, actorId: actor.id, topic: "orders" });
+}

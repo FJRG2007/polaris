@@ -10,7 +10,7 @@ import { ownVenue } from "../lib/audit";
 import * as orders from "../lib/orders";
 import * as load from "../lib/service-load";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
-import { addLinesInput, floorInput, lineOnly, moveInput, openOrderInput, sendInput, splitInput, venueOnly } from "../model/order-schemas";
+import { addLinesInput, coversInput, floorInput, lineOnly, moveInput, openOrderInput, sendInput, splitInput, venueOnly } from "../model/order-schemas";
 
 export async function readServiceAction(raw: unknown): Promise<Outcome<{ service: orders.ServiceView }>> {
     const input = venueOnly.safeParse(raw);
@@ -30,6 +30,12 @@ export async function readServiceScreenAction(raw: unknown): Promise<Outcome<loa
         if (user.device) ownVenue(user, venueId);
         return load.readServiceScreen(venueId);
     });
+}
+
+export async function setCoversAction(raw: unknown): Promise<Outcome<object>> {
+    const input = coversInput.safeParse(raw);
+    if (!input.success) return invalid();
+    return outcome("hospitality.use", async (user) => (await orders.setCovers(input.data.orderId, input.data.covers, user), {}));
 }
 
 export async function openOrderAction(raw: unknown): Promise<Outcome<{ id: string }>> {

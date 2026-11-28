@@ -15,6 +15,9 @@ export const TABLE_SHAPES = ["square", "round", "long"] as const;
 
 export const venueOnly = z.object({ venueId: id });
 
+/** How many guests sit at an order's table: the floor fills that many chairs. */
+export const coversInput = z.object({ orderId: id, covers: z.number().int().min(0).max(500) });
+
 export const openOrderInput = z.object({
     id,
     venueId: id,

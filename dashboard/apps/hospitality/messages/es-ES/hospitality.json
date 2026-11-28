@@ -132,13 +132,29 @@
             "free": "libre",
             "open": "abierta",
             "pending": "sin marchar",
-            "billed": "pide cuenta"
+            "billed": "pide cuenta",
+            "seated": "sentados",
+            "kitchen": "en cocina",
+            "served": "servida",
+            "paying": "pagando"
         },
         "shape": {
             "square": "Cuadrada",
             "round": "Redonda",
-            "long": "Larga"
-        }
+            "long": "Larga",
+            "label": "Forma"
+        },
+        "covers": "{count, plural, one {# comensal} other {# comensales}}",
+        "minutes": "{count} min",
+        "summary": "{free} libres - {covers} pax",
+        "zoomIn": "Acercar",
+        "zoomOut": "Alejar",
+        "fit": "Ajustar",
+        "legend": "Estado mesas",
+        "width": "Ancho",
+        "depth": "Fondo",
+        "chairs": "Sillas",
+        "editHint": "Toca una mesa para cambiarla, arrástrala para moverla."
     },
     "order": {
         "back": "Volver a sala",
@@ -170,7 +186,9 @@
         "add": "Poner",
         "more": "Uno más",
         "change": "Cambiar {name}",
-        "move": "Mover"
+        "move": "Mover",
+        "fewerGuests": "Menos personas",
+        "moreGuests": "Más personas"
     },
     "orders": {
         "tableGone": "Esa mesa ya no está en la sala.",

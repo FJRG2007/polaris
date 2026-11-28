@@ -12,6 +12,7 @@
  */
 
 import { TOUCH } from "./touch";
+import { FloorEditor, FloorPlan } from "./floor-plan";
 import { useMoney } from "./menu-screen";
 import { DiscountDialog, PayDialog } from "./till-screen";
 import { LineDialog, MoveDialog } from "./order-dialogs";
@@ -19,15 +20,14 @@ import { chooseModifiers } from "../model/modifiers";
 import { mostSoldFirst, repeatRound } from "../model/rounds";
 import { markBilledAction } from "../actions/till";
 import { lineTotal, orderTotals } from "../model/pricing";
-import { TABLE_SHAPES } from "../model/order-schemas";
 import type { MenuView, ProductView } from "../lib/catalog";
 import { useHospitalityLive, useHospitalityMode } from "./live-client";
 import { readCache, unwrap, useHospitalityT, writeCache } from "./i18n";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRightLeft, Euro, Minus, Move, Percent, Plus, Receipt, Repeat, Save, Send, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRightLeft, Euro, Minus, Move, Plus, Users, Percent, Receipt, Repeat, Send, Trash2 } from "lucide-react";
 import type { LineView, OrderView, RoomView, ServiceView, TableView } from "../lib/orders";
-import { Button, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
-import { readServiceScreenAction, removeLineAction, restoreLineAction, saveFloorAction } from "../actions/orders";
+import { Button, Select, Skeleton, cn, useToast } from "@polaris/ui";
+import { readServiceScreenAction, removeLineAction, setCoversAction, restoreLineAction, saveFloorAction } from "../actions/orders";
 import { useOfflineQueue } from "./offline";
 import { LoadFailed, NoVenue } from "./states";
 
@@ -42,26 +42,9 @@ function lineStatus(status: string): (typeof LINE_STATUSES)[number] {
     return (LINE_STATUSES as readonly string[]).includes(status) ? (status as (typeof LINE_STATUSES)[number]) : "sent";
 }
 
-/** Grid units to pixels on the plan. */
-const UNIT = 28;
-
-type TableState = "free" | "open" | "pending" | "billed";
-
-function tableState(order: OrderView | undefined): TableState {
-    if (!order) return "free";
-    if (order.status === "billed") return "billed";
-    return order.lines.some((l) => l.status === "pending") ? "pending" : "open";
-}
-
-const STATE_CLASS: Record<TableState, string> = {
-    free: "border-border bg-background",
-    open: "border-sky-600 bg-sky-500/15",
-    pending: "border-amber-600 bg-amber-500/20",
-    billed: "border-violet-600 bg-violet-500/20"
-};
-
 export function ServiceScreen({ manager }: { manager: boolean }) {
     const t = useHospitalityT();
+    const toast = useToast();
     const [mode] = useHospitalityMode();
     const basic = mode === "basic";
     const [menu, setMenu] = useState<MenuView | null>(() => readCache<MenuView>("menu"));
@@ -107,8 +90,8 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
 
     return (
         <div className="flex h-[calc(100dvh-4rem)] min-h-0 flex-col md:flex-row">
-            <section className={cn("min-h-0 min-w-0 flex-1 flex-col overflow-auto p-3", table ? "hidden md:flex" : "flex")}>
-                <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
+            <section className={cn("min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden p-3", table ? "hidden md:flex" : "flex")}>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                     {service.rooms.map((r) => (
                         <Button className={TOUCH} key={r.id} variant={r.id === room.id ? "primary" : "outline"} size={basic ? "lg" : "md"} onClick={() => setRoomId(r.id)}>
                             <span className="max-w-40 truncate" title={r.name}>{r.name}</span>
@@ -121,7 +104,15 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
                     ) : null}
                 </div>
                 {editing ? (
-                    <FloorEditor key={room.id} venueId={venueId} room={room} onSaved={() => { setEditing(false); load(); }} />
+                    <FloorEditor
+                        key={room.id}
+                        room={room}
+                        onSave={(name, tables) =>
+                            unwrap(() => saveFloorAction({ venueId, roomId: room.id, name, tables }), t("errors.saveFailed"))
+                                .then(() => { setEditing(false); load(); })
+                                .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }))
+                        }
+                    />
                 ) : (
                     <FloorPlan currency={menu.venues.find((v) => v.id === venueId)?.currency ?? "EUR"} room={room} byTable={byTable} basic={basic} selected={tableId} onPick={setTableId} />
                 )}
@@ -142,154 +133,6 @@ export function ServiceScreen({ manager }: { manager: boolean }) {
                     onChanged={load}
                 />
             ) : null}
-        </div>
-    );
-}
-
-function FloorPlan(props: {
-    currency: string;
-    room: RoomView;
-    byTable: Map<string | null, OrderView>;
-    basic: boolean;
-    selected: string | null;
-    onPick: (id: string) => void;
-}) {
-    const t = useHospitalityT();
-    const money = useMoney(props.currency);
-    const width = Math.max(...props.room.tables.map((x) => x.x + x.width), 8) * UNIT;
-    const height = Math.max(...props.room.tables.map((x) => x.y + x.height), 6) * UNIT;
-    return (
-        <div className="relative shrink-0" style={{ width, height }}>
-            {props.room.tables.map((x) => {
-                const order = props.byTable.get(x.id);
-                const state = tableState(order);
-                return (
-                    <button
-                        key={x.id}
-                        type="button"
-                        onClick={() => props.onPick(x.id)}
-                        aria-label={`${t("floor.table")} ${x.name}: ${t(`floor.state.${state}`)}`}
-                        className={cn(
-                            "absolute flex flex-col items-center justify-center gap-0.5 border-2 text-center",
-                            x.shape === "round" ? "rounded-full" : "rounded-lg",
-                            STATE_CLASS[state],
-                            props.selected === x.id && "ring-2 ring-primary ring-offset-2"
-                        )}
-                        style={{ left: x.x * UNIT, top: x.y * UNIT, width: x.width * UNIT, height: x.height * UNIT }}
-                    >
-                        <span className={cn("font-semibold", props.basic ? "text-xl" : "text-base")}>{x.name}</span>
-                        {order ? <span className="text-xs tabular-nums">{money(order.totals.total)}</span> : null}
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
-
-/** Drag tables into place, add, reshape, rename; Save writes the whole room. */
-function FloorEditor(props: { venueId: string; room: RoomView; onSaved: () => void }) {
-    const t = useHospitalityT();
-    const toast = useToast();
-    const [name, setName] = useState(props.room.name);
-    const [tables, setTables] = useState<Array<Omit<TableView, "id" | "roomId"> & { id: string | null; key: string }>>(() =>
-        props.room.tables.map((x) => ({ ...x, key: x.id }))
-    );
-    const [picked, setPicked] = useState<string | null>(null);
-    const drag = useRef<{ key: string; dx: number; dy: number } | null>(null);
-    const plan = useRef<HTMLDivElement>(null);
-    const update = (key: string, patch: Partial<(typeof tables)[number]>) =>
-        setTables((all) => all.map((x) => (x.key === key ? { ...x, ...patch } : x)));
-    const current = tables.find((x) => x.key === picked) ?? null;
-
-    const save = () =>
-        unwrap(
-            () =>
-                saveFloorAction({
-                    venueId: props.venueId,
-                    roomId: props.room.id,
-                    name,
-                    tables: tables.map(({ key: _key, ...x }) => x)
-                }),
-            t("errors.saveFailed")
-        )
-            .then(props.onSaved)
-            .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }));
-
-    return (
-        <div className="flex min-w-0 flex-col gap-3">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <Input className="w-48" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} aria-label={t("floor.roomName")} />
-                <Button className={TOUCH}
-                    variant="outline"
-                    onClick={() => {
-                        const key = crypto.randomUUID();
-                        setTables((all) => [...all, { id: null, key, name: String(all.length + 1), x: 0, y: 0, width: 2, height: 2, shape: "square", seats: 4 }]);
-                        setPicked(key);
-                    }}
-                >
-                    <Plus aria-hidden /> {t("floor.addTable")}
-                </Button>
-                <Button className={TOUCH} onClick={save}>
-                    <Save aria-hidden /> {t("actions.save")}
-                </Button>
-            </div>
-            {current ? (
-                <div className="flex min-w-0 flex-wrap items-end gap-2 rounded-lg border p-2">
-                    <Input className="w-20" value={current.name} maxLength={12} onChange={(e) => update(current.key, { name: e.target.value })} aria-label={t("floor.tableName")} />
-                    <Select
-                        value={current.shape}
-                        onValueChange={(shape) => update(current.key, { shape })}
-                        options={TABLE_SHAPES.map((s) => ({ value: s, label: t(`floor.shape.${s}`) }))}
-                    />
-                    <Button className={TOUCH} variant="outline" size="icon" aria-label={t("floor.fewerSeats")} onClick={() => update(current.key, { seats: Math.max(1, current.seats - 1) })}>
-                        <Minus aria-hidden />
-                    </Button>
-                    <span className="tabular-nums">{t("floor.seats", { count: current.seats })}</span>
-                    <Button className={TOUCH} variant="outline" size="icon" aria-label={t("floor.moreSeats")} onClick={() => update(current.key, { seats: Math.min(60, current.seats + 1) })}>
-                        <Plus aria-hidden />
-                    </Button>
-                    <Button className={TOUCH} variant="ghost" aria-label={t("floor.removeTable")} onClick={() => { setTables((all) => all.filter((x) => x.key !== current.key)); setPicked(null); }}>
-                        <Trash2 aria-hidden />
-                    </Button>
-                </div>
-            ) : null}
-            <div
-                ref={plan}
-                className="relative touch-none rounded-lg border border-dashed bg-[length:28px_28px] bg-[linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border))_1px,transparent_1px)]"
-                style={{ width: 24 * UNIT, height: 16 * UNIT, maxWidth: "100%" }}
-                onPointerMove={(e) => {
-                    const d = drag.current;
-                    const box = plan.current?.getBoundingClientRect();
-                    if (!d || !box) return;
-                    update(d.key, {
-                        x: Math.max(0, Math.round((e.clientX - box.left - d.dx) / UNIT)),
-                        y: Math.max(0, Math.round((e.clientY - box.top - d.dy) / UNIT))
-                    });
-                }}
-                onPointerUp={() => (drag.current = null)}
-                onPointerLeave={() => (drag.current = null)}
-            >
-                {tables.map((x) => (
-                    <div
-                        key={x.key}
-                        role="button"
-                        tabIndex={0}
-                        onPointerDown={(e) => {
-                            const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                            drag.current = { key: x.key, dx: e.clientX - box.left, dy: e.clientY - box.top };
-                            setPicked(x.key);
-                        }}
-                        className={cn(
-                            "absolute flex cursor-grab items-center justify-center border-2 bg-background font-semibold",
-                            x.shape === "round" ? "rounded-full" : "rounded-lg",
-                            picked === x.key ? "border-primary" : "border-border"
-                        )}
-                        style={{ left: x.x * UNIT, top: x.y * UNIT, width: (x.shape === "long" ? Math.max(x.width, 4) : x.width) * UNIT, height: x.height * UNIT }}
-                    >
-                        {x.name}
-                    </div>
-                ))}
-            </div>
         </div>
     );
 }
@@ -333,6 +176,20 @@ function OrderPanel(props: {
     const [paying, setPaying] = useState(false);
     const [discounting, setDiscounting] = useState<LineView | "order" | null>(null);
     const [moving, setMoving] = useState(false);
+    /** Guests at the table: the floor fills that many chairs. Kept here until the order exists. */
+    const [covers, setCovers] = useState(props.order?.covers ?? props.table.seats);
+    useEffect(() => setCovers(props.order?.covers ?? props.table.seats), [props.order?.covers, props.table.seats]);
+    const changeCovers = (next: number) => {
+        const value = Math.min(Math.max(next, 1), 500);
+        setCovers(value);
+        if (!props.order) return;
+        unwrap(() => setCoversAction({ orderId: props.order!.id, covers: value }), t("errors.saveFailed"))
+            .then(props.onChanged)
+            .catch((caught: Error) => {
+                setCovers(props.order?.covers ?? props.table.seats);
+                toast.show({ title: t("errors.saveFailed"), body: caught.message });
+            });
+    };
     /** The product whose options are being picked, and the draft it edits (null: a new one). */
     const [picking, setPicking] = useState<{ product: ProductView; draft: Draft | null } | null>(null);
     const products = mostSoldFirst(props.menu.products.filter((p) => p.categoryId === category));
@@ -368,7 +225,7 @@ function OrderPanel(props: {
             const ops = [
                 ...(props.order
                     ? []
-                    : [{ id: `open:${orderId}`, kind: "open", payload: { id: orderId, venueId: props.venueId, tableId: props.table.id, covers: props.table.seats } }]),
+                    : [{ id: `open:${orderId}`, kind: "open", payload: { id: orderId, venueId: props.venueId, tableId: props.table.id, covers } }]),
                 ...(drafts.length
                     ? [{
                           id: `add:${drafts[0]?.id ?? orderId}`,
@@ -438,6 +295,17 @@ function OrderPanel(props: {
                         </span>
                     ) : null}
                 </div>
+                <span className="flex shrink-0 items-center gap-1" role="group" aria-label={t("floor.covers", { count: covers })}>
+                    <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("order.fewerGuests")} disabled={covers <= 1} onClick={() => changeCovers(covers - 1)}>
+                        <Minus aria-hidden />
+                    </Button>
+                    <span className="flex items-center gap-1 tabular-nums" title={t("floor.covers", { count: covers })}>
+                        <Users className="size-4" aria-hidden /> {covers}
+                    </span>
+                    <Button className={TOUCH} variant="ghost" size="icon" aria-label={t("order.moreGuests")} onClick={() => changeCovers(covers + 1)}>
+                        <Plus aria-hidden />
+                    </Button>
+                </span>
                 <Select
                     aria-label={t("order.course")}
                     value={String(course)}
