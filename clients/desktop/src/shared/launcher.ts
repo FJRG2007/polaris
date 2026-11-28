@@ -273,3 +273,14 @@ export function launcherEngineOf(stored: SearchEngine, chosen: boolean): SearchE
 export function webSearchUrl(engine: SearchEngine, query: string): string {
     return `${SEARCH_ENGINES[engine].url}${encodeURIComponent(query.trim())}`;
 }
+
+/**
+ * Where the highlight goes when a list is drawn again for the same text: on the
+ * row the reader had highlighted, wherever it moved to, so Enter runs what they
+ * saw; `fallback` (clamped into the list) when that row is gone or the text is
+ * a new one.
+ */
+export function highlightAfter(rows: readonly { readonly id: string }[], previousId: string | null, sameText: boolean, fallback: number): number {
+    const kept = sameText && previousId !== null ? rows.findIndex((row) => row.id === previousId) : -1;
+    return kept >= 0 ? kept : Math.min(Math.max(0, fallback), Math.max(0, rows.length - 1));
+}

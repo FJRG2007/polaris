@@ -33,7 +33,7 @@ import { exeDescription } from "./launcher-exe-info";
 import { shortcutIcon, urlShortcutIcon } from "./launcher-icons";
 import { readFileSync, watch, type FSWatcher } from "node:fs";
 import { readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
-import { isPackagedAppId, isVettedLaunchUri, regQuery, storeApps, type AppLaunch } from "./launcher-stores";
+import { gameFolders, isPackagedAppId, isVettedLaunchUri, regQuery, storeApps, type AppLaunch } from "./launcher-stores";
 import * as programs from "./launcher-programs";
 
 export interface InstalledApp {
@@ -65,7 +65,7 @@ export const WATCH_MAX_MS = 20_000;
 const MAX_APPS = 4000;
 const MAX_DEPTH = 3;
 /** Bumped whenever what a listing holds changes, so an older one on disk is read again rather than trusted. */
-export const INDEX_VERSION = 3;
+export const INDEX_VERSION = 4;
 const MAX_INDEX_BYTES = 8 * 1024 * 1024;
 
 interface Listing {
@@ -252,14 +252,14 @@ async function read(platform: NodeJS.Platform): Promise<Listing> {
     for (const root of roots(platform)) await walk(platform, root, 0, menu);
     const desktop: InstalledApp[] = [];
     if (platform === "win32") for (const root of programs.desktopFolders(userDesktop(), process.env)) await walk(platform, root, 0, desktop, 0);
-    const [stores, [appPaths, uninstall]] = platform === "win32"
-        ? await Promise.all([storeApps().catch(() => []), registryPrograms().catch((): [programs.FoundProgram[], programs.FoundProgram[]] => [[], []])])
-        : [[], [[], []] as [programs.FoundProgram[], programs.FoundProgram[]]];
+    const [stores, [appPaths, uninstall], detected] = platform === "win32"
+        ? await Promise.all([storeApps().catch(() => []), registryPrograms().catch((): [programs.FoundProgram[], programs.FoundProgram[]] => [[], []]), gameFolders().catch(() => [])])
+        : [[], [[], []] as [programs.FoundProgram[], programs.FoundProgram[]], []];
     const packaged = stores.filter((store) => store.launch.kind === "packaged");
     const games = stores.filter((store) => store.launch.kind !== "packaged");
     const apps = programs.mergePrograms<InstalledApp>([packaged, menu, desktop, games, appPaths, uninstall], MAX_APPS);
     const storeGames = stores.flatMap((store) => (store.folder ? [{ name: store.label, folder: store.folder, ...(store.store ? { store: store.store } : {}) }] : []));
-    return { apps, games: storeGames };
+    return { apps, games: [...storeGames, ...detected.map((game) => ({ name: game.name, folder: game.folder, store: game.store }))].slice(0, MAX_APPS) };
 }
 
 function refresh(platform: NodeJS.Platform): void {

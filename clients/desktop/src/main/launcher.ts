@@ -40,11 +40,11 @@ import { CLIPBOARD_KEEP, ClipboardStore } from "@/shared/clipboard-store";
 import * as settings from "./settings";
 import { openExternal } from "./open-external";
 import { holdGlobalKey } from "./call-hotkeys";
-import { runningPrograms } from "./game-detect";
+import { listedGame, runningPrograms, storeGameFolders, type StoreGame } from "./game-detect";
 import { quickAnswer } from "@/shared/quick-answer";
 import type { LauncherStatus } from "@/shared/bridge";
 import { takeFocus } from "./window-front";
-import { installedApps, installedAppsRead, listedApps, openListedApp, type InstalledApp } from "./launcher-apps";
+import { installedApps, installedAppsRead, installedGames, listedApps, openListedApp, type InstalledApp } from "./launcher-apps";
 import { gameExe, iconCandidates, PICTURE_FILE } from "./launcher-icons";
 import { readdir, stat } from "node:fs/promises";
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipEntry } from "@/shared/clipboard-history";
@@ -264,7 +264,9 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
     const appKey = (app: { path: string; }) => `app:${app.path}`;
     const kinds = gameKinds();
     // What somebody said a program is wins over what it is found to be (Raycast's Treat as Game / Treat as Application).
-    const isGame = (app: InstalledApp) => treatedAsGame(gameStore(app) !== null, kinds.get(app.path));
+    const folders = gameFolderList();
+    // Found by the store that lists it, or by living in an installed game's folder whichever shortcut or entry listed it.
+    const isGame = (app: InstalledApp) => treatedAsGame(gameStore(app) !== null || listedGame(app, folders) !== null, kinds.get(app.path));
     const addApp = (app: InstalledApp) => {
         const game = isGame(app);
         const store = game ? gameStore(app) : null;
@@ -445,6 +447,14 @@ async function upgradeOwnPanel(kept: BrowserWindow): Promise<void> {
 function appSubtitle(app: { path: string; launch?: { kind: string; }; updating?: boolean; }): string {
     const source = app.launch && app.launch.kind !== "open" ? appSource(app.path) : "Application";
     return app.updating ? `${source} - updating` : source;
+}
+
+let folderMemo: { games: readonly StoreGame[]; folders: StoreGame[]; } | null = null;
+/** The installed games' folders, made ready to compare once per listing. */
+function gameFolderList(): StoreGame[] {
+    const games = installedGames();
+    if (!folderMemo || folderMemo.games !== games) folderMemo = { games, folders: storeGameFolders(games) };
+    return folderMemo.folders;
 }
 
 /** The store a listed program is a game of, or null for an application (a shortcut, a packaged app, a store's own client). */

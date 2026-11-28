@@ -13,6 +13,7 @@ import { createRoot } from "react-dom/client";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { LauncherRowAction } from "@/shared/game-kinds";
 import type { LauncherRow, LauncherRowKind, PolarisLauncher } from "@/shared/launcher";
+import { highlightAfter } from "@/shared/launcher";
 import { groupRows, searchTerms, stepActive } from "../../../../dashboard/packages/ui/src/search/search-match";
 import { AppWindow, Calculator, ClipboardList, Compass, Gamepad2, Globe, Link, Power, Search, Sparkles, type LucideIcon } from "lucide-react";
 import { SearchGroup, SearchItem, SearchMessage, SearchOption, SearchSheet } from "../../../../dashboard/packages/ui/src/search/search-panel";
@@ -102,16 +103,25 @@ function Launcher() {
     const list = useRef<HTMLDivElement>(null);
     /** Each query numbered, so a slow answer never replaces a newer one. */
     const asked = useRef(0);
+    /** The text the rows on screen answered, and the id of the row highlighted in them. */
+    const answeredText = useRef<string | null>(null);
+    const highlighted = useRef<string | null>(null);
 
     /** `keep`: the row the keys stay on, after an action changed the list under them. */
     const search = useCallback(async (text: string, keep = 0) => {
         const mine = ++asked.current;
         const answer = await window.polarisLauncher.query(text).catch(() => null);
         if (mine !== asked.current || !answer) return;
+        // The same text answered again (a late source, an action's refresh)
+        // keeps the highlight on the row the reader was looking at, wherever
+        // it moved to; a new text starts at the top.
+        const same = answeredText.current === text;
+        const at = highlightAfter(answer.rows, highlighted.current, same, keep);
+        answeredText.current = text;
         setRows(answer.rows);
         setVersion(answer.version ?? null);
         setNotice(answer.notice);
-        setActive(Math.min(keep, Math.max(0, answer.rows.length - 1)));
+        setActive(at);
         setAnswered(true);
     }, []);
 
@@ -143,6 +153,7 @@ function Launcher() {
         field.current?.focus();
     };
     const activeRow = rows[active];
+    highlighted.current = activeRow?.id ?? null;
     const hasActions = Boolean(activeRow?.actions?.length && window.polarisLauncher.act && version !== null);
     const openPanel = () => {
         if (activeRow && hasActions && version !== null) setPanel({ row: activeRow, version, active: 0 });
@@ -190,6 +201,8 @@ function Launcher() {
             event.preventDefault();
             setActive(next);
         } else if (event.key === "Enter") {
+            // Enter that confirms an IME candidate is not a command to run.
+            if (event.nativeEvent.isComposing) return;
             event.preventDefault();
             choose(active);
         } else if (event.key === "Escape") {

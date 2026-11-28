@@ -284,7 +284,16 @@ export async function packagedApps(): Promise<StoreApp[]> {
         const app = startAppSchema.safeParse(item);
         if (!app.success || out.length >= MAX_PER_STORE) continue;
         const icon = await packagedLogo(app.data.Location, app.data.AppID);
-        out.push({ label: app.data.Name, path: `packaged:${app.data.AppID}`, launch: { kind: "packaged", id: app.data.AppID }, ...(icon ? { icon } : {}) });
+        // A package that carries a MicrosoftGame.config is an Xbox / Store game.
+        const location = app.data.Location && folder.safeParse(app.data.Location).success ? app.data.Location : null;
+        const game = location !== null && (await exists(join(location, "MicrosoftGame.config")));
+        out.push({
+            label: app.data.Name,
+            path: `packaged:${app.data.AppID}`,
+            launch: { kind: "packaged", id: app.data.AppID },
+            ...(icon ? { icon } : {}),
+            ...(game && location ? { folder: location, store: `xbox:${app.data.AppID.split("!")[0]!.toLowerCase()}` } : {})
+        });
     }
     return out;
 }
@@ -553,6 +562,175 @@ export async function ubisoftGames(): Promise<StoreApp[]> {
     return out;
 }
 
+// --- Games a store keeps no launch link for -----------------------------------
+//
+// These stores are read for where a game lives, so a program started from that
+// folder - or listed by a Start menu shortcut or an uninstall entry that points
+// into it - is known as a game. They are not launched from here: the shortcut or
+// the store's own entry already opens them. Where each keeps its list:
+//   Rockstar Games Launcher  HKLM\SOFTWARE\WOW6432Node\Rockstar Games\<title>, value InstallFolder
+//                            (InstallFolderSteam / InstallFolderEpic when bought there)
+//   EA app / Origin          HKLM\SOFTWARE\WOW6432Node\EA Games\<title>, value "Install Dir";
+//                            %ProgramData%\Origin\LocalContent\<title>\*.mfst, `dipinstallpath`
+//   Battle.net               uninstall entries published by Blizzard Entertainment, InstallLocation
+//   Xbox app / Microsoft Store  <drive>:\XboxGames\<title>\Content\MicrosoftGame.config, and a
+//                            package folder holding MicrosoftGame.config
+//   Windows' own hint        HKCU\System\GameConfigStore\Children\*, value MatchedExeFullPath
+//                            (what Game Bar matched as a game)
+// See docs/launcher-game-detection.md for the sources.
+
+/** A game found by a store with no launch link: its name, folder and the store's id. */
+export interface GameFolder {
+    readonly name: string;
+    readonly folder: string;
+    readonly store: string;
+}
+
+/** The name a registry key is listed by: its last path segment. */
+function lastSegment(key: string): string {
+    return key.slice(key.lastIndexOf("\\") + 1);
+}
+
+/** A folder from a registry value: backslashes, no trailing separator, or null when unusable. */
+function folderValue(value: string | undefined): string | null {
+    const dir = value?.replace(/\//g, "\\").replace(/\\+$/, "");
+    return dir && folder.safeParse(dir).success ? dir : null;
+}
+
+function storeId(store: string, name: string): string {
+    return `${store}:${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+}
+
+/** Keys that sit beside Rockstar's games without being one. */
+const ROCKSTAR_NOT_GAMES = /^(rockstar games|launcher|social club|rockstar games social club|rockstar games launcher)$/i;
+
+/** Rockstar's titles from `reg query ... /s` of its key. */
+export function rockstarFolders(keys: readonly RegistryKey[]): GameFolder[] {
+    const out: GameFolder[] = [];
+    for (const found of keys) {
+        const name = lastSegment(found.key);
+        if (!name || ROCKSTAR_NOT_GAMES.test(name)) continue;
+        for (const value of ["installfolder", "installfolderepic", "installfoldersteam"]) {
+            const dir = folderValue(found.values.get(value));
+            if (dir) out.push({ name, folder: dir, store: storeId("rockstar", name) });
+        }
+    }
+    return out;
+}
+
+/** EA's games from `reg query` of its `EA Games` key. */
+export function eaFolders(keys: readonly RegistryKey[]): GameFolder[] {
+    const out: GameFolder[] = [];
+    for (const found of keys) {
+        const name = lastSegment(found.key);
+        const dir = folderValue(found.values.get("install dir"));
+        if (name && !/^ea games$/i.test(name) && dir) out.push({ name, folder: dir, store: storeId("ea", name) });
+    }
+    return out;
+}
+
+/** The install folder an Origin `.mfst` names: `dipinstallpath`, URL-encoded. */
+export function originInstallPath(text: string): string | null {
+    const raw = /(?:^|[&?])dipinstallpath=([^&\s]+)/i.exec(text)?.[1];
+    if (!raw) return null;
+    try {
+        return folderValue(decodeURIComponent(raw));
+    } catch {
+        return null;
+    }
+}
+
+/** Battle.net's games out of the uninstall entries: Blizzard's, bar its own client. */
+export function battleNetFolders(keys: readonly RegistryKey[]): GameFolder[] {
+    const out: GameFolder[] = [];
+    for (const found of keys) {
+        const publisher = found.values.get("publisher") ?? "";
+        const name = found.values.get("displayname") ?? "";
+        const dir = folderValue(found.values.get("installlocation"));
+        if (!/^Blizzard Entertainment/i.test(publisher) || !name || /^battle\.net/i.test(name) || !dir) continue;
+        out.push({ name, folder: dir, store: storeId("battlenet", name) });
+    }
+    return out;
+}
+
+/** Windows' Game Bar matches: the folder of each `MatchedExeFullPath`, never a system one. */
+export function gameConfigFolders(keys: readonly RegistryKey[], windowsDir: string): GameFolder[] {
+    const out: GameFolder[] = [];
+    for (const found of keys) {
+        const exe = found.values.get("matchedexefullpath");
+        if (!exe || !/\.exe$/i.test(exe) || !folder.safeParse(exe).success) continue;
+        const dir = win32.dirname(exe);
+        if (dir.toLowerCase().startsWith(windowsDir.toLowerCase())) continue;
+        out.push({ name: basename(dir), folder: dir, store: "windows:gamebar" });
+    }
+    return out;
+}
+
+/** The drives' `XboxGames\<title>\Content` folders that hold a `MicrosoftGame.config`. */
+export async function xboxFolders(drives = "CDEFGHIJKLMNOPQRSTUVWXYZ"): Promise<GameFolder[]> {
+    const out: GameFolder[] = [];
+    for (const letter of drives) {
+        const root = `${letter}:\\XboxGames`;
+        for (const title of (await readdir(root).catch(() => [] as string[])).slice(0, MAX_PER_STORE)) {
+            const content = join(root, title, "Content");
+            if (await exists(join(content, "MicrosoftGame.config"))) out.push({ name: title, folder: content, store: storeId("xbox", title) });
+        }
+    }
+    return out;
+}
+
+/** The folders Origin's `LocalContent` manifests name. */
+export async function originFolders(programData: string): Promise<GameFolder[]> {
+    const root = join(programData, "Origin", "LocalContent");
+    const out: GameFolder[] = [];
+    for (const title of (await readdir(root).catch(() => [] as string[])).slice(0, MAX_PER_STORE)) {
+        for (const file of (await readdir(join(root, title)).catch(() => [] as string[])).filter((name) => /\.mfst$/i.test(name)).slice(0, 4)) {
+            const dir = originInstallPath((await readBounded(join(root, title, file))) ?? "");
+            if (dir) out.push({ name: title, folder: dir, store: storeId("ea", title) });
+        }
+    }
+    return out;
+}
+
+/**
+ * The EA app's installed games: a folder per title in
+ * `%ProgramData%\EA Desktop\InstallData`, whose game is in `EA Games\<title>`
+ * under a library folder (its default is `Program Files\EA Games`). Only a
+ * title whose folder is found on a drive is listed.
+ */
+export async function eaAppFolders(programData: string, drives = "CDEFGHIJKLMNOPQRSTUVWXYZ"): Promise<GameFolder[]> {
+    const out: GameFolder[] = [];
+    const titles = (await readdir(join(programData, "EA Desktop", "InstallData")).catch(() => [] as string[])).filter((title) => title && !/^(base-|\.)/i.test(title)).slice(0, MAX_PER_STORE);
+    for (const title of titles) {
+        for (const letter of drives) {
+            const dir = (await Promise.all([`${letter}:\Program Files\EA Games\${title}`, `${letter}:\EA Games\${title}`].map(async (path) => ((await exists(path)) ? path : null)))).find((path) => path !== null);
+            if (dir) {
+                out.push({ name: title, folder: dir, store: storeId("ea", title) });
+                break;
+            }
+        }
+    }
+    return out;
+}
+
+/**
+ * The folders of games these stores keep, read once per listing, each store
+ * failing on its own. Windows only; every read is bounded and read-only.
+ */
+export async function gameFolders(env: NodeJS.ProcessEnv = process.env): Promise<GameFolder[]> {
+    const wow = "HKLM\\SOFTWARE\\WOW6432Node";
+    const windowsDir = env.SystemRoot ?? env.windir ?? "C:\\Windows";
+    const lists = await Promise.all([
+        registry([`${wow}\\Rockstar Games`, "/s"]).then(rockstarFolders),
+        registry([`${wow}\\EA Games`, "/s"]).then(eaFolders),
+        originFolders(env.ProgramData ?? "C:\\ProgramData"),
+        eaAppFolders(env.ProgramData ?? "C:\\ProgramData"),
+        Promise.all(UNINSTALL_HIVES.map((hive) => registry([hive, "/s", "/f", "Blizzard Entertainment", "/d", "/e"]))).then((hives) => battleNetFolders(hives.flat())),
+        xboxFolders(),
+        registry(["HKCU\\System\\GameConfigStore\\Children", "/s"]).then((keys) => gameConfigFolders(keys, windowsDir))
+    ].map((list) => list.catch(() => [] as GameFolder[])));
+    return lists.flat().slice(0, MAX_PER_STORE * 2);
+}
 /** Every store above, each failing on its own: one unreadable store never hides the others. */
 export async function storeApps(env: NodeJS.ProcessEnv = process.env): Promise<StoreApp[]> {
     const lists = await Promise.all([
