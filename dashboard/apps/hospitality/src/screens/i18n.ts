@@ -4,6 +4,7 @@
 
 import { hospitalityCatalogs } from "../../messages";
 import { hostUi } from "@polaris/app-host/client";
+import { reportReach } from "./connection";
 import type { HospitalityTranslator } from "../lib/i18n";
 
 export function useHospitalityT(): HospitalityTranslator {
@@ -27,6 +28,8 @@ export async function unwrap<T extends { ok: boolean }>(
     const answer = await hostUi.runAction.runAction(call, (message) => {
         failure = message;
     });
+    // No answer at all is the server away (restarting, updating, unreachable): the banner says so.
+    reportReach(Boolean(answer));
     if (!answer) throw new Error(failure);
     if (!answer.ok) throw new Error((answer as unknown as { error: string }).error);
     return answer as Extract<T, { ok: true }>;

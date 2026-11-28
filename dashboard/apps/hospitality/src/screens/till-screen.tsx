@@ -17,11 +17,11 @@ import { readMenuAction } from "../actions/catalog";
 import type { closeShift, xReport } from "../lib/till";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { OrderView } from "../lib/orders";
-import type { OfflineQueue } from "./offline";
+import { useOfflineQueue, type OfflineQueue } from "./offline";
 import { changeDue, itemsDue, lineTotal, quickTenders, splitEvenly } from "../model/pricing";
 import { readCache, unwrap, useHospitalityT } from "./i18n";
 import { Banknote, CreditCard, Minus, Percent, Plus } from "lucide-react";
-import { closeShiftAction, moveCashAction, openShiftAction, payAction, readTillAction, setDiscountAction } from "../actions/till";
+import { closeShiftAction, openShiftAction, payAction, readTillAction, setDiscountAction } from "../actions/till";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, EmptyState, Input, Select, Skeleton, cn, useToast } from "@polaris/ui";
 
 type Till = Awaited<ReturnType<typeof xReport>>;
@@ -38,6 +38,8 @@ export function TillScreen() {
     const [closed, setClosed] = useState<Closed | null>(null);
     const money = useMoney(venue?.currency ?? "EUR");
     const fail = (caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message });
+    // One id per cash movement being typed, so a retry is the same movement.
+    const moveId = useRef(crypto.randomUUID());
 
     const load = useCallback(() => {
         unwrap(() => readMenuAction({ venueId: readCache<string>("venue") }), t("errors.loadFailed"))
@@ -50,6 +52,7 @@ export function TillScreen() {
             .catch((caught: Error) => toast.show({ title: t("errors.loadFailed"), body: caught.message }));
     }, [t, toast]);
     useEffect(load, [load]);
+    const queue = useOfflineQueue(load, (error) => toast.show({ title: t("errors.saveFailed"), body: error }));
     useHospitalityLive(venue?.id ?? null, load);
 
     if (till === undefined) return <Skeleton className="m-4 h-48" />;
@@ -109,8 +112,16 @@ export function TillScreen() {
                         disabled={!moveCents}
                         onClick={() =>
                             moveCents &&
-                            unwrap(() => moveCashAction({ id: crypto.randomUUID(), venueId: venue.id, kind: move.kind, amount: moveCents, reason: move.reason }), t("errors.saveFailed"))
-                                .then(() => { setMove({ kind: "out", amount: "", reason: "" }); load(); })
+                            // Recorded on this till even with the server away: the id it carries is stored once on replay.
+                            queue
+                                .submit([{ id: `cash:${moveId.current}`, kind: "cash", payload: { id: moveId.current, venueId: venue.id, kind: move.kind, amount: moveCents, reason: move.reason } }])
+                                .then((result) => {
+                                    if (result.refused.length > 0) return fail(new Error(result.refused[0]));
+                                    moveId.current = crypto.randomUUID();
+                                    setMove({ kind: "out", amount: "", reason: "" });
+                                    if (result.left > 0) toast.show({ title: t("offline.queued") });
+                                    else load();
+                                })
                                 .catch(fail)
                         }
                     >

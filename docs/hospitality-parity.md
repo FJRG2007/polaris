@@ -91,6 +91,25 @@ Status: **done** (on branch `hospitality-app`), **partial**, **planned (Mn)**,
 | Works with no internet on the local network | Rv Ag Gl Ht uC Fl Ch Lo | done (M1: served by the venue's own Polaris; no external call in the path) |
 | Device keeps taking orders when it loses the LAN | Sq To Ls Lo | done (M4: IndexedDB queue, replay with device-made ids) |
 
+## Degraded modes
+
+The venue keeps serving through every failure below. Each screen shows a
+banner while something is degraded ("Sin conexion: N pendientes" with the
+server away, "Enviando N" while the queue drains) and clears it once all is
+live. Recovery is automatic: the queue on each device replays in order on
+the `online` event, when the screen is shown again and every 15 seconds, and
+every write carries ids made on the device, stored once by the database, so a
+replay changes nothing twice. Tests: `apps/web/test/hospitality/model/degraded-modes.test.ts`
+and `offline-replay.test.ts`.
+
+| Failure | What keeps working | What does not, until it is back | Recovery |
+| --- | --- | --- | --- |
+| Polaris update or restart | Every screen stays up; orders, rounds, kitchen marks, payments and cash movements are kept on the device (IndexedDB, survives the reload the update causes) | Nothing new from other devices reaches the screen | Queue replays in order; a request applied before the answer was lost is a no-op |
+| Server down for minutes | Same as a restart: waiters keep taking orders, the kitchen keeps the tickets it last showed (kept across a reload) and marks them, the till takes cash and records cash in/out, and says a payment is saved on the device | New orders from other devices do not reach the kitchen; card terminals that need the server; a ticket number for a payment taken offline (given when it lands) | Same as a restart |
+| Internet down | Everything: devices talk to the venue's own Polaris on the LAN and no Hospitality screen or action calls anything outside it | Nothing in Hospitality | Nothing to do |
+| Printer down | Orders and payments are unaffected; printing is a job of its own | Paper tickets for that printer | Print jobs are deduplicated by job id, so a retry never prints twice (lands with the printing work, not on this branch yet) |
+| One device dead | Every other device; what it had already sent is on the server | The work still queued on that device | Its queue is in its own storage and replays, once, when it is back; nothing else waits on it |
+
 ## Stock, staff, customers
 
 | Feature | Products | Polaris |

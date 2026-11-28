@@ -11,7 +11,8 @@
  * `{ ok: false }`. That is the line between "keep it" and "tell the waiter".
  */
 
-import { payAction } from "../actions/till";
+import { markLinesAction, moveCashAction, payAction } from "../actions/till";
+import { reportReach, reportWaiting } from "./connection";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { addLinesAction, openOrderAction, sendLinesAction } from "../actions/orders";
 import { enqueue, flush, memoryStore, type Delivery, type QueuedOp, type QueueStore } from "../model/offline-queue";
@@ -64,13 +65,24 @@ const ACTIONS: Record<string, (payload: unknown) => Promise<{ ok: boolean; error
     open: (p) => openOrderAction(p) as Promise<{ ok: boolean; error?: string }>,
     add: (p) => addLinesAction(p) as Promise<{ ok: boolean; error?: string }>,
     send: (p) => sendLinesAction(p) as Promise<{ ok: boolean; error?: string }>,
-    pay: (p) => payAction(p) as Promise<{ ok: boolean; error?: string }>
+    pay: (p) => payAction(p) as Promise<{ ok: boolean; error?: string }>,
+    // The kitchen marking a ticket ready, and a till's cash in or out: both
+    // stored once (a status change, an id the till made), so a replay is a no-op.
+    mark: (p) => markLinesAction(p) as Promise<{ ok: boolean; error?: string }>,
+    cash: (p) => moveCashAction(p) as Promise<{ ok: boolean; error?: string }>
 };
 
 async function deliver(op: QueuedOp): Promise<Delivery> {
     const action = ACTIONS[op.kind];
     if (!action) return { status: "refused", error: "" };
-    const answer = await action(op.payload);
+    let answer: { ok: boolean; error?: string };
+    try {
+        answer = await action(op.payload);
+    } catch (caught) {
+        reportReach(false);
+        throw caught;
+    }
+    reportReach(true);
     return answer.ok ? { status: "ok" } : { status: "refused", error: answer.error ?? "" };
 }
 
@@ -93,6 +105,7 @@ export function useOfflineQueue(onDelivered: () => void, onRefused: (error: stri
         busy.current = (async () => {
             const result = await flush(store(), deliver);
             setWaiting(result.left);
+            reportWaiting(result.left);
             if (result.sent) callbacks.current.onDelivered();
             for (const r of result.refused) callbacks.current.onRefused(r.error);
             return { left: result.left, refused: result.refused.map((r) => r.error) };

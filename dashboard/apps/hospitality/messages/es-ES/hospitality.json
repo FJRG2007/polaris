@@ -298,5 +298,10 @@
         "code": "Codigo",
         "failed": "No se pudo pedir un codigo al servidor.",
         "retry": "Reintentar"
+    },
+    "degraded": {
+        "offline": "Sin conexion: {count, plural, =0 {nada pendiente} one {# pendiente} other {# pendientes}}",
+        "offlineHint": "Sigue trabajando: todo queda guardado y se envia al volver",
+        "syncing": "Enviando {count, plural, one {# cambio} other {# cambios}} guardados"
     }
 }

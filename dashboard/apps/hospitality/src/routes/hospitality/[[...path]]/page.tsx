@@ -15,6 +15,7 @@ import { ServiceScreen } from "../../../screens/service-screen";
 import { KitchenScreen } from "../../../screens/kitchen-screen";
 import { TillScreen } from "../../../screens/till-screen";
 import { DevicesScreen } from "../../../screens/devices-screen";
+import { DegradedBanner } from "../../../screens/connection";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,7 @@ export default async function HospitalityPage({ params }: { params: Promise<Reco
                     </Link>
                 ))}
             </nav>
+            <DegradedBanner />
             {tab === "menu" ? (
                 <HospitalityScreen manager={manager} />
             ) : tab === "kitchen" ? (

@@ -298,5 +298,10 @@
         "code": "Link code",
         "failed": "Could not get a code from the server.",
         "retry": "Try again"
+    },
+    "degraded": {
+        "offline": "No connection to the server: {count, plural, =0 {nothing waiting} one {# waiting} other {# waiting}}",
+        "offlineHint": "Keep working: everything is saved here and sent when it is back",
+        "syncing": "Sending {count, plural, one {# item} other {# items}} saved here"
     }
 }

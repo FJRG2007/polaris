@@ -6,6 +6,7 @@
  * Nobody signs in on the device; it acts for its venue only.
  */
 import { TOUCH } from "./touch";
+import { DegradedBanner } from "./connection";
 import { useHospitalityT } from "./i18n";
 import { ServiceScreen } from "./service-screen";
 import { KitchenScreen } from "./kitchen-screen";
@@ -124,6 +125,7 @@ export function DeviceWork(props: { name: string }) {
                         {props.name}
                     </span>
                 </nav>
+                <DegradedBanner />
                 {work === "kitchen" ? <KitchenScreen /> : <ServiceScreen manager={false} />}
             </div>
         </ToastProvider>

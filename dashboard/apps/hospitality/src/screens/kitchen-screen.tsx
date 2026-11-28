@@ -11,7 +11,8 @@ import { Check, Undo2 } from "lucide-react";
 import type { KitchenTicket } from "../lib/till";
 import { readMenuAction } from "../actions/catalog";
 import { useCallback, useEffect, useState } from "react";
-import { markLinesAction, readKitchenAction } from "../actions/till";
+import { readKitchenAction } from "../actions/till";
+import { useOfflineQueue } from "./offline";
 import { useHospitalityLive, useHospitalityMode } from "./live-client";
 import { readCache, unwrap, useHospitalityT, writeCache } from "./i18n";
 import { Button, EmptyState, Select, Skeleton, cn, useToast } from "@polaris/ui";
@@ -26,7 +27,8 @@ export function KitchenScreen() {
     const [mode] = useHospitalityMode();
     const [venueId, setVenueId] = useState<string | null>(null);
     const [station, setStation] = useState<string>(() => readCache<string>("station") ?? "all");
-    const [tickets, setTickets] = useState<KitchenTicket[] | null>(null);
+    // What the screen last showed, kept across a reload: the kitchen keeps cooking while the server is away.
+    const [tickets, setTickets] = useState<KitchenTicket[] | null>(() => readCache<KitchenTicket[]>(`kitchen:${station}`));
     const [undo, setUndo] = useState<string[] | null>(null);
     const [now, setNow] = useState(() => Date.now());
 
@@ -38,12 +40,16 @@ export function KitchenScreen() {
                 return unwrap(
                     () => readKitchenAction({ venueId: answer.menu.venueId, station: station === "all" ? null : station }),
                     t("errors.loadFailed")
-                ).then((k) => setTickets(k.tickets));
+                ).then((k) => {
+                    setTickets(k.tickets);
+                    writeCache(`kitchen:${station}`, k.tickets);
+                });
             })
             .catch((caught: Error) => toast.show({ title: t("errors.loadFailed"), body: caught.message }));
     }, [station, t, toast]);
     useEffect(load, [load]);
     useHospitalityLive(venueId, load);
+    const queue = useOfflineQueue(load, () => undefined);
     useEffect(() => {
         const timer = setInterval(() => setNow(Date.now()), 30_000);
         return () => clearInterval(timer);
@@ -54,8 +60,15 @@ export function KitchenScreen() {
         const before = tickets;
         if (ready) setTickets((all) => all && all.map((x) => ({ ...x, lines: x.lines.filter((l) => !lineIds.includes(l.id)) })).filter((x) => x.lines.length));
         setUndo(ready ? lineIds : null);
-        unwrap(() => markLinesAction({ lineIds, ready }), t("errors.saveFailed"))
-            .then(() => !ready && load())
+        // Through the device's queue: with the server away the mark waits here and goes out once it is back.
+        queue
+            .submit([{ id: `mark:${ready ? "ready" : "back"}:${crypto.randomUUID()}`, kind: "mark", payload: { lineIds, ready } }])
+            .then((result) => {
+                if (result.refused.length > 0) {
+                    setTickets(before);
+                    toast.show({ title: t("errors.saveFailed"), body: result.refused[0] });
+                } else if (result.left === 0 && !ready) load();
+            })
             .catch((caught: Error) => {
                 setTickets(before);
                 toast.show({ title: t("errors.saveFailed"), body: caught.message });
