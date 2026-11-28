@@ -164,6 +164,14 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   The same-instance local fallback rule applies (`/api/instance` publishes
   `localCaSha256`; accept a LAN address only after it proves to be the same
   instance).
+  *Built:* sign-in keeps the `GET /api/instance` record with the account
+  (`crates/polaris_instance`, the port of `instance-fallback.ts`). The relay
+  dials the held address, the usual one, then each alternate; an alternate gets
+  the key only after it signs a fresh nonce (`POST /api/instance/challenge`),
+  and its certificate may chain to a pinned local CA the server sends in its
+  chain. Settings > Account says when the local address is in use and names an
+  address that answered as another Polaris or whose certificate is not trusted.
+  Polar requests will take the same path once the Polar provider exists.
 
 ### AI providers (`agent_sdk`, `rook_agent_page`)
 
@@ -394,8 +402,17 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   `rook.sqlite` and its `-wal` / `-shm` files, never overwriting and never
   following a symbolic link, then assembles the home directory under a
   temporary name with the `.migrated-from-rook` marker inside and renames it into
-  place, so an interrupted copy runs again on the next launch. Not built yet:
-  the keychain re-read and the per-repository `./.rook/` fallback.
+  place, so an interrupted copy runs again on the next launch. Keychain:
+  on a computer with a Rook home directory, the released GUI build reads a
+  secret it does not have from Rook's service name (`dev.rook.RookOss`) once,
+  writes it under its own and records that, so a value removed later (a
+  sign-out) is not read back from Rook; Rook's entries are never changed
+  (`ptermui_extras::secure_storage::register_native`). On macOS the keychain
+  may ask once per copied entry, since the entry belongs to Rook. Per
+  repository: project workflows are read from `./.rook/` when
+  `./.polaris/terminal/` does not exist (`paths::project_config_dir_for_reading`).
+  Not built yet: the same fallback for project skills, which come from a fixed
+  provider list (`crates/ai/src/skills/skill_provider.rs`).
 
 ### The rook.dev links
 

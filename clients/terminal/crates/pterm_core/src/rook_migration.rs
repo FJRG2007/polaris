@@ -29,6 +29,9 @@ pub const MIGRATION_MARKER: &str = ".migrated-from-rook";
 /// stable channel's that older installs kept.
 const ROOK_HOME_DIRS: &[&str] = &[".rook-oss", ".rook"];
 
+/// The secure-storage service name of Rook's released build: its app id.
+const ROOK_SECURE_STORAGE_SERVICE: &str = "dev.rook.RookOss";
+
 /// Rook's database file name and the one it becomes, with SQLite's side files.
 const DATABASE_RENAMES: &[(&str, &str)] = &[
     ("rook.sqlite", "polaris-terminal.sqlite"),
@@ -83,12 +86,31 @@ pub fn migrate_from_rook_if_needed() {
     }
 }
 
+/// The secure-storage service Rook's released build kept its secrets under (its
+/// app id), for the released GUI build to read once a value it does not have
+/// yet: `None` on every other build, or when this computer never had Rook.
+pub fn rook_secure_storage_service() -> Option<&'static str> {
+    if !is_released_gui() {
+        return None;
+    }
+    let home = dirs::home_dir()?;
+    ROOK_HOME_DIRS
+        .iter()
+        .any(|dir| home.join(dir).is_dir())
+        .then_some(ROOK_SECURE_STORAGE_SERVICE)
+}
+
+/// Whether this process is the released GUI build with no data profile: the
+/// only one that inherits a Rook install. The terminal UI front-end keeps its
+/// own folders and secrets.
+fn is_released_gui() -> bool {
+    ChannelState::channel() == Channel::Oss
+        && ChannelState::data_profile().is_none()
+        && ChannelState::app_id().application_name() == "PolarisTerminal"
+}
+
 fn plan_for_current_process() -> Option<MigrationPlan> {
-    // The released GUI only: the terminal UI front-end keeps its own folders.
-    if ChannelState::channel() != Channel::Oss
-        || ChannelState::data_profile().is_some()
-        || ChannelState::app_id().application_name() != "PolarisTerminal"
-    {
+    if !is_released_gui() {
         return None;
     }
     let home = dirs::home_dir()?;

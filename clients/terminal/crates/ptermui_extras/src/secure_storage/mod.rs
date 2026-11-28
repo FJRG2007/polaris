@@ -9,6 +9,7 @@
 #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), path = "linux.rs")]
 #[cfg_attr(target_os = "windows", path = "windows.rs")]
 mod imp;
+mod legacy;
 mod noop;
 mod unavailable;
 
@@ -54,6 +55,57 @@ pub type Model = Box<dyn SecureStorage>;
 #[cfg(not(target_os = "windows"))]
 pub fn register(service_name: &str, ctx: &mut ptermui_core::AppContext) {
     ctx.add_singleton_model(|_| -> Model { Box::new(imp::SecureStorage::new(service_name)) });
+}
+
+/// Registers the platform's Secure Storage provider under `service_name`, as
+/// [`register`], [`register_with_fallback`] or [`register_with_dir`] would for
+/// this platform (`storage_dir` is where the file-based ones keep their files).
+///
+/// With `legacy_service_name`, a value missing under `service_name` is read
+/// once from that service and copied over, for an app that was renamed. The
+/// legacy entries are never changed.
+pub fn register_native(
+    service_name: &str,
+    legacy_service_name: Option<&str>,
+    storage_dir: std::path::PathBuf,
+    ctx: &mut ptermui_core::AppContext,
+) {
+    let open = |name: &str| open_native(name, &storage_dir);
+    let current = open(service_name);
+    let model = match legacy_service_name {
+        Some(legacy) if legacy != service_name => {
+            Box::new(legacy::WithLegacy::new(current, open(legacy))) as Model
+        }
+        _ => current,
+    };
+    ctx.add_singleton_model(move |_| model);
+}
+
+#[cfg(all(
+    not(target_family = "wasm"),
+    any(target_os = "linux", target_os = "freebsd")
+))]
+fn open_native(service_name: &str, storage_dir: &std::path::Path) -> Model {
+    Box::new(imp::SecureStorage::new_with_fallback(
+        service_name,
+        storage_dir.to_path_buf(),
+    ))
+}
+
+#[cfg(all(not(target_family = "wasm"), target_os = "windows"))]
+fn open_native(service_name: &str, storage_dir: &std::path::Path) -> Model {
+    Box::new(imp::SecureStorage::new_with_path(
+        service_name,
+        storage_dir.to_path_buf(),
+    ))
+}
+
+#[cfg(not(all(
+    not(target_family = "wasm"),
+    any(target_os = "linux", target_os = "freebsd", target_os = "windows")
+)))]
+fn open_native(service_name: &str, _storage_dir: &std::path::Path) -> Model {
+    Box::new(imp::SecureStorage::new(service_name))
 }
 
 /// Registers a no-op Secure Storage provider with the application.

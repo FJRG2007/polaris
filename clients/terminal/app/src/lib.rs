@@ -1507,12 +1507,18 @@ pub(crate) fn initialize_app(
         cfg_if::cfg_if! {
             if #[cfg(feature = "integration_tests")] {
                 ptermui_extras::secure_storage::register_noop(&secure_storage_service_name, ctx);
-            } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-                ptermui_extras::secure_storage::register_with_fallback(&secure_storage_service_name, pterm_core::paths::state_dir(), ctx)
-            } else if #[cfg(target_os = "windows")] {
-                ptermui_extras::secure_storage::register_with_dir(&secure_storage_service_name, pterm_core::paths::state_dir(), ctx)
             } else {
-                ptermui_extras::secure_storage::register(&secure_storage_service_name, ctx);
+                // A computer that had Rook keeps its secrets under Rook's
+                // service name; the released GUI reads each one once from there.
+                let legacy_service_name = matches!(launch_mode, LaunchMode::App { .. })
+                    .then(pterm_core::rook_migration::rook_secure_storage_service)
+                    .flatten();
+                ptermui_extras::secure_storage::register_native(
+                    &secure_storage_service_name,
+                    legacy_service_name,
+                    pterm_core::paths::state_dir(),
+                    ctx,
+                );
             }
         }
     }

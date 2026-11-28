@@ -182,7 +182,9 @@ fn app_workflows() -> Vec<Workflow> {
 pub(super) fn load_project_workflows(path: &Path) -> Vec<Workflow> {
     match git2::Repository::discover(path) {
         Ok(repository) => repository.workdir().map_or(Vec::new(), |workdir| {
-            load_workflows(&workflows_dir(workdir.join(".polaris").join("terminal")))
+            load_workflows(&workflows_dir(
+                pterm_core::paths::project_config_dir_for_reading(workdir),
+            ))
         }),
         Err(_) => Vec::new(),
     }

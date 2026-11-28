@@ -28,6 +28,20 @@ use crate::channel::{Channel, ChannelState};
 /// repository workflows would be stored (in "./.polaris/terminal/workflows").
 pub const POLARIS_TERMINAL_CONFIG_DIR: &str = ".polaris-terminal";
 
+/// The per-repository folder Polaris Terminal reads project files from
+/// (workflows): `<root>/.polaris/terminal`, or a Rook checkout's `<root>/.rook`
+/// when only that one exists, so a repository set up for Rook keeps working
+/// without being rewritten. Never write into what this returns.
+pub fn project_config_dir_for_reading(root: &Path) -> PathBuf {
+    let current = root.join(".polaris").join("terminal");
+    let rook = root.join(".rook");
+    if !current.is_dir() && rook.is_dir() {
+        rook
+    } else {
+        current
+    }
+}
+
 /// The name of the folder that stores Polaris Terminal execution logs and network logs.
 /// This is currently only used on Windows to maintain backwards compatibility.
 pub const POLARIS_TERMINAL_LOGS_DIR: &str = "logs";

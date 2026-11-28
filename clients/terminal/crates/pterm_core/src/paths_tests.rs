@@ -230,3 +230,15 @@ fn test_project_path_for_oss_app_id() {
         }
     }
 }
+
+#[test]
+fn a_repository_set_up_for_rook_is_read_from_its_rook_folder() {
+    let repo = tempfile::tempdir().unwrap();
+    let current = repo.path().join(".polaris").join("terminal");
+    let rook = repo.path().join(".rook");
+    assert_eq!(project_config_dir_for_reading(repo.path()), current);
+    std::fs::create_dir_all(&rook).unwrap();
+    assert_eq!(project_config_dir_for_reading(repo.path()), rook);
+    std::fs::create_dir_all(&current).unwrap();
+    assert_eq!(project_config_dir_for_reading(repo.path()), current);
+}
