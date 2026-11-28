@@ -3073,7 +3073,8 @@
             "translate": "Translate",
             "polar": "Polar",
             "terminal": "Terminal",
-            "alerts": "Alerts"
+            "alerts": "Alerts",
+            "hospitality": "Hospitality"
         },
         "permissions": {
             "drive": {
@@ -3191,6 +3192,10 @@
             },
             "alerts": {
                 "topics": "Receive alerts from other systems"
+            },
+            "hospitality": {
+                "use": "Take orders and use the till",
+                "manage": "Run the menu, the floor and the reports"
             }
         }
     },
@@ -3960,6 +3965,7 @@
             "showAll": "Show all {count}",
             "showLess": "Show less",
             "openCommit": "Open this commit on GitHub",
+            "plugins": "{count, plural, one {# change ships with a device plugin update.} other {# changes ship with device plugin updates.}}",
             "rest": "{more, plural, =0 {} one {# more change, } other {# more changes, }}{hidden, plural, =0 {} one {# internal commit not listed. } other {# internal commits not listed. }}<link>See everything on GitHub</link>",
             "unavailable": "GitHub could not be reached to read what changed. The update can still be installed.",
             "nothingVisible": "Only internal changes: tests, CI and tooling."

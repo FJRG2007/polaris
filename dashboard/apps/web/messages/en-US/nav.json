@@ -220,6 +220,9 @@
         },
         "arcade": {
             "description": "Play on your own, or together from a call"
+        },
+        "hospitality": {
+            "description": "Menu, orders and till for a bar or restaurant"
         }
     },
     "labels": {
@@ -405,6 +408,7 @@
         "Clipboard": "Clipboard",
         "Voice widget and games": "Voice widget and games",
         "Hosts": "Hosts",
+        "Hospitality": "Hospitality",
         "Advanced": "Advanced",
         "Connectivity": "Connectivity",
         "Work": "Work",

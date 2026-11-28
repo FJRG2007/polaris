@@ -139,6 +139,7 @@ import {
     FileBadge,
     Award,
     Laptop,
+    UtensilsCrossed,
     type LucideIcon
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
@@ -501,6 +502,22 @@ export const POLARIS_APPS: AppEntry[] = [
         permission: "crm.use",
         requiresApp: "crm",
         favorites: true
+    },
+    {
+        /**
+         * A bar or restaurant run on the venue's own network: the menu, the
+         * floor, orders, the kitchen and the till.
+         *
+         * Installable: a Polaris that runs no venue carries no entry for it.
+         */
+        id: "hospitality",
+        category: "work",
+        label: "Hospitality", // i18n-ignore
+        description: "Menu, orders and till for a bar or restaurant", // i18n-ignore
+        icon: UtensilsCrossed,
+        href: "/hospitality",
+        permission: "hospitality.use",
+        requiresApp: "hospitality"
     },
     {
         /**

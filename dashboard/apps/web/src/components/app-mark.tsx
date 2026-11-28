@@ -59,6 +59,7 @@ const OWN_APPS: ReadonlySet<string> = new Set([
     "crm",
     "arcade",
     "status-pages",
+    "hospitality",
     "analytics",
     "telemetry",
     "translate",

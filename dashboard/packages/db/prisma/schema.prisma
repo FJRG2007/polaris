@@ -19849,3 +19849,281 @@ model ChatHistoryKey {
 
     @@id([channelId, epoch, recipient])
 }
+// Hospitality (apps/hospitality): a bar or restaurant run from this Polaris -
+// the menu, the floor, orders and the kitchen, payments and the till. One
+// Polaris runs any number of venues; the menu is shared and each venue may
+// override a product's price or availability. Amounts are integer cents, tax included. Staff are
+// referred to by user id with their name copied at the time, so a ticket still
+// says who served it after the account is gone. Untouched by uninstalling.
+model HospitalityCategory {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    name      String
+    // A colour token ("amber", "sky"...) and an icon name for the order grid.
+    color     String   @default("slate")
+    icon      String   @default("utensils")
+    imageUrl  String?
+    // Where its products are made: "kitchen", "bar" or any station name.
+    station   String   @default("kitchen")
+    position  Float    @default(0)
+    createdAt DateTime @default(now())
+
+    products HospitalityProduct[]
+
+    @@index([position])
+}
+
+model HospitalityProduct {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    categoryId  String   @db.Uuid
+    name        String
+    description String   @default("")
+    // Price in cents, tax included.
+    price       Int
+    // Basis points: 1000 = 10 %.
+    taxRateBp   Int      @default(1000)
+    // EU allergen keys ("gluten", "milk"...).
+    allergens   String[] @default([])
+    imageUrl    String?
+    // A code a scanner types, or the till's own reference.
+    sku         String?
+    // Overrides the category's station when set.
+    station     String?
+    // Modifier groups: [{ id, name, min, max, options: [{ id, name, price }] }].
+    modifiers   Json?
+    available   Boolean  @default(true)
+    position    Float    @default(0)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    category HospitalityCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+    @@index([categoryId, position])
+    @@index([sku])
+}
+
+// A room or a terrace, and the tables placed on it.
+model HospitalityRoom {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    venueId   String   @db.Uuid
+    name      String
+    position  Float    @default(0)
+    createdAt DateTime @default(now())
+
+    venue  HospitalityVenue   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+    tables HospitalityTable[]
+
+    @@index([venueId, position])
+}
+
+model HospitalityTable {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    roomId    String   @db.Uuid
+    name      String
+    // Position and size on the room's plan, in grid units.
+    x         Float    @default(0)
+    y         Float    @default(0)
+    width     Float    @default(2)
+    height    Float    @default(2)
+    shape     String   @default("square")
+    seats     Int      @default(4)
+    createdAt DateTime @default(now())
+
+    room HospitalityRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+    @@index([roomId])
+}
+
+// One table's (or one counter's) order. The id is made by the device that
+// opened it, so a device that replays a queued order cannot open it twice.
+model HospitalityOrder {
+    id         String    @id @db.Uuid
+    venueId    String    @db.Uuid
+    tableId    String?   @db.Uuid
+    // A label for an order with no table ("Barra", "Para llevar 3").
+    label      String    @default("")
+    // open, billed (bill printed), paid, void.
+    status     String    @default("open")
+    covers     Int       @default(0)
+    waiterId   String?   @db.Uuid
+    waiterName String    @default("")
+    // The staff profile tapped on a shared device, when there was one.
+    staffId    String?   @db.Uuid
+    // The whole order's discount: { kind, value, reason } or null.
+    discount   Json?
+    note       String    @default("")
+    // The simplified invoice number, given when the order is paid ("T2026-000123").
+    ticketNo   String?   @unique
+    // The total stored when the order closes, so a report never recomputes it.
+    total      Int       @default(0)
+    shiftId    String?   @db.Uuid
+    openedAt   DateTime  @default(now())
+    closedAt   DateTime?
+    updatedAt  DateTime  @updatedAt
+
+    lines    HospitalityOrderLine[]
+    payments HospitalityPayment[]
+
+    @@index([venueId, status, openedAt])
+    @@index([tableId, status])
+    @@index([shiftId])
+}
+
+model HospitalityOrderLine {
+    id        String    @id @db.Uuid
+    orderId   String    @db.Uuid
+    productId String?   @db.Uuid
+    // Copied from the product when the line is added: a price change later
+    // never changes an order already taken.
+    name      String
+    unitPrice Int
+    taxRateBp Int
+    quantity  Int       @default(1)
+    // [{ name, price }] chosen for this line.
+    modifiers Json?
+    note      String    @default("")
+    // 1 first course, 2 second... 0 = as soon as possible (drinks).
+    course    Int       @default(0)
+    station   String    @default("kitchen")
+    // The line's own discount: { kind, value, reason } or null.
+    discount  Json?
+    // pending (not sent), sent (fired to the station), ready, served, void.
+    status    String    @default("pending")
+    // Set when it was paid in a split, so the rest of the order stays open.
+    paidAt    DateTime?
+    byName    String    @default("")
+    sentAt    DateTime?
+    readyAt   DateTime?
+    createdAt DateTime  @default(now())
+
+    order HospitalityOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+    @@index([orderId])
+    @@index([status, station, sentAt])
+}
+
+model HospitalityPayment {
+    // Made by the device, like the order's.
+    id        String   @id @db.Uuid
+    orderId   String   @db.Uuid
+    shiftId   String?  @db.Uuid
+    // cash, card, other.
+    method    String
+    amount    Int
+    tip       Int      @default(0)
+    // What the customer handed over (cash), to print the change.
+    tendered  Int      @default(0)
+    // The lines this payment covered when the bill was split by item.
+    lineIds   String[] @default([]) @db.Uuid
+    byId      String?  @db.Uuid
+    byName    String   @default("")
+    createdAt DateTime @default(now())
+
+    order HospitalityOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+    @@index([orderId])
+    @@index([shiftId, method])
+}
+
+// A till session: opened with a float, closed with a count (Z report).
+model HospitalityShift {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    venueId      String    @db.Uuid
+    openedById   String?   @db.Uuid
+    openedByName String    @default("")
+    openedAt     DateTime  @default(now())
+    float        Int       @default(0)
+    closedById   String?   @db.Uuid
+    closedByName String    @default("")
+    closedAt     DateTime?
+    // What was counted in the drawer, and what the system expected.
+    counted      Int?
+    expected     Int?
+    // The Z report's number in its venue, given at close.
+    zNumber      Int?
+
+    moves HospitalityCashMove[]
+
+    @@unique([venueId, zNumber])
+    @@index([venueId, closedAt])
+}
+
+model HospitalityCashMove {
+    id        String   @id @db.Uuid
+    shiftId   String   @db.Uuid
+    // in (change brought in) or out (a supplier paid from the drawer).
+    kind      String
+    amount    Int
+    reason    String   @default("")
+    byId      String?  @db.Uuid
+    byName    String   @default("")
+    createdAt DateTime @default(now())
+
+    shift HospitalityShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+    @@index([shiftId])
+}
+
+// Numbering series, one per venue: "<venueId>:ticket:2026", "<venueId>:z".
+model HospitalityCounter {
+    key   String @id
+    value Int    @default(0)
+}
+
+// A venue (a bar, a restaurant, a terrace of its own): what is printed on its
+// tickets, its currency and how a shared device picks who is serving.
+model HospitalityVenue {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    name         String
+    businessName String   @default("")
+    taxId        String   @default("")
+    address      String   @default("")
+    currency     String   @default("EUR")
+    footer       String   @default("")
+    // Series prefix of its simplified invoices ("T", "B"...).
+    ticketPrefix String   @default("T")
+    // How staff are picked on a shared device: none, tap, pin, shift.
+    staffMode    String   @default("none")
+    // Printer ids of the printer layer: { till, stations: { kitchen, bar } }.
+    printers     Json?
+    position     Float    @default(0)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    rooms     HospitalityRoom[]
+    staff     HospitalityStaff[]
+    overrides HospitalityPriceOverride[]
+}
+
+// A venue's own price or availability for a product of the shared menu.
+model HospitalityPriceOverride {
+    venueId   String   @db.Uuid
+    productId String   @db.Uuid
+    // Null keeps the menu's price.
+    price     Int?
+    available Boolean  @default(true)
+    updatedAt DateTime @updatedAt
+
+    venue HospitalityVenue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+    @@id([venueId, productId])
+    @@index([productId])
+}
+
+// Somebody who works at a venue. Not a Polaris account: a waiter needs no email.
+model HospitalityStaff {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    venueId   String   @db.Uuid
+    name      String
+    color     String   @default("sky")
+    imageUrl  String?
+    // waiter, bar, kitchen, cashier, manager.
+    role      String   @default("waiter")
+    // A scrypt hash of the PIN, when the venue asks for one.
+    pinHash   String?
+    active    Boolean  @default(true)
+    createdAt DateTime @default(now())
+
+    venue HospitalityVenue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+    @@index([venueId, active])
+}

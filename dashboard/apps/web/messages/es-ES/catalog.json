@@ -158,6 +158,10 @@
         "vpn": {
             "summary": "Una VPN privada para tu gente, en tus propios servidores.",
             "description": "Conecta desde la app o la extensión de Polaris y elige por dónde sale tu tráfico, en tus propios servidores. Sin cuentas en ningún otro sitio."
+        },
+        "hospitality": {
+            "summary": "Lleva un bar o restaurante en tu propia red.",
+            "description": "Ten la carta con precios, IVA y alérgenos, impórtala de una hoja y cambia precios de golpe. Los camareros toman comandas desde el móvil o la tablet y la barra las ve al momento, todo en la red del local, sin necesitar internet. Al desinstalar se conservan la carta y los pedidos."
         }
     },
     "help": {

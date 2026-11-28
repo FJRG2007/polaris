@@ -31,6 +31,8 @@ export const PERMISSIONS = [
     "alerts.topics",
     "automations.secrets",
     "status.manage",
+    "hospitality.use",
+    "hospitality.manage",
     "chat.use",
     "chat.spaces",
     "chat.groups",
@@ -295,6 +297,14 @@ export const PERMISSION_META: Readonly<Record<Permission, PermissionMeta>> = {
         area: "Status pages",
         app: "status-pages",
         label: "Run status pages and their checks"
+    },
+    // Hospitality: taking orders and using the till is staff work, given person
+    // by person; the menu, the floor, prices and the reports are a manager's.
+    "hospitality.use": { area: "Hospitality", app: "hospitality", label: "Take orders and use the till" },
+    "hospitality.manage": {
+        area: "Hospitality",
+        app: "hospitality",
+        label: "Run the menu, the floor and the reports"
     },
     "chat.use": { area: "Chat", label: "Talk in channels and direct messages" },
     // The four things somebody with the chat can do beyond talking in it. Split

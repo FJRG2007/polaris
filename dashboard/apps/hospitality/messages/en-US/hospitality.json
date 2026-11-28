@@ -1,0 +1,266 @@
+{
+    "errors": {
+        "generic": "Something went wrong. Try again.",
+        "checkInput": "Check what you typed and try again.",
+        "loadFailed": "Could not load the menu",
+        "saveFailed": "Could not save"
+    },
+    "actions": {
+        "retry": "Try again",
+        "cancel": "Cancel",
+        "save": "Save"
+    },
+    "mode": {
+        "standard": "Standard view",
+        "basic": "Simple view"
+    },
+    "venue": {
+        "pick": "Venue"
+    },
+    "menu": {
+        "title": "Menu",
+        "all": "All",
+        "import": "Import",
+        "export": "Export",
+        "prices": "Prices",
+        "newProduct": "Product",
+        "newCategory": "Category",
+        "edit": "Edit",
+        "soldOut": "Sold out",
+        "backOn": "Back on",
+        "empty": "Nothing here yet",
+        "emptyManager": "Add a product or import a spreadsheet.",
+        "exportFile": "menu.csv",
+        "categoryNotEmpty": "Move or delete its products first.",
+        "exportXlsx": "menu.xlsx",
+        "exportCsv": "CSV"
+    },
+    "setup": {
+        "title": "Set up your venue",
+        "description": "Start with a sample menu and a room of eight tables. You can change everything later.",
+        "askManager": "A manager has to set up the venue first.",
+        "start": "Start with a sample",
+        "sampleVenue": "My venue",
+        "sampleRoom": "Dining room",
+        "sampleCsv": "category,name,price,tax,allergens,station\nDrinks,Water,1.80,10,,bar\nDrinks,Beer,2.50,10,gluten,bar\nDrinks,Soft drink,2.20,10,,bar\nDrinks,Coffee,1.50,10,milk,bar\nStarters,Patatas bravas,5.50,10,eggs,kitchen\nStarters,Croquettes,7.00,10,gluten|milk|eggs,kitchen\nMains,Burger,11.50,10,gluten|milk|eggs|sesame,kitchen\nMains,Grilled fish,14.00,10,fish,kitchen\nDesserts,Cheesecake,5.00,10,milk|eggs|gluten,kitchen\n"
+    },
+    "product": {
+        "new": "New product",
+        "edit": "Edit product",
+        "name": "Name",
+        "price": "Price",
+        "tax": "Tax",
+        "category": "Category",
+        "description": "Description",
+        "sku": "Code",
+        "image": "Picture link",
+        "allergens": "Allergens"
+    },
+    "category": {
+        "new": "New category",
+        "edit": "Edit category",
+        "name": "Name",
+        "station": "Made at",
+        "color": "Colour"
+    },
+    "stations": {
+        "kitchen": "Kitchen",
+        "bar": "Bar"
+    },
+    "prices": {
+        "title": "Change prices",
+        "apply": "Apply",
+        "which": "Products",
+        "how": "Change by",
+        "percent": "Percent",
+        "amount": "Amount",
+        "value": "How much",
+        "hint": "Use a minus sign to lower prices. Percent changes round to 5 cents.",
+        "done": "{count, plural, one {# price changed} other {# prices changed}}"
+    },
+    "import": {
+        "title": "Import menu",
+        "run": "Import",
+        "hint": "A CSV or Excel file with the columns category, name, price, tax, allergens, code. Products already there are updated.",
+        "done": "{created} added, {updated} updated",
+        "skipped": "Rows skipped: {rows}",
+        "unreadable": "That file could not be read.",
+        "choose": "Choose file"
+    },
+    "allergens": {
+        "gluten": "Gluten",
+        "crustaceans": "Crustaceans",
+        "eggs": "Eggs",
+        "fish": "Fish",
+        "peanuts": "Peanuts",
+        "soy": "Soy",
+        "milk": "Milk",
+        "nuts": "Tree nuts",
+        "celery": "Celery",
+        "mustard": "Mustard",
+        "sesame": "Sesame",
+        "sulphites": "Sulphites",
+        "lupin": "Lupin",
+        "molluscs": "Molluscs"
+    },
+    "tabs": {
+        "label": "Hospitality",
+        "service": "Service",
+        "menu": "Menu",
+        "kitchen": "Kitchen",
+        "till": "Till"
+    },
+    "service": {
+        "noFloor": "No dining room yet",
+        "noFloorHint": "Set up the venue from the Menu tab first."
+    },
+    "floor": {
+        "edit": "Edit floor",
+        "done": "Done",
+        "table": "Table",
+        "roomName": "Room name",
+        "addTable": "Table",
+        "tableName": "Table name",
+        "fewerSeats": "Fewer seats",
+        "moreSeats": "More seats",
+        "removeTable": "Remove table",
+        "seats": "{count, plural, one {# seat} other {# seats}}",
+        "state": {
+            "free": "free",
+            "open": "open",
+            "pending": "not sent",
+            "billed": "bill asked"
+        },
+        "shape": {
+            "square": "Square",
+            "round": "Round",
+            "long": "Long"
+        }
+    },
+    "order": {
+        "back": "Back to the floor",
+        "course": "Course",
+        "courses": {
+            "0": "Now",
+            "1": "1st",
+            "2": "2nd",
+            "3": "Dessert"
+        },
+        "send": "Send",
+        "sent": "Sent to kitchen and bar",
+        "remove": "Remove",
+        "less": "One less",
+        "status": {
+            "pending": "not sent yet",
+            "sent": "fired",
+            "ready": "ready",
+            "served": "served",
+            "void": "void"
+        },
+        "bill": "Bill",
+        "pay": "Pay",
+        "pick": "Pick {count}",
+        "upTo": "Up to {count}",
+        "note": "Note for the kitchen",
+        "add": "Add",
+        "more": "One more",
+        "change": "Change {name}",
+        "move": "Move"
+    },
+    "orders": {
+        "tableGone": "That table is no longer on the floor.",
+        "gone": "That order is no longer there.",
+        "closed": "That order is already closed.",
+        "soldOut": "Something on it is sold out.",
+        "modifiers": "Pick the options this one needs.",
+        "tableBusy": "A table you removed still has an open order."
+    },
+    "kitchen": {
+        "station": "Station",
+        "all": "All stations",
+        "undo": "Undo bump",
+        "empty": "Nothing waiting",
+        "minutes": "{count} min",
+        "allReady": "All ready"
+    },
+    "till": {
+        "openTitle": "Open the till",
+        "float": "Float",
+        "open": "Open till",
+        "openSince": "Till opened by {name}",
+        "moveTitle": "Cash in or out",
+        "in": "Cash in",
+        "out": "Cash out",
+        "amount": "Amount",
+        "reason": "Reason",
+        "record": "Record",
+        "closeTitle": "Close the till",
+        "closeHint": "Count the drawer and type what is there.",
+        "counted": "Counted",
+        "close": "Close and print Z",
+        "zTitle": "Z report {number}",
+        "expected": "Expected",
+        "short": "Short",
+        "over": "Over",
+        "next": "Done",
+        "orders": "Orders",
+        "sales": "Sales",
+        "discounts": "Discounts",
+        "tips": "Tips taken",
+        "tax": "VAT {rate} %",
+        "noShift": "Open the till first.",
+        "shiftOpen": "The till is already open.",
+        "overpaid": "That is more than is left to pay."
+    },
+    "pay": {
+        "title": "Pay {amount}",
+        "handed": "Cash handed",
+        "change": "Change: {amount}",
+        "partial": "{amount} left to pay",
+        "card": "Card {amount}",
+        "done": "Paid. Ticket {ticket}",
+        "methods": {
+            "cash": "In cash",
+            "card": "Card",
+            "other": "Other"
+        },
+        "modes": {
+            "whole": "All",
+            "items": "By item",
+            "even": "Equal parts"
+        },
+        "tip": "Tip",
+        "noTip": "None",
+        "fewer": "Fewer people",
+        "more": "More people",
+        "parts": "{count} people, {amount} each",
+        "short": "{amount} short of the total",
+        "pickItems": "Tap what this person is paying for."
+    },
+    "discount": {
+        "title": "Discount",
+        "reason": "Reason",
+        "remove": "Remove",
+        "apply": "Apply",
+        "line": "Discount on {name}"
+    },
+    "offline": {
+        "queued": "No network: saved on this device, it will be sent",
+        "waiting": "{count} waiting",
+        "waitingHint": "Saved on this device; sent as soon as the network is back"
+    },
+    "move": {
+        "title": "Move to another table",
+        "whole": "All of it",
+        "some": "Some items",
+        "joins": "{table} is open: these join its order.",
+        "confirm": "Move",
+        "done": "Moved to {table}"
+    },
+    "picture": {
+        "choose": "Choose picture",
+        "remove": "Remove",
+        "hint": "Or drop or paste one here",
+        "failed": "The picture could not be stored."
+    }
+}

@@ -101,6 +101,7 @@ export const SCREEN_RECORDS: readonly ScreenRecord[] = [
     { route: "/polar/artifacts/[id]", kind: "polar code deliverable", id: "id" },
     { route: "/polar/shared/[id]", kind: "shared polar chat", id: "id" },
     { route: "/status-pages/[[...path]]", kind: null },
+    { route: "/hospitality/[[...path]]", kind: null },
     { route: "/tasks/l/[listId]", kind: "task list", id: "listId" },
     { route: "/tasks/s/[spaceId]", kind: "task space", id: "spaceId" },
     { route: "/tasks/t/[taskId]", kind: "task", id: "taskId" },

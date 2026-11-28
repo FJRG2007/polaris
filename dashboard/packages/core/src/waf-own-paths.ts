@@ -89,6 +89,7 @@ export const POLARIS_ROUTE_ROOTS: readonly string[] = [
     "sounds",
     "status",
     "status-pages",
+    "hospitality",
     "sw.js",
     "t",
     "tasks",

@@ -71,6 +71,12 @@ const FilePickerDialog = dynamic(
     { ssr: false }
 );
 
+/** The crop dialog every picture upload goes through: framing, resize, WebP. */
+const ImageCropDialog = dynamic(
+    () => import("@/components/image-cropper").then((module) => module.ImageCropDialog),
+    { ssr: false }
+);
+
 /**
  * These two draw words from the automations catalog, and an app draws them on
  * its own routes (Places' automation editor), which no layout of ours hands
@@ -292,6 +298,7 @@ export const clientHost = {
     filePicker: { ChooseFilesDialog, FilePickerDialog, useChooseFiles },
     gameLogo: { GameLogo },
     i18nProvider: { useClient, useLocale },
+    imageCropper: { ImageCropDialog },
     jsonView: { CodeLine, CodeEditor },
     logViewer: { LogViewer },
     terminalView: { TerminalView },

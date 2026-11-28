@@ -646,6 +646,10 @@ system notifications; see [`clients/desktop/README.md`](clients/desktop/README.m
 
 ## Requirements
 
+A machine with 4 GB of RAM, 2 cores and 20 GB of free disk at the least; 8 GB
+and 4 cores recommended, more for agent sessions and game servers. Measured
+figures, part by part, are in [hardware requirements](docs/requirements.md).
+
 [Docker Engine](https://docs.docker.com/engine/install/) with the Compose v2
 plugin. For local development without containers, see the
 [developer guide](docs/developers/README.md).

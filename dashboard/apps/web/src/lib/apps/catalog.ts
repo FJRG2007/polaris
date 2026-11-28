@@ -34,6 +34,7 @@ import {
     ShieldBan,
     Wrench,
     Waypoints,
+    UtensilsCrossed,
     type LucideIcon
 } from "lucide-react";
 
@@ -340,6 +341,24 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         description:
             "Open a game from the Games page, or start one in a call and everyone there can join and see each other play. Games run in the browser and nothing runs on your servers. Admins choose who may play and who may play in calls.", // i18n-ignore
         keywords: ["games", "play", "arcade", "activities"],
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Public status pages. Installing it adds two scheduled jobs and the
+        // screens; nothing is checked until somebody adds a check, and
+        // uninstalling stops the checks and keeps every page and its history.
+        id: "hospitality",
+        name: "Hospitality",
+        category: "Productivity",
+        icon: UtensilsCrossed,
+        opensAt: "/hospitality",
+        summary: "Run a bar or restaurant on your own network.",
+        description:
+            "Keep the menu with prices, taxes and allergens, import it from a spreadsheet and change prices in bulk. Waiters take orders from a phone or tablet and the bar sees them at once, all on the venue's own network, with no internet needed. Uninstalling keeps the menu and every order.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",
