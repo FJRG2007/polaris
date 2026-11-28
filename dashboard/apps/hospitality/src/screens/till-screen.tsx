@@ -14,7 +14,7 @@ import { parsePrice } from "../model/catalog-csv";
 import { useHospitalityLive } from "./live-client";
 import { readMenuAction } from "../actions/catalog";
 import type { closeShift, xReport } from "../lib/till";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { OrderView } from "../lib/orders";
 import { changeDue, itemsDue, lineTotal, quickTenders, splitEvenly } from "../model/pricing";
 import { readCache, unwrap, useHospitalityT } from "./i18n";
@@ -189,6 +189,11 @@ export function PayDialog(props: { order: OrderView; currency: string; onClose: 
     const [tipTyped, setTipTyped] = useState("");
     const [tendered, setTendered] = useState("");
     const [pending, setPending] = useState(false);
+    // A ref, not state: two taps in one frame both see `pending` false.
+    const busy = useRef(false);
+    // One payment id per amount, method and tip while the dialog is open, so a
+    // retry after a lost answer is the same payment, never a second one.
+    const paymentIds = useRef(new Map<string, string>());
     const due = Math.min(
         left,
         mode === "items" ? itemsDue(live, props.order.totals.total, chosen) : mode === "even" ? (splitEvenly(left, parts)[0] ?? 0) : left
@@ -197,17 +202,25 @@ export function PayDialog(props: { order: OrderView; currency: string; onClose: 
     const total = due + tip;
     const typed = parsePrice(tendered);
     const pay = (method: "cash" | "card", handed: number) => {
-        if (pending || due <= 0) return;
+        if (busy.current || due <= 0) return;
+        busy.current = true;
         setPending(true);
         const lineIds = mode === "items" ? [...chosen] : [];
-        unwrap(() => payAction({ orderId: props.order.id, payments: [{ id: crypto.randomUUID(), method, amount: due, tip, tendered: handed, lineIds }] }), t("errors.saveFailed"))
+        unwrap(() => payAction({ orderId: props.order.id, payments: [{ id: paymentId(`${method}:${due}:${tip}:${lineIds.join(",")}`), method, amount: due, tip, tendered: handed, lineIds }] }), t("errors.saveFailed"))
             .then((answer) => {
                 if (method === "cash" && handed > total) toast.show({ title: t("pay.change", { amount: money(changeDue(total, handed)) }) });
                 if (answer.closed) props.onPaid(answer.ticketNo);
                 else props.onClose();
             })
             .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }))
-            .finally(() => setPending(false));
+            .finally(() => { busy.current = false; setPending(false); });
+    };
+    const paymentId = (key: string) => {
+        const known = paymentIds.current.get(key);
+        if (known) return known;
+        const made = crypto.randomUUID();
+        paymentIds.current.set(key, made);
+        return made;
     };
     const toggle = (id: string) =>
         setChosen((all) => {

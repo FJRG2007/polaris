@@ -6,7 +6,7 @@
  * the table it goes to, or only some items (splitting the table).
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useHospitalityT, unwrap } from "./i18n";
 import type { ProductView } from "../lib/catalog";
 import type { OrderView, RoomView } from "../lib/orders";
@@ -97,7 +97,16 @@ export function MoveDialog(props: {
     const [whole, setWhole] = useState(true);
     const [take, setTake] = useState<Record<string, number>>({});
     const [pending, setPending] = useState(false);
-    const chosen = lines.flatMap((l) => ((take[l.id] ?? 0) > 0 ? [{ lineId: l.id, quantity: take[l.id] ?? 0, newLineId: crypto.randomUUID() }] : []));
+    // Ids made once per dialog: a retried split finds its lines stored and moves nothing twice.
+    const ids = useRef({ order: crypto.randomUUID(), lines: new Map<string, string>() });
+    const lineId = (id: string) => {
+        const known = ids.current.lines.get(id);
+        if (known) return known;
+        const made = crypto.randomUUID();
+        ids.current.lines.set(id, made);
+        return made;
+    };
+    const chosen = lines.flatMap((l) => ((take[l.id] ?? 0) > 0 ? [{ lineId: l.id, quantity: take[l.id] ?? 0, newLineId: lineId(l.id) }] : []));
     const ready = target !== null && (whole || chosen.length > 0) && !pending;
     const targetName = props.rooms.flatMap((r) => r.tables).find((x) => x.id === target)?.name ?? "";
 
@@ -106,7 +115,7 @@ export function MoveDialog(props: {
         setPending(true);
         const work = whole
             ? unwrap(() => moveOrderAction({ orderId: props.order.id, tableId: target }), t("errors.saveFailed"))
-            : unwrap(() => splitOrderAction({ orderId: props.order.id, tableId: target, targetOrderId: crypto.randomUUID(), lines: chosen }), t("errors.saveFailed"));
+            : unwrap(() => splitOrderAction({ orderId: props.order.id, tableId: target, targetOrderId: ids.current.order, lines: chosen }), t("errors.saveFailed"));
         work.then(() => { toast.show({ title: t("move.done", { table: targetName }) }); props.onMoved(target); })
             .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }))
             .finally(() => setPending(false));
