@@ -70,7 +70,8 @@ import {
     DialogTitle,
     Input,
     isDirty,
-    Select
+    Select,
+    useResetOnOpen
 } from "@polaris/ui";
 
 interface MemberRow {
@@ -419,6 +420,11 @@ function VaultPanel({
     const [invitee, setInvitee] = useState("");
     const [adding, setAdding] = useState<"collection" | "member" | null>(null);
     const [addError, setAddError] = useState<string | null>(null);
+    useResetOnOpen(adding !== null, () => {
+        setNewCollection("");
+        setInvitee("");
+        setAddError(null);
+    });
     const [renaming, setRenaming] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [access, setAccess] = useState<MemberRow | null>(null);

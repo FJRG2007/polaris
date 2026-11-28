@@ -33,14 +33,22 @@ const PENDING = new Set([
     "apps/web/src/app/(app)/apps/deploy/settings/automations-section.tsx#AutomationsSection",
     "apps/web/src/app/(app)/automations/[id]/alert-fields.tsx#AlertInFields",
     "apps/web/src/app/(app)/chat/chat-sidebar.tsx#ChatSidebarList",
-    "apps/web/src/app/(app)/chat/location-card.tsx#LocationCard",
     "apps/web/src/app/(app)/drive/drive-explorer.tsx#DriveExplorer",
     "apps/web/src/app/(app)/drive/files-view.tsx#FilesView",
-    "apps/web/src/app/(app)/tasks/task-panel.tsx#TaskPanel",
     "apps/web/src/app/(app)/vault/sends/sends-view.tsx#SendsView",
-    "apps/web/src/app/(app)/vault/vaults/vaults-view.tsx#VaultPanel",
     "apps/web/src/app/s/[token]/share-explorer.tsx#ShareExplorer",
     "apps/web/src/components/account-menu.tsx#AccountMenu"
+]);
+
+/**
+ * Owners whose dialog is not a form, so there is nothing to start from scratch:
+ * the state it keeps is the record or the view itself.
+ */
+const NOT_A_FORM = new Set([
+    // The task sheet edits the task in place and saves as it goes.
+    "apps/web/src/app/(app)/tasks/task-panel.tsx#TaskPanel",
+    // The enlarged map keeps the map style the reader picked.
+    "apps/web/src/app/(app)/chat/location-card.tsx#LocationCard"
 ]);
 
 function sources(): string[] {
@@ -154,7 +162,9 @@ describe("dialog forms reset when they open", () => {
         const text = readFileSync(file, "utf8");
         if (!/<(Dialog|Sheet)\b/.test(text)) continue;
         const rel = relative(DASHBOARD, file).split("\\").join("/");
-        for (const name of offenders(rel, text)) found.push(`${rel}#${name}`);
+        for (const name of offenders(rel, text)) {
+            if (!NOT_A_FORM.has(`${rel}#${name}`)) found.push(`${rel}#${name}`);
+        }
     }
 
     it("leaves no dialog owner holding last time's values", () => {
