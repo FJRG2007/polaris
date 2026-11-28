@@ -2628,7 +2628,7 @@
             "title": "Perfiles",
             "pick": "Perfil",
             "automatic": "Automático",
-            "default": "Predeterminado",
+            "default": "Principal",
             "inUse": "En uso: {name}.",
             "why": {
                 "manual": "Lo elegiste tú.",
@@ -2649,10 +2649,10 @@
             "renameTitle": "Renombrar perfil",
             "copyOf": "{name} copia",
             "deleteTitle": "¿Eliminar {name}?",
-            "deleteBody": "Se borran sus ajustes y reglas. Predeterminado y los demás perfiles no cambian.",
-            "defaultFixed": "Predeterminado no se puede renombrar ni eliminar.",
-            "defaultRules": "Predeterminado se usa cuando no coincide la regla de otro perfil.",
-            "full": "Un plugin puede tener hasta 16 perfiles además de Predeterminado.",
+            "deleteBody": "Se borran sus ajustes y reglas. Principal y los demás perfiles no cambian.",
+            "defaultFixed": "Principal no se puede renombrar ni eliminar.",
+            "defaultRules": "Principal se usa cuando no coincide la regla de otro perfil.",
+            "full": "Un plugin puede tener hasta 16 perfiles además de Principal.",
             "failed": "No se guardó el cambio.",
             "name": {
                 "label": "Nombre",
@@ -2663,13 +2663,13 @@
             "rules": {
                 "title": "Cambiar a {name} solo cuando",
                 "order": "Si coinciden varios perfiles, gana la primera regla en este orden: llamada, reunión, juego, app delante.",
-                "call": "En una llamada de Polaris",
+                "call": "En llamada de Polaris",
                 "meeting": "En una reunión en otra app",
                 "meetingHint": "Otra app está usando el micrófono.",
                 "game": "Hay un juego en marcha",
                 "apps": "Una de estas apps está delante",
                 "appsHint": "Su nombre de programa, como obs64 o spotify.",
-                "appsPlaceholder": "Nombre del programa",
+                "appsPlaceholder": "Programa",
                 "add": "Añadir",
                 "remove": "Quitar {app}",
                 "windowsOnly": "Por ahora solo Polaris para escritorio en Windows lo sabe."
@@ -2791,8 +2791,8 @@
             "ran": "Acción ejecutada.",
             "runFailed": "Un paso de esa acción no ha funcionado.",
             "summary": "{count, plural, one {# paso} other {# pasos}}",
-            "stateFirst": "próxima pulsación: primer estado",
-            "stateSecond": "próxima pulsación: segundo estado",
+            "stateFirst": "siguiente: primer estado",
+            "stateSecond": "siguiente: segundo estado",
             "unconfirmed": "pregunta la primera vez",
             "dialog": {
                 "title": "Acción propia",
@@ -2811,10 +2811,10 @@
             "kind": {
                 "open": "Abrir archivo o carpeta",
                 "website": "Abrir una web",
-                "run": "Ejecutar un programa",
+                "run": "Abrir programa",
                 "hotkey": "Pulsar un atajo",
                 "launcher": "Lanzador de Polaris",
-                "polaris": "Llamada de Polaris",
+                "polaris": "Llamada Polaris",
                 "delay": "Esperar"
             },
             "modifier": {

@@ -623,7 +623,7 @@ export function pluginSettingTargets(manifest: Pick<PluginManifest, "settings" |
 }
 /*
  * Profiles (manifest `profiles`): several sets of a plugin's grouped settings,
- * one of them in use at a time, the way Stream Deck and Hercules' own software
+ * one of them in use at a time, the way Stream Deck and other controllers' own software
  * keep them. "Default" is the settings file every install already has, so an
  * install from before profiles keeps all it had as its Default profile; the
  * others live beside it. Which one is in use is chosen by hand, or else by the

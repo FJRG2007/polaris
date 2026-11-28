@@ -2823,7 +2823,7 @@
                 "shift": "Shift",
                 "meta": "Win / Cmd"
             },
-            "pickFile": "Pick file",
+            "pickFile": "Choose file",
             "pickFolder": "Pick folder",
             "pickProgram": "Pick program",
             "hotkeysUnsupported": "Hotkeys can only be pressed on Windows for now.",
