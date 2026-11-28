@@ -211,7 +211,7 @@ off offline.
 
 ## Custom actions
 
-An `action` setting (a lit button) can name more than a call action:
+An `action` setting (a lit button, or a knob press on the Stream 100) can name more than a call action:
 `custom:<id>` runs one of this computer's custom actions and
 `launcher:<entry>` runs a launcher entry (`system:<command>` or
 `page:/<path>`). Custom actions follow Stream Deck's System actions and Multi

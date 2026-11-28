@@ -154,6 +154,16 @@ pub fn plugin_settings() -> Value {
             "default": knob_value(target),
         }));
     }
+    for index in 0..4 {
+        list.push(json!({
+            "kind": "action",
+            "key": format!("press{}", index + 1),
+            "group": "knobs",
+            "label": label(&format!("Press knob {}", index + 1), &format!("Pulsar rueda {}", index + 1)),
+            "hint": label("Nothing mutes what the knob turns.", "Nada silencia lo que mueve la rueda."),
+            "default": Value::Null,
+        }));
+    }
     for (index, action) in defaults.buttons.iter().enumerate() {
         list.push(json!({
             "kind": "action",
@@ -185,6 +195,7 @@ pub fn plugin_settings() -> Value {
         defaults.tuning.dead_band.into(),
     ));
     list.push(json!({ "kind": "choice", "key": "display", "group": "screen", "label": label("Screen shows", "La pantalla muestra"), "hint": label("With no call or nothing playing it shows the knobs. macOS does not let apps read what is playing.", "Sin llamada o sin nada sonando muestra las ruedas. macOS no deja a las apps leer lo que suena."), "options": options(DISPLAY_CHOICES), "default": "mixer" }));
+    list.push(json!({ "kind": "range", "key": "idleAfter", "group": "screen", "label": label("Show this computer's stats after (seconds, 0 = never)", "Mostrar datos del ordenador tras (segundos, 0 = nunca)"), "hint": label("Clock, CPU, memory, disk and Linux network until a control is touched. GPU load is left out: no light way to read it.", "Hora, CPU, memoria, disco y red en Linux hasta tocar un control. Sin carga de GPU: no hay forma ligera de leerla."), "min": 0, "max": 600, "step": 5, "default": 0 }));
     list.push(json!({ "kind": "range", "key": "brightness", "group": "screen", "label": label("Screen brightness", "Brillo de la pantalla"), "min": 10, "max": 100, "step": 5, "default": defaults.brightness }));
     Value::Array(list)
 }
@@ -219,6 +230,14 @@ pub fn settings_from_plugin(values: &Map<String, Value>) -> Settings {
             _ => {}
         }
     }
+    let mut knob_press: [String; 4] = Default::default();
+    for (index, press) in knob_press.iter_mut().enumerate() {
+        if let Some(Value::String(id)) = values.get(&format!("press{}", index + 1)) {
+            if id.len() <= 64 {
+                *press = id.clone();
+            }
+        }
+    }
     let display = match values.get("display").and_then(Value::as_str) {
         Some("call") => DisplayMode::Call,
         Some("nowPlaying") => DisplayMode::NowPlaying,
@@ -242,6 +261,7 @@ pub fn settings_from_plugin(values: &Map<String, Value>) -> Settings {
             .unwrap_or(defaults.enabled),
         knobs,
         buttons,
+        knob_press,
         tuning,
         display,
         brightness: number(values, "brightness")

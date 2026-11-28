@@ -483,6 +483,62 @@
             ]
         },
         {
+            "default": null,
+            "group": "knobs",
+            "hint": {
+                "en-US": "Nothing mutes what the knob turns.",
+                "es-ES": "Nada silencia lo que mueve la rueda."
+            },
+            "key": "press1",
+            "kind": "action",
+            "label": {
+                "en-US": "Press knob 1",
+                "es-ES": "Pulsar rueda 1"
+            }
+        },
+        {
+            "default": null,
+            "group": "knobs",
+            "hint": {
+                "en-US": "Nothing mutes what the knob turns.",
+                "es-ES": "Nada silencia lo que mueve la rueda."
+            },
+            "key": "press2",
+            "kind": "action",
+            "label": {
+                "en-US": "Press knob 2",
+                "es-ES": "Pulsar rueda 2"
+            }
+        },
+        {
+            "default": null,
+            "group": "knobs",
+            "hint": {
+                "en-US": "Nothing mutes what the knob turns.",
+                "es-ES": "Nada silencia lo que mueve la rueda."
+            },
+            "key": "press3",
+            "kind": "action",
+            "label": {
+                "en-US": "Press knob 3",
+                "es-ES": "Pulsar rueda 3"
+            }
+        },
+        {
+            "default": null,
+            "group": "knobs",
+            "hint": {
+                "en-US": "Nothing mutes what the knob turns.",
+                "es-ES": "Nada silencia lo que mueve la rueda."
+            },
+            "key": "press4",
+            "kind": "action",
+            "label": {
+                "en-US": "Press knob 4",
+                "es-ES": "Pulsar rueda 4"
+            }
+        },
+        {
             "default": "call.mic",
             "group": "buttons",
             "key": "button1",
@@ -606,6 +662,23 @@
             ]
         },
         {
+            "default": 0,
+            "group": "screen",
+            "hint": {
+                "en-US": "Clock, CPU, memory, disk and Linux network until a control is touched. GPU load is left out: no light way to read it.",
+                "es-ES": "Hora, CPU, memoria, disco y red en Linux hasta tocar un control. Sin carga de GPU: no hay forma ligera de leerla."
+            },
+            "key": "idleAfter",
+            "kind": "range",
+            "label": {
+                "en-US": "Show this computer's stats after (seconds, 0 = never)",
+                "es-ES": "Mostrar datos del ordenador tras (segundos, 0 = nunca)"
+            },
+            "max": 600,
+            "min": 0,
+            "step": 5
+        },
+        {
             "default": 80,
             "group": "screen",
             "key": "brightness",
@@ -638,6 +711,6 @@
         }
     },
     "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
-    "version": "0.1.22",
+    "version": "0.1.23",
     "view": "view/index.html"
 }

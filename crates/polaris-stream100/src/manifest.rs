@@ -55,6 +55,8 @@ pub fn manifest() -> Value {
         "permissions": ["usb", "audio-sessions", "polaris-actions"],
         "settings": crate::plugin::plugin_settings(),
         "groups": crate::plugin::plugin_groups(),
+        // The desktop keeps several sets of the grouped settings (`docs/device-plugins.md`, profiles).
+        "profiles": true,
         // On Windows the desktop app puts Polaris' own WinUSB driver on the
         // controller (`clients/desktop/src/main/plugins/requirements.ts`): listed
         // in the install consent, one Windows prompt, put back when another

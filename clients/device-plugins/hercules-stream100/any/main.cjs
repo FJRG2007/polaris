@@ -16,6 +16,11 @@
  * running (`games` in the `polaris.state` answer, program keys), read every
  * GAMES_EVERY_MS while a knob is on games. An app that does not send them
  * leaves the knob on the games the native module recognises by itself.
+ *
+ * After `idleAfter` seconds with no control touched (any report that differs
+ * from the one before), the screen shows the clock and this computer's
+ * figures (`createStats`), read every WATCH_MS only while it shows; the first
+ * touch brings the chosen page back. Off by default (0).
  */
 
 "use strict";
@@ -89,12 +94,154 @@ function connectedStatus(access) {
     }
     return { state: "connected" };
 }
+/** The longest wait before the idle screen, as the setting allows. */
+const MAX_IDLE_S = 600;
+/** Disk space changes slowly: read it this often while the idle screen shows. */
+const DISK_EVERY_MS = 30_000;
+
+/** How long nobody touches a control before the idle screen shows, in ms; 0 is never. */
+function idleAfterMs(values) {
+    const seconds = Number(values?.idleAfter);
+    if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+    return Math.round(Math.min(seconds, MAX_IDLE_S)) * 1_000;
+}
+
+/** Whether two reports differ: any knob turned or any button pressed or released. */
+function sameReport(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    for (let index = 0; index < a.length; index += 1) if (a[index] !== b[index]) return false;
+    return true;
+}
+
+/** Bytes received and sent by every interface but loopback, from Linux's `/proc/net/dev`. */
+function parseNetDev(text) {
+    let received = 0;
+    let sent = 0;
+    for (const line of String(text).split("\n").slice(2)) {
+        const colon = line.indexOf(":");
+        if (colon === -1) continue;
+        if (line.slice(0, colon).trim() === "lo") continue;
+        const fields = line.slice(colon + 1).trim().split(/\s+/).map(Number);
+        if (fields.length < 9 || !fields.every(Number.isFinite)) continue;
+        received += fields[0];
+        sent += fields[8];
+    }
+    return { received, sent };
+}
+
+/**
+ * This computer's figures for the idle screen, read cheaply: the processor
+ * from `os.cpus()` times (the share busy since the last read), memory from
+ * `os.totalmem`/`os.freemem`, the system disk from `statfs`, and the network
+ * from `/proc/net/dev` on Linux only (Windows and macOS have no reading that
+ * light from here, so no network row there). The graphics card's load has no
+ * such reading at all and is left out. Everything is passed in for tests.
+ */
+function createStats({ os, statfs, readNetDev, platform, systemDisk }) {
+    let cpuBefore = null;
+    let netBefore = null;
+    let disk = null;
+    let diskAt = -Infinity;
+
+    function cpu() {
+        const times = os.cpus().map((core) => core.times);
+        const total = times.reduce((sum, t) => sum + t.user + t.nice + t.sys + t.idle + t.irq, 0);
+        const idle = times.reduce((sum, t) => sum + t.idle, 0);
+        const before = cpuBefore;
+        cpuBefore = { total, idle };
+        if (!before || total <= before.total) return null;
+        return Math.round(100 * (1 - (idle - before.idle) / (total - before.total)));
+    }
+
+    function network(now) {
+        if (platform !== "linux") return null;
+        let counts;
+        try {
+            counts = parseNetDev(readNetDev());
+        } catch {
+            return null;
+        }
+        const before = netBefore;
+        netBefore = { ...counts, at: now };
+        if (!before || now <= before.at) return null;
+        const seconds = (now - before.at) / 1_000;
+        return { down: Math.max(0, (counts.received - before.received) / seconds), up: Math.max(0, (counts.sent - before.sent) / seconds) };
+    }
+
+    function diskNow(now) {
+        if (now - diskAt < DISK_EVERY_MS) return disk;
+        diskAt = now;
+        try {
+            const read = statfs(systemDisk);
+            const total = read.blocks * read.bsize;
+            disk = total > 0 ? { used: total - read.bavail * read.bsize, total } : null;
+        } catch {
+            disk = null;
+        }
+        return disk;
+    }
+
+    return {
+        read(now) {
+            const total = os.totalmem();
+            return { cpu: cpu(), memory: total > 0 ? { used: total - os.freemem(), total } : null, disk: diskNow(now), network: network(now) };
+        },
+        /** Forget the last reading, so the next one does not average over the time the screen was not shown. */
+        reset() {
+            cpuBefore = null;
+            netBefore = null;
+        }
+    };
+}
+
+const GB = 1024 ** 3;
+
+function percentOf(part) {
+    return Math.max(0, Math.min(100, Math.round((100 * part.used) / part.total)));
+}
+
+function rate(bytes) {
+    if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)}M`;
+    if (bytes >= 1024) return `${Math.round(bytes / 1024)}K`;
+    return `${Math.round(bytes)}B`;
+}
+
+function gigabytes(part) {
+    const used = part.used / GB;
+    const total = part.total / GB;
+    return `${used >= 100 ? Math.round(used) : used.toFixed(1)}/${Math.round(total)} GB`;
+}
+
+/** The idle page the native module draws (`screen::Idle`), in `locale`'s words; the clock in its own format. */
+function formatIdle(stats, locale, date) {
+    const spanish = /^es\b/i.test(locale);
+    let clock;
+    try {
+        clock = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(date);
+    } catch {
+        clock = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+    }
+    const rows = [];
+    rows.push(stats.cpu === null ? { label: "CPU", value: "-", percent: null } : { label: "CPU", value: `${stats.cpu}%`, percent: stats.cpu });
+    if (stats.memory) rows.push({ label: "RAM", value: gigabytes(stats.memory), percent: percentOf(stats.memory) });
+    if (stats.disk) rows.push({ label: spanish ? "Disco" : "Disk", value: gigabytes(stats.disk), percent: percentOf(stats.disk) });
+    if (stats.network) rows.push({ label: spanish ? "Red" : "Net", value: `${rate(stats.network.down)}/${rate(stats.network.up)}`, percent: null });
+    return { clock: clock.replace(/\s/g, " ").trim(), rows };
+}
+
+/** The figures read on this computer, for the plugin as it really runs. */
+function systemStats() {
+    const os = require("node:os");
+    const fs = require("node:fs");
+    const systemDisk = process.platform === "win32" ? `${process.env.SystemDrive || "C:"}\\` : "/";
+    return createStats({ os, statfs: (path) => fs.statfsSync(path), readNetDev: () => fs.readFileSync("/proc/net/dev", "utf8"), platform: process.platform, systemDisk });
+}
 
 /**
  * Runs the plugin against `port` (the utility process's parentPort) and the
  * native module. Everything it touches is passed in, so it is tested with fakes.
  */
-function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) => setTimeout(done, ms)), exit = (code) => process.exit(code), every = (tick, ms) => setInterval(tick, ms), stopEvery = (timer) => clearInterval(timer) }) {
+function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) => setTimeout(done, ms)), exit = (code) => process.exit(code), every = (tick, ms) => setInterval(tick, ms), stopEvery = (timer) => clearInterval(timer), stats = null, clock = () => new Date() }) {
     let values = {};
     let controller = null;
     let reader = null;
@@ -111,6 +258,36 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     let gamesAt = -Infinity;
     let nextCall = 1;
     const pending = new Map();
+    let lastReport = null;
+    let touchedAt = now();
+    let idle = false;
+    let figures = stats;
+
+    /** Show the idle page, or go back to the chosen one. */
+    function showIdle(next) {
+        if (!controller || typeof controller.setIdle !== "function") return;
+        if (!next) {
+            if (idle) controller.setIdle("null");
+            idle = false;
+            return;
+        }
+        figures ??= systemStats();
+        if (!idle) figures.reset();
+        idle = true;
+        try {
+            controller.setIdle(JSON.stringify(formatIdle(figures.read(now()), locale, clock())));
+        } catch (error) {
+            log("warn", `could not show the idle screen: ${error?.message ?? error}`);
+        }
+    }
+
+    /** Once a second: whether nobody has touched a control for long enough. */
+    function idleTick(connected) {
+        const after = idleAfterMs(values);
+        const due = connected && after > 0 && values.display !== "off" && now() - touchedAt >= after;
+        if (due) showIdle(true);
+        else if (idle) showIdle(false);
+    }
 
     const send = (message) => port.postMessage(message);
     const log = (level, text) => send({ type: "log", level, text: String(text).slice(0, 2_000) });
@@ -229,6 +406,8 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
         for (const id of actions) void act(id);
     }
 
+    let loopConnected = false;
+
     async function loop() {
         let connected = false;
         while (running) {
@@ -241,6 +420,8 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
             }
             if (!running) break;
             if (read.error) {
+                loopConnected = false;
+                lastReport = null;
                 if (connected) controller?.reset();
                 connected = false;
                 status(describe(read.error, read.error === "notFound" ? ownershipNow() : null));
@@ -249,6 +430,7 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
             }
             if (!connected) {
                 connected = true;
+                touchedAt = now();
                 ownershipAt = -Infinity;
                 accessAt = -Infinity;
             }
@@ -256,8 +438,17 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
                 accessAt = now();
                 status(connectedStatus(accessNow()));
             }
-            if (read.report) feed(read.report);
+            if (read.report) {
+                if (lastReport && !sameReport(read.report, lastReport)) {
+                    touchedAt = now();
+                    if (idle) showIdle(false);
+                }
+                lastReport = Uint8Array.from(read.report);
+                feed(read.report);
+            }
+            loopConnected = true;
         }
+        loopConnected = false;
     }
 
     function stop() {
@@ -282,12 +473,18 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
             reader = new native.Reader();
             send({ type: "ready" });
             void loop();
-            watcher = every(() => void watch(), WATCH_MS);
+            watcher = every(() => {
+                void watch();
+                idleTick(loopConnected);
+            }, WATCH_MS);
             watcher?.unref?.();
             void watch();
         } else if (message.type === "settings") {
             values = message.settings ?? {};
             controller?.setSettings(settingsJson());
+            // A changed setting is somebody at the page: the chosen page comes back, and the wait starts again.
+            touchedAt = now();
+            if (idle) showIdle(false);
             void watch();
         } else if (message.type === "reply") {
             pending.get(message.id)?.(message);
@@ -296,7 +493,7 @@ function run({ port, native, now = Date.now, sleep = (ms) => new Promise((done) 
     });
 }
 
-module.exports = { run, describe, connectedStatus, systemLocale, gamesOf, RENAMED };
+module.exports = { run, describe, connectedStatus, systemLocale, gamesOf, RENAMED, idleAfterMs, sameReport, parseNetDev, createStats, formatIdle };
 
 /** Started by the plugin host: load the native module, or say plainly that it did not load. */
 function main(port) {

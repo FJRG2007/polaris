@@ -124,6 +124,8 @@ pub struct Settings {
     pub enabled: bool,
     pub knobs: [Target; 4],
     pub buttons: [ActionId; 4],
+    /// What pressing each knob runs; empty mutes what the knob follows, as before.
+    pub knob_press: [ActionId; 4],
     pub tuning: Tuning,
     pub display: DisplayMode,
     pub brightness: u8,
@@ -139,6 +141,7 @@ impl Default for Settings {
             enabled: true,
             knobs: default_targets(),
             buttons: ["call.mic", "call.deafen", "call.camera", "call.hangup"].map(String::from),
+            knob_press: Default::default(),
             tuning: Tuning::default(),
             display: DisplayMode::Mixer,
             brightness: 80,
@@ -164,6 +167,7 @@ impl Settings {
         set(&mut settings.enabled, stored.get("enabled"));
         each(&mut settings.knobs, stored.get("knobs"));
         each(&mut settings.buttons, stored.get("buttons"));
+        each(&mut settings.knob_press, stored.get("knobPress"));
         if let Some(serde_json::Value::Object(tuning)) = stored.get("tuning") {
             let target = &mut settings.tuning;
             set(

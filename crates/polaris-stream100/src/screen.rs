@@ -107,6 +107,43 @@ impl NowPlaying {
     }
 }
 
+/// One line of the idle page: a name, its value as the plugin wrote it, and
+/// how full it is (0-100) for a bar, when it has one.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct IdleRow {
+    pub label: String,
+    pub value: String,
+    pub percent: Option<u8>,
+}
+
+/// What the screen shows while nobody touches the controller: the clock and
+/// a few of this computer's figures (CPU, memory, disk, network), each one
+/// formatted by the plugin in the reader's language.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Idle {
+    pub clock: String,
+    pub rows: Vec<IdleRow>,
+}
+
+/// Rows the idle page has room for.
+pub const IDLE_ROWS: usize = 4;
+
+impl Idle {
+    /// The same page with every text cleaned and at most [`IDLE_ROWS`] rows.
+    pub fn bounded(mut self) -> Self {
+        self.clock = clean(&self.clock);
+        self.rows.truncate(IDLE_ROWS);
+        for row in &mut self.rows {
+            row.label = clean(&row.label);
+            row.value = clean(&row.value);
+            row.percent = row.percent.map(|percent| percent.min(100));
+        }
+        self
+    }
+}
+
 /// The page the screen should show.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Screen {
@@ -119,6 +156,8 @@ pub struct Screen {
     pub call: Option<Call>,
     /// What `NowPlaying` mode shows; with nothing it shows the knobs.
     pub playing: Option<NowPlaying>,
+    /// The idle page, shown instead of `mode`'s while it is set.
+    pub idle: Option<Idle>,
 }
 
 impl Screen {
@@ -344,6 +383,13 @@ pub fn render(screen: &Screen) -> Option<IndexedFrame> {
     let mut canvas = Canvas {
         pixels: vec![BACKGROUND; WIDTH * HEIGHT],
     };
+    if let Some(idle) = &screen.idle {
+        idle_page(&mut canvas, idle);
+        return Some(IndexedFrame {
+            palette: palette(),
+            pixels: canvas.pixels,
+        });
+    }
     match (screen.mode, &screen.call, &screen.playing) {
         (DisplayMode::Call, Some(call), _) => call_page(&mut canvas, call, screen.locale),
         (DisplayMode::NowPlaying, _, Some(playing)) => {
@@ -383,6 +429,27 @@ fn mixer_page(canvas: &mut Canvas, knobs: &[Knob; 4]) {
                 filled,
                 fill,
             );
+        }
+    }
+}
+
+const IDLE_ROW_TOP: usize = 92;
+const IDLE_ROW_HEIGHT: usize = 44;
+
+/// The clock large at the top, then one row per figure: its name on the
+/// left, its value on the right and a thin bar under it when it has one.
+fn idle_page(canvas: &mut Canvas, idle: &Idle) {
+    canvas.text(&idle.clock, WIDTH / 2, 14, 7, 8, TEXT);
+    for (index, row) in idle.rows.iter().take(IDLE_ROWS).enumerate() {
+        let top = IDLE_ROW_TOP + index * IDLE_ROW_HEIGHT;
+        canvas.text_at(&row.label, MARGIN, top, 3, 9, DIM);
+        let value = Canvas::fit(&row.value, 14).len();
+        let right = (WIDTH - MARGIN).saturating_sub((value * 18).saturating_sub(3));
+        canvas.text_at(&row.value, right, top, 3, 14, TEXT);
+        if let Some(percent) = row.percent {
+            let width = WIDTH - 2 * MARGIN;
+            canvas.rect(MARGIN, top + 28, width, 4, TRACK);
+            canvas.rect(MARGIN, top + 28, width * usize::from(percent.min(100)) / 100, 4, FILL);
         }
     }
 }

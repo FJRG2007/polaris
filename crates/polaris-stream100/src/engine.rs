@@ -11,7 +11,7 @@ use crate::audio::{resolve, Session, Target};
 use crate::encoder::{apply, Encoder};
 use crate::plugin::{knob_value, screen_name, Locale};
 use crate::report::{Decoder, Event, KnobMap, Report};
-use crate::screen::{Call, Knob, NowPlaying, Screen};
+use crate::screen::{Call, Idle, Knob, NowPlaying, Screen};
 use crate::settings::Settings;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -55,6 +55,7 @@ pub struct Engine {
     locale: Locale,
     call: Option<Call>,
     playing: Option<NowPlaying>,
+    idle: Option<Idle>,
 }
 
 impl Engine {
@@ -67,6 +68,7 @@ impl Engine {
             locale: Locale::default(),
             call: None,
             playing: None,
+            idle: None,
         }
     }
 
@@ -118,6 +120,17 @@ impl Engine {
         true
     }
 
+    /// The idle page the plugin wants shown instead of the chosen one
+    /// (`None`: the chosen page). Answers whether it changed.
+    pub fn set_idle(&mut self, idle: Option<Idle>) -> bool {
+        let idle = idle.map(Idle::bounded);
+        if self.idle == idle {
+            return false;
+        }
+        self.idle = idle;
+        true
+    }
+
     /// Forgets the decoder baseline and pending counts (reconnect, lock).
     pub fn reset(&mut self) {
         self.decoder.reset();
@@ -154,7 +167,14 @@ impl Engine {
                 Event::KnobPress {
                     knob,
                     pressed: true,
-                } => self.press(usize::from(knob), sessions, output, &mut commands),
+                } => {
+                    let id = self.settings.knob_press[usize::from(knob) % 4].trim();
+                    if id.is_empty() {
+                        self.press(usize::from(knob), sessions, output, &mut commands);
+                    } else {
+                        commands.push(Command::Action { id: id.to_owned() });
+                    }
+                }
                 Event::Button {
                     button,
                     pressed: true,
@@ -264,6 +284,7 @@ impl Engine {
             locale: self.locale,
             call: self.call.clone(),
             playing: self.playing.clone(),
+            idle: self.idle.clone(),
         }
     }
 
@@ -444,6 +465,29 @@ mod tests {
         assert!(engine
             .feed(&report(0, [0; 4]), 20, &[], Output::default())
             .is_empty());
+    }
+
+    #[test]
+    fn a_knob_press_runs_its_action_when_one_is_set() {
+        let mut settings = Settings::default();
+        settings.knob_press[1] = "custom:obs".into();
+        let mut engine = engine();
+        engine.set_settings(settings);
+        let _ = engine.feed(&report(0, [0; 4]), 0, &[], Output::default());
+        let bit = KnobMap::default().0[1];
+        let commands = engine.feed(&report(bit, [0; 4]), 10, &[session("a", "Spotify.exe", 50, false)], Output::default());
+        assert_eq!(commands, vec![Command::Action { id: "custom:obs".into() }]);
+    }
+
+    #[test]
+    fn the_idle_page_replaces_the_chosen_one_until_it_is_cleared() {
+        let mut engine = Engine::new(Settings::default(), KnobMap::default());
+        let idle = Idle { clock: "12:30".into(), rows: vec![crate::screen::IdleRow { label: "CPU".into(), value: "12%".into(), percent: Some(12) }] };
+        assert!(engine.set_idle(Some(idle.clone())));
+        assert!(!engine.set_idle(Some(idle)));
+        assert!(engine.screen(&[], Output::default(), &[]).idle.is_some());
+        assert!(engine.set_idle(None));
+        assert!(engine.screen(&[], Output::default(), &[]).idle.is_none());
     }
 
     #[test]

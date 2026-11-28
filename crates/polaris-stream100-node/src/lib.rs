@@ -185,6 +185,16 @@ impl Controller {
         }
     }
 
+    /// The idle page to show instead of the chosen one (`Idle` JSON), or
+    /// `null` to go back to it: the plugin decides when nobody is touching.
+    #[napi(catch_unwind)]
+    pub fn set_idle(&mut self, idle: String) {
+        let idle = serde_json::from_str::<Option<screen::Idle>>(&idle).ok().flatten();
+        if self.engine.set_idle(idle) {
+            self.repaint();
+        }
+    }
+
     /// Program keys of the running games the desktop's game detection found.
     #[napi(catch_unwind)]
     pub fn set_games(&mut self, keys: Vec<String>) {

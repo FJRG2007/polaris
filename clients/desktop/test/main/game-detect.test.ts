@@ -23,6 +23,7 @@ import {
     parseProcessList,
     parsePs,
     parseTasklist,
+    KEYS_SOURCE,
     READER_SOURCE,
     REPEAT_MS,
     type RunningGame,
@@ -311,11 +312,25 @@ describe("listing programs on Windows", () => {
         const lister = new WindowsLister(() => shell.child, async () => []);
         expect(await lister.list()).toEqual([{ name: "celeste.exe", path: "C:\\Games\\Celeste\\Celeste.exe" }]);
         await lister.list();
-        // Each reader once: the process list, and the profiles' glance (microphone and app in front).
-        expect(shell.asked.filter((line) => line.includes("Add-Type"))).toHaveLength(2);
+        // Each reader once: the process list, the profiles' glance (microphone and app in front) and the custom actions' hotkeys.
+        expect(shell.asked.filter((line) => line.includes("Add-Type"))).toHaveLength(3);
+        expect(shell.asked.filter((line) => line.includes("Add-Type") && line.includes("class PolarisKeys"))).toHaveLength(1);
         expect(shell.asked.filter((line) => line.includes("Add-Type") && line.includes("class PolarisProcessList"))).toHaveLength(1);
         expect(shell.asked.filter((line) => line.includes("Add-Type") && line.includes("class PolarisGlance"))).toHaveLength(1);
         expect(shell.asked.filter((line) => line.includes("PolarisProcessList]::Read()"))).toHaveLength(2);
+    });
+
+    it("presses a hotkey as key codes only, and refuses anything else without asking the shell", async () => {
+        expect(KEYS_SOURCE).not.toMatch(/['\r\n]/);
+        const shell = fakeShell({ names: ["sent"] });
+        const lister = new WindowsLister(() => shell.child, async () => []);
+        expect(await lister.sendKeys([0x11, 0x4d])).toBe(true);
+        expect(shell.asked.some((line) => line.includes("[PolarisKeys]::Send('17,77')"))).toBe(true);
+        const before = shell.asked.length;
+        expect(await lister.sendKeys([])).toBe(false);
+        expect(await lister.sendKeys([0x11, 300])).toBe(false);
+        expect(await lister.sendKeys([1.5])).toBe(false);
+        expect(shell.asked.length).toBe(before);
     });
 
     it("gives up on a list too long to be real and asks tasklist instead", async () => {

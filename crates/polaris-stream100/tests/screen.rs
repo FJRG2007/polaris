@@ -176,6 +176,7 @@ fn page(volume: u8) -> Screen {
         locale: Locale::EnUs,
         call: None,
         playing: None,
+        idle: None,
     }
 }
 
