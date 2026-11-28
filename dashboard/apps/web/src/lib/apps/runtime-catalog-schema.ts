@@ -14,7 +14,7 @@
  * newer Polaris"; it never takes the rest of the catalogue down with it.
  */
 
-import type { AppStepDefinition } from "@polaris/core";
+import type { AppMcpToolDefinition, AppStepDefinition, AppStepField } from "@polaris/core";
 import { z } from "zod";
 import { Package } from "lucide-react";
 import type { AppCategory, AppManifest } from "./catalog";
@@ -39,6 +39,28 @@ const CATEGORIES: readonly AppCategory[] = ["Messaging", "Productivity", "AI", "
 
 const localized = (max: number) =>
     z.object({ "en-US": z.string().trim().min(1).max(max) }).catchall(z.string().trim().min(1).max(max));
+
+/** Typed settings or input an app declares: drawn and checked by the host, never by its bundle. */
+const declaredFields = z
+    .array(
+        z.object({
+            key: z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/),
+            kind: z.enum(["string", "text", "number", "boolean", "id", "choice"]),
+            label: localized(60),
+            hint: localized(160).optional(),
+            required: z.boolean().default(false),
+            min: z.number().finite().optional(),
+            max: z.number().finite().optional(),
+            options: z
+                .array(z.object({ value: z.string().min(1).max(64), label: localized(60) }))
+                .max(50)
+                .optional()
+        })
+    )
+    .max(16)
+    .default([]);
+/** A typed answer an app declares: plain fields, checked before anybody reads it. */
+const declaredOutput = z.record(z.enum(["string", "number", "boolean", "id"])).default({});
 
 export const runtimeAppEntrySchema = z.object({
     id: z.string().regex(APP_ID),
@@ -105,25 +127,29 @@ export const runtimeAppEntrySchema = z.object({
                 label: localized(80),
                 description: localized(200),
                 permission: z.string().regex(/^[a-z][a-z0-9-]{1,47}\.[a-z][a-z0-9.-]{0,63}$/),
-                fields: z
-                    .array(
-                        z.object({
-                            key: z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/),
-                            kind: z.enum(["string", "text", "number", "boolean", "id", "choice"]),
-                            label: localized(60),
-                            hint: localized(160).optional(),
-                            required: z.boolean().default(false),
-                            min: z.number().finite().optional(),
-                            max: z.number().finite().optional(),
-                            options: z
-                                .array(z.object({ value: z.string().min(1).max(64), label: localized(60) }))
-                                .max(50)
-                                .optional()
-                        })
-                    )
-                    .max(16)
-                    .default([]),
-                output: z.record(z.enum(["string", "number", "boolean", "id"])).default({})
+                fields: declaredFields,
+                output: declaredOutput
+            })
+        )
+        .max(32)
+        .default([]),
+    /**
+     * The MCP tools it offers assistants, each `<id, "-" as "_">_<name>`, behind
+     * one of its own permissions (the scope a key needs), with typed input and
+     * answer; the bundle's `AppExtension.mcpToolHandlers` only does the work.
+     */
+    mcpTools: z
+        .array(
+            z.object({
+                name: z.string().regex(/^[a-z][a-z0-9_]{1,63}$/),
+                title: localized(80),
+                description: localized(500),
+                permission: z.string().regex(PERMISSION),
+                readOnly: z.boolean(),
+                destructive: z.boolean().optional(),
+                fields: declaredFields,
+                output: declaredOutput,
+                items: declaredOutput.optional()
             })
         )
         .max(32)
@@ -264,6 +290,8 @@ export type RuntimeAppView = Omit<AppManifest, "icon"> & {
     }[];
     /** Its automation steps, labelled in the reader's language. */
     readonly automationSteps?: readonly AppStepDefinition[];
+    /** Its MCP tools, worded in the reader's language. */
+    readonly mcpTools?: readonly AppMcpToolDefinition[];
     /** Its kinds of alert, labelled in the reader's language. */
     readonly notificationKinds?: readonly {
         id: string;
@@ -274,6 +302,22 @@ export type RuntimeAppView = Omit<AppManifest, "icon"> & {
         defaults?: { inapp: boolean; email: boolean };
     }[];
 };
+
+/** Declared fields worded in the reader's language. */
+function fieldsIn(fields: z.infer<typeof declaredFields>, locale: string): AppStepField[] {
+    return fields.map((field) => ({
+        key: field.key,
+        kind: field.kind,
+        label: entryText(field.label, locale),
+        ...(field.hint ? { hint: entryText(field.hint, locale) } : {}),
+        required: field.required,
+        ...(field.min !== undefined ? { min: field.min } : {}),
+        ...(field.max !== undefined ? { max: field.max } : {}),
+        ...(field.options
+            ? { options: field.options.map((option) => ({ value: option.value, label: entryText(option.label, locale) })) }
+            : {})
+    }));
+}
 
 /** The entries a dashboard lists, with the ones written for a host API it has moved past left out. */
 export function runtimeViews(catalog: RuntimeAppCatalog | null, known: ReadonlySet<string>, locale: string): RuntimeAppView[] {
@@ -313,23 +357,24 @@ export function runtimeViews(catalog: RuntimeAppCatalog | null, known: ReadonlyS
             description: entryText(step.description, locale),
             permission: step.permission,
             output: step.output,
-            fields: step.fields.map((field) => ({
-                key: field.key,
-                kind: field.kind,
-                label: entryText(field.label, locale),
-                ...(field.hint ? { hint: entryText(field.hint, locale) } : {}),
-                required: field.required,
-                ...(field.min !== undefined ? { min: field.min } : {}),
-                ...(field.max !== undefined ? { max: field.max } : {}),
-                ...(field.options
-                    ? { options: field.options.map((option) => ({ value: option.value, label: entryText(option.label, locale) })) }
-                    : {})
-            }))
+            fields: fieldsIn(step.fields, locale)
+        }));
+        const mcpTools: AppMcpToolDefinition[] = entry.mcpTools.map((tool) => ({
+            name: tool.name,
+            title: entryText(tool.title, locale),
+            description: entryText(tool.description, locale),
+            permission: tool.permission,
+            readOnly: tool.readOnly,
+            ...(tool.destructive !== undefined ? { destructive: tool.destructive } : {}),
+            fields: fieldsIn(tool.fields, locale),
+            output: tool.output,
+            ...(tool.items ? { items: tool.items } : {})
         }));
         views.push({
             ...view,
             ...(notificationKinds.length ? { notificationKinds } : {}),
             ...(automationSteps.length ? { automationSteps } : {}),
+            ...(mcpTools.length ? { mcpTools } : {}),
             ...(entry.nav ? { nav: entry.nav } : {}),
             ...(permissionDefs.length ? { permissionDefs } : {}),
             ...(events.length ? { events } : {})

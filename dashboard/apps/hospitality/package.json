@@ -231,6 +231,88 @@
                         "sent": "number"
                     }
                 }
+            ],
+            "mcpTools": [
+                {
+                    "name": "hospitality_open_orders",
+                    "title": {
+                        "en-US": "List open orders",
+                        "es-ES": "Ver comandas abiertas"
+                    },
+                    "description": {
+                        "en-US": "Lists the orders still open (not yet paid), newest first, in one venue or all: table, covers, total in cents, waiter and when it opened. Read only; it does not send, change or close anything.",
+                        "es-ES": "Lista las comandas aún abiertas (sin cobrar), las más recientes primero, en un local o en todos: mesa, comensales, total en céntimos, camarero y hora de apertura. Solo lectura; no envía, cambia ni cierra nada."
+                    },
+                    "permission": "hospitality.use",
+                    "readOnly": true,
+                    "fields": [
+                        {
+                            "key": "venueId",
+                            "kind": "id",
+                            "label": {
+                                "en-US": "Venue",
+                                "es-ES": "Local"
+                            },
+                            "hint": {
+                                "en-US": "Leave empty for every venue.",
+                                "es-ES": "Vacío para todos los locales."
+                            }
+                        }
+                    ],
+                    "output": {
+                        "count": "number"
+                    },
+                    "items": {
+                        "orderId": "id",
+                        "venueId": "id",
+                        "table": "string",
+                        "covers": "number",
+                        "total": "number",
+                        "waiter": "string",
+                        "openedAt": "string"
+                    }
+                },
+                {
+                    "name": "hospitality_product_availability",
+                    "title": {
+                        "en-US": "Check product availability",
+                        "es-ES": "Ver si un producto está disponible"
+                    },
+                    "description": {
+                        "en-US": "Says whether a product can be ordered right now, everywhere or in one venue (a venue's own setting wins). Read only; to change it use the automation step.",
+                        "es-ES": "Dice si un producto se puede pedir ahora, en todos los locales o en uno (manda el ajuste del local). Solo lectura; para cambiarlo usa el paso de automatización."
+                    },
+                    "permission": "hospitality.use",
+                    "readOnly": true,
+                    "fields": [
+                        {
+                            "key": "productId",
+                            "kind": "id",
+                            "label": {
+                                "en-US": "Product",
+                                "es-ES": "Producto"
+                            },
+                            "required": true
+                        },
+                        {
+                            "key": "venueId",
+                            "kind": "id",
+                            "label": {
+                                "en-US": "Venue",
+                                "es-ES": "Local"
+                            },
+                            "hint": {
+                                "en-US": "Leave empty for every venue.",
+                                "es-ES": "Vacío para todos los locales."
+                            }
+                        }
+                    ],
+                    "output": {
+                        "productId": "id",
+                        "name": "string",
+                        "available": "boolean"
+                    }
+                }
             ]
         }
     },

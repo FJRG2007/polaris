@@ -580,11 +580,25 @@ async function installedWith(hook: keyof AppExtension): Promise<AppExtension[]> 
  * never anybody else's.
  */
 export async function appMcpTools(): Promise<{ app: string; tool: AppMcpTool }[]> {
+    const [withTools, withHandlers, { manifestMcpTools }, declaredBy] = await Promise.all([
+        installedWith("mcpTools"),
+        installedWith("mcpToolHandlers"),
+        import("@/lib/mcp/app-manifest-tools"),
+        import("@polaris/core").then((core) => core.appMcpToolDefinitions().map((tool) => tool.app))
+    ]);
+    // An app the published catalogue delivers declares its tools in its manifest,
+    // so their shape and gate are checked before its bundle loads; a tool its
+    // bundle builds without declaring it is not listed. Apps built into this
+    // image keep building theirs in code.
+    const { runnableIds } = await import("@/lib/apps/runtime-catalog");
+    const delivered = new Set([...runnableIds(), ...declaredBy]);
+    const extensionsOf = new Map([...withTools, ...withHandlers].map((extension) => [extension.id, extension]));
     const lists = await Promise.all(
-        (await installedWith("mcpTools")).map(async (extension) => {
+        [...extensionsOf.values()].map(async (extension) => {
             try {
-                const tools = (await extension.mcpTools?.()) ?? [];
-                return tools.map((tool) => ({ app: extension.id, tool }));
+                const coded = delivered.has(extension.id) ? [] : ((await extension.mcpTools?.()) ?? []);
+                const declared = manifestMcpTools(extension.id, extension.mcpToolHandlers);
+                return [...coded, ...declared].map((tool) => ({ app: extension.id, tool }));
             } catch (caught) {
                 console.error(`polaris: ${extension.id} could not list its MCP tools:`, caught);
                 return [];

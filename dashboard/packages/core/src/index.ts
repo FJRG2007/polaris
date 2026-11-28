@@ -96,6 +96,7 @@ export * from "./automation-canvas.js";
 export * from "./automation-validate.js";
 export * from "./automation-app-events.js";
 export * from "./automation-app-steps.js";
+export * from "./app-mcp-tools.js";
 export * from "./sign-in-methods.js";
 export * from "./request-origin.js";
 export * from "./user-agent.js";

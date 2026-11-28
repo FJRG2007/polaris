@@ -334,6 +334,15 @@ export interface AppExtension {
     readonly mcpTools?: () => Promise<readonly AppMcpTool[]>;
 
     /**
+     * What does each MCP tool its manifest declares (`mcpTools`), by tool name.
+     * The dashboard lists the tool from the manifest, checks the caller's scope
+     * and permission and the input against the declared fields before asking,
+     * and the answer against the declared output after; a handler only does the
+     * work. Import the implementations lazily inside.
+     */
+    readonly mcpToolHandlers?: () => Promise<Readonly<Record<string, AppMcpToolHandler>>>;
+
+    /**
      * What a person reads for each of those tools, by tool name, in their
      * language: the list behind a permission's info button on the consent
      * screen and on a connected app's permissions. One for every tool it
@@ -688,6 +697,15 @@ export type AppStepHandler = (
         readonly automationId: string;
         /** What started the run: the trigger's payload. */
         readonly trigger: Readonly<Record<string, unknown>>;
+    }
+) => Promise<{ readonly output?: Record<string, unknown>; readonly refused?: string }>;
+
+/** One manifest-declared MCP tool's work, handed input already checked. */
+export type AppMcpToolHandler = (
+    input: Readonly<Record<string, unknown>>,
+    context: {
+        /** The caller's account, already holding the tool's permission. */
+        readonly userId: string;
     }
 ) => Promise<{ readonly output?: Record<string, unknown>; readonly refused?: string }>;
 

@@ -65,6 +65,17 @@ function readableField(field: AppStepField): boolean {
     return options.length > 0 && options.length <= 50 && new Set(options.map((option) => option.value)).size === options.length;
 }
 
+/** Whether a declared list of fields can be drawn and checked: readable kinds, unique keys, at most `max`. */
+export function appFieldsReadable(fields: readonly AppStepField[], max: number = MAX_FIELDS): boolean {
+    return fields.length <= max && fields.every(readableField) && new Set(fields.map((field) => field.key)).size === fields.length;
+}
+
+/** Whether a declared answer shape is plain typed fields. */
+export function appOutputReadable(output: Readonly<Record<string, AppStepOutputKind>>): boolean {
+    const entries = Object.entries(output);
+    return entries.length <= 32 && entries.every(([key, kind]) => KEY.test(key) && APP_STEP_OUTPUT_KINDS.includes(kind));
+}
+
 /**
  * Register (or replace) the steps an app declares. One outside the app's id,
  * behind a permission that is not the app's, or with an unreadable field or
