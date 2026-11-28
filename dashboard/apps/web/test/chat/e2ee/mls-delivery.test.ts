@@ -622,6 +622,26 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         expect(await bob.readSealed(CHANNEL, [id])).toEqual([]);
     });
 
+    it("opens a sealed message in one row only: a copy the server stores under another id is refused", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const bob = await open(BOB, "bob-phone-1");
+        for (const device of [alice, bob]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        await bob.sync(CHANNEL);
+        const id = await alice.sendSealed(CHANNEL, new TextEncoder().encode("say it once"));
+        const row = state.tables.chatMessage!.find((r) => r.id === id)!;
+        const copy = crypto.randomUUID();
+        state.tables.chatMessage!.push({ ...row, id: copy, createdAt: new Date(Date.now() + 1000) });
+        const read = await bob.readSealed(CHANNEL, [id, copy]);
+        const opened = read.filter((entry) => entry.opened);
+        expect(opened).toHaveLength(1);
+        expect(new TextDecoder().decode(opened[0]!.opened!)).toBe("say it once");
+        // The row it opened as keeps opening.
+        const again = await bob.readSealed(CHANNEL, [opened[0]!.id]);
+        expect(new TextDecoder().decode(again[0]!.opened!)).toBe("say it once");
+    });
+
     it("adds at most one claim's worth of newcomers per send, however many the roster answers", async () => {
         // A large channel: the roster's pages together name more joinable accounts than one claim takes.
         const many = Array.from({ length: 150 }, (_, i) => `66666666-6666-4666-8666-${String(i).padStart(12, "0")}`);

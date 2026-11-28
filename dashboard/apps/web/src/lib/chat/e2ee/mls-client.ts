@@ -82,6 +82,8 @@ const ADD_BATCH = 100;
  * them before anything is sealed.
  */
 const REMOVE_BATCH = 100;
+/** Sealed message ids whose row this page remembers (`rowOf`). */
+const ROWS_REMEMBERED = 50_000;
 /**
  * Members from which a device fills its own path. A group built by one
  * device's adds has every parent node blank but that device's path, and a
@@ -852,8 +854,13 @@ export class MlsDevice {
             const revision = row.revision ?? 0;
             // A version below one this device has seen is the server handing back an earlier one: not shown as the message.
             const current = revision >= this.revisionFloor(channelId, row.id);
-            const opened = current ? await this.openStored(channelId, row) : null;
-            if (opened) this.raiseRevisionFloor(channelId, row.id, revision);
+            const opened = current && this.firstRowFor(channelId, row) ? await this.openStored(channelId, row) : null;
+            if (opened) {
+                this.raiseRevisionFloor(channelId, row.id, revision);
+                this.rowOf.set(`${channelId}/${row.clientKey}`, row.id);
+                const oldest = this.rowOf.size > ROWS_REMEMBERED ? this.rowOf.keys().next().value : undefined;
+                if (oldest !== undefined) this.rowOf.delete(oldest);
+            }
             out.push({
                 id: row.id,
                 authorId: row.authorId,
@@ -881,6 +888,20 @@ export class MlsDevice {
             out.push(opened);
         }
         return out;
+    }
+
+    /**
+     * The row each sealed message id (`clientKey`) opened as on this page. The
+     * seal binds its id, conversation, epoch and sender, not the row the server
+     * stores it in, so a server copying a sealed row under a second id would
+     * show one message twice; the copy is refused like a row that does not
+     * open. Bounded (`ROWS_REMEMBERED`, oldest first); kept for the page only.
+     */
+    private readonly rowOf = new Map<string, string>();
+
+    private firstRowFor(channelId: string, row: SealedWire): boolean {
+        const seen = this.rowOf.get(`${channelId}/${row.clientKey}`);
+        return seen === undefined || seen === row.id;
     }
 
     /** The lowest revision this device still takes as the message's current one (0 when it has seen none). */
