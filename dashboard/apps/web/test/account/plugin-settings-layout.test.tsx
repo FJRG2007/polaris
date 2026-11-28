@@ -84,8 +84,10 @@ describe("a plugin's settings", () => {
     it("draw the knobs and buttons as the controller's tiles, in the reader's language, with no native control", async () => {
         const view = open(raw);
         const knobs = await screen.findByRole("region", { name: "Ruedas" });
-        expect(within(knobs).getAllByRole("combobox")).toHaveLength(4);
+        // Each knob turns (four) and is pressed (four more): a press runs an action of its own.
+        expect(within(knobs).getAllByRole("combobox")).toHaveLength(8);
         expect(within(knobs).getByText("Rueda 1")).toBeTruthy();
+        expect(within(knobs).getByText("Pulsar rueda 1")).toBeTruthy();
         expect(within(screen.getByRole("region", { name: "Botones iluminados" })).getAllByRole("combobox")).toHaveLength(4);
         expect(screen.getByRole("region", { name: "Pantalla" })).toBeTruthy();
         expect(view.container.querySelectorAll("select, option, input[type=range], input[type=checkbox], textarea")).toHaveLength(0);
@@ -117,7 +119,7 @@ describe("a plugin's settings", () => {
     it("read as one list from an app that does not know groups", async () => {
         const { groups: _groups, ...old } = raw;
         const view = open({ ...old, settings: (old.settings as Record<string, unknown>[]).map(({ group: _group, ...setting }) => setting) });
-        await waitFor(() => expect(view.container.querySelectorAll("[role=combobox]").length).toBe(9));
+        await waitFor(() => expect(view.container.querySelectorAll("[role=combobox]").length).toBe(13));
         expect(screen.queryByRole("region", { name: "Ruedas" })).toBeNull();
     });
 

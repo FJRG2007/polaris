@@ -11,10 +11,10 @@ import { packageDir, pluginsFolder } from "./packages";
 import { judgeViewCall, readViewUrl, resolveViewFile, viewContentType, VIEW_CSP, VIEW_SCHEMES } from "./view";
 import { CHANNELS } from "@/shared/bridge";
 import type { PluginAction } from "@/shared/plugin-protocol";
-import { spawn } from "node:child_process";
 import { DeviceActions, windowsKeyCodes } from "./device-actions";
 import { openExternal } from "../open-external";
 import { launcherEntries, runLauncherEntry } from "../launcher";
+import { startProgram } from "../launcher-apps";
 import { setTrayPlugins } from "../tray";
 import { watchUsb, type UsbWatch } from "./presence";
 import { pluginShortcuts, sameShortcuts, type PluginShortcuts } from "./ways-in";
@@ -239,16 +239,8 @@ function actionsNow(): DeviceActions {
                 openExternal(url);
                 return true;
             },
-            run: (file, args) =>
-                new Promise((resolve) => {
-                    // The file and each argument as they are: no shell reads them.
-                    const child = spawn(file, [...args], { shell: false, detached: true, stdio: "ignore", windowsHide: false });
-                    child.once("error", () => resolve(false));
-                    child.once("spawn", () => {
-                        child.unref();
-                        resolve(true);
-                    });
-                }),
+            // A program the person chose to open: its window is the point.
+            run: (file, args) => startProgram(file, args),
             hotkey: async (step) => {
                 const codes = windowsKeyCodes(step);
                 return process.platform === "win32" && codes !== null ? sharedWindowsLister().sendKeys(codes) : false;

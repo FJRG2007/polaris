@@ -15,7 +15,8 @@ import type { PluginsBridge } from "@/lib/device-plugins-client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowDown, ArrowUp, Pencil, Play, Plus, Trash2, X } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Select, Switch, useToast } from "@polaris/ui";
+import { CodeEditor } from "@/components/json-view";
+import { Button, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Select, settingType, Switch, useToast } from "@polaris/ui";
 import {
     CUSTOM_ACTION_PREFIX,
     DEVICE_ACTION_KEYS,
@@ -105,6 +106,31 @@ function newId(): string {
     return globalThis.crypto.randomUUID().toLowerCase();
 }
 
+/**
+ * A program's arguments, one per line. The box keeps what is typed - a new
+ * empty line included, so a second argument can be started - and hands on only
+ * the lines that hold something.
+ */
+function ArgsField({ args, label, onChange }: { args: readonly string[]; label: string; onChange: (args: string[]) => void }) {
+    const [text, setText] = useState(() => args.join("\n"));
+    // Another step loaded into this slot: show its arguments, not what was typed before.
+    useEffect(() => {
+        setText((typed) => (argsFromText(typed).join("\n") === args.join("\n") ? typed : args.join("\n")));
+    }, [args]);
+    return (
+        <CodeEditor
+            value={text}
+            language={null}
+            label={label}
+            placeholder={label}
+            onChange={(next) => {
+                setText(next);
+                onChange(argsFromText(next));
+            }}
+        />
+    );
+}
+
 function StepEditor({ bridge, step, onChange, launcher, hotkeys }: { bridge: PluginsBridge; step: Step; onChange: (step: Step) => void; launcher: DeviceActionsView["launcher"]; hotkeys: string | null }) {
     const t = useTranslations("account");
     const pick = async (what: "file" | "folder" | "program") => {
@@ -129,26 +155,20 @@ function StepEditor({ bridge, step, onChange, launcher, hotkeys }: { bridge: Plu
                         <Input className="min-w-0 flex-1" value={step.file} placeholder={say(t, "field.program")} aria-label={say(t, "field.program")} onChange={(event) => onChange({ ...step, file: event.target.value })} />
                         <Button variant="secondary" onClick={async () => { const file = await pick("program"); if (file) onChange({ ...step, file }); }}>{say(t, "pickProgram")}</Button>
                     </div>
-                    <textarea
-                        className="min-h-16 w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm"
-                        value={step.args.join("\n")}
-                        placeholder={say(t, "field.args")}
-                        aria-label={say(t, "field.args")}
-                        onChange={(event) => onChange({ ...step, args: argsFromText(event.target.value) })}
-                    />
+                    <ArgsField args={step.args} label={say(t, "field.args")} onChange={(args) => onChange({ ...step, args })} />
                 </div>
             );
         case "hotkey":
             return (
                 <div className="flex min-w-0 flex-wrap items-center gap-3">
                     {(["ctrl", "alt", "shift", "meta"] as const).map((modifier) => (
-                        <label key={modifier} className="flex items-center gap-2 text-sm">
+                        <label key={modifier} className={cn("flex items-center gap-2", settingType.body)}>
                             <Switch checked={step[modifier]} onChange={(checked) => onChange({ ...step, [modifier]: checked })} aria-label={say(t, `modifier.${modifier}`)} />
                             {say(t, `modifier.${modifier}`)}
                         </label>
                     ))}
                     <Select value={step.key} onValueChange={(key) => onChange({ ...step, key })} aria-label={say(t, "field.key")} className="w-40" options={DEVICE_ACTION_KEYS.map((key) => ({ value: key, label: key.length === 1 ? key.toUpperCase() : key }))} />
-                    {hotkeys ? <p className="w-full text-sm text-muted-foreground">{say(t, "hotkeysUnsupported")}</p> : null}
+                    {hotkeys ? <p className={cn("w-full", settingType.hint)}>{say(t, "hotkeysUnsupported")}</p> : null}
                 </div>
             );
         case "launcher":
@@ -190,9 +210,6 @@ function StepsEditor({ bridge, steps, onChange, launcher, hotkeys }: { bridge: P
                     <StepEditor bridge={bridge} step={step} onChange={(next) => set(index, next)} launcher={launcher} hotkeys={hotkeys} />
                 </li>
             ))}
-            <li>
-                <Button variant="secondary" onClick={() => onChange([...steps, blankStep("delay")])}><Plus className="size-4 shrink-0" />{say(t, "addStep")}</Button>
-            </li>
         </ol>
     );
 }
@@ -224,20 +241,28 @@ function ActionDialog({ bridge, draft, onClose, launcher, hotkeys }: { bridge: P
                     <DialogDescription>{say(t, "dialog.hint")}</DialogDescription>
                 </DialogHeader>
                 {edit ? (
-                    <div className="flex max-h-[60vh] min-w-0 flex-col gap-4 overflow-y-auto">
+                    <div className="flex max-h-[60vh] min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain">
                         <Input value={edit.name} maxLength={60} placeholder={say(t, "field.name")} aria-label={say(t, "field.name")} onChange={(event) => setEdit({ ...edit, name: event.target.value })} />
                         <StepsEditor bridge={bridge} steps={edit.steps} onChange={(steps) => setEdit({ ...edit, steps })} launcher={launcher} hotkeys={hotkeys} />
-                        <label className="flex items-center gap-2 text-sm">
+                        <Button variant="secondary" className="self-start" onClick={() => setEdit({ ...edit, steps: [...edit.steps, blankStep("delay")] })}>
+                            <Plus className="size-4 shrink-0" />
+                            {say(t, "addStep")}
+                        </Button>
+                        <label className={cn("flex items-center gap-2", settingType.body)}>
                             <Switch checked={edit.off !== null} onChange={(checked) => setEdit({ ...edit, off: checked ? [blankStep("hotkey")] : null })} aria-label={say(t, "twoStates")} />
                             {say(t, "twoStates")}
                         </label>
                         {edit.off ? (
                             <div className="flex flex-col gap-2">
-                                <p className="text-sm text-muted-foreground">{say(t, "secondState")}</p>
+                                <p className={settingType.hint}>{say(t, "secondState")}</p>
                                 <StepsEditor bridge={bridge} steps={edit.off} onChange={(off) => setEdit({ ...edit, off })} launcher={launcher} hotkeys={hotkeys} />
+                                <Button variant="secondary" className="self-start" onClick={() => setEdit({ ...edit, off: [...(edit.off ?? []), blankStep("delay")] })}>
+                                    <Plus className="size-4 shrink-0" />
+                                    {say(t, "addStep")}
+                                </Button>
                             </div>
                         ) : null}
-                        {problem !== null ? <p className="text-sm text-destructive">{say(t, "incomplete")}</p> : null}
+                        {problem !== null ? <p className={settingType.error}>{say(t, "incomplete")}</p> : null}
                     </div>
                 ) : null}
                 <DialogFooter>
@@ -293,19 +318,19 @@ export function PluginActions({ bridge }: { bridge: PluginsBridge }) {
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                     <h3 id="plugin-actions-title" className="font-medium">{say(t, "title")}</h3>
-                    <p className="text-sm text-muted-foreground">{say(t, "hint")}</p>
+                    <p className={settingType.hint}>{say(t, "hint")}</p>
                 </div>
                 <Button variant="secondary" onClick={() => open(null)}><Plus className="size-4 shrink-0" />{say(t, "new")}</Button>
             </div>
             {current === null ? null : current.actions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{say(t, "empty")}</p>
+                <p className={cn(settingType.body, "text-muted-foreground")}>{say(t, "empty")}</p>
             ) : (
                 <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                     {current.actions.map((action) => (
                         <li key={action.id} className="flex min-w-0 items-center gap-2 px-3 py-2">
                             <div className="min-w-0 flex-1">
-                                <p className="truncate font-medium" title={action.name}>{action.name}</p>
-                                <p className="truncate text-sm text-muted-foreground">
+                                <p className={cn("truncate font-medium", settingType.body)} title={action.name}>{action.name}</p>
+                                <p className={cn("truncate text-muted-foreground", settingType.small)}>
                                     {say(t, "summary", { count: action.steps.length })}
                                     {action.off ? ` - ${say(t, action.on ? "stateSecond" : "stateFirst")}` : ""}
                                     {action.confirmed ? "" : ` - ${say(t, "unconfirmed")}`}

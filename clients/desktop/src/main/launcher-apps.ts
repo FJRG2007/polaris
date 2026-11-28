@@ -369,15 +369,27 @@ export function isListedApp(path: string): boolean {
     return cached?.apps.some((app) => app.path === path) ?? false;
 }
 
-/** Start a program detached from Polaris, so closing one never closes the other. */
+/**
+ * Start a program the person is meant to see, detached from Polaris so closing
+ * one never closes the other. The file and each argument go as they are: no
+ * shell reads them. Settles true once it started, false if it could not.
+ */
+export function startProgram(file: string, args: readonly string[], cwd?: string): Promise<boolean> {
+    return new Promise((resolve) => {
+        try {
+            const child = spawn(file, [...args], { cwd, detached: true, stdio: "ignore", windowsHide: false, shell: false });
+            child.once("error", () => resolve(false));
+            child.once("spawn", () => resolve(true));
+            child.unref();
+        } catch {
+            // Gone since it was listed, or not a program at all: nothing to start.
+            resolve(false);
+        }
+    });
+}
+
 function start(file: string, args: readonly string[], cwd?: string): void {
-    try {
-        const child = spawn(file, args, { cwd, detached: true, stdio: "ignore", windowsHide: false, shell: false });
-        child.on("error", () => undefined);
-        child.unref();
-    } catch {
-        // Gone since it was listed: nothing to start.
-    }
+    void startProgram(file, args, cwd);
 }
 
 /** Open the listed app with this `path`, the way it was listed. Anything not listed is ignored. */
