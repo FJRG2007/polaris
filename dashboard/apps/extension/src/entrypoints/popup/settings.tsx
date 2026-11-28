@@ -14,7 +14,7 @@ import * as polar from "@/lib/polar-panel";
 import * as filling from "@/lib/page-filling";
 import * as launcherStore from "@/lib/launcher-settings";
 import * as launcherRules from "@polaris/core/launcher";
-import { bindingOfEvent } from "@polaris/core";
+import { bindingOfEvent } from "@polaris/core/key-binding";
 import { askBackground } from "@/lib/messages";
 import { useEffect, useState } from "react";
 import type { WordKey, Words } from "@/lib/words";

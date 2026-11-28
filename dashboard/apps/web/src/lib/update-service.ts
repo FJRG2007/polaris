@@ -109,6 +109,18 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 export const WEB_IMAGE_PATHS =
     /^dashboard\/apps\/(?!(?:extension|site|companion|streamdeck)\/)|^dashboard\/(packages|cli|patches|scripts)\/|^dashboard\/resources\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^crates\/polaris-core|^\.github\/workflows\/dashboard-publish\.yml$/;
 
+/** Tests and their runner's config: in the image's build context, in nothing it
+ *  runs. A change to nothing else publishes no image worth offering, so it never
+ *  counts as a build on its way (mirrors `NOT_SHIPPED` in dashboard-publish.yml).
+ *  Only a package's or crate's own test folder: a route can be called `test`. */
+export const NOT_SHIPPED =
+    /^dashboard\/(apps|packages)\/[^/]+\/(test|tests)\/|^dashboard\/scripts\/test\/|^crates\/[^/]+\/(tests|benches)\/|\.test\.[cm]?[jt]sx?$|(^|\/)vitest\.config\.[cm]?[jt]s$/;
+
+/** Whether a changed path rebuilds the web image. */
+export function rebuildsWebImage(file: string): boolean {
+    return WEB_IMAGE_PATHS.test(file) && !NOT_SHIPPED.test(file);
+}
+
 /** Check runs that decide whether the dashboard image is safe to install (mirrors
  *  dashboard-publish.yml: `changes` picks the images, `web` builds this one, and
  *  `tag` is what gives it the `latest` name, which it does only once the called
@@ -342,7 +354,7 @@ async function query(): Promise<UpdateStatus> {
     if (running === target) {
         // Already in flight: `running` and `target` are the same commit here.
         const pending = await pendingFromRunning;
-        const rebuilds = pending?.files.some((file) => WEB_IMAGE_PATHS.test(file)) ?? false;
+        const rebuilds = pending?.files.some(rebuildsWebImage) ?? false;
         const building = (pending?.aheadBy ?? 0) > 0 && rebuilds;
         // A commit that failed its suites is not a build on its way: publishing
         // waits on them, so no image is coming and "still building" would be a

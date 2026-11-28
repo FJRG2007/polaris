@@ -27,7 +27,7 @@ import {
     KDF_ARGON2ID,
     parseEncString,
     type KdfSettings
-} from "@polaris/core";
+} from "@polaris/core/vault";
 
 /** The two halves of a vault key: one to encrypt with, one to authenticate with. */
 export interface SymmetricKey {
