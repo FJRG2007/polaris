@@ -262,5 +262,8 @@
         "remove": "Remove",
         "hint": "Or drop or paste one here",
         "failed": "The picture could not be stored."
+    },
+    "devices": {
+        "badCode": "That code is wrong or has expired. Ask the device for a new one."
     }
 }

@@ -262,5 +262,8 @@
         "remove": "Quitar",
         "hint": "O suéltala o pégala aquí",
         "failed": "No se pudo guardar la foto."
+    },
+    "devices": {
+        "badCode": "Ese código no vale o ha caducado. Pide uno nuevo en el aparato."
     }
 }

@@ -20091,6 +20091,7 @@ model HospitalityVenue {
 
     rooms     HospitalityRoom[]
     staff     HospitalityStaff[]
+    devices   HospitalityDevice[]
     overrides HospitalityPriceOverride[]
 }
 
@@ -20110,6 +20111,45 @@ model HospitalityPriceOverride {
 }
 
 // Somebody who works at a venue. Not a Polaris account: a waiter needs no email.
+// A till, tablet or handheld linked to one venue by QR + code. It carries no
+// Polaris account: its token (only the hash is kept) lets it take orders at
+// that venue and nothing else, until the venue's admin revokes it.
+model HospitalityDevice {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    venueId     String    @db.Uuid
+    name        String
+    // sha256 of the device's token; the token itself is never stored.
+    tokenHash   String    @unique
+    lastSeenAt  DateTime?
+    revokedAt   DateTime?
+    createdById String?   @db.Uuid
+    createdAt   DateTime  @default(now())
+
+    venue HospitalityVenue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+    @@index([venueId, revokedAt])
+}
+
+// A link being made: the device shows `userCode` (and its QR), the admin
+// approves it for a venue, and the device's next poll with its secret
+// `deviceCode` collects the token once. Expires after a few minutes.
+model HospitalityDeviceLink {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    userCode       String    @unique
+    // sha256 of the secret only the device holds.
+    deviceCodeHash String    @unique
+    venueId        String?   @db.Uuid
+    name           String    @default("")
+    approvedById   String?   @db.Uuid
+    approvedAt     DateTime?
+    deviceId       String?   @db.Uuid
+    lastPolledAt   DateTime?
+    expiresAt      DateTime
+    createdAt      DateTime  @default(now())
+
+    @@index([expiresAt])
+}
+
 model HospitalityStaff {
     id        String   @id @default(uuid(7)) @db.Uuid
     venueId   String   @db.Uuid

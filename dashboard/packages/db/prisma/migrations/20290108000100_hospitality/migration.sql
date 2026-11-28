@@ -280,3 +280,40 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
+-- Devices linked to a venue by QR + code, and links being made.
+CREATE TABLE IF NOT EXISTS "HospitalityDevice" (
+    "id" UUID NOT NULL,
+    "venueId" UUID NOT NULL,
+    "name" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "lastSeenAt" TIMESTAMP(3),
+    "revokedAt" TIMESTAMP(3),
+    "createdById" UUID,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "HospitalityDevice_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "HospitalityDevice_tokenHash_key" ON "HospitalityDevice"("tokenHash");
+CREATE INDEX IF NOT EXISTS "HospitalityDevice_venueId_revokedAt_idx" ON "HospitalityDevice"("venueId", "revokedAt");
+DO $$ BEGIN
+    ALTER TABLE "HospitalityDevice" ADD CONSTRAINT "HospitalityDevice_venueId_fkey" FOREIGN KEY ("venueId") REFERENCES "HospitalityVenue"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS "HospitalityDeviceLink" (
+    "id" UUID NOT NULL,
+    "userCode" TEXT NOT NULL,
+    "deviceCodeHash" TEXT NOT NULL,
+    "venueId" UUID,
+    "name" TEXT NOT NULL DEFAULT '',
+    "approvedById" UUID,
+    "approvedAt" TIMESTAMP(3),
+    "deviceId" UUID,
+    "lastPolledAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "HospitalityDeviceLink_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "HospitalityDeviceLink_userCode_key" ON "HospitalityDeviceLink"("userCode");
+CREATE UNIQUE INDEX IF NOT EXISTS "HospitalityDeviceLink_deviceCodeHash_key" ON "HospitalityDeviceLink"("deviceCodeHash");
+CREATE INDEX IF NOT EXISTS "HospitalityDeviceLink_expiresAt_idx" ON "HospitalityDeviceLink"("expiresAt");
