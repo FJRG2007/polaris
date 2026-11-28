@@ -18,7 +18,7 @@
  * asserted without a browser.
  */
 
-import { HOST_LIST_MAX } from "@polaris/core";
+import { HOST_LIST_MAX } from "@polaris/core/host-list";
 import { accountHost } from "@/lib/accounts";
 
 /** One server as it is stored: an address, and what somebody called it. */

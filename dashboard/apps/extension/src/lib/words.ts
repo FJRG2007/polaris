@@ -15,15 +15,13 @@
 
 import {
     createTranslator,
-    DEFAULT_LOCALE,
-    isLocale,
     mergeCatalog,
-    negotiateLocale,
-    type Locale,
     type MessageKey,
     type PartialCatalogShape,
     type Translator
-} from "@polaris/core";
+} from "@polaris/core/i18n/messages";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@polaris/core/i18n/locales";
+import { negotiateLocale } from "@polaris/core/i18n/detect";
 import english from "@/messages/en-US.json";
 import spanish from "@/messages/es-ES.json";
 

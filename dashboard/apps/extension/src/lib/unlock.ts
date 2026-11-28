@@ -18,7 +18,7 @@
  */
 
 import type { WrappedKeys } from "@/lib/accounts";
-import { KDF_ARGON2ID, type KdfSettings } from "@polaris/core";
+import { KDF_ARGON2ID, type KdfSettings } from "@polaris/core/vault";
 import {
     decryptBytes,
     deriveMasterKey,

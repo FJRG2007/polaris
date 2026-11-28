@@ -25,7 +25,7 @@
  * behind it.
  */
 
-import { KDF_PBKDF2, type KdfSettings } from "@polaris/core";
+import { KDF_PBKDF2, type KdfSettings } from "@polaris/core/vault";
 
 /** How long a call may hang before it is somebody's problem rather than a wait. */
 const TIMEOUT_MS = 20_000;

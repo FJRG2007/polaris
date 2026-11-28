@@ -16,7 +16,8 @@ import { useRef, useState } from "react";
 import type { Words } from "@/lib/words";
 import type { ServerRef } from "@/lib/servers";
 import { askBackground, type HostImport } from "@/lib/messages";
-import { encodeHostList, encodeQr, hostListFile, hostListLink, qrSvgPath, readHostList } from "@polaris/core";
+import { encodeHostList, hostListFile, hostListLink, readHostList } from "@polaris/core/host-list";
+import { encodeQr, qrSvgPath } from "@polaris/core/qr";
 
 /** The most text an import reads, pasted or from a file. A full list is far under it. */
 export const IMPORT_MAX = 64 * 1024;
