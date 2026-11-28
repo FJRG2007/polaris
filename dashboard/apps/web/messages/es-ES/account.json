@@ -2839,6 +2839,27 @@
                 "hint": "Los botones que la ejecutan no harán nada.",
                 "confirm": "Borrar"
             }
+        },
+        "replica": {
+            "library": "Acciones",
+            "libraryHint": "Arrástrala a una rueda o un botón, o elige un control y pulsa una.",
+            "find": "Buscar una acción",
+            "volume": "Volumen",
+            "call": "En llamada",
+            "more": "Más acciones",
+            "noMatch": "Ninguna acción coincide.",
+            "press": "Pulsar",
+            "swap": "Cambiar con",
+            "holds": "{name}: {value}"
+        },
+        "look": {
+            "choose": "Elegir imagen",
+            "replace": "Cambiar",
+            "remove": "Quitar imagen",
+            "defaultColor": "Por defecto",
+            "useDefault": "Usar el color por defecto",
+            "unreadable": "No se pudo leer esa imagen",
+            "preview": "Vista previa de la pantalla"
         }
     }
 }

@@ -74,6 +74,19 @@ export const pluginClaimSchema = z.object({
 
 export type PluginClaim = z.infer<typeof pluginClaimSchema>;
 
+/** A colour setting's value: `#rrggbb`. */
+export const PLUGIN_COLOR = /^#[0-9a-fA-F]{6}$/;
+/** The longest picture a setting holds, as `data:` URL text: a screen-sized photo is far under it. */
+export const PLUGIN_IMAGE_MAX_TEXT = 2 * 1024 * 1024;
+/** The largest side a picture setting may ask for. */
+export const PLUGIN_IMAGE_MAX_SIDE = 4096;
+const PLUGIN_IMAGE_URL = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/;
+
+/** Whether a value is a picture a setting may hold: a PNG or JPEG `data:` URL no longer than the ceiling. */
+export function isPluginImageValue(value: unknown): value is string {
+    return typeof value === "string" && value.length <= PLUGIN_IMAGE_MAX_TEXT && PLUGIN_IMAGE_URL.test(value);
+}
+
 /** Text a plugin shows, in English and any other language it ships ("es-ES": "..."). */
 const pluginTextSchema = z.object({ "en-US": z.string().trim().min(1).max(120) }).catchall(z.string().trim().min(1).max(120));
 const settingKeySchema = z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/);
@@ -112,8 +125,48 @@ export const pluginSettingSchema = z.discriminatedUnion("kind", [
         default: z.number()
     }),
     /** A Polaris action picked from the client's own list (mute, deafen, ...), or none. */
-    z.object({ kind: z.literal("action"), key: settingKeySchema, label: pluginTextSchema, hint: pluginTextSchema.optional(), group: settingKeySchema.optional(), default: z.string().max(64).nullable() })
+    z.object({ kind: z.literal("action"), key: settingKeySchema, label: pluginTextSchema, hint: pluginTextSchema.optional(), group: settingKeySchema.optional(), default: z.string().max(64).nullable() }),
+    /**
+     * A colour, `#rrggbb`, or "" for the plugin's own; `fallback` is that own
+     * colour, so the page can show it while nothing is picked.
+     */
+    z.object({
+        kind: z.literal("color"),
+        key: settingKeySchema,
+        label: pluginTextSchema,
+        hint: pluginTextSchema.optional(),
+        group: settingKeySchema.optional(),
+        fallback: z.string().regex(PLUGIN_COLOR).optional(),
+        default: z.union([z.literal(""), z.string().regex(PLUGIN_COLOR)])
+    }),
+    /**
+     * A picture, as a PNG or JPEG `data:` URL, or "" for none. The page scales
+     * what is picked to fit `width` x `height` (the size the device draws it at)
+     * before it is stored, so a photo never travels at camera size.
+     */
+    z.object({
+        kind: z.literal("image"),
+        key: settingKeySchema,
+        label: pluginTextSchema,
+        hint: pluginTextSchema.optional(),
+        group: settingKeySchema.optional(),
+        width: z.number().int().min(1).max(PLUGIN_IMAGE_MAX_SIDE),
+        height: z.number().int().min(1).max(PLUGIN_IMAGE_MAX_SIDE),
+        default: z.literal("")
+    })
 ]);
+
+/**
+ * The kinds an app before desktop 0.1.138 reads. A catalog entry lists only
+ * these (`clients/device-plugins/scripts/publish.mjs`): one unknown kind made
+ * those apps refuse the whole signed catalog. A manifest read here drops a
+ * setting of a kind this build does not know instead, so the next new kind
+ * costs nothing.
+ */
+export const PLUGIN_SETTING_KINDS_BEFORE_LOOK = ["toggle", "choice", "range", "action"] as const;
+const PLUGIN_SETTING_KINDS: readonly string[] = [...PLUGIN_SETTING_KINDS_BEFORE_LOOK, "color", "image"];
+const knownSettingKinds = (value: unknown): unknown =>
+    Array.isArray(value) ? value.filter((item) => !(item && typeof item === "object" && "kind" in item && typeof item.kind === "string" && !PLUGIN_SETTING_KINDS.includes(item.kind))) : value;
 
 export type PluginSetting = z.infer<typeof pluginSettingSchema>;
 
@@ -179,11 +232,15 @@ export const pluginManifestSchema = z.object({
         .default([])
         .refine((list) => new Set(list).size === list.length, "repeated permission"),
     settings: z
-        .array(pluginSettingSchema)
-        .max(64)
-        .default([])
-        .refine((list) => new Set(list.map((item) => item.key)).size === list.length, "repeated setting")
-        .refine((list) => list.every(settingDefaultFits), "default outside its setting"),
+        .preprocess(
+            knownSettingKinds,
+            z
+                .array(pluginSettingSchema)
+                .max(64)
+                .refine((list) => new Set(list.map((item) => item.key)).size === list.length, "repeated setting")
+                .refine((list) => list.every(settingDefaultFits), "default outside its setting")
+        )
+        .default([]),
     /** Sections the settings are drawn in, in this order after the settings that name none (or a group not listed here). */
     groups: z
         .array(pluginSettingGroupSchema)
@@ -425,6 +482,10 @@ function settingValue(setting: PluginSetting, value: unknown): PluginSettingValu
             return typeof value === "number" && Number.isFinite(value) && value >= setting.min && value <= setting.max ? value : undefined;
         case "action":
             return value === null || (typeof value === "string" && value.length > 0 && value.length <= 64) ? value : undefined;
+        case "color":
+            return value === "" || (typeof value === "string" && PLUGIN_COLOR.test(value)) ? value : undefined;
+        case "image":
+            return value === "" || isPluginImageValue(value) ? value : undefined;
     }
 }
 
