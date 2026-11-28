@@ -28,9 +28,7 @@ const CHANGE = /^on(Change|ValueChange|CheckedChange|Input|Select)$/;
 const PENDING = new Set([
     "apps/web/src/app/(app)/apps/deploy/import-site.tsx#ImportSiteButton",
     "apps/game-servers/src/screens/installed/game-console.tsx#GameConsole",
-    "apps/places/src/screens/cameras/camera-sets-dialog.tsx#CameraSetsDialog",
     "apps/places/src/screens/devices/rooms-dialog.tsx#RoomsDialog",
-    "apps/web/src/app/(app)/apps/backups/keys-panel.tsx#KeysPanel",
     "apps/web/src/app/(app)/apps/deploy/database-panel.tsx#DatabaseManageDialog",
     "apps/web/src/app/(app)/apps/deploy/settings/automations-section.tsx#AutomationsSection",
     "apps/web/src/app/(app)/automations/[id]/alert-fields.tsx#AlertInFields",
@@ -38,7 +36,6 @@ const PENDING = new Set([
     "apps/web/src/app/(app)/chat/location-card.tsx#LocationCard",
     "apps/web/src/app/(app)/drive/drive-explorer.tsx#DriveExplorer",
     "apps/web/src/app/(app)/drive/files-view.tsx#FilesView",
-    "apps/web/src/app/(app)/places/ups/ups-connection-dialog.tsx#UpsConnectionDialog",
     "apps/web/src/app/(app)/tasks/task-panel.tsx#TaskPanel",
     "apps/web/src/app/(app)/vault/sends/sends-view.tsx#SendsView",
     "apps/web/src/app/(app)/vault/vaults/vaults-view.tsx#VaultPanel",

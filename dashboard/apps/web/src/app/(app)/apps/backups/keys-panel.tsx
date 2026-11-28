@@ -28,7 +28,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Skeleton
+    Skeleton,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as polls from "./backups-polls";
 
@@ -46,6 +47,9 @@ export function KeysPanel() {
     const [pasted, setPasted] = useState("");
     const [adding, setAdding] = useState(false);
     const [addOpen, setAddOpen] = useState(false);
+    useResetOnOpen(addOpen, () => {
+        setPasted("");
+    });
     const [note, setNote] = useState<string | null>(null);
 
     const load = useCallback(async () => {

@@ -19,7 +19,8 @@ import {
     DialogTitle,
     Input,
     SegmentedControl,
-    Select
+    Select,
+    useResetOnOpen
 } from "@polaris/ui";
 import { serverOfMachine } from "./ups-words";
 import { hostSubject } from "@/lib/metrics-shared";
@@ -142,6 +143,10 @@ export function UpsConnectionDialog({
     const [values, setValues] = useState<FormValues>(() => initialValues(editing, offers));
     const [pending, setPending] = useState(false);
     const [failure, setFailure] = useState<ErrorKey | null>(null);
+    useResetOnOpen(open, () => {
+        setValues(() => initialValues(editing, offers));
+        setFailure(null);
+    });
 
     const set = <K extends keyof FormValues>(key: K, value: FormValues[K]) => {
         setFailure(null);

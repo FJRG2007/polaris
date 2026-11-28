@@ -28,7 +28,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    isDirty
+    isDirty,
+    useResetOnOpen
 } from "@polaris/ui";
 import { usePlacesT } from "../use-places-t";
 import { hostUi } from "@polaris/app-host/client";
@@ -63,6 +64,12 @@ export function CameraSetsDialog({
     const [removing, setRemoving] = useState<CameraSetView | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setDraft(null);
+        setOpened(null);
+        setRemoving(null);
+        setError(null);
+    });
 
     const edit = (next: Draft) => {
         setDraft(next);
