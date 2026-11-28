@@ -466,7 +466,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create a client, and register the redirect URI on it",
                 url: "https://dev.epicgames.com/portal",
-                help: "Product settings -> Clients -> New client. Policy type Custom with 'User required' ticked, which is what a client that signs a person in needs; leave every feature disabled, since Polaris only reads who authorized. Paste this into its redirect URLs.",
+                help: "Product settings -> Clients -> New client. Policy type Custom with 'User required' checked, which is what a client that signs a person in needs; leave every feature disabled, since Polaris only reads who authorized. Paste this into its redirect URLs.",
                 values: ["redirectUri"]
             },
             {
@@ -577,7 +577,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create an app",
                 url: "https://developer.spotify.com/dashboard/create",
-                help: "Copy each value below into the field of the same name - the home page URL goes in Website - and tick Web API where it asks which APIs the app uses.",
+                help: "Copy each value below into the field of the same name - the home page URL goes in Website - and check Web API where it asks which APIs the app uses.",
                 values: ["appName", "appDescription", "homeUrl", "redirectUri"]
             },
             {
@@ -654,7 +654,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create the key",
                 url: "https://developer.apple.com/account/resources/authkeys/list",
-                help: "Certificates, Identifiers & Profiles > Keys > +, with Apple Push Notifications service (APNs) ticked. Note its Key ID and download the .p8 file."
+                help: "Certificates, Identifiers & Profiles > Keys > +, with Apple Push Notifications service (APNs) checked. Note its Key ID and download the .p8 file."
             },
             {
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts

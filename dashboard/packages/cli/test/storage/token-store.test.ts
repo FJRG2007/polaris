@@ -86,7 +86,7 @@ it("refuses something that is not a Polaris token before storing it anywhere", a
     const { dir, host } = await setup();
     const keychain = fakeKeychain();
     const store = secrets(host, dir, keychain.run);
-    await expect(store.save("work", "plk_x y; rm -rf /")).rejects.toThrow(/does not recognise/);
+    await expect(store.save("work", "plk_x y; rm -rf /")).rejects.toThrow(/does not recognize/);
     expect(keychain.calls).toEqual([]);
 });
 

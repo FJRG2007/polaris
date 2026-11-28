@@ -1973,7 +1973,7 @@ export function toPillarsPace(preset: EventPreset): EventPreset {
 }
 
 /** The name the first events gave a horde defense. */
-const BRITISH_HORDE_NAME = "Horde defense";
+const BRITISH_HORDE_NAME = "Horde defence";
 
 const same = (left: unknown, right: unknown): boolean =>
     JSON.stringify(left) === JSON.stringify(right);

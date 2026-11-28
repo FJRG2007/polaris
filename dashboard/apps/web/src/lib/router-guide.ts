@@ -492,7 +492,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         reserve: {
             kind: "device",
             path: "Home Network > Network > Network Connections",
-            action: 'open this server with the pencil button and tick "Always assign this network device the same IPv4 address"'
+            action: 'open this server with the pencil button and check "Always assign this network device the same IPv4 address"'
         },
         forwardPath: "Internet > Permit Access > Port Sharing > Add Device for Sharing",
         forwardFields: null,

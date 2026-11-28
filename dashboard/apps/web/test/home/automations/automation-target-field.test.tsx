@@ -54,7 +54,7 @@ describe("which devices a block is about", () => {
         });
         expect(screen.getByText("1 light, 1 excluded")).toBeTruthy();
         expect(screen.getByText("Light")).toBeTruthy();
-        expect(screen.getByText("All labelled Ceiling")).toBeTruthy();
+        expect(screen.getByText("All labeled Ceiling")).toBeTruthy();
     });
 
     it("counts every kind in the whole place", () => {

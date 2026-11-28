@@ -280,7 +280,7 @@ describe("Try, Wait for a condition, and the finished event", () => {
         expect(ticked.checked).toBe(true);
         expect(
             screen.getByText(
-                "None ticked takes any ending. Read it as {{steps.we.payload.outcome}}."
+                "None checked takes any ending. Read it as {{steps.we.payload.outcome}}."
             )
         ).toBeTruthy();
     });
