@@ -33,6 +33,7 @@ import { readerWords } from "@/lib/i18n/reader-words";
 import { viewedUserId } from "@/lib/view-as-service";
 import { membershipOf } from "@/lib/announcements/audience";
 import { noticeReaches, subscribeNotices, type NoticeLookups } from "@/lib/shell-notices-live";
+import { untilShutdown } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -136,7 +137,7 @@ export async function GET(request: Request): Promise<Response> {
                     .catch(() => undefined);
             });
 
-            request.signal.addEventListener("abort", () => {
+            untilShutdown(request.signal).addEventListener("abort", () => {
                 stop();
                 try {
                     controller.close();

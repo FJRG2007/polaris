@@ -10,6 +10,7 @@ import { withKeyUsage } from "@/lib/api-usage/recorder";
 import { deckCaller, deckWords } from "@/lib/deck/auth";
 import { readWatch } from "@/lib/deck/deck-service";
 import { deckStateStream } from "@/lib/deck/state-stream";
+import { untilShutdown } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
     const watched = readWatch(new URL(request.url).searchParams.get("watch"));
     if (!watched) return Response.json({ error: words("deck.errors.badRequest") }, { status: 400 });
 
-    return new Response(deckStateStream(caller, watched, words, request.signal), {
+    return new Response(deckStateStream(caller, watched, words, untilShutdown(request.signal)), {
         headers: {
             "content-type": "text/event-stream; charset=utf-8",
             "cache-control": "no-store, no-transform",
