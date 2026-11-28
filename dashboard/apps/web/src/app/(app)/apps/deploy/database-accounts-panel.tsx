@@ -27,7 +27,8 @@ import {
     DialogTitle,
     Input,
     Select,
-    Skeleton
+    Skeleton,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 
@@ -90,6 +91,10 @@ export function UsersSection({
     const [name, setName] = useState("");
     const [createError, setCreateError] = useState<string | null>(null);
     const [adding, setAdding] = useState(false);
+    useResetOnOpen(adding, () => {
+        setName("");
+        setCreateError(null);
+    });
     const [created, setCreated] = useState<{ username: string; password: string } | null>(null);
     const [granting, setGranting] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();

@@ -32,7 +32,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /** One-line summary of what a saved list holds. */
@@ -243,6 +244,21 @@ function GroupDialog({
     );
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    useResetOnOpen(open, () => {
+        setName(group?.name ?? "");
+        setDescription(group?.description ?? "");
+        setValue(
+            group
+                ? {
+                      groupIds: [],
+                      allowedCidrs: group.allowedCidrs,
+                      allowedCountries: group.allowedCountries,
+                      allowedContinents: group.allowedContinents
+                  }
+                : EMPTY_ACCESS_RULES
+        );
+        setError(null);
+    });
 
     /** Editing an existing group only offers Save once something actually differs. */
     const unchanged =

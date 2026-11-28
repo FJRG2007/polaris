@@ -36,7 +36,8 @@ import {
     DialogTitle,
     Input,
     settingType,
-    Textarea
+    Textarea,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /**
@@ -211,6 +212,13 @@ export function OrganizationsView({
     const [slugTouched, setSlugTouched] = useState(false);
     const [description, setDescription] = useState("");
     const [error, setError] = useState("");
+    useResetOnOpen(creating, () => {
+        setName("");
+        setSlug("");
+        setSlugTouched(false);
+        setDescription("");
+        setError("");
+    });
     const [saving, setSaving] = useState(false);
 
     const parsed = core.organizationSchema.safeParse({ name, slug, description });

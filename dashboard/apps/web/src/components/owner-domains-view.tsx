@@ -122,6 +122,9 @@ export function OwnerDomainsView({
     useResetOnOpen(adding, () => {
         setValue("");
     });
+    useResetOnOpen(adding, () => {
+        setValue("");
+    });
 
     // Empty until something has been typed: a field nobody has filled in yet is
     // incomplete, not wrong.

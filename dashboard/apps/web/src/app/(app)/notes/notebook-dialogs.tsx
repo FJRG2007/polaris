@@ -30,7 +30,8 @@ import {
     DialogTitle,
     Input,
     Select,
-    Checkbox
+    Checkbox,
+    useResetOnOpen
 } from "@polaris/ui";
 import * as polls from "./notes-polls";
 
@@ -451,6 +452,10 @@ export function ImportNotesDialog({
     const [keepFolders, setKeepFolders] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    useResetOnOpen(target !== null, () => {
+        setKeepFolders(true);
+        setError("");
+    });
     const [done, setDone] = useState<{
         notes: number;
         folders: number;

@@ -17,7 +17,7 @@
  * keeps its button.
  */
 
-import { cn } from "@polaris/ui";
+import { cn, useResetOnOpen } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
@@ -64,6 +64,12 @@ export function NewDirectDialog({
     const [preview, setPreview] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    useResetOnOpen(open, () => {
+        setPicked([]);
+        setName("");
+        setTouched(false);
+        setError("");
+    });
     const [chooseFiles, chooser] = useChooseFiles();
     /** Chosen, and waiting to be framed. Nothing is held until it has been. */
     const [chosen, setChosen] = useState<File | null>(null);

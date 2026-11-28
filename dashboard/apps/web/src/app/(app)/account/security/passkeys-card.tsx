@@ -50,7 +50,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    settingType
+    settingType,
+    useResetOnOpen
 } from "@polaris/ui";
 
 /** The address this browser is on: the name a new passkey would be bound to, and
@@ -81,6 +82,9 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
     const [here, setHere] = useState<Here | null>(null);
     const [name, setName] = useState("");
     const [asking, setAsking] = useState(false);
+    useResetOnOpen(asking, () => {
+        setName("");
+    });
     const [busy, setBusy] = useState(false);
     const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState<string | null>(null);

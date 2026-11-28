@@ -26,7 +26,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    useResetOnOpen
 } from "@polaris/ui";
 import {
     createHostGroupAction,
@@ -54,6 +55,9 @@ export function ServerGroups({
     const [groups, setGroups] = useState<Group[] | null>(null);
     const [creating, setCreating] = useState(false);
     const [draftName, setDraftName] = useState("");
+    useResetOnOpen(creating, () => {
+        setDraftName("");
+    });
     const [renaming, setRenaming] = useState<string | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<Group | null>(null);
     const [error, setError] = useState<string | null>(null);

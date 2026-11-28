@@ -32,7 +32,8 @@ import {
     Input,
     Select,
     settingType,
-    useToast
+    useToast,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useLiveRead } from "@/components/use-live-resource";
 import type { HistoryRow } from "@/lib/announcements/service";
@@ -178,6 +179,10 @@ export function AnnouncementsView({
     const [updating, setUpdating] = useState<HistoryRow | null>(null);
     const [updateText, setUpdateText] = useState("");
     const [updateError, setUpdateError] = useState<string | null>(null);
+    useResetOnOpen(updating !== null, () => {
+        setUpdateText("");
+        setUpdateError(null);
+    });
 
     const loadHistory = useCallback(() => historyAction(), []);
     const { data: latest, refresh: refreshLatest } = useLiveRead<HistoryRow[]>({

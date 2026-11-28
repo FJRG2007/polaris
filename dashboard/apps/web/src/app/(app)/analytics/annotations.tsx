@@ -7,7 +7,16 @@
 
 import { useState, useTransition } from "react";
 import { Plus, X } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    useResetOnOpen
+} from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { AnnotationView } from "@/lib/analytics-annotations";
 import { useDisplayFormat } from "@/components/display-format";
@@ -39,6 +48,10 @@ export function Annotations({
     const [adding, setAdding] = useState(false);
     const [when, setWhen] = useState(() => localInput(Date.now()));
     const [text, setText] = useState("");
+    useResetOnOpen(canEdit && adding, () => {
+        setWhen(() => localInput(Date.now()));
+        setText("");
+    });
     const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
     const [failure, setFailure] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();

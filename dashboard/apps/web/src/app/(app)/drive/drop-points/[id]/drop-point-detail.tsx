@@ -832,6 +832,20 @@ function EditDropPointDialog({
         allowedCountries: config.allowedCountries,
         allowedContinents: config.allowedContinents
     });
+    useResetOnOpen(open, () => {
+        setError(null);
+        setAdvanced({
+            ...EMPTY_LINK_ADVANCED,
+            days,
+            hoursFrom,
+            hoursTo,
+            timeZone,
+            expiresAt: initialExpiry,
+            allowedCidrs: config.allowedCidrs,
+            allowedCountries: config.allowedCountries,
+            allowedContinents: config.allowedContinents
+        });
+    });
     const { formProps, changed: fieldsChanged } = useFormChanged();
 
     // The Advanced section lives outside the form, so it is compared separately;

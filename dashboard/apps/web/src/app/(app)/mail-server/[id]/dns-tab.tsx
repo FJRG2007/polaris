@@ -377,11 +377,10 @@ function CatchAllDialog({
     const [address, setAddress] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    useResetOnOpen(domain !== null, () => {
-        setAddress("");
-        setError(null);
-    });
     const [seen, setSeen] = useState<string | null>(null);
+    // Closed, it forgets which domain it showed, so opening the same one again
+    // starts from that domain's saved address rather than the last edit.
+    if (!domain && seen !== null) setSeen(null);
     if (domain && seen !== domain.id) {
         setSeen(domain.id);
         setAddress(domain.catchAll ?? "");

@@ -31,7 +31,8 @@ import {
     SegmentedControl,
     Skeleton,
     Textarea,
-    useToast
+    useToast,
+    useResetOnOpen
 } from "@polaris/ui";
 import { useChat } from "./chat-context";
 import { useChatStream } from "./use-chat-stream";
@@ -753,6 +754,11 @@ function NewPostDialog({
     const [tagIds, setTagIds] = useState<readonly string[]>([]);
     const [files, setFiles] = useState<readonly File[]>([]);
     const [error, setError] = useState("");
+    useResetOnOpen(open, () => {
+        setTitle("");
+        setBody("");
+        setError("");
+    });
     const tFiles = useTranslations("components");
     const [picking, setPicking] = useState(false);
 
